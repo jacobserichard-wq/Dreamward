@@ -1,5 +1,111 @@
 ﻿"use client";
+
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useState } from "react";
-const D=[{id:1,name:"Invoice Data Entry",icon:"📋",active:true,runs:312,last:"14m ago",saved:"6.5 hrs/wk",color:"#00b4ff"},{id:2,name:"Weekly Report",icon:"📊",active:true,runs:48,last:"2h ago",saved:"3.2 hrs/wk",color:"#00ff88"},{id:3,name:"AR Follow-Ups",icon:"✉️",active:true,runs:103,last:"3m ago",saved:"5.1 hrs/wk",color:"#ff6b35"},{id:4,name:"Expenses",icon:"💳",active:false,runs:87,last:"1d ago",saved:"2.8 hrs/wk",color:"#c084fc"}];
-const R=[{id:1,name:"Invoice Data Entry",ok:true,time:"2:47 PM"},{id:2,name:"AR Follow-Ups",ok:true,time:"2:44 PM"},{id:3,name:"Invoice Data Entry",ok:false,time:"2:38 PM"},{id:4,name:"Weekly Report",ok:true,time:"8:00 AM"}];
-export default function Home(){const[s,setS]=useState(D[0]);return(<div style={{minHeight:"100vh",background:"#0e0e0e",color:"#e8e8e8",fontFamily:"sans-serif"}}><div style={{padding:"0 32px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #1a1a1a"}}><span style={{fontWeight:800,fontSize:18}}>⚡ FlowWork</span><span style={{fontSize:13,color:"#555"}}>Meridian Supply Co.</span></div><div style={{padding:32,maxWidth:1100,margin:"0 auto"}}><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:32}}>{[["17.6h","Hours Saved","#00ff88"],["550","Total Runs","#00b4ff"],["3","Active","#ff6b35"],["97%","Success","#c084fc"]].map(([v,l,c])=><div key={l} style={{background:"rgba(255,255,255,0.04)",border:"1px solid #1a1a1a",borderRadius:12,padding:"20px 24px"}}><div style={{fontSize:32,fontWeight:700,color:c}}>{v}</div><div style={{fontSize:12,color:"#555",marginTop:4}}>{l}</div></div>)}</div><div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24}}><div style={{background:"rgba(255,255,255,0.02)",border:"1px solid #1a1a1a",borderRadius:14}}><div style={{padding:"16px 20px",borderBottom:"1px solid #1a1a1a",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:700}}>Automations</span><button style={{background:"#00ff88",color:"#000",border:"none",borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New</button></div>{D.map(a=><div key={a.id} onClick={()=>setS(a)} style={{display:"flex",alignItems:"center",gap:16,padding:"16px 20px",cursor:"pointer",borderLeft:s.id===a.id?"3px solid "+a.color:"3px solid transparent",background:s.id===a.id?"rgba(255,255,255,0.04)":"transparent",borderBottom:"1px solid #111"}}><span style={{fontSize:20}}>{a.icon}</span><div style={{flex:1}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{width:7,height:7,borderRadius:"50%",background:a.active?"#00ff88":"#444",display:"inline-block"}}/><span style={{fontSize:14,fontWeight:600}}>{a.name}</span></div><div style={{fontSize:12,color:"#555",marginTop:3}}>{a.runs} runs</div></div><span style={{fontSize:13,fontWeight:700,color:a.color}}>{a.saved}</span></div>)}</div><div style={{background:"rgba(255,255,255,0.02)",border:"1px solid #1a1a1a",borderRadius:14}}><div style={{padding:"16px 20px",borderBottom:"1px solid #1a1a1a",fontWeight:700}}>Live Run Log</div>{R.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid #111"}}><span style={{fontSize:11,fontWeight:700,color:r.ok?"#00ff88":"#ff4d4d",minWidth:40}}>{r.ok?"OK":"ERR"}</span><span style={{fontSize:12,color:"#aaa",flex:1}}>{r.name}</span><span style={{fontSize:11,color:"#444"}}>{r.time}</span></div>)}</div></div></div></div>);}
+
+type Message = {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+};
+
+export default function Home() {
+  const { data: session, status } = useSession();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [activeLabel, setActiveLabel] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const labels = ["Invoices", "AR-Followup", "Expenses"];
+
+  const fetchEmails = async (label: string) => {
+    setLoading(true);
+    setActiveLabel(label);
+    try {
+      const res = await fetch(`/api/gmail?label=${"$"}{encodeURIComponent(label)}`);
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (err) {
+      console.error("Failed to fetch emails:", err);
+    }
+    setLoading(false);
+  };
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-2">FlowWork</h1>
+        <p className="text-gray-400 mb-8">Accounting Automation Agency</p>
+
+        {!session ? (
+          <button
+            onClick={() => signIn("google")}
+            className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-medium"
+          >
+            Connect Gmail
+          </button>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-gray-400">
+                Connected as {session.user?.email}
+              </p>
+              <button
+                onClick={() => signOut()}
+                className="text-sm text-gray-500 hover:text-white"
+              >
+                Disconnect
+              </button>
+            </div>
+
+            <div className="flex gap-3 mb-6">
+              {labels.map((label) => (
+                <button
+                  key={label}
+                  onClick={() => fetchEmails(label)}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${"$"}{
+                    activeLabel === label
+                      ? "bg-blue-600"
+                      : "bg-gray-800 hover:bg-gray-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {loading && <p className="text-gray-400">Fetching emails...</p>}
+
+            {messages.length > 0 && (
+              <div className="space-y-3">
+                {messages.map((msg) => (
+                  <div key={msg.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                    <div className="flex justify-between mb-1">
+                      <span className="font-medium text-sm">{msg.from}</span>
+                      <span className="text-xs text-gray-500">{msg.date}</span>
+                    </div>
+                    <p className="font-semibold mb-1">{msg.subject}</p>
+                    <p className="text-sm text-gray-400">{msg.snippet}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!loading && activeLabel && messages.length === 0 && (
+              <p className="text-gray-500">No emails found with label &quot;{activeLabel}&quot;</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
