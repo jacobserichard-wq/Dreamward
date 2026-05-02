@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { saveProcessedItem } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
@@ -58,6 +59,23 @@ export async function POST(request: NextRequest) {
         responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
       );
       const results = Array.isArray(parsed) ? parsed : parsed.results || [];
+
+      for (const result of results) {
+        try {
+          await saveProcessedItem({
+            vendor: result.vendor || "Unknown",
+            invoiceNumber: result.invoiceNumber || "N/A",
+            amount: result.amount || 0,
+            dueDate: result.dueDate || null,
+            status: result.status || "needs_review",
+            category: result.category || category || "invoice",
+            confidence: result.confidence || 0,
+            summary: result.summary || "",
+            rawEmailId: result.rawEmailId || "",
+            extractedData: result,
+          });
+        } catch (dbErr) { console.error("DB save error:", dbErr); }
+      }
 
       return NextResponse.json({
         success: true,
