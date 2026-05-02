@@ -206,7 +206,6 @@ export default function Home() {
         {error && <div style={styles.errorBanner}>{error}</div>}
         {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
 // 
-        {/* ── EMAILS TAB ── */}
         {activeTab === "emails" && (
           <>
             {/* Label selector + actions */}
