@@ -136,6 +136,11 @@ export default function Home() {
   const updateStatus = useCallback(
     (id: string, newStatus: ProcessedItem["status"]) => {
       setProcessedItems((prev) =>
+    fetch("/api/items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: Number(id), status: newStatus }),
+    }).catch((err) => console.error("Status update failed:", err));
         prev.map((item) =>
           item.id === id ? { ...item, status: newStatus } : item
         )
@@ -755,4 +760,7 @@ const styles: Record<string, React.CSSProperties> = {
   breakdownCount: { fontSize: 24, fontWeight: 800, color: "#0f172a" },
   breakdownLabel: { fontSize: 13, color: "#64748b" },
 };
+
+
+
 
