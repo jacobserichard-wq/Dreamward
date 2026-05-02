@@ -316,7 +316,7 @@ export default function Home() {
                       <div style={styles.cardRow}>
                         <span style={styles.cardLabel}>Due Date</span>
                         <span style={styles.cardValue}>
-                          {item.dueDate || "—"}
+                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "-"}
                         </span>
                       </div>
                       <div style={styles.cardRow}>
