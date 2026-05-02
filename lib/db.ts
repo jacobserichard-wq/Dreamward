@@ -6,13 +6,23 @@ const pool = new Pool({
 });
 
 export async function saveProcessedItem(item: any) {
+    const emailId = item.raw_email_id || item.rawEmailId || null;
+  if (emailId) {
+    const existing = await pool.query(
+      "SELECT id FROM processed_items WHERE raw_email_id = $1",
+      [emailId]
+    );
+    if (existing.rows.length > 0) {
+      return existing;
+    }
+  }
   const sql =
     "INSERT INTO processed_items " +
     "(vendor, invoice_number, amount, due_date, " +
     "status, category, confidence, summary, " +
     "raw_email_id, extracted_data) " +
     "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) " +
-    "RETURNING *";
+    emailId,
   const vals = [
     item.vendor || "Unknown",
     item.invoice_number || item.invoiceNumber || null,
