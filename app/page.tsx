@@ -40,7 +40,32 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);Load processed items from database on mount
+  useEffect(() => {
+    async function loadItems() {
+      try {
+        const res = await fetch("/api/items");
+        if (!res.ok) return;
+        const data = await res.json();
+        const mapped = (data.items || []).map((item: any) => ({
+          id: String(item.id),
+          vendor: item.vendor,
+          invoiceNumber: item.invoice_number || "",
+          amount: parseFloat(item.amount) || 0,
+          dueDate: item.due_date || "",
+          status: item.status || "pending",
+          category: item.category || "invoice",
+          confidence: item.confidence || 0,
+          rawEmailId: item.raw_email_id || "",
+          summary: item.summary || "",
+        }));
+        setProcessedItems(mapped);
+      } catch (err) {
+        console.error("Failed to load items:", err);
+      }
+    }
+    loadItems();
+  }, []);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
@@ -174,32 +199,7 @@ export default function Home() {
         {/* Status messages */}
         {error && <div style={styles.errorBanner}>{error}</div>}
         {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
-// Load processed items from database on mount
-  useEffect(() => {
-    async function loadItems() {
-      try {
-        const res = await fetch("/api/items");
-        if (!res.ok) return;
-        const data = await res.json();
-        const mapped = (data.items || []).map((item: any) => ({
-          id: String(item.id),
-          vendor: item.vendor,
-          invoiceNumber: item.invoice_number || "",
-          amount: parseFloat(item.amount) || 0,
-          dueDate: item.due_date || "",
-          status: item.status || "pending",
-          category: item.category || "invoice",
-          confidence: item.confidence || 0,
-          rawEmailId: item.raw_email_id || "",
-          summary: item.summary || "",
-        }));
-        setProcessedItems(mapped);
-      } catch (err) {
-        console.error("Failed to load items:", err);
-      }
-    }
-    loadItems();
-  }, []);
+// 
         {/* ── EMAILS TAB ── */}
         {activeTab === "emails" && (
           <>
