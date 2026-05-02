@@ -132,15 +132,14 @@ export default function Home() {
   }, [emails, selectedLabel]);
 
   // ─── Update item status ────────────────────────────────────────────────────
-
   const updateStatus = useCallback(
     (id: string, newStatus: ProcessedItem["status"]) => {
+      fetch("/api/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id), status: newStatus }),
+      }).catch((err) => console.error("Status update failed:", err));
       setProcessedItems((prev) =>
-    fetch("/api/items", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: Number(id), status: newStatus }),
-    }).catch((err) => console.error("Status update failed:", err));
         prev.map((item) =>
           item.id === id ? { ...item, status: newStatus } : item
         )
