@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-interface EmailMessage {
+interface EmailMessage {snippet: string;
   id: string;
   subject: string;
   from: string;
