@@ -11,33 +11,30 @@ export async function saveProcessedItem(item: any) {
     "(vendor, invoice_number, amount, due_date, " +
     "status, category, confidence, summary, " +
     "raw_email_id, extracted_data) " +
-    "VALUES (,,,,,,,,,) " +
+    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) " +
     "RETURNING *";
   const vals = [
     item.vendor || "Unknown",
-    item.invoice_number || null,
+    item.invoice_number || item.invoiceNumber || null,
     item.amount || 0,
-    item.due_date || null,
+    item.due_date || item.dueDate || null,
     item.status || "needs_review",
     item.category || "invoice",
     item.confidence || 0,
     item.summary || null,
-    item.raw_email_id || null,
-    item.extracted_data
-      ? JSON.stringify(item.extracted_data)
+    item.raw_email_id || item.rawEmailId || null,
+    (item.extracted_data || item.extractedData)
+      ? JSON.stringify(item.extracted_data || item.extractedData)
       : null,
   ];
   return pool.query(sql, vals);
 }
 
-export async function updateItemStatus(
-  id: string,
-  status: string
-) {
+export async function updateItemStatus(id: string, status: string) {
   return pool.query(
     "UPDATE processed_items " +
-    "SET status = , updated_at = NOW() " +
-    "WHERE id =  RETURNING *",
+    "SET status = $1, updated_at = NOW() " +
+    "WHERE id = $2 RETURNING *",
     [status, id]
   );
 }
