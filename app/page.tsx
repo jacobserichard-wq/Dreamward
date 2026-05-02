@@ -204,7 +204,6 @@ export default function Home() {
       <main style={styles.main}>
         {/* Status messages */}
         {error && <div style={styles.errorBanner}>{error}</div>}
-        {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
 // 
           <>
             {/* Label selector + actions */}
