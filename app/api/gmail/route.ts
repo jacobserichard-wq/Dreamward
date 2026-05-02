@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.accessToken) {
+ if (!(session as any)?.accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const label = searchParams.get("label") || "INBOX";
 
   const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: session.accessToken });
+  auth.setCredentials({ access_token: (session as any).accessToken });
 
   const gmail = google.gmail({ version: "v1", auth });
 
