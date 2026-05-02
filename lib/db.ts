@@ -22,7 +22,7 @@ export async function saveProcessedItem(item: any) {
     "status, category, confidence, summary, " +
     "raw_email_id, extracted_data) " +
     "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) " +
-    emailId,
+    "RETURNING *";
   const vals = [
     item.vendor || "Unknown",
     item.invoice_number || item.invoiceNumber || null,
@@ -32,7 +32,7 @@ export async function saveProcessedItem(item: any) {
     item.category || "invoice",
     item.confidence || 0,
     item.summary || null,
-    item.raw_email_id || item.rawEmailId || null,
+    item.emailId,
     (item.extracted_data || item.extractedData)
       ? JSON.stringify(item.extracted_data || item.extractedData)
       : null,
