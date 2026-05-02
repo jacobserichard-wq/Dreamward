@@ -62,4 +62,4 @@ export async function saveProcessedItem(item: {
        (vendor, invoice_number, amount, due_date, status, category, confidence, summary, raw_email_id, extracted_data)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
-    [item.vendor, item.invoice
+    [item.vendor, item.invoiceNumber, item.amount, item.dueDate || null, item.status, item.category, item.confidence, item.summary, item.rawEmailId, JSON.stringify(item.extractedData)]
