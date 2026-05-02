@@ -18,5 +18,5 @@ export async function saveProcessedItem(item: any) {
     item.raw_email_id || null,
     item.extracted_data ? JSON.stringify(item.extracted_data) : null
   ];
-  return query(sql, vals);
+  return pool.query(sql, vals);
 }
