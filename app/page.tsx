@@ -272,7 +272,6 @@ export default function Home() {
               </div>
             )}
           </>
-        )}
 
         {/* ── PROCESSED TAB ── */}
         {activeTab === "processed" && (
