@@ -40,7 +40,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);Load processed items from database on mount
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Load processed items from database on mount
   useEffect(() => {
     async function loadItems() {
       try {
@@ -753,3 +755,4 @@ const styles: Record<string, React.CSSProperties> = {
   breakdownCount: { fontSize: 24, fontWeight: 800, color: "#0f172a" },
   breakdownLabel: { fontSize: 13, color: "#64748b" },
 };
+
