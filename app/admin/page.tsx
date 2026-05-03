@@ -127,7 +127,7 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {clients.map((client) => (
-                  <tr key={client.id} style={s.tr}>
+                  <tr key={client.id} style={{...s.tr, cursor: "pointer"}} onClick={() => window.location.href = `/admin/client?id=${client.id}`}>
                     <td style={s.td}>
                       <span style={s.businessName}>{client.business_name || "\u2014"}</span>
                     </td>
