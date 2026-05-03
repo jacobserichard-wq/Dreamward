@@ -1,5 +1,5 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = "FlowWork <onboarding@resend.dev>";
+const FROM_EMAIL = "FlowWork <hello@flowworks.it.com>";
 
 interface EmailParams {
   to: string;
