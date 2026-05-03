@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveProcessedItem } from "@/lib/db";
+import pool from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSessionClient } from "@/lib/getClient";
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-interface EmailMessage {snippet: string;
+interface EmailMessage {
+  snippet: string;
   id: string;
   subject: string;
   from: string;
@@ -64,8 +67,7 @@ export async function POST(request: NextRequest) {
       );
       const results = Array.isArray(parsed) ? parsed : parsed.results || [];
 
-      for (const result of results) {
-        let savedCount = 0;
+      let savedCount = 0;
       for (const result of results) {
         try {
           await saveProcessedItem({
@@ -79,15 +81,16 @@ export async function POST(request: NextRequest) {
             summary: result.summary || "",
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
-            }, client.id);
+          }, client.id);
           savedCount++;
-        } catch (dbErr) { console.error("DB save error:", dbErr); }
+        } catch (dbErr) {
+          console.error("DB save error:", dbErr);
+        }
       }
 
       // Track usage
       if (savedCount > 0) {
         try {
-          const pool = (await import("@/lib/db")).default;
           await pool.query(
             `INSERT INTO usage_logs (client_id, month, items_processed, api_calls)
              VALUES ($1, date_trunc('month', CURRENT_DATE), $2, 1)
@@ -96,20 +99,9 @@ export async function POST(request: NextRequest) {
                            api_calls = usage_logs.api_calls + 1`,
             [client.id, savedCount]
           );
-        } catch (usageErr) { console.error("Usage tracking error:", usageErr); }
-      }
-            vendor: result.vendor || "Unknown",
-            invoiceNumber: result.invoiceNumber || "N/A",
-            amount: result.amount || 0,
-            dueDate: result.dueDate || null,
-            status: result.status || "needs_review",
-            category: result.category || category || "invoice",
-            confidence: result.confidence || 0,
-            summary: result.summary || "",
-            rawEmailId: result.rawEmailId || "",
-            extractedData: result,
-            }, client.id);
-        } catch (dbErr) { console.error("DB save error:", dbErr); }
+        } catch (usageErr) {
+          console.error("Usage tracking error:", usageErr);
+        }
       }
 
       return NextResponse.json({
