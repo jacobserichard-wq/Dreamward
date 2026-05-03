@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { getItems, updateItemStatus, getDashboardSummary } from "@/lib/db";
+
+// TODO: Replace with session-based client lookup
+const CLIENT_ID = 1;
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,46 +10,12 @@ export async function GET(request: NextRequest) {
     const view = searchParams.get("view");
 
     if (view === "dashboard") {
-      const stats = await pool.query(
-        "SELECT category, status, " +
-        "COUNT(*) as count, " +
-        "SUM(amount) as total " +
-        "FROM processed_items " +
-        "GROUP BY category, status " +
-        "ORDER BY category, status"
-      );
-      const totals = await pool.query(
-        "SELECT COUNT(*) as total_items, " +
-        "COALESCE(SUM(amount), 0) as total_amount " +
-        "FROM processed_items"
-      );
-      return NextResponse.json({
-        summary: stats.rows,
-        totalItems: parseInt(totals.rows[0].total_items),
-        totalAmount: parseFloat(totals.rows[0].total_amount),
-      });
+      const stats = await getDashboardSummary(CLIENT_ID);
+      return NextResponse.json({ stats: stats.rows });
     }
 
-    const status = searchParams.get("status");
     const category = searchParams.get("category");
-    let query = "SELECT * FROM processed_items";
-    const conditions: string[] = [];
-    const values: string[] = [];
-
-    if (status) {
-      conditions.push("status = $" + (values.length + 1));
-      values.push(status);
-    }
-    if (category) {
-      conditions.push("category = $" + (values.length + 1));
-      values.push(category);
-    }
-    if (conditions.length > 0) {
-      query = query + " WHERE " + conditions.join(" AND ");
-    }
-    query = query + " ORDER BY processed_at DESC";
-
-    const result = await pool.query(query, values);
+    const result = await getItems(CLIENT_ID, category || undefined);
     return NextResponse.json({ items: result.rows });
   } catch (error) {
     console.error("Error fetching items:", error);
@@ -64,25 +33,12 @@ export async function PATCH(request: NextRequest) {
 
     if (!id || !status) {
       return NextResponse.json(
-        { error: "Missing required fields: id, status" },
+        { error: "Missing id or status" },
         { status: 400 }
       );
     }
 
-    const valid = ["needs_review", "approved", "rejected", "paid", "pending"];
-    if (!valid.includes(status)) {
-      return NextResponse.json(
-        { error: "Invalid status" },
-        { status: 400 }
-      );
-    }
-
-    const result = await pool.query(
-      "UPDATE processed_items " +
-      "SET status = $1, updated_at = NOW() " +
-      "WHERE id = $2 RETURNING *",
-      [status, id]
-    );
+    const result = await updateItemStatus(id, status, CLIENT_ID);
 
     if (result.rows.length === 0) {
       return NextResponse.json(
