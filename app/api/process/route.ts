@@ -65,8 +65,39 @@ export async function POST(request: NextRequest) {
       const results = Array.isArray(parsed) ? parsed : parsed.results || [];
 
       for (const result of results) {
+        let savedCount = 0;
+      for (const result of results) {
         try {
           await saveProcessedItem({
+            vendor: result.vendor || "Unknown",
+            invoiceNumber: result.invoiceNumber || "N/A",
+            amount: result.amount || 0,
+            dueDate: result.dueDate || null,
+            status: result.status || "needs_review",
+            category: result.category || category || "invoice",
+            confidence: result.confidence || 0,
+            summary: result.summary || "",
+            rawEmailId: result.rawEmailId || "",
+            extractedData: result,
+            }, client.id);
+          savedCount++;
+        } catch (dbErr) { console.error("DB save error:", dbErr); }
+      }
+
+      // Track usage
+      if (savedCount > 0) {
+        try {
+          const pool = (await import("@/lib/db")).default;
+          await pool.query(
+            `INSERT INTO usage_logs (client_id, month, items_processed, api_calls)
+             VALUES ($1, date_trunc('month', CURRENT_DATE), $2, 1)
+             ON CONFLICT (client_id, month)
+             DO UPDATE SET items_processed = usage_logs.items_processed + $2,
+                           api_calls = usage_logs.api_calls + 1`,
+            [client.id, savedCount]
+          );
+        } catch (usageErr) { console.error("Usage tracking error:", usageErr); }
+      }
             vendor: result.vendor || "Unknown",
             invoiceNumber: result.invoiceNumber || "N/A",
             amount: result.amount || 0,
