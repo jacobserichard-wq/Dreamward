@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import pool from "@/lib/db";
+import { sendEmail, paymentFailedEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,19 @@ export async function POST(request: NextRequest) {
           [plan, subscription.id, customerId]
         );
         console.log("Subscription updated:", plan);
+
+        // Send payment failed email
+        if (status === "past_due" || status === "unpaid") {
+          const clientResult = await pool.query(
+            "SELECT email, business_name FROM clients WHERE stripe_customer_id = $1",
+            [customerId]
+          );
+          if (clientResult.rows[0]) {
+            const c = clientResult.rows[0];
+            const email = paymentFailedEmail(c.business_name);
+            await sendEmail({ to: c.email, ...email });
+          }
+        }
         break;
       }
 
