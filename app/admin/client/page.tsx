@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
-export default function ClientDetailPage() {
+function ClientDetailContent() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get("id");
   const [data, setData] = useState<any>(null);
@@ -189,7 +189,7 @@ const s: Record<string, React.CSSProperties> = {
 };
 export default function ClientDetailPage() {
   return (
-    <Suspense fallback={<div style={s.container}><div style={s.content}><p style={s.loading}>Loading client...</p></div></div>}>
+    <Suspense fallback={<div>Loading...</div>}>
       <ClientDetailContent />
     </Suspense>
   );
