@@ -1,8 +1,8 @@
 "use client";
 
-
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
+
 function ClientDetailContent() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get("id");
@@ -81,7 +81,7 @@ function ClientDetailContent() {
             <div style={s.infoRow}><span style={s.infoLabel}>Avg Confidence</span><span style={s.infoValue}>{Math.round(parseFloat(stats.avg_confidence))}%</span></div>
           </div>
 
-         {settings && (
+          {settings && (
             <div style={s.infoCard}>
               <h3 style={s.infoTitle}>Settings</h3>
               <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
@@ -106,10 +106,6 @@ function ClientDetailContent() {
                 <span style={s.infoLabel}>Preferences</span>
                 <span style={s.infoValue}>{settings.preferences && Object.keys(settings.preferences).length > 0 ? Object.entries(settings.preferences).map(([k, v]) => `${k}: ${v}`).join(", ") : "Default"}</span>
               </div>
-            </div>
-          )}{settings.active_modules ? JSON.stringify(settings.active_modules) : "Default"}</span></div>
-              <div style={s.infoRow}><span style={s.infoLabel}>Custom Categories</span><span style={s.infoValue}>{settings.custom_categories ? JSON.stringify(settings.custom_categories) : "None"}</span></div>
-              <div style={s.infoRow}><span style={s.infoLabel}>Preferences</span><span style={s.infoValue}>{settings.preferences ? JSON.stringify(settings.preferences) : "Default"}</span></div>
             </div>
           )}
         </div>
@@ -201,6 +197,10 @@ const s: Record<string, React.CSSProperties> = {
   infoLabel: { fontSize: 13, color: "#64748b" },
   infoValue: { fontSize: 13, fontWeight: 500, color: "#0f172a" },
 
+  tagRow: { display: "flex", flexWrap: "wrap" as const, gap: 6 },
+  tag: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#eff6ff", color: "#1d4ed8" },
+  tagGreen: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#16a34a" },
+
   tableCard: { background: "white", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" },
   tableHeader: { padding: "16px 24px", borderBottom: "1px solid #e2e8f0" },
   tableTitle: { fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0 },
@@ -210,6 +210,7 @@ const s: Record<string, React.CSSProperties> = {
   td: { padding: "12px 16px", color: "#334155" },
   statusBadge: { padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const },
 };
+
 export default function ClientDetailPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -217,6 +218,3 @@ export default function ClientDetailPage() {
     </Suspense>
   );
 }
-tagRow: { display: "flex", flexWrap: "wrap" as const, gap: 6 },
-  tag: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#eff6ff", color: "#1d4ed8" },
-  tagGreen: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#16a34a" },
