@@ -6,7 +6,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const sig = request.headers.get("stripe-signature");
-
     let event;
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -19,16 +18,22 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
+        const clientId = session.metadata?.clientId;
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
-        const result = await pool.query(
-          "UPDATE clients SET plan = 'starter', " +
-          "stripe_subscription_id = $1, updated_at = NOW() " +
-          "WHERE stripe_customer_id = $2 RETURNING *",
-          [subscriptionId, customerId]
-        );
-        console.log("Checkout completed for:", result.rows[0]?.email);
+        if (clientId) {
+          const result = await pool.query(
+            "UPDATE clients SET plan = 'starter', " +
+            "stripe_customer_id = $1, " +
+            "stripe_subscription_id = $2, updated_at = NOW() " +
+            "WHERE id = $3 RETURNING *",
+            [customerId, subscriptionId, parseInt(clientId)]
+          );
+          console.log("Checkout completed for:", result.rows[0]?.email);
+        } else {
+          console.error("No clientId in checkout session metadata");
+        }
         break;
       }
 
