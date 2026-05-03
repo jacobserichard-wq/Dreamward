@@ -102,24 +102,24 @@ export default async function DashboardPage() {
     {
       label: "Total Items",
       value: summary.total_items,
-      icon: "📋",
+      icon: "\u{1F4CB}",
     },
     {
       label: "Invoices",
       value: summary.invoices,
       subtext: formatCurrency(summary.total_invoice_amount),
-      icon: "🧾",
+      icon: "\u{1F9FE}",
     },
     {
       label: "Expenses",
       value: summary.expenses,
       subtext: formatCurrency(summary.total_expense_amount),
-      icon: "💰",
+      icon: "\u{1F4B0}",
     },
     {
       label: "Pending Review",
       value: summary.pending,
-      icon: "⏳",
+      icon: "\u231B",
     },
   ];
 
@@ -130,14 +130,14 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Welcome back, {session.user?.name || session.user?.email}
+              {"Welcome back, "}{session.user?.name || session.user?.email}
             </p>
           </div>
           <div className="flex items-center gap-4">
             <PlanBadge plan={client.plan} />
             {client.plan === "trial" && client.trial_ends_at && (
               <span className="text-sm text-gray-500">
-                Trial ends {formatDate(client.trial_ends_at)}
+                {"Trial ends "}{formatDate(client.trial_ends_at)}
               </span>
             )}
           </div>
@@ -171,7 +171,7 @@ export default async function DashboardPage() {
               Recent Items
             </h2>
             <span className="text-sm text-gray-500">
-              {summary.processed} of {summary.total_items} processed
+              {summary.processed}{" of "}{summary.total_items}{" processed"}
             </span>
           </div>
 
@@ -201,19 +201,19 @@ export default async function DashboardPage() {
                   {recentItems.map((item: any) => (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {item.vendor || "—"}
+                        {item.vendor || "\u2014"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">
-                        {item.category || "—"}
+                        {item.category || "\u2014"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {item.amount ? formatCurrency(item.amount) : "—"}
+                        {item.amount ? formatCurrency(item.amount) : "\u2014"}
                       </td>
                       <td className="px-6 py-4">
                         <StatusBadge status={item.status || "pending"} />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {item.due_date ? formatDate(item.due_date) : "—"}
+                        {item.due_date ? formatDate(item.due_date) : "\u2014"}
                       </td>
                     </tr>
                   ))}
@@ -223,45 +223,44 @@ export default async function DashboardPage() {
           ) : (
             <div className="px-6 py-12 text-center">
               <p className="text-gray-500 text-sm">
-                No items processed yet. Connect your Gmail to start
-                automatically processing invoices and expenses.
+                {"No items processed yet. Connect your Gmail to start automatically processing invoices and expenses."}
               </p>
             </div>
           )}
         </div>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          
+          <a
             href="/emails"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
             <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-              📧 Process Emails
+              {"\u{1F4E7} Process Emails"}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Scan your inbox for new invoices and expenses
+              {"Scan your inbox for new invoices and expenses"}
             </p>
           </a>
-          
+          <a
             href="/items"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
             <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-              📑 View All Items
+              {"\u{1F4D1} View All Items"}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Review and manage all processed documents
+              {"Review and manage all processed documents"}
             </p>
           </a>
-          
+          <a
             href="/settings"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
             <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-              ⚙️ Settings
+              {"\u2699\uFE0F Settings"}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Manage your account, integrations, and billing
+              {"Manage your account, integrations, and billing"}
             </p>
           </a>
         </div>
