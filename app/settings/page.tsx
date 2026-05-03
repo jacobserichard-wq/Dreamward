@@ -13,14 +13,19 @@ const ALL_MODULES = [
   { id: "tax_reports", label: "Tax Reports", description: "Schedule C mapping and quarterly estimates", icon: "\u{1F4CA}", minPlan: "pro" },
 ];
 
+const DEFAULT_CATEGORIES = ["Supplies", "Booth Fees", "Travel/Gas", "Packaging", "Marketing", "Other"];
 const PLAN_RANK: Record<string, number> = { trial: 0, starter: 1, growth: 2, pro: 3 };
 
 export default function SettingsPage() {
   const [plan, setPlan] = useState("trial");
   const [activeModules, setActiveModules] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [catSaving, setCatSaving] = useState(false);
+  const [catSaved, setCatSaved] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -30,6 +35,7 @@ export default function SettingsPage() {
         const data = await res.json();
         setPlan(data.plan);
         setActiveModules(data.settings?.active_modules || ["invoices", "expenses"]);
+        setCategories(data.settings?.custom_categories || DEFAULT_CATEGORIES);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -64,6 +70,41 @@ export default function SettingsPage() {
     }
   };
 
+  const addCategory = () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    if (categories.includes(trimmed)) return;
+    setCategories((prev) => [...prev, trimmed]);
+    setNewCategory("");
+    setCatSaved(false);
+  };
+
+  const removeCategory = (cat: string) => {
+    setCategories((prev) => prev.filter((c) => c !== cat));
+    setCatSaved(false);
+  };
+
+  const resetCategories = () => {
+    setCategories([...DEFAULT_CATEGORIES]);
+    setCatSaved(false);
+  };
+
+  const saveCategories = async () => {
+    setCatSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customCategories: categories }),
+      });
+      if (res.ok) setCatSaved(true);
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={st.container}>
@@ -83,6 +124,7 @@ export default function SettingsPage() {
           <p style={st.subtitle}>Manage your modules and preferences</p>
         </div>
 
+        {/* Module Toggles */}
         <div style={st.section}>
           <div style={st.sectionHeader}>
             <h2 style={st.sectionTitle}>Active Modules</h2>
@@ -132,20 +174,59 @@ export default function SettingsPage() {
           </div>
 
           <div style={st.saveRow}>
-            <button
-              onClick={saveModules}
-              disabled={saving}
-              style={{
-                ...st.saveBtn,
-                ...(saving ? { opacity: 0.5 } : {}),
-              }}
-            >
+            <button onClick={saveModules} disabled={saving} style={{...st.saveBtn, ...(saving ? { opacity: 0.5 } : {})}}>
               {saving ? "Saving..." : "Save changes"}
             </button>
             {saved && <span style={st.savedMsg}>{"\u2713 Saved"}</span>}
           </div>
         </div>
 
+        {/* Expense Categories */}
+        <div style={st.section}>
+          <div style={st.sectionHeader}>
+            <h2 style={st.sectionTitle}>Expense Categories</h2>
+            <p style={st.sectionSubtitle}>Customize how your expenses are organized</p>
+          </div>
+
+          <div style={st.catCard}>
+            <div style={st.catList}>
+              {categories.map((cat) => (
+                <div key={cat} style={st.catItem}>
+                  <span style={st.catName}>{cat}</span>
+                  <button
+                    onClick={() => removeCategory(cat)}
+                    style={st.catRemoveBtn}
+                    title="Remove category"
+                  >
+                    {"\u2715"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={st.catAddRow}>
+              <input
+                type="text"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="Add new category..."
+                style={st.catInput}
+                onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }}
+              />
+              <button onClick={addCategory} style={st.catAddBtn}>Add</button>
+            </div>
+
+            <div style={st.catActions}>
+              <button onClick={saveCategories} disabled={catSaving} style={{...st.saveBtn, ...(catSaving ? { opacity: 0.5 } : {})}}>
+                {catSaving ? "Saving..." : "Save categories"}
+              </button>
+              {catSaved && <span style={st.savedMsg}>{"\u2713 Saved"}</span>}
+              <button onClick={resetCategories} style={st.resetBtn}>Reset to defaults</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Links */}
         <div style={st.linksRow}>
           <a href="/billing" style={st.linkCard}>
             <span style={{ fontSize: 20 }}>{"\u{1F4B3}"}</span>
@@ -189,6 +270,18 @@ const st: Record<string, React.CSSProperties> = {
   saveRow: { display: "flex", alignItems: "center", gap: 12, marginTop: 20 },
   saveBtn: { padding: "10px 24px", borderRadius: 8, border: "none", background: "#3b82f6", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 600 },
   savedMsg: { fontSize: 14, color: "#16a34a", fontWeight: 500 },
+
+  catCard: { background: "white", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" },
+  catList: { display: "flex", flexWrap: "wrap" as const, gap: 8, marginBottom: 16 },
+  catItem: { display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "6px 12px" },
+  catName: { fontSize: 13, fontWeight: 500, color: "#166534" },
+  catRemoveBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#94a3b8", padding: "0 2px", lineHeight: 1 },
+  catAddRow: { display: "flex", gap: 8, marginBottom: 16 },
+  catInput: { flex: 1, padding: "10px 14px", fontSize: 14, border: "1px solid #e2e8f0", borderRadius: 8, outline: "none", boxSizing: "border-box" as const },
+  catAddBtn: { padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#334155" },
+  catActions: { display: "flex", alignItems: "center", gap: 12 },
+  resetBtn: { padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 13, color: "#64748b" },
+
   linksRow: { display: "flex", gap: 12 },
   linkCard: { flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", background: "white", borderRadius: 12, border: "1px solid #e2e8f0", textDecoration: "none", color: "#334155", fontSize: 14, fontWeight: 500 },
 };
