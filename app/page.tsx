@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState<any>(null);
+  const router = useRouter();
 
   // Load processed items from database on mount
   useEffect(() => {
@@ -77,11 +79,9 @@ export default function Home() {
         const res = await fetch("/api/client");
         if (!res.ok) return;
         const data = await res.json();
-        setClientInfo(data);  
-        const data = await res.json();
         setClientInfo(data);
         if (data.onboardingCompleted === false) {
-          window.location.href = "/onboarding";
+          router.push("/onboarding");
           return;
         }
       } catch (err) {
@@ -89,7 +89,7 @@ export default function Home() {
       }
     }
     loadClient();
-  }, []);
+  }, [router]);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
