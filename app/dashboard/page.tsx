@@ -7,22 +7,22 @@ import pool from "@/lib/db";
 async function getDashboardData(clientId: number) {
   const [itemsResult, summaryResult] = await Promise.all([
     pool.query(
-      `SELECT id, vendor_name, type, amount, status, due_date, created_at 
+      `SELECT id, vendor, invoice_number, category, amount, status, due_date, processed_at 
        FROM processed_items 
        WHERE client_id = $1 
-       ORDER BY created_at DESC 
+       ORDER BY processed_at DESC 
        LIMIT 10`,
       [clientId]
     ),
     pool.query(
       `SELECT 
          COUNT(*) as total_items,
-         COUNT(*) FILTER (WHERE type = 'invoice') as invoices,
-         COUNT(*) FILTER (WHERE type = 'expense') as expenses,
+         COUNT(*) FILTER (WHERE category = 'invoice') as invoices,
+         COUNT(*) FILTER (WHERE category = 'expense') as expenses,
          COUNT(*) FILTER (WHERE status = 'pending') as pending,
          COUNT(*) FILTER (WHERE status = 'processed') as processed,
-         COALESCE(SUM(amount) FILTER (WHERE type = 'invoice'), 0) as total_invoice_amount,
-         COALESCE(SUM(amount) FILTER (WHERE type = 'expense'), 0) as total_expense_amount
+         COALESCE(SUM(amount) FILTER (WHERE category = 'invoice'), 0) as total_invoice_amount,
+         COALESCE(SUM(amount) FILTER (WHERE category = 'expense'), 0) as total_expense_amount
        FROM processed_items 
        WHERE client_id = $1`,
       [clientId]
@@ -125,7 +125,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
@@ -146,7 +145,6 @@ export default async function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat) => (
             <div
@@ -167,7 +165,6 @@ export default async function DashboardPage() {
           ))}
         </div>
 
-        {/* Recent Items Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -187,7 +184,7 @@ export default async function DashboardPage() {
                       Vendor
                     </th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
+                      Category
                     </th>
                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Amount
@@ -204,10 +201,10 @@ export default async function DashboardPage() {
                   {recentItems.map((item: any) => (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {item.vendor_name || "—"}
+                        {item.vendor || "—"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">
-                        {item.type || "—"}
+                        {item.category || "—"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {item.amount ? formatCurrency(item.amount) : "—"}
@@ -233,9 +230,8 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Quick Actions */}
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <a
+          
             href="/emails"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
@@ -246,7 +242,7 @@ export default async function DashboardPage() {
               Scan your inbox for new invoices and expenses
             </p>
           </a>
-          <a
+          
             href="/items"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
@@ -257,7 +253,7 @@ export default async function DashboardPage() {
               Review and manage all processed documents
             </p>
           </a>
-          <a
+          
             href="/settings"
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
           >
