@@ -41,6 +41,7 @@ export default function Home() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [clientInfo, setClientInfo] = useState<any>(null);
 
   // Load processed items from database on mount
   useEffect(() => {
@@ -67,6 +68,19 @@ export default function Home() {
       }
     }
     loadItems();
+  }, []);// Load client plan info
+  useEffect(() => {
+    async function loadClient() {
+      try {
+        const res = await fetch("/api/client");
+        if (!res.ok) return;
+        const data = await res.json();
+        setClientInfo(data);
+      } catch (err) {
+        console.error("Failed to load client info:", err);
+      }
+    }
+    loadClient();
   }, []);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
