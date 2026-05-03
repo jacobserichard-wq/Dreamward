@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe, PLANS } from "@/lib/stripe";
-import { getOrCreateClient } from "@/lib/getClient";
+import { getSessionClient } from "@/lib/getClient";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
 
-    const client = await getOrCreateClient(session.user.email);
+    const client = await getSessionClient();
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
