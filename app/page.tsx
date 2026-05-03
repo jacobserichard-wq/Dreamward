@@ -68,7 +68,9 @@ export default function Home() {
       }
     }
     loadItems();
-  }, []);// Load client plan info
+  }, []);
+
+  // Load client plan info
   useEffect(() => {
     async function loadClient() {
       try {
@@ -109,6 +111,17 @@ export default function Home() {
       setError("Fetch emails first before processing");
       return;
     }
+
+    // Plan-gated item limit check
+    if (clientInfo?.features?.maxItemsPerMonth !== null && clientInfo?.features?.maxItemsPerMonth !== undefined) {
+      const currentCount = processedItems.length;
+      const limit = clientInfo.features.maxItemsPerMonth;
+      if (currentCount >= limit) {
+        setError(`You've reached your ${clientInfo.plan} plan limit of ${limit} items/month. Upgrade to process more.`);
+        return;
+      }
+    }
+
     setProcessing(true);
     setError(null);
     setSuccessMsg(null);
@@ -143,7 +156,7 @@ export default function Home() {
     } finally {
       setProcessing(false);
     }
-  }, [emails, selectedLabel]);
+  }, [emails, selectedLabel, clientInfo, processedItems.length]);
 
   // ─── Update item status ────────────────────────────────────────────────────
   const updateStatus = useCallback(
@@ -183,17 +196,38 @@ export default function Home() {
         : 0,
   };
 
+  // Determine which labels to show based on plan
+  const availableLabels: Label[] = clientInfo?.features?.labels
+    ? (clientInfo.features.labels as Label[])
+    : ["Invoices", "Expenses"];
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <h1 style={styles.logo}>
-            <span style={styles.logoIcon}>⚡</span> FlowWork
-          </h1>
-          <p style={styles.tagline}>Accounting Automation</p>
+        <div style={{...styles.headerInner, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+          <div>
+            <h1 style={styles.logo}>
+              <span style={styles.logoIcon}>{"\u26A1"}</span> FlowWork
+            </h1>
+            <p style={styles.tagline}>Accounting Automation</p>
+          </div>
+          {clientInfo && (
+            <span style={{
+              background: "rgba(255,255,255,0.15)",
+              color: "white",
+              padding: "6px 16px",
+              borderRadius: 20,
+              fontSize: 13,
+              fontWeight: 600,
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.5px",
+            }}>
+              {clientInfo.plan}
+            </span>
+          )}
         </div>
       </header>
 
@@ -208,9 +242,9 @@ export default function Home() {
               ...(activeTab === tab ? styles.navTabActive : {}),
             }}
           >
-            {tab === "emails" && "📧 Emails"}
-            {tab === "processed" && `📄 Processed (${processedItems.length})`}
-            {tab === "dashboard" && "📊 Dashboard"}
+            {tab === "emails" && "\u{1F4E7} Emails"}
+            {tab === "processed" && `\u{1F4C4} Processed (${processedItems.length})`}
+            {tab === "dashboard" && "\u{1F4CA} Dashboard"}
           </button>
         ))}
       </nav>
@@ -218,30 +252,31 @@ export default function Home() {
       <main style={styles.main}>
         {/* Status messages */}
         {error && <div style={styles.errorBanner}>{error}</div>}
-// 
+        {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
+
+        {/* ── EMAILS TAB ── */}
+        {activeTab === "emails" && (
           <>
             {/* Label selector + actions */}
             <div style={styles.toolbar}>
               <div style={styles.labelGroup}>
-                {(["Invoices", "AR Follow Up", "Expenses"] as Label[]).map(
-                  (label) => (
-                    <button
-                      key={label}
-                      onClick={() => fetchEmails(label)}
-                      style={{
-                        ...styles.labelBtn,
-                        ...(selectedLabel === label
-                          ? styles.labelBtnActive
-                          : {}),
-                      }}
-                    >
-                      {label === "Invoices" && "📑"}
-                      {label === "AR Follow Up" && "🔔"}
-                      {label === "Expenses" && "💳"}{" "}
-                      {label}
-                    </button>
-                  )
-                )}
+                {availableLabels.map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => fetchEmails(label)}
+                    style={{
+                      ...styles.labelBtn,
+                      ...(selectedLabel === label
+                        ? styles.labelBtnActive
+                        : {}),
+                    }}
+                  >
+                    {label === "Invoices" && "\u{1F4D1}"}
+                    {label === "AR Follow Up" && "\u{1F514}"}
+                    {label === "Expenses" && "\u{1F4B3}"}{" "}
+                    {label}
+                  </button>
+                ))}
               </div>
 
               <button
@@ -254,7 +289,7 @@ export default function Home() {
                     : {}),
                 }}
               >
-                {processing ? "⏳ Processing..." : "🤖 Process with AI"}
+                {processing ? "\u231B Processing..." : "\u{1F916} Process with AI"}
               </button>
             </div>
 
@@ -263,7 +298,7 @@ export default function Home() {
               <div style={styles.loadingState}>Loading emails...</div>
             ) : emails.length === 0 ? (
               <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>📭</p>
+                <p style={styles.emptyIcon}>{"\u{1F4ED}"}</p>
                 <p>Select a label above to fetch emails</p>
               </div>
             ) : (
@@ -285,13 +320,14 @@ export default function Home() {
               </div>
             )}
           </>
+        )}
 
         {/* ── PROCESSED TAB ── */}
         {activeTab === "processed" && (
           <>
             {processedItems.length === 0 ? (
               <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>📋</p>
+                <p style={styles.emptyIcon}>{"\u{1F4CB}"}</p>
                 <p>No processed items yet. Fetch emails and click Process with AI.</p>
               </div>
             ) : (
@@ -330,7 +366,7 @@ export default function Home() {
                       <div style={styles.cardRow}>
                         <span style={styles.cardLabel}>Due Date</span>
                         <span style={styles.cardValue}>
-                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "-"}
+                          {item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "-"}
                         </span>
                       </div>
                       <div style={styles.cardRow}>
@@ -373,10 +409,10 @@ export default function Home() {
                               : {}),
                           }}
                         >
-                          {s === "pending" && "⏳"}
-                          {s === "paid" && "✅"}
-                          {s === "overdue" && "🚨"}
-                          {s === "needs_review" && "👀"}
+                          {s === "pending" && "\u231B"}
+                          {s === "paid" && "\u2705"}
+                          {s === "overdue" && "\u{1F6A8}"}
+                          {s === "needs_review" && "\u{1F440}"}
                         </button>
                       ))}
                     </div>
@@ -395,7 +431,7 @@ export default function Home() {
               <StatCard
                 label="Total Items"
                 value={stats.total}
-                icon="📦"
+                icon={"\u{1F4E6}"}
                 color="#3b82f6"
               />
               <StatCard
@@ -403,7 +439,7 @@ export default function Home() {
                 value={`$${stats.totalAmount.toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                 })}`}
-                icon="💰"
+                icon={"\u{1F4B0}"}
                 color="#16a34a"
               />
               <StatCard
@@ -412,13 +448,13 @@ export default function Home() {
                 sub={`$${stats.overdueAmount.toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                 })}`}
-                icon="🚨"
+                icon={"\u{1F6A8}"}
                 color="#dc2626"
               />
               <StatCard
                 label="Avg Confidence"
                 value={`${stats.avgConfidence}%`}
-                icon="🎯"
+                icon={"\u{1F3AF}"}
                 color="#8b5cf6"
               />
             </div>
@@ -432,25 +468,25 @@ export default function Home() {
                     label: "Pending",
                     count: stats.pending,
                     color: "#f59e0b",
-                    icon: "⏳",
+                    icon: "\u231B",
                   },
                   {
                     label: "Overdue",
                     count: stats.overdue,
                     color: "#dc2626",
-                    icon: "🚨",
+                    icon: "\u{1F6A8}",
                   },
                   {
                     label: "Needs Review",
                     count: stats.needsReview,
                     color: "#6366f1",
-                    icon: "👀",
+                    icon: "\u{1F440}",
                   },
                   {
                     label: "Paid",
                     count: stats.paid,
                     color: "#16a34a",
-                    icon: "✅",
+                    icon: "\u2705",
                   },
                 ].map((item) => (
                   <div
@@ -470,7 +506,7 @@ export default function Home() {
 
             {processedItems.length === 0 && (
               <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>📊</p>
+                <p style={styles.emptyIcon}>{"\u{1F4CA}"}</p>
                 <p>Process some emails to see dashboard data</p>
               </div>
             )}
@@ -769,9 +805,3 @@ const styles: Record<string, React.CSSProperties> = {
   breakdownCount: { fontSize: 24, fontWeight: 800, color: "#0f172a" },
   breakdownLabel: { fontSize: 13, color: "#64748b" },
 };
-
-
-
-
-
-
