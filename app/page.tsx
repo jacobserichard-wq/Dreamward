@@ -77,7 +77,13 @@ export default function Home() {
         const res = await fetch("/api/client");
         if (!res.ok) return;
         const data = await res.json();
+        setClientInfo(data);  
+        const data = await res.json();
         setClientInfo(data);
+        if (data.onboardingCompleted === false) {
+          window.location.href = "/onboarding";
+          return;
+        }
       } catch (err) {
         console.error("Failed to load client info:", err);
       }
