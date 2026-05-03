@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveProcessedItem } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
-
+import { getSessionClient } from "@/lib/getClient";
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -18,6 +18,10 @@ interface EmailMessage {snippet: string;
 export async function POST(request: NextRequest) {
   try {
     const { emails, category } = await request.json();
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return NextResponse.json(
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
             summary: result.summary || "",
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
-            }, 1);
+            }, client.id);
         } catch (dbErr) { console.error("DB save error:", dbErr); }
       }
 

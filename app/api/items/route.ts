@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getItems, updateItemStatus, getDashboardSummary } from "@/lib/db";
-
-// TODO: Replace with session-based client lookup
-const CLIENT_ID = 1;
+import { getSessionClient } from "@/lib/getClient";
 
 export async function GET(request: NextRequest) {
   try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const view = searchParams.get("view");
 
     if (view === "dashboard") {
-      const stats = await getDashboardSummary(CLIENT_ID);
+      const stats = await getDashboardSummary(client.id);
       return NextResponse.json({ stats: stats.rows });
     }
 
     const category = searchParams.get("category");
-    const result = await getItems(CLIENT_ID, category || undefined);
+    const result = await getItems(client.id, category || undefined);
     return NextResponse.json({ items: result.rows });
   } catch (error) {
     console.error("Error fetching items:", error);
@@ -28,6 +31,11 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, status } = body;
 
@@ -38,7 +46,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const result = await updateItemStatus(id, status, CLIENT_ID);
+    const result = await updateItemStatus(id, status, client.id);
 
     if (result.rows.length === 0) {
       return NextResponse.json(
