@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             summary: result.summary || "",
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
-          });
+            }, 1);
         } catch (dbErr) { console.error("DB save error:", dbErr); }
       }
 
