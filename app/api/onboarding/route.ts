@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
+import { sendEmail, welcomeEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +11,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { businessName, industry } = await req.json();
-
     if (!businessName || !industry) {
       return NextResponse.json({ error: "Business name and industry are required" }, { status: 400 });
     }
@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
        SET business_name = $1, industry = $2, onboarding_completed = true, updated_at = NOW() 
        WHERE id = $3`,
       [businessName, industry, client.id]
+    );
+
+    // Send welcome email (don't block the response if it fails)
+    const { subject, html } = welcomeEmail(businessName);
+    sendEmail({ to: client.email, subject, html }).catch((err) =>
+      console.error("Welcome email failed:", err)
     );
 
     return NextResponse.json({ success: true });
