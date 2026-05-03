@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-
+import { useState, useEffect, Suspense } from "react";
 export default function ClientDetailPage() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get("id");
@@ -187,3 +187,10 @@ const s: Record<string, React.CSSProperties> = {
   td: { padding: "12px 16px", color: "#334155" },
   statusBadge: { padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const },
 };
+export default function ClientDetailPage() {
+  return (
+    <Suspense fallback={<div style={s.container}><div style={s.content}><p style={s.loading}>Loading client...</p></div></div>}>
+      <ClientDetailContent />
+    </Suspense>
+  );
+}
