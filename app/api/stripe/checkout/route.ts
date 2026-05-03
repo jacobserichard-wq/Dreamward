@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         trial_period_days: 14,
         metadata: { clientId: String(client.id) },
       },
-      success_url: `${process.env.NEXTAUTH_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.NEXTAUTH_URL}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/pricing`,
       metadata: { clientId: String(client.id) },
     });
