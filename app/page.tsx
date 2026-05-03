@@ -215,7 +215,7 @@ export default function Home() {
             <p style={styles.tagline}>Accounting Automation</p>
           </div>
           {clientInfo && (
-            <span style={{
+            <a href="/billing" style={{
               background: "rgba(255,255,255,0.15)",
               color: "white",
               padding: "6px 16px",
@@ -224,9 +224,11 @@ export default function Home() {
               fontWeight: 600,
               textTransform: "uppercase" as const,
               letterSpacing: "0.5px",
+              textDecoration: "none",
+              cursor: "pointer",
             }}>
               {clientInfo.plan}
-            </span>
+            </a>
           )}
         </div>
       </header>
@@ -694,7 +696,6 @@ const styles: Record<string, React.CSSProperties> = {
   emailSubject: { fontSize: 14, fontWeight: 500, color: "#334155", marginBottom: 4 },
   emailSnippet: { fontSize: 13, color: "#64748b", lineHeight: 1.4 },
 
-  // Processed items
   cardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
@@ -760,7 +761,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "#94a3b8",
   },
 
-  // Dashboard
   dashboard: {},
   statGrid: {
     display: "grid",
