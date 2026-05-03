@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { planId } = await req.json();
-    const plan = PLANS.find((p) => p.id === planId);
+    const plan = PLANS[planId as keyof typeof PLANS];
     if (!plan) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
