@@ -3,8 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
 
-const ADMIN_EMAILS = ["rjacobsen@flowworks.ap.com", "jacobse.richard@gmail.com"];
-
+const ADMIN_EMAILS = ["rjacobsen@flowworks.ap.com", "jacobse.richard@gmail.com", "meridian.supply.test@gmail.com"];
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
