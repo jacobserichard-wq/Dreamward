@@ -81,10 +81,33 @@ function ClientDetailContent() {
             <div style={s.infoRow}><span style={s.infoLabel}>Avg Confidence</span><span style={s.infoValue}>{Math.round(parseFloat(stats.avg_confidence))}%</span></div>
           </div>
 
-          {settings && (
+         {settings && (
             <div style={s.infoCard}>
               <h3 style={s.infoTitle}>Settings</h3>
-              <div style={s.infoRow}><span style={s.infoLabel}>Active Modules</span><span style={s.infoValue}>{settings.active_modules ? JSON.stringify(settings.active_modules) : "Default"}</span></div>
+              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
+                <span style={s.infoLabel}>Active Modules</span>
+                <div style={s.tagRow}>
+                  {(settings.active_modules || []).map((m: string) => (
+                    <span key={m} style={s.tag}>{m}</span>
+                  ))}
+                  {(!settings.active_modules || settings.active_modules.length === 0) && <span style={s.infoValue}>Default</span>}
+                </div>
+              </div>
+              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
+                <span style={s.infoLabel}>Expense Categories</span>
+                <div style={s.tagRow}>
+                  {(settings.custom_categories || []).map((c: string) => (
+                    <span key={c} style={s.tagGreen}>{c}</span>
+                  ))}
+                  {(!settings.custom_categories || settings.custom_categories.length === 0) && <span style={s.infoValue}>None</span>}
+                </div>
+              </div>
+              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
+                <span style={s.infoLabel}>Preferences</span>
+                <span style={s.infoValue}>{settings.preferences && Object.keys(settings.preferences).length > 0 ? Object.entries(settings.preferences).map(([k, v]) => `${k}: ${v}`).join(", ") : "Default"}</span>
+              </div>
+            </div>
+          )}{settings.active_modules ? JSON.stringify(settings.active_modules) : "Default"}</span></div>
               <div style={s.infoRow}><span style={s.infoLabel}>Custom Categories</span><span style={s.infoValue}>{settings.custom_categories ? JSON.stringify(settings.custom_categories) : "None"}</span></div>
               <div style={s.infoRow}><span style={s.infoLabel}>Preferences</span><span style={s.infoValue}>{settings.preferences ? JSON.stringify(settings.preferences) : "Default"}</span></div>
             </div>
@@ -194,3 +217,6 @@ export default function ClientDetailPage() {
     </Suspense>
   );
 }
+tagRow: { display: "flex", flexWrap: "wrap" as const, gap: 6 },
+  tag: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#eff6ff", color: "#1d4ed8" },
+  tagGreen: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#16a34a" },
