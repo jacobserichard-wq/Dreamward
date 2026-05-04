@@ -51,6 +51,9 @@ export default function Home() {
   const [reviewRows, setReviewRows] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
 
+  // Backfill state
+  const [backfillRange, setBackfillRange] = useState<string>("");
+
   // Load processed items from database on mount
   useEffect(() => {
     async function loadItems() {
@@ -113,6 +116,30 @@ export default function Home() {
       setEmails([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // ─── Backfill emails ──────────────────────────────────────────────────────
+
+  const fetchBackfill = useCallback(async (label: Label, daysBack: number) => {
+    setLoading(true);
+    setError(null);
+    setSelectedLabel(label);
+    const afterDate = new Date();
+    afterDate.setDate(afterDate.getDate() - daysBack);
+    const after = afterDate.toISOString().split("T")[0].replace(/-/g, "/");
+    try {
+      const res = await fetch(`/api/gmail?label=${encodeURIComponent(label)}&after=${after}&maxResults=100`);
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+      const data = await res.json();
+      setEmails(data.messages || []);
+      setSuccessMsg(`Found ${(data.messages || []).length} emails from the last ${daysBack} days`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch emails");
+      setEmails([]);
+    } finally {
+      setLoading(false);
+      setBackfillRange("");
     }
   }, []);
 
@@ -213,7 +240,7 @@ export default function Home() {
     }
   }, []);
 
-// ─── Delete item ───────────────────────────────────────────────────────────
+  // ─── Delete item ───────────────────────────────────────────────────────────
 
   const deleteItem = useCallback((id: string) => {
     if (!confirm("Delete this item? This cannot be undone.")) return;
@@ -418,6 +445,32 @@ export default function Home() {
                     disabled={uploading}
                   />
                 </label>
+
+                <select
+                  value={backfillRange}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setBackfillRange(e.target.value);
+                      fetchBackfill(selectedLabel, parseInt(e.target.value));
+                    }
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "white",
+                    fontSize: 13,
+                    color: "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">Backfill...</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="60">Last 60 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="180">Last 6 months</option>
+                  <option value="365">Last year</option>
+                </select>
               </div>
             </div>
 
@@ -956,7 +1009,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: "white",
     borderRadius: 12,
     border: "1px solid #e2e8f0",
-    
   },
   cardHeader: {
     display: "flex",

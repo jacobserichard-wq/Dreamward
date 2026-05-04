@@ -6,12 +6,14 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
 
- if (!(session as any)?.accessToken) {
+  if (!(session as any)?.accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
   const label = searchParams.get("label") || "INBOX";
+  const after = searchParams.get("after") || "";
+  const maxResults = parseInt(searchParams.get("maxResults") || "20", 10);
 
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: (session as any).accessToken });
@@ -28,10 +30,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: `Label "${label}" not found` }, { status: 404 });
     }
 
+    // Build query with optional date filter
+    let q = "";
+    if (after) {
+      q = `after:${after}`;
+    }
+
     const messagesRes = await gmail.users.messages.list({
       userId: "me",
       labelIds: [targetLabel.id!],
-      maxResults: 20,
+      maxResults: Math.min(maxResults, 100),
+      q: q || undefined,
     });
 
     if (!messagesRes.data.messages) {
