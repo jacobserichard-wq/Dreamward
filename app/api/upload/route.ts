@@ -18,7 +18,6 @@ export async function POST(req: NextRequest) {
     const text = await file.text();
     const fileName = file.name.toLowerCase();
 
-    // Parse CSV (Excel .csv exports work here too)
     let rows: string[][] = [];
     if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
       const delimiter = fileName.endsWith(".tsv") ? "\t" : ",";
@@ -40,7 +39,6 @@ export async function POST(req: NextRequest) {
     const headers = rows[0];
     const dataRows = rows.slice(1).filter((r) => r.some((cell) => cell.trim()));
 
-    // Get client's custom categories if any
     const settings = await getClientSettings(client.id);
     const customCategories: string[] = settings?.expense_categories
       ? JSON.parse(settings.expense_categories)
@@ -54,9 +52,7 @@ export async function POST(req: NextRequest) {
       ? customCategories
       : defaultCategories;
 
-    // Send headers + sample rows to Claude for mapping + categorization
-    const sampleRows = dataRows.slice(0, 5);
-    const allDataForClaude = dataRows.slice(0, 200); // limit to 200 rows
+    const allDataForClaude = dataRows.slice(0, 200);
 
     const prompt = `You are a bookkeeping data mapper. Analyze this CSV data and:
 
@@ -98,14 +94,111 @@ Rules:
 - Always try to extract a vendor name even if the column isn't obviously labeled
 
 QuickBooks Export Detection:
-- If headers include "Transaction Type", "Num", "Name", "Memo/Description", "Split", "Amount", "Balance" — this is a QuickBooks Online export
+- If headers include "Transaction Type", "Num", "Name", "Memo/Description", "Split", "Amount", "Balance" this is a QuickBooks Online export
 - For QB exports: "Name" = vendor, "Num" = invoice_number, "Amount" = amount, "Date" = due_date, "Memo/Description" or "Memo" = description
 - QB "Transaction Type" values like "Bill", "Expense", "Check", "Credit Card Charge" help determine the category
-- QB exports may have "Split" column showing the GL account — use this to improve category accuracy (e.g. "Office Supplies" split = Office Supplies category)
+- QB exports may have "Split" column showing the GL account, use this to improve category accuracy
 - Ignore rows where Transaction Type is "Transfer" or "Deposit" unless they look like vendor payments
 - If QB "Amount" is negative, treat it as a positive expense amount
 
 Other Accounting Software:
-- Xero exports: "Date", "Description", "Reference", "Contact", "Debit Amount" / "Credit Amount"
+- Xero exports: "Date", "Description", "Reference", "Contact", "Debit Amount" or "Credit Amount"
 - Wave exports: "Date", "Description", "Amount", "Account", "Name"
 - Generic bookkeeping: look for any columns resembling date, vendor/payee/name, amount/total, description/memo, category/account/type`;
+
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!claudeRes.ok) {
+      const err = await claudeRes.text();
+      console.error("Claude API error:", err);
+      return NextResponse.json(
+        { error: "AI processing failed. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    const claudeData = await claudeRes.json();
+    const responseText = claudeData.content
+      .filter((b: any) => b.type === "text")
+      .map((b: any) => b.text)
+      .join("");
+
+    let parsed;
+    try {
+      parsed = JSON.parse(responseText.replace(/```json|```/g, "").trim());
+    } catch {
+      console.error("Failed to parse Claude response:", responseText);
+      return NextResponse.json(
+        { error: "AI returned invalid data. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      headers,
+      totalRows: dataRows.length,
+      columnMapping: parsed.column_mapping,
+      mappedRows: parsed.mapped_rows || [],
+      categories: allCategories,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    return NextResponse.json(
+      { error: "Upload processing failed" },
+      { status: 500 }
+    );
+  }
+}
+
+function parseCSV(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let current: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        cell += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === delimiter) {
+        current.push(cell.trim());
+        cell = "";
+      } else if (ch === "\n" || (ch === "\r" && text[i + 1] === "\n")) {
+        current.push(cell.trim());
+        if (current.some((c) => c)) rows.push(current);
+        current = [];
+        cell = "";
+        if (ch === "\r") i++;
+      } else {
+        cell += ch;
+      }
+    }
+  }
+  if (cell || current.length) {
+    current.push(cell.trim());
+    if (current.some((c) => c)) rows.push(current);
+  }
+  return rows;
+}
