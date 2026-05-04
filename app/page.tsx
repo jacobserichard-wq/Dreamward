@@ -522,6 +522,11 @@ export default function Home() {
                     {/* Summary */}
                     <p style={styles.cardSummary}>{item.summary}</p>
 
+                    {/* Remove */}
+                    <div style={{ padding: "0 16px 4px", textAlign: "right" as const }}>
+                      <button onClick={() => deleteItem(item.id)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 12, cursor: "pointer", padding: "4px 8px" }}>Remove</button>
+                    </div>
+
                     {/* Status actions */}
                     <div style={styles.cardActions}>
                       {(
@@ -650,7 +655,7 @@ export default function Home() {
               </div>
             )}
           </div>
-     
+        )}
 
         {/* ── CSV REVIEW MODAL ── */}
         {uploadReview && (
