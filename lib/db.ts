@@ -16,8 +16,7 @@ export async function getOrCreateClient(email: string) {
     return existing.rows[0];
   }
   const result = await pool.query(
-    "INSERT INTO clients (email) " +
-    "VALUES ($1) RETURNING *",
+    "INSERT INTO clients (email) VALUES ($1) RETURNING *",
     [email]
   );
   await pool.query(
@@ -88,8 +87,7 @@ export async function saveProcessedItem(item: any, clientId: number) {
   const emailId = item.raw_email_id || item.rawEmailId || null;
   if (emailId) {
     const existing = await pool.query(
-      "SELECT id FROM processed_items " +
-      "WHERE raw_email_id = $1 AND client_id = $2",
+      "SELECT id FROM processed_items WHERE raw_email_id = $1 AND client_id = $2",
       [emailId, clientId]
     );
     if (existing.rows.length > 0) {
@@ -100,8 +98,8 @@ export async function saveProcessedItem(item: any, clientId: number) {
     "INSERT INTO processed_items " +
     "(vendor, invoice_number, amount, due_date, " +
     "status, category, confidence, summary, " +
-    "raw_email_id, extracted_data, client_id) " +
-    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) " +
+    "raw_email_id, extracted_data, client_id, source) " +
+    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) " +
     "RETURNING *";
   const vals = [
     item.vendor || "Unknown",
@@ -117,6 +115,7 @@ export async function saveProcessedItem(item: any, clientId: number) {
       ? JSON.stringify(item.extracted_data || item.extractedData)
       : null,
     clientId,
+    item.source || "email",
   ];
   return pool.query(sql, vals);
 }
@@ -127,9 +126,7 @@ export async function updateItemStatus(
   clientId: number
 ) {
   return pool.query(
-    "UPDATE processed_items " +
-    "SET status = $1, updated_at = NOW() " +
-    "WHERE id = $2 AND client_id = $3 RETURNING *",
+    "UPDATE processed_items SET status = $1, updated_at = NOW() WHERE id = $2 AND client_id = $3 RETURNING *",
     [status, id, clientId]
   );
 }
@@ -137,29 +134,21 @@ export async function updateItemStatus(
 export async function getItems(clientId: number, category?: string) {
   if (category) {
     return pool.query(
-      "SELECT * FROM processed_items " +
-      "WHERE client_id = $1 AND category = $2 " +
-      "ORDER BY processed_at DESC",
+      "SELECT * FROM processed_items WHERE client_id = $1 AND category = $2 ORDER BY processed_at DESC",
       [clientId, category]
     );
   }
   return pool.query(
-    "SELECT * FROM processed_items " +
-    "WHERE client_id = $1 " +
-    "ORDER BY processed_at DESC",
+    "SELECT * FROM processed_items WHERE client_id = $1 ORDER BY processed_at DESC",
     [clientId]
   );
 }
 
 export async function getDashboardSummary(clientId: number) {
   return pool.query(
-    "SELECT category, status, " +
-    "COUNT(*) as count, " +
-    "SUM(amount) as total " +
-    "FROM processed_items " +
-    "WHERE client_id = $1 " +
-    "GROUP BY category, status " +
-    "ORDER BY category, status",
+    "SELECT category, status, COUNT(*) as count, SUM(amount) as total " +
+    "FROM processed_items WHERE client_id = $1 " +
+    "GROUP BY category, status ORDER BY category, status",
     [clientId]
   );
 }
