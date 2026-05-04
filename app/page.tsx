@@ -544,6 +544,9 @@ export default function Home() {
                         </button>
                       ))}
                     </div>
+                    <div style={{ padding: "0 16px 12px", textAlign: "right" as const }}>
+                      <button onClick={() => deleteItem(item.id)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 12, cursor: "pointer", padding: "4px 8px" }}>Remove</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -953,7 +956,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "white",
     borderRadius: 12,
     border: "1px solid #e2e8f0",
-    overflow: "hidden",
+    
   },
   cardHeader: {
     display: "flex",
