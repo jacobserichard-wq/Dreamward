@@ -187,19 +187,7 @@ export default function Home() {
     []
   );
 
-  // ─── Delete item ───────────────────────────────────────────────────────────
-
-  const deleteItem = useCallback((id: string) => {
-    if (!confirm("Delete this item? This cannot be undone.")) return;
-    fetch("/api/items", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: Number(id) }),
-    }).catch((err) => console.error("Delete failed:", err));
-    setProcessedItems((prev) => prev.filter((item) => item.id !== id));
-  }, []);
-
-  // ─── CSV Upload
+  // ─── CSV Upload ────────────────────────────────────────────────────────────
 
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
@@ -223,6 +211,18 @@ export default function Home() {
     } finally {
       setUploading(false);
     }
+  }, []);
+
+// ─── Delete item ───────────────────────────────────────────────────────────
+
+  const deleteItem = useCallback((id: string) => {
+    if (!confirm("Delete this item? This cannot be undone.")) return;
+    fetch("/api/items", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: Number(id) }),
+    }).catch((err) => console.error("Delete failed:", err));
+    setProcessedItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   const confirmImport = useCallback(async () => {
@@ -543,17 +543,6 @@ export default function Home() {
                           {s === "needs_review" && "\u{1F440}"}
                         </button>
                       ))}
-                   </div>
-                    <div style={{ padding: "0 16px 12px", textAlign: "right" as const }}>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        style={{
-                          background: "none", border: "none", color: "#94a3b8",
-                          fontSize: 12, cursor: "pointer", padding: "4px 8px",
-                        }}
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -562,7 +551,7 @@ export default function Home() {
           </>
         )}
 
-        {/* ── DASHBOARD TAB
+        {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (
           <div style={styles.dashboard}>
             {/* Stat cards */}
