@@ -10,30 +10,26 @@ export async function sendEmail({ to, subject, html }: EmailParams) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   console.log("Attempting to send email to:", to, "API key exists:", !!RESEND_API_KEY);
   if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
-    return null;
+    throw new Error("RESEND_API_KEY not configured");
   }
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
-    });
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+  });
 
-    const data = await res.json();
-    if (!res.ok) {
-      console.error("Email send failed:", data);
-      return null;
-    }
-    return data;
-  } catch (error) {
-    console.error("Email error:", error);
-    return null;
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail =
+      (data && typeof data === "object" && "message" in data && (data as { message?: string }).message) ||
+      `HTTP ${res.status}`;
+    throw new Error(`Resend send failed: ${detail}`);
   }
+  return data;
 }
 
 export function welcomeEmail(businessName: string) {

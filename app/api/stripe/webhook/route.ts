@@ -70,7 +70,13 @@ export async function POST(request: NextRequest) {
           if (clientResult.rows[0]) {
             const c = clientResult.rows[0];
             const email = paymentFailedEmail(c.business_name);
-            await sendEmail({ to: c.email, ...email });
+            try {
+              await sendEmail({ to: c.email, ...email });
+            } catch (err) {
+              // Don't 5xx the webhook on email failure — Stripe would retry
+              // and we'd re-run the whole subscription update.
+              console.error("Payment-failed email send failed:", err);
+            }
           }
         }
         break;

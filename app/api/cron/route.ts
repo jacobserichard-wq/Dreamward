@@ -22,16 +22,22 @@ export async function GET(req: NextRequest) {
     );
 
     let sent = 0;
+    let failed = 0;
     for (const client of result.rows) {
       const daysLeft = Math.ceil(
         (new Date(client.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
       const email = trialExpiringEmail(client.business_name, daysLeft);
-      await sendEmail({ to: client.email, ...email });
-      sent++;
+      try {
+        await sendEmail({ to: client.email, ...email });
+        sent++;
+      } catch (err) {
+        console.error(`Trial-expiring email failed for ${client.email}:`, err);
+        failed++;
+      }
     }
 
-    return NextResponse.json({ success: true, emailsSent: sent });
+    return NextResponse.json({ success: true, emailsSent: sent, emailsFailed: failed });
   } catch (error) {
     console.error("Cron error:", error);
     return NextResponse.json({ error: "Cron failed" }, { status: 500 });

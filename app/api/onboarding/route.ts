@@ -22,11 +22,15 @@ export async function POST(req: NextRequest) {
       [businessName, industry, client.id]
     );
 
-    // Send welcome email (don't block the response if it fails)
+    // Send welcome email. Must be awaited on Vercel serverless — an unawaited
+    // promise gets orphaned when the function returns. Failures shouldn't
+    // block onboarding, so we catch and log instead of propagating.
     const { subject, html } = welcomeEmail(businessName);
-    sendEmail({ to: client.email, subject, html }).catch((err) =>
-      console.error("Welcome email failed:", err)
-    );
+    try {
+      await sendEmail({ to: client.email, subject, html });
+    } catch (err) {
+      console.error("Welcome email failed:", err);
+    }
 
     return NextResponse.json({ success: true, plan: client.plan });
   } catch (error) {
