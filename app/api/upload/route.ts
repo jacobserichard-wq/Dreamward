@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     const dataRows = rows.slice(1).filter((r) => r.some((cell) => cell.trim()));
 
     const settings = await getClientSettings(client.id);
-    const customCategories: string[] = settings?.expense_categories
-      ? JSON.parse(settings.expense_categories)
+    const customCategories: string[] = Array.isArray(settings?.custom_categories)
+      ? settings.custom_categories
       : [];
     const defaultCategories = [
       "invoice", "expense", "ar_followup",
