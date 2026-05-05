@@ -42,6 +42,11 @@ function SignInContent() {
           <GoogleIcon />
           <span>{submitting ? "Redirecting..." : "Sign in with Google"}</span>
         </button>
+        <div style={s.legal}>
+          <a href="/privacy" style={s.legalLink}>Privacy</a>
+          <span style={s.legalDot}>{"·"}</span>
+          <a href="/terms" style={s.legalLink}>Terms</a>
+        </div>
       </div>
     </div>
   );
@@ -134,5 +139,18 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     marginBottom: 16,
     textAlign: "left" as const,
+  },
+  legal: {
+    marginTop: 24,
+    fontSize: 13,
+    color: "#94a3b8",
+  },
+  legalLink: {
+    color: "#64748b",
+    textDecoration: "none",
+    margin: "0 6px",
+  },
+  legalDot: {
+    color: "#cbd5e1",
   },
 };

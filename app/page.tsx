@@ -932,6 +932,11 @@ export default function Home() {
           </div>
         )}
       </main>
+      <footer style={styles.footer}>
+        <a href="/privacy" style={styles.footerLink}>Privacy</a>
+        <span style={styles.footerDot}>{"·"}</span>
+        <a href="/terms" style={styles.footerLink}>Terms</a>
+      </footer>
     </div>
   );
 }
@@ -1238,4 +1243,21 @@ const styles: Record<string, React.CSSProperties> = {
   breakdownIcon: { fontSize: 20 },
   breakdownCount: { fontSize: 24, fontWeight: 800, color: "#0f172a" },
   breakdownLabel: { fontSize: 13, color: "#64748b" },
+
+  footer: {
+    maxWidth: 1200,
+    margin: "32px auto 0",
+    padding: "20px 32px 32px",
+    fontSize: 13,
+    color: "#94a3b8",
+    textAlign: "center" as const,
+  },
+  footerLink: {
+    color: "#64748b",
+    textDecoration: "none",
+    margin: "0 6px",
+  },
+  footerDot: {
+    color: "#cbd5e1",
+  },
 };
