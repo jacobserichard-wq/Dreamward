@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes fw-spin {
+  to { transform: rotate(360deg); }
+}
+
+.fw-spin {
+  animation: fw-spin 0.8s linear infinite;
+  transform-origin: center;
+}

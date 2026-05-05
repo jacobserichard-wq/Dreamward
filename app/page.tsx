@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Spinner from "./components/Spinner";
+import ErrorBanner from "./components/ErrorBanner";
+import { apiFetch } from "@/lib/apiFetch";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,12 +58,15 @@ export default function Home() {
   // Backfill state
   const [backfillRange, setBackfillRange] = useState<string>("");
 
+  // Per-action loading states
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
+  const [deletingItems, setDeletingItems] = useState<Set<string>>(new Set());
+  const [clearingSample, setClearingSample] = useState(false);
+
   // Load processed items from database
   const loadItems = useCallback(async () => {
     try {
-      const res = await fetch("/api/items");
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await apiFetch<{ items: any[] }>("/api/items");
       const mapped = (data.items || []).map((item: any) => ({
         id: String(item.id),
         vendor: item.vendor,
@@ -76,7 +82,7 @@ export default function Home() {
       }));
       setProcessedItems(mapped);
     } catch (err) {
-      console.error("Failed to load items:", err);
+      setError(err instanceof Error ? `Couldn't load items: ${err.message}` : "Couldn't load items");
     }
   }, []);
 
@@ -110,12 +116,12 @@ export default function Home() {
     setError(null);
     setSelectedLabel(label);
     try {
-      const res = await fetch(`/api/gmail?label=${encodeURIComponent(label)}`);
-      if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
-      const data = await res.json();
+      const data = await apiFetch<{ messages: Email[] }>(
+        `/api/gmail?label=${encodeURIComponent(label)}`
+      );
       setEmails(data.messages || []);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to fetch emails");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't fetch emails");
       setEmails([]);
     } finally {
       setLoading(false);
@@ -132,13 +138,13 @@ export default function Home() {
     afterDate.setDate(afterDate.getDate() - daysBack);
     const after = afterDate.toISOString().split("T")[0].replace(/-/g, "/");
     try {
-      const res = await fetch(`/api/gmail?label=${encodeURIComponent(label)}&after=${after}&maxResults=100`);
-      if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
-      const data = await res.json();
+      const data = await apiFetch<{ messages: Email[] }>(
+        `/api/gmail?label=${encodeURIComponent(label)}&after=${after}&maxResults=100`
+      );
       setEmails(data.messages || []);
       setSuccessMsg(`Found ${(data.messages || []).length} emails from the last ${daysBack} days`);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to fetch emails");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't fetch emails");
       setEmails([]);
     } finally {
       setLoading(false);
@@ -175,25 +181,21 @@ export default function Home() {
     };
 
     try {
-      const res = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emails,
-          category: categoryMap[selectedLabel],
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || `Processing failed: ${res.statusText}`);
-      }
-
-      const data = await res.json();
+      const data = await apiFetch<{ results: ProcessedItem[]; processed: number }>(
+        "/api/process",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            emails,
+            category: categoryMap[selectedLabel],
+          }),
+        }
+      );
       setProcessedItems((prev) => [...data.results, ...prev]);
       setSuccessMsg(`Processed ${data.processed} items from ${selectedLabel}`);
       setActiveTab("processed");
-    } catch (err: unknown) {
+    } catch (err) {
       setError(err instanceof Error ? err.message : "AI processing failed");
     } finally {
       setProcessing(false);
@@ -202,19 +204,32 @@ export default function Home() {
 
   // ─── Update item status ────────────────────────────────────────────────────
   const updateStatus = useCallback(
-    (id: string, newStatus: ProcessedItem["status"]) => {
-      fetch("/api/items", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: Number(id), status: newStatus }),
-      }).catch((err) => console.error("Status update failed:", err));
+    async (id: string, newStatus: ProcessedItem["status"]) => {
+      const prevItems = processedItems;
+      setUpdatingStatus((s) => new Set(s).add(id));
       setProcessedItems((prev) =>
         prev.map((item) =>
           item.id === id ? { ...item, status: newStatus } : item
         )
       );
+      try {
+        await apiFetch("/api/items", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: Number(id), status: newStatus }),
+        });
+      } catch (err) {
+        setProcessedItems(prevItems);
+        setError(err instanceof Error ? err.message : "Couldn't update status");
+      } finally {
+        setUpdatingStatus((s) => {
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+      }
     },
-    []
+    [processedItems]
   );
 
   // ─── CSV Upload ────────────────────────────────────────────────────────────
@@ -226,18 +241,16 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Upload failed");
-      }
-      const data = await res.json();
+      const data = await apiFetch<{ mappedRows: any[]; categories: string[] }>(
+        "/api/upload",
+        { method: "POST", body: formData }
+      );
       setUploadReview(data);
       setReviewRows(
         data.mappedRows.map((r: any, i: number) => ({ ...r, _approved: true, _index: i }))
       );
-    } catch (err: any) {
-      setError(err.message || "Upload failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -247,29 +260,41 @@ export default function Home() {
 
   const clearSampleData = useCallback(async () => {
     if (!confirm("Clear all sample data? You can't undo this.")) return;
+    setClearingSample(true);
+    setError(null);
     try {
-      const res = await fetch("/api/sample-data", { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to clear sample data");
-      }
+      await apiFetch("/api/sample-data", { method: "DELETE" });
       await loadItems();
       setSuccessMsg("Sample data cleared");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear sample data");
+      setError(err instanceof Error ? err.message : "Couldn't clear sample data");
+    } finally {
+      setClearingSample(false);
     }
   }, [loadItems]);
 
   // ─── Delete item ───────────────────────────────────────────────────────────
 
-  const deleteItem = useCallback((id: string) => {
+  const deleteItem = useCallback(async (id: string) => {
     if (!confirm("Delete this item? This cannot be undone.")) return;
-    fetch("/api/items", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: Number(id) }),
-    }).catch((err) => console.error("Delete failed:", err));
-    setProcessedItems((prev) => prev.filter((item) => item.id !== id));
+    setDeletingItems((s) => new Set(s).add(id));
+    setError(null);
+    try {
+      await apiFetch("/api/items", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id) }),
+      });
+      setProcessedItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete item");
+    } finally {
+      setDeletingItems((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
+    }
   }, []);
 
   const confirmImport = useCallback(async () => {
@@ -281,25 +306,20 @@ export default function Home() {
     setImporting(true);
     setError(null);
     try {
-      const res = await fetch("/api/upload/confirm", {
+      const data = await apiFetch<{ imported: number }>("/api/upload/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rows: approved.map(({ _approved, _index, ...rest }: any) => rest),
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Import failed");
-      }
-      const data = await res.json();
       setSuccessMsg(`Imported ${data.imported} items from CSV`);
       setUploadReview(null);
       setReviewRows([]);
       await loadItems();
       setActiveTab("processed");
-    } catch (err: any) {
-      setError(err.message || "Import failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setImporting(false);
     }
@@ -383,7 +403,7 @@ export default function Home() {
 
       <main style={styles.main}>
         {/* Status messages */}
-        {error && <div style={styles.errorBanner}>{error}</div>}
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
         {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
 
         {/* Sample data banner */}
@@ -392,8 +412,19 @@ export default function Home() {
             <span style={styles.sampleBannerText}>
               {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when you&apos;re ready to add real data.
             </span>
-            <button onClick={clearSampleData} style={styles.sampleBannerBtn}>
-              Clear sample data
+            <button
+              onClick={clearSampleData}
+              disabled={clearingSample}
+              style={{
+                ...styles.sampleBannerBtn,
+                ...(clearingSample ? { opacity: 0.6, cursor: "wait" } : {}),
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {clearingSample && <Spinner size={12} color="#854d0e" />}
+              {clearingSample ? "Clearing..." : "Clear sample data"}
             </button>
           </div>
         )}
@@ -429,12 +460,16 @@ export default function Home() {
                   disabled={processing || emails.length === 0}
                   style={{
                     ...styles.processBtn,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
                     ...(processing || emails.length === 0
                       ? styles.processBtnDisabled
                       : {}),
                   }}
                 >
-                  {processing ? "\u231B Processing..." : "\u{1F916} Process with AI"}
+                  {processing ? <Spinner size={14} color="white" /> : <span>{"\u{1F916}"}</span>}
+                  {processing ? "Processing..." : "Process with AI"}
                 </button>
 
                 <label style={{
@@ -442,11 +477,12 @@ export default function Home() {
                   background: "#3b82f6",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 8,
                   margin: 0,
                   ...(uploading ? styles.processBtnDisabled : {}),
                 }}>
-                  {uploading ? "\u231B Analyzing..." : "\u{1F4C1} Upload CSV"}
+                  {uploading ? <Spinner size={14} color="white" /> : <span>{"\u{1F4C1}"}</span>}
+                  {uploading ? "Analyzing..." : "Upload CSV"}
                   <input
                     type="file"
                     accept=".csv,.tsv"
@@ -460,37 +496,52 @@ export default function Home() {
                   />
                 </label>
 
-                <select
-                  value={backfillRange}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setBackfillRange(e.target.value);
-                      fetchBackfill(selectedLabel, parseInt(e.target.value));
-                    }
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: "1px solid #e2e8f0",
-                    background: "white",
-                    fontSize: 13,
-                    color: "#475569",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="">Backfill...</option>
-                  <option value="30">Last 30 days</option>
-                  <option value="60">Last 60 days</option>
-                  <option value="90">Last 90 days</option>
-                  <option value="180">Last 6 months</option>
-                  <option value="365">Last year</option>
-                </select>
+                <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                  <select
+                    value={backfillRange}
+                    disabled={loading}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setBackfillRange(e.target.value);
+                        fetchBackfill(selectedLabel, parseInt(e.target.value));
+                      }
+                    }}
+                    style={{
+                      padding: "10px 12px",
+                      paddingRight: loading ? 36 : 12,
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      background: "white",
+                      fontSize: 13,
+                      color: "#475569",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      opacity: loading ? 0.6 : 1,
+                    }}
+                  >
+                    <option value="">{loading ? "Backfilling..." : "Backfill..."}</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 6 months</option>
+                    <option value="365">Last year</option>
+                  </select>
+                  {loading && (
+                    <div style={{ position: "absolute", right: 10, pointerEvents: "none", color: "#475569" }}>
+                      <Spinner size={14} />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Email list */}
             {loading ? (
-              <div style={styles.loadingState}>Loading emails...</div>
+              <div style={styles.loadingState}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "#64748b" }}>
+                  <Spinner size={20} />
+                  <span>Loading emails...</span>
+                </div>
+              </div>
             ) : emails.length === 0 ? (
               <div style={styles.emptyState}>
                 <p style={styles.emptyIcon}>{"\u{1F4ED}"}</p>
@@ -593,26 +644,56 @@ export default function Home() {
                     <div style={styles.cardActions}>
                       {(
                         ["pending", "paid", "overdue", "needs_review"] as const
-                      ).map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => updateStatus(item.id, s)}
-                          style={{
-                            ...styles.statusBtn,
-                            ...(item.status === s
-                              ? styles.statusBtnActive
-                              : {}),
-                          }}
-                        >
-                          {s === "pending" && "\u231B"}
-                          {s === "paid" && "\u2705"}
-                          {s === "overdue" && "\u{1F6A8}"}
-                          {s === "needs_review" && "\u{1F440}"}
-                        </button>
-                      ))}
+                      ).map((s) => {
+                        const isUpdating = updatingStatus.has(item.id);
+                        const isActive = item.status === s;
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => updateStatus(item.id, s)}
+                            disabled={isUpdating}
+                            style={{
+                              ...styles.statusBtn,
+                              ...(isActive ? styles.statusBtnActive : {}),
+                              ...(isUpdating ? { opacity: 0.6, cursor: "wait" } : {}),
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {isUpdating && isActive ? (
+                              <Spinner size={14} color="#475569" />
+                            ) : (
+                              <>
+                                {s === "pending" && "\u231B"}
+                                {s === "paid" && "\u2705"}
+                                {s === "overdue" && "\u{1F6A8}"}
+                                {s === "needs_review" && "\u{1F440}"}
+                              </>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                     <div style={{ padding: "0 16px 12px", textAlign: "right" as const }}>
-                      <button onClick={() => deleteItem(item.id)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 12, cursor: "pointer", padding: "4px 8px" }}>Remove</button>
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        disabled={deletingItems.has(item.id)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#94a3b8",
+                          fontSize: 12,
+                          cursor: deletingItems.has(item.id) ? "wait" : "pointer",
+                          padding: "4px 8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        {deletingItems.has(item.id) && <Spinner size={11} color="#94a3b8" />}
+                        {deletingItems.has(item.id) ? "Removing..." : "Remove"}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -823,8 +904,10 @@ export default function Home() {
                       padding: "10px 24px", borderRadius: 8, border: "none",
                       background: "#16a34a", color: "white", cursor: "pointer",
                       fontSize: 14, fontWeight: 600,
+                      display: "inline-flex", alignItems: "center", gap: 8,
                       ...(importing ? { opacity: 0.5, cursor: "not-allowed" } : {}),
                     }}>
+                    {importing && <Spinner size={14} color="white" />}
                     {importing ? "Importing..." : `Import ${reviewRows.filter((r: any) => r._approved).length} Rows`}
                   </button>
                 </div>
@@ -922,15 +1005,6 @@ const styles: Record<string, React.CSSProperties> = {
 
   main: { maxWidth: 1200, margin: "0 auto", padding: "24px 32px" },
 
-  errorBanner: {
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    color: "#991b1b",
-    padding: "12px 16px",
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 14,
-  },
   successBanner: {
     background: "#f0fdf4",
     border: "1px solid #bbf7d0",

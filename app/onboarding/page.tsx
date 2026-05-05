@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Spinner from "../components/Spinner";
+import ErrorBanner from "../components/ErrorBanner";
+import { apiFetch } from "@/lib/apiFetch";
 
 const INDUSTRIES = [
   { id: "marketplace", label: "Market Vendor / Craft Seller", icon: "\u{1F3EA}" },
@@ -39,21 +42,14 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/onboarding", {
+      const data = await apiFetch<{ plan: string }>("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessName: businessName.trim(), industry }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save");
-      }
-
       router.push(data.plan === "pro" ? "/welcome-pro" : "/");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't complete onboarding");
       setSaving(false);
     }
   };
@@ -148,16 +144,25 @@ export default function OnboardingPage() {
                 disabled={saving || !industry}
                 style={{
                   ...s.primaryBtn,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
                   ...(saving || !industry ? { opacity: 0.5, cursor: "not-allowed" } : {}),
                 }}
               >
+                {saving && <Spinner size={14} color="white" />}
                 {saving ? "Setting up..." : "Launch FlowWork"}
               </button>
             </div>
           </div>
         )}
 
-        {error && <div style={s.error}>{error}</div>}
+        {error && (
+          <div style={{ marginTop: 16 }}>
+            <ErrorBanner message={error} onDismiss={() => setError(null)} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -297,15 +302,5 @@ const s: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: 15,
     fontWeight: 500,
-  },
-  error: {
-    marginTop: 16,
-    padding: "10px 16px",
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    borderRadius: 8,
-    color: "#991b1b",
-    fontSize: 14,
-    textAlign: "center" as const,
   },
 };

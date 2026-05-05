@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
+import Spinner from "../components/Spinner";
+import ErrorBanner from "../components/ErrorBanner";
+import { apiFetch } from "@/lib/apiFetch";
 
 export default function WelcomeProPage() {
   const router = useRouter();
@@ -37,14 +40,10 @@ export default function WelcomeProPage() {
     setLoadingSample(true);
     setError(null);
     try {
-      const res = await fetch("/api/sample-data", { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to load sample data");
-      }
+      await apiFetch("/api/sample-data", { method: "POST" });
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Couldn't load sample data");
       setLoadingSample(false);
     }
   };
@@ -129,16 +128,20 @@ export default function WelcomeProPage() {
             We can load a set of realistic sample invoices and expenses tailored to your
             industry so you can click around the dashboard before adding real data.
           </p>
-          {error && <div style={s.error}>{error}</div>}
+          {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
           <div style={s.btnRow}>
             <button
               onClick={handleLoadSample}
               disabled={loadingSample}
               style={{
                 ...s.primaryBtn,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
                 ...(loadingSample ? { opacity: 0.5, cursor: "not-allowed" } : {}),
               }}
             >
+              {loadingSample && <Spinner size={14} color="white" />}
               {loadingSample ? "Loading sample data..." : "Load sample data"}
             </button>
             <a href="/" style={s.skipLink}>
@@ -267,14 +270,5 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     textDecoration: "none",
     fontWeight: 500,
-  },
-  error: {
-    padding: "10px 16px",
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    borderRadius: 8,
-    color: "#991b1b",
-    fontSize: 14,
-    marginBottom: 16,
   },
 };

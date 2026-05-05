@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Spinner from "../components/Spinner";
+import ErrorBanner from "../components/ErrorBanner";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface BillingData {
   plan: string;
@@ -56,12 +59,10 @@ export default function BillingPage() {
   useEffect(() => {
     async function loadBilling() {
       try {
-        const res = await fetch("/api/billing");
-        if (!res.ok) throw new Error("Failed to load billing");
-        const data = await res.json();
+        const data = await apiFetch<BillingData>("/api/billing");
         setBilling(data);
       } catch (err) {
-        setError("Failed to load billing information");
+        setError(err instanceof Error ? err.message : "Couldn't load billing information");
       } finally {
         setLoading(false);
       }
@@ -71,32 +72,38 @@ export default function BillingPage() {
 
   const openPortal = async () => {
     setActionLoading("portal");
+    setError(null);
     try {
-      const res = await fetch("/api/stripe/portal", { method: "POST" });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else setError(data.error || "Failed to open billing portal");
-    } catch {
-      setError("Failed to open billing portal");
-    } finally {
+      const data = await apiFetch<{ url?: string }>("/api/stripe/portal", { method: "POST" });
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setError("Billing portal returned no URL — please contact support.");
+        setActionLoading(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't open billing portal");
       setActionLoading(null);
     }
   };
 
   const startCheckout = async (planId: string) => {
     setActionLoading(planId);
+    setError(null);
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      const data = await apiFetch<{ url?: string }>("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId }),
       });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else setError(data.error || "Failed to start checkout");
-    } catch {
-      setError("Failed to start checkout");
-    } finally {
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setError("Checkout returned no URL — please contact support.");
+        setActionLoading(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start checkout");
       setActionLoading(null);
     }
   };
@@ -105,7 +112,10 @@ export default function BillingPage() {
     return (
       <div style={s.container}>
         <div style={s.content}>
-          <p style={{ textAlign: "center", color: "#64748b", padding: 60 }}>Loading billing information...</p>
+          <div style={{ textAlign: "center", color: "#64748b", padding: 60, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <Spinner size={20} />
+            <span>Loading billing information...</span>
+          </div>
         </div>
       </div>
     );
@@ -136,7 +146,7 @@ export default function BillingPage() {
           <p style={s.subtitle}>{billing.email}</p>
         </div>
 
-        {error && <div style={s.errorBanner}>{error}</div>}
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
         {/* Current Plan Card */}
         <div style={s.card}>
@@ -149,8 +159,19 @@ export default function BillingPage() {
               </div>
             </div>
             {billing.stripeCustomerId && (
-              <button onClick={openPortal} disabled={actionLoading === "portal"} style={s.portalBtn}>
-                {actionLoading === "portal" ? "Loading..." : "Manage subscription"}
+              <button
+                onClick={openPortal}
+                disabled={actionLoading === "portal"}
+                style={{
+                  ...s.portalBtn,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  ...(actionLoading === "portal" ? { opacity: 0.6, cursor: "wait" } : {}),
+                }}
+              >
+                {actionLoading === "portal" && <Spinner size={14} color="#334155" />}
+                {actionLoading === "portal" ? "Opening portal..." : "Manage subscription"}
               </button>
             )}
           </div>
@@ -225,16 +246,36 @@ export default function BillingPage() {
                 {isCurrent ? (
                   <div style={s.currentLabel}>Current plan</div>
                 ) : isDowngrade ? (
-                  <button onClick={openPortal} style={s.downgradeBtn}>
-                    Manage in portal
+                  <button
+                    onClick={openPortal}
+                    disabled={actionLoading === "portal"}
+                    style={{
+                      ...s.downgradeBtn,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      ...(actionLoading === "portal" ? { opacity: 0.6, cursor: "wait" } : {}),
+                    }}
+                  >
+                    {actionLoading === "portal" && <Spinner size={14} color="#64748b" />}
+                    {actionLoading === "portal" ? "Opening portal..." : "Manage in portal"}
                   </button>
                 ) : (
                   <button
                     onClick={() => startCheckout(planId)}
                     disabled={actionLoading === planId}
-                    style={s.upgradeBtn}
+                    style={{
+                      ...s.upgradeBtn,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      ...(actionLoading === planId ? { opacity: 0.7, cursor: "wait" } : {}),
+                    }}
                   >
-                    {actionLoading === planId ? "Loading..." : `Upgrade to ${plan.name}`}
+                    {actionLoading === planId && <Spinner size={14} color="white" />}
+                    {actionLoading === planId ? "Starting checkout..." : `Upgrade to ${plan.name}`}
                   </button>
                 )}
               </div>
@@ -265,16 +306,6 @@ const s: Record<string, React.CSSProperties> = {
   },
   title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
   subtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-
-  errorBanner: {
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    color: "#991b1b",
-    padding: "12px 16px",
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 14,
-  },
 
   card: {
     background: "white",
