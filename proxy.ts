@@ -1,5 +1,11 @@
-// Middleware uses NextAuth's `withAuth` helper. The matcher below is the
-// authoritative list of protected routes. Anything not listed is public.
+// Next 16 renamed the `middleware.ts` file convention to `proxy.ts`. NextAuth's
+// `withAuth` is itself the middleware function — it conforms to the same
+// (req, event) signature Next expects. We import it explicitly and re-export
+// as default; the older `export { default } from "next-auth/middleware"`
+// pattern is not recognized by Next 16's Turbopack analyzer as a function.
+//
+// The matcher below is the authoritative list of protected routes. Anything
+// not listed is public.
 //
 // Public by intentional omission:
 //   /signin            — the sign-in page itself
@@ -8,11 +14,12 @@
 //   /api/cron          — invoked by Vercel Cron with Bearer ${CRON_SECRET}
 //   /api/stripe/webhook — invoked by Stripe with stripe-signature header
 //
-// If you add a new route that needs to be public (no NextAuth session),
-// leave it OUT of the matcher. If you add a new route that needs auth,
-// add it explicitly below.
+// If you add a new route that needs to be public, leave it OUT of the matcher.
+// If you add a new route that needs auth, add it explicitly below.
 
-export { default } from "next-auth/middleware";
+import withAuth from "next-auth/middleware";
+
+export default withAuth;
 
 export const config = {
   matcher: [
