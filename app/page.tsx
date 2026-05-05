@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import Spinner from "./components/Spinner";
 import ErrorBanner from "./components/ErrorBanner";
 import { apiFetch } from "@/lib/apiFetch";
@@ -364,22 +365,37 @@ export default function Home() {
             </h1>
             <p style={styles.tagline}>Accounting Automation</p>
           </div>
-          {clientInfo && (
-            <a href="/billing" style={{
-              background: "rgba(255,255,255,0.15)",
-              color: "white",
-              padding: "6px 16px",
-              borderRadius: 20,
-              fontSize: 13,
-              fontWeight: 600,
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.5px",
-              textDecoration: "none",
-              cursor: "pointer",
-            }}>
-              {clientInfo.plan}
-            </a>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {clientInfo && (
+              <a href="/billing" style={{
+                background: "rgba(255,255,255,0.15)",
+                color: "white",
+                padding: "6px 16px",
+                borderRadius: 20,
+                fontSize: 13,
+                fontWeight: 600,
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.5px",
+                textDecoration: "none",
+                cursor: "pointer",
+              }}>
+                {clientInfo.plan}
+              </a>
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/signin" })}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.75)",
+                fontSize: 13,
+                cursor: "pointer",
+                padding: "6px 4px",
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 
