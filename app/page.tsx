@@ -26,6 +26,7 @@ interface ProcessedItem {
   confidence: number;
   rawEmailId: string;
   summary: string;
+  source: string;
 }
 
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
@@ -54,32 +55,34 @@ export default function Home() {
   // Backfill state
   const [backfillRange, setBackfillRange] = useState<string>("");
 
-  // Load processed items from database on mount
-  useEffect(() => {
-    async function loadItems() {
-      try {
-        const res = await fetch("/api/items");
-        if (!res.ok) return;
-        const data = await res.json();
-        const mapped = (data.items || []).map((item: any) => ({
-          id: String(item.id),
-          vendor: item.vendor,
-          invoiceNumber: item.invoice_number || "",
-          amount: parseFloat(item.amount) || 0,
-          dueDate: item.due_date || "",
-          status: item.status || "pending",
-          category: item.category || "invoice",
-          confidence: item.confidence || 0,
-          rawEmailId: item.raw_email_id || "",
-          summary: item.summary || "",
-        }));
-        setProcessedItems(mapped);
-      } catch (err) {
-        console.error("Failed to load items:", err);
-      }
+  // Load processed items from database
+  const loadItems = useCallback(async () => {
+    try {
+      const res = await fetch("/api/items");
+      if (!res.ok) return;
+      const data = await res.json();
+      const mapped = (data.items || []).map((item: any) => ({
+        id: String(item.id),
+        vendor: item.vendor,
+        invoiceNumber: item.invoice_number || "",
+        amount: parseFloat(item.amount) || 0,
+        dueDate: item.due_date || "",
+        status: item.status || "pending",
+        category: item.category || "invoice",
+        confidence: item.confidence || 0,
+        rawEmailId: item.raw_email_id || "",
+        summary: item.summary || "",
+        source: item.source || "email",
+      }));
+      setProcessedItems(mapped);
+    } catch (err) {
+      console.error("Failed to load items:", err);
     }
-    loadItems();
   }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
 
   // Load client plan info
   useEffect(() => {
@@ -240,6 +243,23 @@ export default function Home() {
     }
   }, []);
 
+  // ─── Clear sample data ─────────────────────────────────────────────────────
+
+  const clearSampleData = useCallback(async () => {
+    if (!confirm("Clear all sample data? You can't undo this.")) return;
+    try {
+      const res = await fetch("/api/sample-data", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to clear sample data");
+      }
+      await loadItems();
+      setSuccessMsg("Sample data cleared");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear sample data");
+    }
+  }, [loadItems]);
+
   // ─── Delete item ───────────────────────────────────────────────────────────
 
   const deleteItem = useCallback((id: string) => {
@@ -276,32 +296,14 @@ export default function Home() {
       setSuccessMsg(`Imported ${data.imported} items from CSV`);
       setUploadReview(null);
       setReviewRows([]);
-      // Reload items
-      const itemsRes = await fetch("/api/items");
-      if (itemsRes.ok) {
-        const itemsData = await itemsRes.json();
-        setProcessedItems(
-          (itemsData.items || []).map((item: any) => ({
-            id: String(item.id),
-            vendor: item.vendor,
-            invoiceNumber: item.invoice_number || "",
-            amount: parseFloat(item.amount) || 0,
-            dueDate: item.due_date || "",
-            status: item.status || "pending",
-            category: item.category || "invoice",
-            confidence: item.confidence || 0,
-            rawEmailId: item.raw_email_id || "",
-            summary: item.summary || "",
-          }))
-        );
-      }
+      await loadItems();
       setActiveTab("processed");
     } catch (err: any) {
       setError(err.message || "Import failed");
     } finally {
       setImporting(false);
     }
-  }, [reviewRows]);
+  }, [reviewRows, loadItems]);
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
@@ -383,6 +385,18 @@ export default function Home() {
         {/* Status messages */}
         {error && <div style={styles.errorBanner}>{error}</div>}
         {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
+
+        {/* Sample data banner */}
+        {processedItems.some((i) => i.source === "sample") && (
+          <div style={styles.sampleBanner}>
+            <span style={styles.sampleBannerText}>
+              {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when you&apos;re ready to add real data.
+            </span>
+            <button onClick={clearSampleData} style={styles.sampleBannerBtn}>
+              Clear sample data
+            </button>
+          </div>
+        )}
 
         {/* ── EMAILS TAB ── */}
         {activeTab === "emails" && (
@@ -925,6 +939,33 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
     marginBottom: 16,
     fontSize: 14,
+  },
+  sampleBanner: {
+    background: "#fefce8",
+    border: "1px solid #fde047",
+    color: "#854d0e",
+    padding: "12px 16px",
+    borderRadius: 8,
+    marginBottom: 16,
+    fontSize: 14,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap" as const,
+  },
+  sampleBannerText: {
+    fontWeight: 500,
+  },
+  sampleBannerBtn: {
+    padding: "6px 14px",
+    borderRadius: 6,
+    border: "1px solid #ca8a04",
+    background: "white",
+    color: "#854d0e",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
   },
 
   toolbar: {

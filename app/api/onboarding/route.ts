@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       console.error("Welcome email failed:", err)
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, plan: client.plan });
   } catch (error) {
     console.error("Onboarding error:", error);
     return NextResponse.json({ error: "Failed to save onboarding" }, { status: 500 });

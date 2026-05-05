@@ -45,12 +45,12 @@ export default function OnboardingPage() {
         body: JSON.stringify({ businessName: businessName.trim(), industry }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || "Failed to save");
       }
 
-      router.push("/");
+      router.push(data.plan === "pro" ? "/welcome-pro" : "/");
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
