@@ -9,6 +9,9 @@
 //
 // Public by intentional omission:
 //   /signin            — the sign-in page itself
+//   /privacy           — privacy policy, must be reachable to anonymous users
+//                        (Google OAuth review and end-user review require this)
+//   /terms             — terms of service, same reasoning as /privacy
 //   /api/auth/*        — NextAuth callbacks (sign-in/sign-out flow)
 //   /api/test-email    — diagnostic endpoint, kept reachable for debugging
 //   /api/cron          — invoked by Vercel Cron with Bearer ${CRON_SECRET}
