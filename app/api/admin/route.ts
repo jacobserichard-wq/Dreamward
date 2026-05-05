@@ -3,11 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
 
-const ADMIN_EMAILS = ["rjacobsen@flowworks.ap.com", "jacobse.richard@gmail.com", "meridian.supply.test@gmail.com"];
+function getAdminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS || "meridian.supply.test@gmail.com")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
+    const email = session?.user?.email?.toLowerCase();
+    if (!email || !getAdminEmails().includes(email)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
