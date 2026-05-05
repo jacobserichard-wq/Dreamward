@@ -1,12 +1,23 @@
+function endpointLabel(url: string): string {
+  try {
+    const path = url.startsWith("http") ? new URL(url).pathname : url.split("?")[0];
+    return path || url;
+  } catch {
+    return url;
+  }
+}
+
 export async function apiFetch<T = unknown>(
   url: string,
   init?: RequestInit
 ): Promise<T> {
+  const endpoint = endpointLabel(url);
+
   let res: Response;
   try {
     res = await fetch(url, init);
   } catch {
-    throw new Error("Network error — check your connection and try again.");
+    throw new Error(`Network error contacting ${endpoint} — check your connection and try again.`);
   }
 
   if (res.ok) {
@@ -18,21 +29,29 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  let message = `Request failed (${res.status})`;
+  // Build a non-empty error message. Trim and validate every candidate so we
+  // never throw an Error with an empty/whitespace-only message.
+  let detail = "";
   try {
     const data = await res.json();
-    if (data?.error && typeof data.error === "string") {
-      message = data.error;
-    } else if (data?.message && typeof data.message === "string") {
-      message = data.message;
+    if (typeof data?.error === "string" && data.error.trim()) {
+      detail = data.error.trim();
+    } else if (typeof data?.message === "string" && data.message.trim()) {
+      detail = data.message.trim();
     }
   } catch {
     try {
       const text = await res.text();
-      if (text) message = text;
+      if (text && text.trim() && !text.trim().startsWith("<")) {
+        detail = text.trim();
+      }
     } catch {
-      // keep fallback
+      // ignore
     }
   }
+
+  const message = detail
+    ? `${detail} (${endpoint} ${res.status})`
+    : `${endpoint} returned ${res.status}`;
   throw new Error(message);
 }

@@ -94,16 +94,16 @@ export default function Home() {
   useEffect(() => {
     async function loadClient() {
       try {
-        const res = await fetch("/api/client");
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiFetch<{ onboardingCompleted?: boolean } & Record<string, unknown>>(
+          "/api/client"
+        );
+        if (!data) return;
         setClientInfo(data);
         if (data.onboardingCompleted === false) {
           router.push("/onboarding");
-          return;
         }
       } catch (err) {
-        console.error("Failed to load client info:", err);
+        setError(err instanceof Error ? err.message : "Couldn't load account info");
       }
     }
     loadClient();
