@@ -28,8 +28,15 @@ FlowWork's use and transfer of information received from Google APIs adheres to 
 
 We request the following Google OAuth scopes:
 
-- **`https://www.googleapis.com/auth/userinfo.email`** and **`profile`** — to identify you and create your FlowWork account.
-- **`https://www.googleapis.com/auth/gmail.readonly`** (or equivalent metadata scopes) — to read emails you have explicitly labeled as invoices, expenses, or accounts receivable, so we can extract financial data using AI.
+- **`openid`**, **`email`**, and **`profile`** — to identify you and create your FlowWork account.
+- **`https://www.googleapis.com/auth/gmail.readonly`** — to read the content of email messages in your Gmail account. This is a "Restricted" scope under Google's classification.
+- **`https://www.googleapis.com/auth/gmail.labels`** — to view and manage Gmail labels (used to identify which emails you have designated for processing).
+
+**What the Gmail scope grants vs. how FlowWork uses it.** The `gmail.readonly` scope is broad: it grants FlowWork's servers the technical ability to read any message in your Gmail account. We disclose this honestly because Google requires us to request the scope at this level — Gmail does not currently offer a narrower production scope that would let us read only labeled messages while still accessing message bodies.
+
+In practice, FlowWork's application code only reads messages that match the Gmail labels you configure (by default: Invoices, Expenses, AR, or whatever labels you select during onboarding). We do not retrieve, store, display, or process messages outside those labels. We do not maintain copies of your full inbox. The broader technical access is not used, not logged, and not retained beyond the duration of the labeled-message fetch.
+
+If you would prefer not to grant this level of access, you should not connect your Gmail account to FlowWork. CSV upload remains available as an alternative for users who do not want to link their Gmail.
 
 We use Gmail data **only** to provide the user-facing accounting automation features of FlowWork. Specifically:
 
