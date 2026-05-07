@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 import Spinner from "./components/Spinner";
 import ErrorBanner from "./components/ErrorBanner";
@@ -421,6 +422,18 @@ export default function Home() {
         {/* Status messages */}
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
         {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
+
+        {/* White-glove backstop: Pro users who haven't visited /welcome-pro yet */}
+        {clientInfo?.plan === "pro" && clientInfo?.welcomeProSeen === false && (
+          <div style={styles.welcomeProBanner}>
+            <span style={styles.welcomeProBannerText}>
+              {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your white-glove onboarding call to get started.
+            </span>
+            <Link href="/welcome-pro" style={styles.welcomeProBannerBtn}>
+              Book your call {"→"}
+            </Link>
+          </div>
+        )}
 
         {/* Sample data banner */}
         {processedItems.some((i) => i.source === "sample") && (
@@ -1048,6 +1061,34 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
     flexWrap: "wrap" as const,
+  },
+  welcomeProBanner: {
+    background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+    border: "1px solid #f59e0b",
+    color: "#78350f",
+    padding: "12px 16px",
+    borderRadius: 8,
+    marginBottom: 16,
+    fontSize: 14,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap" as const,
+  },
+  welcomeProBannerText: {
+    fontWeight: 500,
+  },
+  welcomeProBannerBtn: {
+    padding: "6px 14px",
+    borderRadius: 6,
+    border: "1px solid #b45309",
+    background: "white",
+    color: "#78350f",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: "none",
   },
   sampleBannerText: {
     fontWeight: 500,

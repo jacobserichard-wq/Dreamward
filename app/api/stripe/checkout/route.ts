@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
 
     const client = await getSessionClient();
 
+    // Pro tier lands on /welcome-pro for white-glove onboarding (Calendly +
+    // sample data). Starter and Growth go to the regular dashboard.
+    const successPath = planId === "pro" ? "/welcome-pro" : "/";
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -28,7 +32,7 @@ export async function POST(req: NextRequest) {
         trial_period_days: 14,
         metadata: { clientId: String(client.id) },
       },
-      success_url: `${process.env.NEXTAUTH_URL}/?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.NEXTAUTH_URL}${successPath}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/pricing`,
       metadata: { clientId: String(client.id) },
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Spinner from "../components/Spinner";
@@ -37,6 +37,7 @@ export default function WelcomeProPage() {
   const [identity, setIdentity] = useState<ClientIdentity | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const seenRecorded = useRef(false);
 
   const businessName = identity?.businessName || "";
   const calendlyHref = useMemo(() => buildCalendlyHref(identity), [identity]);
@@ -60,6 +61,15 @@ export default function WelcomeProPage() {
           businessName: data.businessName ?? null,
         });
         setCheckingPlan(false);
+
+        // Mark welcome page as seen so the dashboard's backstop banner
+        // clears. Fire-and-forget — failures are logged, never block.
+        if (!seenRecorded.current) {
+          seenRecorded.current = true;
+          fetch("/api/welcome-pro/seen", { method: "POST" }).catch((err) => {
+            console.error("Failed to record welcome-pro visit:", err);
+          });
+        }
       } catch {
         router.replace("/");
       }

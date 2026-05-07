@@ -19,6 +19,7 @@ export async function GET() {
       industry: client.industry,
       trialEndsAt: client.trial_ends_at,
       onboardingCompleted: client.onboarding_completed,
+      welcomeProSeen: client.welcome_pro_seen,
       features: {
         maxItemsPerMonth: features.maxItemsPerMonth === Infinity ? null : features.maxItemsPerMonth,
         modules: features.modules,
