@@ -388,7 +388,7 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 ## Tech Stack & Tooling
 
-Next.js 14 (App Router), TypeScript, PostgreSQL (Railway), Tailwind, Stripe Checkout/Webhooks/Portal, NextAuth (Google OAuth), Anthropic Claude API (extraction, column mapping, sample data), Resend (transactional email), Calendly (booking), Vercel hosting (custom domain `flowworks.it.com`), Vercel Cron (daily trial-expiring sweep).
+Next.js 16 (App Router), TypeScript, PostgreSQL (Railway), Tailwind, Stripe Checkout/Webhooks/Portal, NextAuth (Google OAuth), Anthropic Claude API (extraction, column mapping, sample data), Resend (transactional email), Calendly (booking), Vercel hosting (custom domain `flowworks.it.com`), Vercel Cron (daily trial-expiring sweep).
 
 **Development workflow:** Claude Code (Opus 4.7) in VS Code terminal with Vercel MCP for deployment logs, GitHub for version control, notepad for emergency edits, `/api/test-email` diagnostic endpoint for Resend health checks.
 
