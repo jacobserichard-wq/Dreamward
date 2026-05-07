@@ -1,8 +1,8 @@
 # FlowWork Product Roadmap
 
-**Small Business Edition** | Updated May 6, 2026
+**Small Business Edition** | Updated May 6, 2026 (evening)
 
-**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phase 0–1 SHIPPED** · **Phase 1.5 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7 SHIPPED (white-glove Tier 1)** · **Phase 2: 3/6**
+**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phase 0–1 SHIPPED** · **Phase 1.5 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7 SHIPPED (white-glove Tier 1)** · **Phase 2: 3/6 + signin mobile-responsive shipped, dashboard pending**
 
 ---
 
@@ -220,12 +220,42 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 - [x] Fix stray `//` in JSX — *bug*
 - [x] Improve error messages (show actual error text + endpoint + status) — *UX*
 - [x] Add loading spinners during email fetch and AI processing — *UX*
-- [ ] **Mobile-responsive layout** for on-the-go use — *UX*
+- [ ] **Mobile-responsive layout** for on-the-go use — *UX* (in progress — see sub-section below)
   - UX considerations: Phone-first design, not just "scaled down desktop." Header collapses to hamburger; primary actions accessible by thumb in the bottom third of the screen; tables become cards on narrow viewports.
 - [ ] **Publish Google Cloud OAuth app to Production mode** — *infra*
   - **Blocked on CASA decision (see Phase 1.6 above).** App can run in Testing mode (capped at 100 users) until CASA is committed.
 - [ ] **AI auto-classification** — scan inbox, auto-label emails — *AI*
   - UX considerations: Confidence threshold for auto-apply vs. ask. Always show a "review" surface so users can correct mistakes; corrections feed back into the prompt or fine-tune.
+
+### Mobile-responsive progress (May 6, 2026, evening session)
+
+**Architectural decision:** Tailwind v4 was already installed but unused. After a read-only audit of styling architecture (inline `style` objects everywhere, zero responsive logic, `globals.css` already importing Tailwind), the choice was Option C — adopt Tailwind utility classes for new and touched components. Reasons: zero new dependency, no JS runtime cost, no SSR hydration risk, scannable utilities, design tokens in `@theme`. Mixed-system burden bounded because each file is either fully inline or fully Tailwind — never both. The `s`/`st`/`styles` const at the bottom of a file is the visible signal of "this one's still inline."
+
+**Pattern (reproducible):**
+1. Audit the file — list every hex color and map to slate (or red/amber/etc.) tokens.
+2. Smoke test — add one utility class with visible effect (e.g., `outline outline-2 outline-red-500`) and deploy. Verify Tailwind JIT picks up the file before doing the full conversion.
+3. Convert — replace `s` const with `className` strings, mobile-first responsive (`p-3 sm:p-6` etc.).
+4. Verify on Vercel preview at 320px, 390px, and desktop. Inspect DOM to confirm `style={...}` removed and Tailwind classes applied.
+5. Stop after each commit. One file per commit until the pattern is fully proven.
+
+**Shipped tonight:**
+- [x] **Tailwind v4 smoke test** — verified JIT scans `app/**/*.tsx` correctly. Commit `23221eb`. — *infra*
+- [x] **Signin page migrated to Tailwind** — first responsive page in the app. 22 lines of utilities replacing 91 lines of inline styles. Mobile-first padding (`p-3 sm:p-6` container, `py-8 px-6 sm:py-11 sm:px-10` card). Verified at 320px, 375px, 390px, and desktop. Commit `009a5a8`. — *UX*
+
+**Discovered during the session (not in original Phase 2 scope, but real):**
+- **Brand mark / header is duplicated across 4–5 pages** (dashboard, welcome-pro, billing, settings, admin). Each rebuilds the FlowWork logo + sign-out independently. Phase 2 mobile work without a shared header means every page rewrites the hamburger logic separately. **Header centralization should happen *before* dashboard mobile work, not after.**
+- **Geist font inconsistency.** `font-sans` in Tailwind maps to `var(--font-geist-sans)` (loaded by `next/font` somewhere), not the Apple system stack the inline-styled pages use. Signin now renders in Geist; other pages render in Apple system. Probably visually near-identical, but a real inconsistency to resolve eventually (either standardize on Geist via shared layout, or override `font-sans` in `globals.css` `@theme {}`).
+
+**Revised ordering for the remaining mobile-responsive sweep:**
+1. ~~Signin~~ ✅ Shipped tonight
+2. **PolicyDocument** — single shared component, both `/privacy` and `/terms` benefit from one conversion. Many element types (h1/h2/p/li/table) but no new patterns. ~25 minutes.
+3. **Header centralization** — extract shared `<AppHeader />` component used by all logged-in pages. Adds the hamburger pattern *once* instead of 4× in subsequent migrations. ~60 minutes.
+4. **Welcome-pro** — has the Calendly inline widget; cautious refactor (only the wrapper, don't touch `data-url` or `className="calendly-inline-widget"`). ~30 minutes.
+5. **Settings, Admin** — form-heavy, table-heavy pages. ~30 minutes each.
+6. **Dashboard** (`app/page.tsx`) — biggest file (~1280 lines), most state, most edge cases. Save for last; benefits from header already being shared. ~60–90 minutes.
+
+**Loose ends from tonight:**
+- Add `NEXT_PUBLIC_CALENDLY_URL` to Vercel env vars (Production + Preview + Development). Hardcoded fallback in code keeps welcome-pro working until then. 30 seconds in the dashboard.
 
 ---
 
@@ -361,7 +391,7 @@ All tiers include a 14-day free trial. CSV upload supports Square, Stripe, Quick
 
 ## Already Shipped (Phases 0 + 1 + 1.5 + Partial 1.6 + 1.7 + Partial 2)
 
-Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, security hardening.
+Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, **Tailwind v4 activated and validated (signin page migrated as first mobile-responsive surface)**, security hardening.
 
 ## Up Next
 
@@ -374,21 +404,32 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 2. **Sample data parity** — tailored data for landscaping, real estate, e-commerce, creative, bookkeeper, nonprofit, fitness. ~1–2 hours.
 3. **Pro reminder cron** — chase Pro users who haven't booked within 3 days. ~1–2 hours.
 
-**Phase 2 remaining (2 tasks now actionable, 1 deferred):**
-1. **Mobile-responsive layout** — important for craft sellers using phones at markets. **Best next coding session.**
-2. **AI auto-classification** — scan inbox, auto-label emails. Meatier feature, deserves its own session. (Will eventually be Pro-tier-only feature given Gmail dependency.)
-3. **Google Cloud OAuth Production review** — gated on tiered auth implementation + CASA decision. Not blocking near-term feature work.
+**Phase 2 mobile-responsive sweep (signin shipped, 5 surfaces remaining):**
+1. ✅ Signin (May 6 evening, commit `009a5a8`)
+2. **PolicyDocument** — single shared component, both `/privacy` and `/terms` benefit. Lowest-risk way to lock in the Tailwind muscle on a more complex file. ~25 minutes.
+3. **Header centralization** — extract shared `<AppHeader />` before dashboard work. Dashboard touches the header heavily; sharing it first means the hamburger pattern is solved once. ~60 minutes.
+4. **Welcome-pro** (cautious — Calendly widget) — *not in original list because welcome-pro is technically Phase 1.7's surface, but mobile work makes more sense alongside the rest of the sweep*. ~30 minutes.
+5. **Settings, Admin** — ~30 minutes each.
+6. **Dashboard** — biggest, most stateful, last. ~60–90 minutes.
 
-**Loose ends from May 6 session:**
-- Add `NEXT_PUBLIC_CALENDLY_URL` to Vercel env vars (Production + Preview + Development). Hardcoded fallback keeps page working until then; no urgency, but should land before any Calendly handle change.
+**Other Phase 2 items:**
+- **AI auto-classification** — scan inbox, auto-label emails. Meatier feature, deserves its own session. (Will eventually be Pro-tier-only feature given Gmail dependency.)
+- **Google Cloud OAuth Production review** — gated on tiered auth implementation + CASA decision. Not blocking near-term feature work.
 
-**Recommended next coding session:** Mobile-responsive layout, scoped to one screen at a time (signin → dashboard → settings → admin). Validates the design pattern before sweeping it across the whole app. Alternative: Phase 1.7 Tier 2 Calendly webhook if you want to keep momentum on white-glove work.
+**Loose ends:**
+- Add `NEXT_PUBLIC_CALENDLY_URL` to Vercel env vars (Production + Preview + Development). Hardcoded fallback keeps welcome-pro working. 30 seconds in the Vercel dashboard.
+
+**Recommended next coding session:** Either **PolicyDocument** (low-risk Tailwind reps on a more complex file) or **header centralization** (higher-leverage structural work that makes everything downstream cheaper). Header is the higher-leverage choice if you've got 60 minutes; PolicyDocument if you want a small completed thing in 25–30 minutes. Both are confined enough to fit a single session.
+
+Alternative non-Phase-2 options if mobile work isn't calling: white-glove Tier 2 Calendly webhook (~2–4 hours) keeps momentum on the Pro experience, and the audit context is still fresh.
 
 ---
 
 ## Tech Stack & Tooling
 
-Next.js 16 (App Router), TypeScript, PostgreSQL (Railway), Tailwind, Stripe Checkout/Webhooks/Portal, NextAuth (Google OAuth), Anthropic Claude API (extraction, column mapping, sample data), Resend (transactional email), Calendly (booking), Vercel hosting (custom domain `flowworks.it.com`), Vercel Cron (daily trial-expiring sweep).
+Next.js 16 (App Router), TypeScript, **Tailwind v4 (CSS-first config in `globals.css`, no `tailwind.config.*` file)**, PostgreSQL (Railway), Stripe Checkout/Webhooks/Portal, NextAuth (Google OAuth), Anthropic Claude API (extraction, column mapping, sample data), Resend (transactional email), Calendly (booking), Vercel hosting (custom domain `flowworks.it.com`), Vercel Cron (daily trial-expiring sweep).
+
+**Styling architecture:** Mixed during the Phase 2 mobile-responsive migration. New and touched components use Tailwind utility classes (mobile-first responsive); untouched components retain inline `style={...}` objects backed by a per-file `s` const at file bottom. The `s` const at the bottom of a file is the visible signal of "still inline." Each file is fully one or fully the other — never mixed within a single file.
 
 **Development workflow:** Claude Code (Opus 4.7) in VS Code terminal with Vercel MCP for deployment logs, GitHub for version control, notepad for emergency edits, `/api/test-email` diagnostic endpoint for Resend health checks.
 
