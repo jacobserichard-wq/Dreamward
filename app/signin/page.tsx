@@ -23,33 +23,36 @@ function SignInContent() {
   };
 
   return (
-    <div style={s.container}>
-      <div
-        style={s.card}
-        data-tailwind-test="true"
-        className="outline outline-2 outline-red-500"
-      >
-        <div style={s.logo}>
-          <span style={s.logoIcon}>{"⚡"}</span>
-          <span style={s.logoText}>FlowWork</span>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-3 sm:p-6 font-sans">
+      <div className="bg-white rounded-xl border border-slate-200 py-8 px-6 sm:py-11 sm:px-10 max-w-md w-full text-center">
+        <div className="inline-flex items-center gap-2.5 mb-2">
+          <span className="text-3xl">{"⚡"}</span>
+          <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            FlowWork
+          </span>
         </div>
-        <p style={s.tagline}>Sign in to continue</p>
-        {friendlyError && <div style={s.error}>{friendlyError}</div>}
+        <p className="text-[15px] text-slate-500 mb-8">Sign in to continue</p>
+        {friendlyError && (
+          <div className="bg-red-50 border border-red-200 text-red-800 py-2.5 px-3.5 rounded-lg text-[13px] mb-4 text-left">
+            {friendlyError}
+          </div>
+        )}
         <button
           onClick={handleSignIn}
           disabled={submitting}
-          style={{
-            ...s.button,
-            ...(submitting ? { opacity: 0.6, cursor: "wait" } : {}),
-          }}
+          className="w-full py-3 px-5 rounded-[10px] border border-slate-200 bg-white cursor-pointer text-[15px] font-semibold text-slate-800 inline-flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-wait"
         >
           <GoogleIcon />
           <span>{submitting ? "Redirecting..." : "Sign in with Google"}</span>
         </button>
-        <div style={s.legal}>
-          <a href="/privacy" style={s.legalLink}>Privacy</a>
-          <span style={s.legalDot}>{"·"}</span>
-          <a href="/terms" style={s.legalLink}>Terms</a>
+        <div className="mt-6 text-[13px] text-slate-400">
+          <a href="/privacy" className="text-slate-500 no-underline mx-1.5">
+            Privacy
+          </a>
+          <span className="text-slate-300">{"·"}</span>
+          <a href="/terms" className="text-slate-500 no-underline mx-1.5">
+            Terms
+          </a>
         </div>
       </div>
     </div>
@@ -86,75 +89,3 @@ function GoogleIcon() {
     </svg>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f8fafc",
-    padding: 24,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  card: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "44px 40px",
-    maxWidth: 400,
-    width: "100%",
-    textAlign: "center" as const,
-  },
-  logo: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 8,
-  },
-  logoIcon: { fontSize: 32 },
-  logoText: { fontSize: 28, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" },
-  tagline: {
-    fontSize: 15,
-    color: "#64748b",
-    margin: "0 0 32px",
-  },
-  button: {
-    width: "100%",
-    padding: "12px 20px",
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    cursor: "pointer",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "#1e293b",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  error: {
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    color: "#991b1b",
-    padding: "10px 14px",
-    borderRadius: 8,
-    fontSize: 13,
-    marginBottom: 16,
-    textAlign: "left" as const,
-  },
-  legal: {
-    marginTop: 24,
-    fontSize: 13,
-    color: "#94a3b8",
-  },
-  legalLink: {
-    color: "#64748b",
-    textDecoration: "none",
-    margin: "0 6px",
-  },
-  legalDot: {
-    color: "#cbd5e1",
-  },
-};
