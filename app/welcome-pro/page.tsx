@@ -7,6 +7,10 @@ import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import { apiFetch } from "@/lib/apiFetch";
 
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL ||
+  "https://calendly.com/jacobse-richard/flowwork-pro-onboarding-call";
+
 export default function WelcomeProPage() {
   const router = useRouter();
   const [checkingPlan, setCheckingPlan] = useState(true);
@@ -117,7 +121,7 @@ export default function WelcomeProPage() {
           </p>
           <div
             className="calendly-inline-widget"
-            data-url="https://calendly.com/jacobse-richard/flowwork-pro-onboarding-call"
+            data-url={CALENDLY_URL}
             style={{ minWidth: 320, height: 700 }}
           />
         </section>
