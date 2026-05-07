@@ -24,7 +24,11 @@ function SignInContent() {
 
   return (
     <div style={s.container}>
-      <div style={s.card}>
+      <div
+        style={s.card}
+        data-tailwind-test="true"
+        className="outline outline-2 outline-red-500"
+      >
         <div style={s.logo}>
           <span style={s.logoIcon}>{"⚡"}</span>
           <span style={s.logoText}>FlowWork</span>
