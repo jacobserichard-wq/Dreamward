@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Spinner from "../components/Spinner";
@@ -11,12 +11,35 @@ const CALENDLY_URL =
   process.env.NEXT_PUBLIC_CALENDLY_URL ||
   "https://calendly.com/jacobse-richard/flowwork-pro-onboarding-call";
 
+interface ClientIdentity {
+  id: number;
+  email: string;
+  businessName: string | null;
+}
+
+function buildCalendlyHref(identity: ClientIdentity | null): string {
+  if (!identity) return CALENDLY_URL;
+  try {
+    const url = new URL(CALENDLY_URL);
+    url.searchParams.set("utm_source", "flowwork");
+    url.searchParams.set("utm_content", String(identity.id));
+    if (identity.email) url.searchParams.set("email", identity.email);
+    if (identity.businessName) url.searchParams.set("name", identity.businessName);
+    return url.toString();
+  } catch {
+    return CALENDLY_URL;
+  }
+}
+
 export default function WelcomeProPage() {
   const router = useRouter();
   const [checkingPlan, setCheckingPlan] = useState(true);
-  const [businessName, setBusinessName] = useState<string>("");
+  const [identity, setIdentity] = useState<ClientIdentity | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const businessName = identity?.businessName || "";
+  const calendlyHref = useMemo(() => buildCalendlyHref(identity), [identity]);
 
   useEffect(() => {
     async function loadClient() {
@@ -31,7 +54,11 @@ export default function WelcomeProPage() {
           router.replace("/");
           return;
         }
-        setBusinessName(data.businessName || "");
+        setIdentity({
+          id: data.id,
+          email: data.email,
+          businessName: data.businessName ?? null,
+        });
         setCheckingPlan(false);
       } catch {
         router.replace("/");
@@ -121,7 +148,7 @@ export default function WelcomeProPage() {
           </p>
           <div
             className="calendly-inline-widget"
-            data-url={CALENDLY_URL}
+            data-url={calendlyHref}
             style={{ minWidth: 320, height: 700 }}
           />
         </section>

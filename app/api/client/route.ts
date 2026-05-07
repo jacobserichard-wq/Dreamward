@@ -12,6 +12,7 @@ export async function GET() {
     const features = getPlanFeatures(client.plan);
 
     return NextResponse.json({
+      id: client.id,
       plan: client.plan,
       businessName: client.business_name,
       email: client.email,
