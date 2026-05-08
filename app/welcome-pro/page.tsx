@@ -91,59 +91,66 @@ export default function WelcomeProPage() {
 
   if (checkingPlan) {
     return (
-      <div style={s.container}>
-        <div style={s.loadingState}>Loading...</div>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="min-h-screen flex items-center justify-center text-slate-500 text-[15px]">
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={s.container}>
-      <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <Script
+        src="https://assets.calendly.com/assets/external/widget.js"
+        strategy="afterInteractive"
+      />
 
-      <div style={s.hero}>
-        <div style={s.proBadge}>{"✨"} PRO</div>
-        <h1 style={s.heroTitle}>
+      <div className="bg-gradient-to-br from-slate-800 to-slate-700 text-white text-center pt-12 px-4 pb-10 sm:pt-16 sm:px-8 sm:pb-14">
+        <div className="inline-block py-1.5 px-3.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-[20px] text-xs font-bold tracking-widest mb-4">
+          {"✨"} PRO
+        </div>
+        <h1 className="text-2xl sm:text-4xl font-extrabold mb-4 leading-[1.2]">
           Welcome to FlowWork Pro{businessName ? `, ${businessName}` : ""}!
         </h1>
-        <p style={s.heroSubtitle}>
+        <p className="text-lg text-white/85 mx-auto max-w-[640px] leading-normal m-0">
           Your white-glove onboarding starts now. Book a 30-minute call with our team
           to get every feature dialed in for your business.
         </p>
       </div>
 
-      <div style={s.content}>
-        <section style={s.section}>
-          <h2 style={s.sectionTitle}>Your white-glove benefits</h2>
-          <div style={s.benefitGrid}>
-            <div style={s.benefitCard}>
-              <div style={s.benefitIcon}>{"\u{1F4DE}"}</div>
-              <h3 style={s.benefitTitle}>1:1 onboarding call</h3>
-              <p style={s.benefitText}>
+      <div className="max-w-[1100px] mx-auto pt-12 px-4 pb-16 sm:px-8 sm:pb-20">
+        <section className="mb-14">
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Your white-glove benefits</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white py-6 px-5 rounded-xl border border-slate-200">
+              <div className="text-3xl mb-3">{"\u{1F4DE}"}</div>
+              <h3 className="text-base font-bold text-slate-900 mb-2">1:1 onboarding call</h3>
+              <p className="text-sm text-slate-500 leading-normal m-0">
                 A 30-minute walkthrough where we configure FlowWork around your specific
                 workflow, accounting software, and tax situation.
               </p>
             </div>
-            <div style={s.benefitCard}>
-              <div style={s.benefitIcon}>{"\u{1F3AF}"}</div>
-              <h3 style={s.benefitTitle}>Custom categories</h3>
-              <p style={s.benefitText}>
+            <div className="bg-white py-6 px-5 rounded-xl border border-slate-200">
+              <div className="text-3xl mb-3">{"\u{1F3AF}"}</div>
+              <h3 className="text-base font-bold text-slate-900 mb-2">Custom categories</h3>
+              <p className="text-sm text-slate-500 leading-normal m-0">
                 Build category structures that match your chart of accounts. We&apos;ll
                 map your historical data on the call.
               </p>
             </div>
-            <div style={s.benefitCard}>
-              <div style={s.benefitIcon}>{"\u{1F4CA}"}</div>
-              <h3 style={s.benefitTitle}>Tax-ready reports</h3>
-              <p style={s.benefitText}>
+            <div className="bg-white py-6 px-5 rounded-xl border border-slate-200">
+              <div className="text-3xl mb-3">{"\u{1F4CA}"}</div>
+              <h3 className="text-base font-bold text-slate-900 mb-2">Tax-ready reports</h3>
+              <p className="text-sm text-slate-500 leading-normal m-0">
                 Schedule C and quarterly estimate prep — generated from your data, not
                 cobbled together at year-end.
               </p>
             </div>
-            <div style={s.benefitCard}>
-              <div style={s.benefitIcon}>{"\u{1F680}"}</div>
-              <h3 style={s.benefitTitle}>Priority support</h3>
-              <p style={s.benefitText}>
+            <div className="bg-white py-6 px-5 rounded-xl border border-slate-200">
+              <div className="text-3xl mb-3">{"\u{1F680}"}</div>
+              <h3 className="text-base font-bold text-slate-900 mb-2">Priority support</h3>
+              <p className="text-sm text-slate-500 leading-normal m-0">
                 Direct line to our team. Most questions answered same-day, guaranteed
                 under 24 hours.
               </p>
@@ -151,41 +158,34 @@ export default function WelcomeProPage() {
           </div>
         </section>
 
-        <section style={s.section}>
-          <h2 style={s.sectionTitle}>Book your onboarding call</h2>
-          <p style={s.sectionLead}>
+        <section className="mb-14">
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Book your onboarding call</h2>
+          <p className="text-[15px] text-slate-500 mb-6 leading-normal">
             Pick a time that works. We&apos;ll send a calendar invite with the meeting link.
           </p>
           <div
-            className="calendly-inline-widget"
+            className="calendly-inline-widget min-w-[320px] h-[600px] sm:h-[700px]"
             data-url={calendlyHref}
-            style={{ minWidth: 320, height: 700 }}
           />
         </section>
 
-        <section style={s.sampleSection}>
-          <h2 style={s.sectionTitle}>Want to explore first?</h2>
-          <p style={s.sectionLead}>
+        <section className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Want to explore first?</h2>
+          <p className="text-[15px] text-slate-500 mb-6 leading-normal">
             We can load a set of realistic sample invoices and expenses tailored to your
             industry so you can click around the dashboard before adding real data.
           </p>
           {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-          <div style={s.btnRow}>
+          <div className="flex gap-4 items-center flex-wrap">
             <button
               onClick={handleLoadSample}
               disabled={loadingSample}
-              style={{
-                ...s.primaryBtn,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                ...(loadingSample ? { opacity: 0.5, cursor: "not-allowed" } : {}),
-              }}
+              className="py-3 px-6 rounded-[10px] border-0 bg-blue-500 text-white cursor-pointer text-[15px] font-semibold inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingSample && <Spinner size={14} color="white" />}
               {loadingSample ? "Loading sample data..." : "Load sample data"}
             </button>
-            <a href="/" style={s.skipLink}>
+            <a href="/" className="text-slate-500 text-sm no-underline font-medium">
               Skip and start fresh {"→"}
             </a>
           </div>
@@ -194,122 +194,3 @@ export default function WelcomeProPage() {
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  loadingState: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#64748b",
-    fontSize: 15,
-  },
-  hero: {
-    background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-    color: "white",
-    padding: "64px 32px 56px",
-    textAlign: "center" as const,
-  },
-  proBadge: {
-    display: "inline-block",
-    padding: "6px 14px",
-    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-    color: "white",
-    borderRadius: 20,
-    fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: "1.5px",
-    marginBottom: 16,
-  },
-  heroTitle: {
-    fontSize: 38,
-    fontWeight: 800,
-    margin: "0 0 16px",
-    lineHeight: 1.2,
-  },
-  heroSubtitle: {
-    fontSize: 18,
-    opacity: 0.85,
-    margin: "0 auto",
-    maxWidth: 640,
-    lineHeight: 1.5,
-  },
-  content: {
-    maxWidth: 1100,
-    margin: "0 auto",
-    padding: "48px 32px 80px",
-  },
-  section: { marginBottom: 56 },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: "0 0 12px",
-  },
-  sectionLead: {
-    fontSize: 15,
-    color: "#64748b",
-    margin: "0 0 24px",
-    lineHeight: 1.5,
-  },
-  benefitGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 16,
-  },
-  benefitCard: {
-    background: "white",
-    padding: "24px 20px",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-  },
-  benefitIcon: {
-    fontSize: 28,
-    marginBottom: 12,
-  },
-  benefitTitle: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: "0 0 8px",
-  },
-  benefitText: {
-    fontSize: 14,
-    color: "#64748b",
-    lineHeight: 1.5,
-    margin: 0,
-  },
-  sampleSection: {
-    background: "white",
-    padding: "32px",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-  },
-  btnRow: {
-    display: "flex",
-    gap: 16,
-    alignItems: "center",
-    flexWrap: "wrap" as const,
-  },
-  primaryBtn: {
-    padding: "12px 24px",
-    borderRadius: 10,
-    border: "none",
-    background: "#3b82f6",
-    color: "white",
-    cursor: "pointer",
-    fontSize: 15,
-    fontWeight: 600,
-  },
-  skipLink: {
-    color: "#64748b",
-    fontSize: 14,
-    textDecoration: "none",
-    fontWeight: 500,
-  },
-};
