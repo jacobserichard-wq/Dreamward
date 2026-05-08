@@ -25,8 +25,7 @@ export async function POST(request: NextRequest) {
 
         if (clientId) {
           const result = await pool.query(
-            "UPDATE clients SET plan = 'starter', " +
-            "stripe_customer_id = $1, " +
+            "UPDATE clients SET stripe_customer_id = $1, " +
             "stripe_subscription_id = $2, updated_at = NOW() " +
             "WHERE id = $3 RETURNING *",
             [customerId, subscriptionId, parseInt(clientId)]
@@ -38,6 +37,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object;
         const customerId = subscription.customer;
