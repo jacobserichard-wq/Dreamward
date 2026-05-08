@@ -285,6 +285,7 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 - **Onboarding Tailwind migration teed up for next session.** No auth-tier guard, can be verified at `/onboarding` directly. Audit prompt at `./session-notes/onboarding-audit-prompt.md` ready to run.
 - **Webhook signature bypass at `/api/stripe/webhook/route.ts:16`** — handler falls through to `event = JSON.parse(body)` when `STRIPE_WEBHOOK_SECRET` signature header is missing. Allows unauthenticated POST requests to process synthetic events as if they were from Stripe. Real attack surface: anyone can POST to `/api/stripe/webhook` and grant themselves Pro plan by forging a `customer.subscription.created` event. ~30 min to fix in a dedicated commit. Separate from the plan-derivation fix shipped in `0f06660`.
 - **`planFromPriceId` helper extraction** — priceId-to-plan mapping is currently duplicated in `/api/stripe/webhook/route.ts` and `/api/stripe/checkout/route.ts`. Risk: future plan additions only get added in one of two places, leading to subtle bugs. Extract to `lib/stripe.ts`. ~20 min, code-quality cleanup, not customer-facing.
+- **"1 Gmail account" inconsistency in Starter/Trial pricing copy.** `app/billing/page.tsx:30,35` and `lib/stripe.ts:12` list "1 Gmail account" in Starter and Trial features. This contradicts Phase 1.6 tiered-auth strategy where Gmail integration is Pro-only. Three resolution options documented; pick one before publishing tiered-auth marketing changes. Do not fix in tandem with CSV copy edit — different decision.
 
 ---
 
@@ -410,7 +411,7 @@ Market vendors & craft sellers · Freelancers & consultants · Small landscaping
 
 | Plan | Price | Auth | Data input | Key Features |
 |---|---|---|---|---|
-| **Starter** | $19/mo | Email magic-link | CSV upload | 1 CSV source, 100 items/mo, expense tracking, dashboard |
+| **Starter** | $19/mo | Email magic-link | CSV upload | Up to 100 items/month, any CSV format, expense tracking, dashboard |
 | **Growth** | $49/mo | Email magic-link | CSV upload | Unlimited processing, events, mileage, AR, exports |
 | **Pro** | $89/mo | Google sign-in | Gmail auto-fetch + CSV | Multi-account, custom categories, tax reports, white-glove onboarding, **Gmail auto-fetch** |
 
