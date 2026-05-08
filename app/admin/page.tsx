@@ -48,7 +48,7 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
-        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">Loading admin dashboard...</p>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function AdminPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
-        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center text-red-800">
             <h2 className="m-0 mb-2 text-xl">{"\u{1F6AB}"} Access Denied</h2>
             <p className="m-0 text-slate-500">{error}</p>
@@ -80,7 +80,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+      <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/"
           backLabel="FlowWork"
