@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
+import PageHeader from "../components/PageHeader";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface BillingData {
@@ -110,9 +111,9 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div style={s.container}>
-        <div style={s.content}>
-          <div style={{ textAlign: "center", color: "#64748b", padding: 60, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <div className="text-center text-slate-500 p-[60px] flex items-center justify-center gap-2.5">
             <Spinner size={20} />
             <span>Loading billing information...</span>
           </div>
@@ -123,9 +124,9 @@ export default function BillingPage() {
 
   if (!billing) {
     return (
-      <div style={s.container}>
-        <div style={s.content}>
-          <p style={{ textAlign: "center", color: "#dc2626", padding: 60 }}>{error || "Unable to load billing"}</p>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <p className="text-center text-red-600 p-[60px]">{error || "Unable to load billing"}</p>
         </div>
       </div>
     );
@@ -137,38 +138,36 @@ export default function BillingPage() {
     : null;
 
   return (
-    <div style={s.container}>
-      <div style={s.content}>
-        {/* Header */}
-        <div style={s.header}>
-          <a href="/" style={s.backLink}>{"\u2190"} Back to FlowWork</a>
-          <h1 style={s.title}>Billing & Plan</h1>
-          <p style={s.subtitle}>{billing.email}</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader
+          backHref="/"
+          backLabel="FlowWork"
+          title="Billing & Plan"
+          subtitle={billing.email}
+        />
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
         {/* Current Plan Card */}
-        <div style={s.card}>
-          <div style={s.cardHeader}>
+        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8">
+          <div className="flex justify-between items-start mb-5 flex-wrap gap-3">
             <div>
-              <h2 style={s.cardTitle}>Current plan</h2>
-              <div style={s.planRow}>
-                <span style={s.planName}>{currentPlan.name}</span>
-                <span style={s.planPrice}>{currentPlan.price}</span>
+              <h2 className="text-[13px] font-medium text-slate-500 mb-2 uppercase tracking-wider m-0">
+                Current plan
+              </h2>
+              <div className="flex items-baseline gap-3">
+                <span className="text-2xl font-bold text-slate-900">{currentPlan.name}</span>
+                <span className="text-lg font-semibold text-slate-500">{currentPlan.price}</span>
               </div>
             </div>
             {billing.stripeCustomerId && (
               <button
                 onClick={openPortal}
                 disabled={actionLoading === "portal"}
-                style={{
-                  ...s.portalBtn,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  ...(actionLoading === "portal" ? { opacity: 0.6, cursor: "wait" } : {}),
-                }}
+                className={`py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-sm font-medium text-slate-700 inline-flex items-center gap-2 ${
+                  actionLoading === "portal" ? "opacity-60 cursor-wait" : ""
+                }`}
               >
                 {actionLoading === "portal" && <Spinner size={14} color="#334155" />}
                 {actionLoading === "portal" ? "Opening portal..." : "Manage subscription"}
@@ -177,36 +176,46 @@ export default function BillingPage() {
           </div>
 
           {billing.plan === "trial" && billing.trialEndsAt && (
-            <div style={s.trialBanner}>
-              {"Trial ends "}{new Date(billing.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            <div className="bg-yellow-50 border border-amber-200 text-amber-800 py-2.5 px-4 rounded-lg text-sm mb-5">
+              {"Trial ends "}
+              {new Date(billing.trialEndsAt).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
             </div>
           )}
 
           {/* Usage */}
-          <div style={s.usageSection}>
-            <div style={s.usageHeader}>
-              <span style={s.usageLabel}>Items processed this month</span>
-              <span style={s.usageCount}>
+          <div className="mb-5">
+            <div className="flex justify-between mb-2">
+              <span className="text-sm text-slate-500">Items processed this month</span>
+              <span className="text-sm font-semibold text-slate-900">
                 {billing.usage.itemsThisMonth}
                 {billing.usage.maxItems ? ` / ${billing.usage.maxItems}` : " (unlimited)"}
               </span>
             </div>
             {usagePct !== null && (
-              <div style={s.usageBarBg}>
-                <div style={{
-                  ...s.usageBarFill,
-                  width: `${usagePct}%`,
-                  background: usagePct >= 90 ? "#dc2626" : usagePct >= 70 ? "#f59e0b" : "#16a34a",
-                }} />
+              <div className="h-2 rounded bg-slate-200">
+                <div
+                  className={`h-2 rounded transition-[width] duration-300 ${
+                    usagePct >= 90
+                      ? "bg-red-600"
+                      : usagePct >= 70
+                      ? "bg-amber-500"
+                      : "bg-green-600"
+                  }`}
+                  style={{ width: `${usagePct}%` }}
+                />
               </div>
             )}
           </div>
 
           {/* Current features */}
-          <div style={s.featureList}>
+          <div className="flex flex-col gap-2">
             {currentPlan.features.map((f) => (
-              <div key={f} style={s.featureItem}>
-                <span style={s.featureCheck}>{"\u2713"}</span>
+              <div key={f} className="flex items-center gap-2 text-sm text-slate-700">
+                <span className="text-green-600 font-bold text-sm">{"✓"}</span>
                 <span>{f}</span>
               </div>
             ))}
@@ -214,49 +223,58 @@ export default function BillingPage() {
         </div>
 
         {/* Plan Comparison */}
-        <h2 style={s.sectionTitle}>
+        <h2 className="text-xl font-bold text-slate-900 mb-4">
           {billing.plan === "canceled" ? "Reactivate your plan" : "Upgrade your plan"}
         </h2>
-        <div style={s.planGrid}>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4 mb-8">
           {(["starter", "growth", "pro"] as const).map((planId) => {
             const plan = PLAN_DETAILS[planId];
             const isCurrent = billing.plan === planId;
-            const isDowngrade = (
+            const isDowngrade =
               (billing.plan === "pro" && (planId === "starter" || planId === "growth")) ||
-              (billing.plan === "growth" && planId === "starter")
-            );
+              (billing.plan === "growth" && planId === "starter");
+
+            // Border precedence: featured > current > default. Matches the
+            // original spread-order behavior where planCardFeatured overrode
+            // planCardCurrent.
+            const borderClass =
+              planId === "growth"
+                ? "border-2 border-violet-500"
+                : isCurrent
+                ? "border-2 border-blue-500"
+                : "border border-slate-200";
 
             return (
-              <div key={planId} style={{
-                ...s.planCard,
-                ...(isCurrent ? s.planCardCurrent : {}),
-                ...(planId === "growth" ? s.planCardFeatured : {}),
-              }}>
-                {planId === "growth" && <div style={s.popularBadge}>Most popular</div>}
-                <h3 style={s.planCardName}>{plan.name}</h3>
-                <div style={s.planCardPrice}>{plan.price}</div>
-                <div style={s.planCardFeatures}>
+              <div
+                key={planId}
+                className={`bg-white rounded-xl p-6 flex flex-col relative ${borderClass}`}
+              >
+                {planId === "growth" && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-xs font-semibold py-1 px-4 rounded-[20px] whitespace-nowrap">
+                    Most popular
+                  </div>
+                )}
+                <h3 className="text-xl font-bold text-slate-900 mt-2 mb-1">{plan.name}</h3>
+                <div className="text-3xl font-extrabold text-slate-900 mb-4">{plan.price}</div>
+                <div className="flex flex-col gap-2 mb-5 flex-1">
                   {plan.features.map((f) => (
-                    <div key={f} style={s.planCardFeature}>
-                      <span style={s.featureCheck}>{"\u2713"}</span>
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-slate-600">
+                      <span className="text-green-600 font-bold text-sm">{"✓"}</span>
                       <span>{f}</span>
                     </div>
                   ))}
                 </div>
                 {isCurrent ? (
-                  <div style={s.currentLabel}>Current plan</div>
+                  <div className="text-center p-2.5 text-sm font-semibold text-blue-500 bg-blue-50 rounded-lg">
+                    Current plan
+                  </div>
                 ) : isDowngrade ? (
                   <button
                     onClick={openPortal}
                     disabled={actionLoading === "portal"}
-                    style={{
-                      ...s.downgradeBtn,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      ...(actionLoading === "portal" ? { opacity: 0.6, cursor: "wait" } : {}),
-                    }}
+                    className={`p-3 rounded-lg border border-slate-200 bg-white cursor-pointer text-sm font-medium text-slate-500 text-center inline-flex items-center justify-center gap-2 ${
+                      actionLoading === "portal" ? "opacity-60 cursor-wait" : ""
+                    }`}
                   >
                     {actionLoading === "portal" && <Spinner size={14} color="#64748b" />}
                     {actionLoading === "portal" ? "Opening portal..." : "Manage in portal"}
@@ -265,17 +283,14 @@ export default function BillingPage() {
                   <button
                     onClick={() => startCheckout(planId)}
                     disabled={actionLoading === planId}
-                    style={{
-                      ...s.upgradeBtn,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      ...(actionLoading === planId ? { opacity: 0.7, cursor: "wait" } : {}),
-                    }}
+                    className={`p-3 rounded-lg border-0 bg-green-600 text-white cursor-pointer text-sm font-semibold text-center inline-flex items-center justify-center gap-2 ${
+                      actionLoading === planId ? "opacity-70 cursor-wait" : ""
+                    }`}
                   >
                     {actionLoading === planId && <Spinner size={14} color="white" />}
-                    {actionLoading === planId ? "Starting checkout..." : `Upgrade to ${plan.name}`}
+                    {actionLoading === planId
+                      ? "Starting checkout..."
+                      : `Upgrade to ${plan.name}`}
                   </button>
                 )}
               </div>
@@ -286,143 +301,3 @@ export default function BillingPage() {
     </div>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  content: { maxWidth: 900, margin: "0 auto", padding: "32px 24px" },
-  header: { marginBottom: 32 },
-  backLink: {
-    fontSize: 14,
-    color: "#3b82f6",
-    textDecoration: "none",
-    display: "inline-block",
-    marginBottom: 12,
-  },
-  title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
-  subtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-
-  card: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "24px",
-    marginBottom: 32,
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-    flexWrap: "wrap" as const,
-    gap: 12,
-  },
-  cardTitle: { fontSize: 13, fontWeight: 500, color: "#64748b", margin: "0 0 8px", textTransform: "uppercase" as const, letterSpacing: "0.5px" },
-  planRow: { display: "flex", alignItems: "baseline", gap: 12 },
-  planName: { fontSize: 24, fontWeight: 700, color: "#0f172a" },
-  planPrice: { fontSize: 18, fontWeight: 600, color: "#64748b" },
-  portalBtn: {
-    padding: "10px 20px",
-    borderRadius: 8,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#334155",
-  },
-
-  trialBanner: {
-    background: "#fefce8",
-    border: "1px solid #fde68a",
-    color: "#92400e",
-    padding: "10px 16px",
-    borderRadius: 8,
-    fontSize: 14,
-    marginBottom: 20,
-  },
-
-  usageSection: { marginBottom: 20 },
-  usageHeader: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
-  usageLabel: { fontSize: 14, color: "#64748b" },
-  usageCount: { fontSize: 14, fontWeight: 600, color: "#0f172a" },
-  usageBarBg: { height: 8, borderRadius: 4, background: "#e2e8f0" },
-  usageBarFill: { height: 8, borderRadius: 4, transition: "width 0.3s" },
-
-  featureList: { display: "flex", flexDirection: "column" as const, gap: 8 },
-  featureItem: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#334155" },
-  featureCheck: { color: "#16a34a", fontWeight: 700, fontSize: 14 },
-
-  sectionTitle: { fontSize: 20, fontWeight: 700, color: "#0f172a", marginBottom: 16 },
-
-  planGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: 16,
-    marginBottom: 32,
-  },
-  planCard: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "24px",
-    display: "flex",
-    flexDirection: "column" as const,
-    position: "relative" as const,
-  },
-  planCardCurrent: { borderColor: "#3b82f6", borderWidth: 2 },
-  planCardFeatured: { borderColor: "#8b5cf6", borderWidth: 2 },
-  popularBadge: {
-    position: "absolute" as const,
-    top: -12,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#8b5cf6",
-    color: "white",
-    fontSize: 12,
-    fontWeight: 600,
-    padding: "4px 16px",
-    borderRadius: 20,
-    whiteSpace: "nowrap" as const,
-  },
-  planCardName: { fontSize: 20, fontWeight: 700, color: "#0f172a", margin: "8px 0 4px" },
-  planCardPrice: { fontSize: 28, fontWeight: 800, color: "#0f172a", marginBottom: 16 },
-  planCardFeatures: { display: "flex", flexDirection: "column" as const, gap: 8, marginBottom: 20, flex: 1 },
-  planCardFeature: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#475569" },
-  currentLabel: {
-    textAlign: "center" as const,
-    padding: "10px",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#3b82f6",
-    background: "#eff6ff",
-    borderRadius: 8,
-  },
-  upgradeBtn: {
-    padding: "12px",
-    borderRadius: 8,
-    border: "none",
-    background: "#16a34a",
-    color: "white",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 600,
-    textAlign: "center" as const,
-  },
-  downgradeBtn: {
-    padding: "12px",
-    borderRadius: 8,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    color: "#64748b",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 500,
-    textAlign: "center" as const,
-  },
-};
