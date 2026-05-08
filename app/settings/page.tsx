@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PageHeader from "../components/PageHeader";
 
 const ALL_MODULES = [
   { id: "invoices", label: "Invoices", description: "Track and process vendor invoices from email", icon: "\u{1F4D1}" },
@@ -9,7 +10,7 @@ const ALL_MODULES = [
   { id: "events", label: "Events and Sales", description: "Log revenue per market day or event", icon: "\u{1F3EA}", minPlan: "growth" },
   { id: "mileage", label: "Mileage Tracking", description: "Track trips and calculate IRS deductions", icon: "\u{1F697}", minPlan: "growth" },
   { id: "exports", label: "CSV/PDF Exports", description: "Export data for your CPA or records", icon: "\u{1F4E4}", minPlan: "growth" },
-  { id: "custom_categories", label: "Custom Categories", description: "Create your own expense categories", icon: "\u{1F3F7}\uFE0F", minPlan: "pro" },
+  { id: "custom_categories", label: "Custom Categories", description: "Create your own expense categories", icon: "\u{1F3F7}️", minPlan: "pro" },
   { id: "tax_reports", label: "Tax Reports", description: "Schedule C mapping and quarterly estimates", icon: "\u{1F4CA}", minPlan: "pro" },
 ];
 
@@ -107,64 +108,77 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={st.container}>
-        <div style={st.content}>
-          <p style={{ textAlign: "center" as const, padding: 60, color: "#64748b" }}>Loading settings...</p>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <p className="text-center p-[60px] text-slate-500">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={st.container}>
-      <div style={st.content}>
-        <div style={st.header}>
-          <a href="/" style={st.backLink}>{"\u2190 Back to FlowWork"}</a>
-          <h1 style={st.title}>Settings</h1>
-          <p style={st.subtitle}>Manage your modules and preferences</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader
+          backHref="/"
+          backLabel="FlowWork"
+          title="Settings"
+          subtitle="Manage your modules and preferences"
+        />
 
         {/* Module Toggles */}
-        <div style={st.section}>
-          <div style={st.sectionHeader}>
-            <h2 style={st.sectionTitle}>Active Modules</h2>
-            <p style={st.sectionSubtitle}>Enable or disable features for your workspace</p>
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Active Modules</h2>
+            <p className="text-sm text-slate-500 m-0">Enable or disable features for your workspace</p>
           </div>
 
-          <div style={st.moduleGrid}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
             {ALL_MODULES.map((mod) => {
               const isActive = activeModules.includes(mod.id);
               const minRank = PLAN_RANK[mod.minPlan || "trial"] || 0;
               const userRank = PLAN_RANK[plan] || 0;
               const isLocked = userRank < minRank;
 
+              // Compose card classes per state — atomic Tailwind doesn't override
+              // the way inline-style spreads do, so each state owns its full set
+              // of conflicting utilities (border color, bg, opacity, cursor).
+              const cardStateClasses = isLocked
+                ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                : isActive
+                ? "border-blue-500 bg-blue-50 cursor-pointer"
+                : "border-slate-200 bg-white cursor-pointer";
+
+              const toggleBgClass = isLocked
+                ? "bg-slate-100"
+                : isActive
+                ? "bg-blue-500"
+                : "bg-slate-200";
+
               return (
                 <div
                   key={mod.id}
-                  style={{
-                    ...st.moduleCard,
-                    ...(isActive && !isLocked ? st.moduleCardActive : {}),
-                    ...(isLocked ? st.moduleCardLocked : {}),
+                  onClick={() => {
+                    if (!isLocked) toggleModule(mod.id);
                   }}
-                  onClick={() => { if (!isLocked) toggleModule(mod.id); }}
+                  className={`rounded-xl border-2 py-4 px-[18px] transition duration-150 ${cardStateClasses}`}
                 >
-                  <div style={st.moduleTop}>
-                    <span style={st.moduleIcon}>{mod.icon}</span>
-                    <div style={{
-                      ...st.toggle,
-                      ...(isActive && !isLocked ? st.toggleOn : {}),
-                      ...(isLocked ? st.toggleLocked : {}),
-                    }}>
-                      <div style={{
-                        ...st.toggleDot,
-                        ...(isActive && !isLocked ? st.toggleDotOn : {}),
-                      }} />
+                  <div className="flex justify-between items-center mb-2.5">
+                    <span className="text-[22px]">{mod.icon}</span>
+                    <div
+                      className={`relative w-9 h-5 rounded-full transition-[background-color] duration-200 ${toggleBgClass}`}
+                    >
+                      <div
+                        className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-[left] duration-200 shadow-sm ${
+                          isActive && !isLocked ? "left-[18px]" : "left-0.5"
+                        }`}
+                      />
                     </div>
                   </div>
-                  <div style={st.moduleLabel}>{mod.label}</div>
-                  <div style={st.moduleDesc}>{mod.description}</div>
+                  <div className="text-sm font-semibold text-slate-900 mb-1">{mod.label}</div>
+                  <div className="text-xs text-slate-500 leading-snug">{mod.description}</div>
                   {isLocked && (
-                    <div style={st.lockBadge}>
+                    <div className="mt-2 text-[11px] text-slate-500 bg-slate-100 py-[3px] px-2 rounded inline-block">
                       {mod.minPlan === "growth" ? "Growth+ plan required" : "Pro plan required"}
                     </div>
                   )}
@@ -173,67 +187,100 @@ export default function SettingsPage() {
             })}
           </div>
 
-          <div style={st.saveRow}>
-            <button onClick={saveModules} disabled={saving} style={{...st.saveBtn, ...(saving ? { opacity: 0.5 } : {})}}>
+          <div className="flex items-center gap-3 mt-5">
+            <button
+              onClick={saveModules}
+              disabled={saving}
+              className={`py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white cursor-pointer text-sm font-semibold ${
+                saving ? "opacity-50" : ""
+              }`}
+            >
               {saving ? "Saving..." : "Save changes"}
             </button>
-            {saved && <span style={st.savedMsg}>{"\u2713 Saved"}</span>}
+            {saved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
           </div>
         </div>
 
         {/* Expense Categories */}
-        <div style={st.section}>
-          <div style={st.sectionHeader}>
-            <h2 style={st.sectionTitle}>Expense Categories</h2>
-            <p style={st.sectionSubtitle}>Customize how your expenses are organized</p>
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Expense Categories</h2>
+            <p className="text-sm text-slate-500 m-0">Customize how your expenses are organized</p>
           </div>
 
-          <div style={st.catCard}>
-            <div style={st.catList}>
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <div className="flex flex-wrap gap-2 mb-4">
               {categories.map((cat) => (
-                <div key={cat} style={st.catItem}>
-                  <span style={st.catName}>{cat}</span>
+                <div
+                  key={cat}
+                  className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-[20px] py-1.5 px-3"
+                >
+                  <span className="text-[13px] font-medium text-green-800">{cat}</span>
                   <button
                     onClick={() => removeCategory(cat)}
-                    style={st.catRemoveBtn}
                     title="Remove category"
+                    className="bg-transparent border-0 cursor-pointer text-xs text-slate-400 px-0.5 py-0 leading-none"
                   >
-                    {"\u2715"}
+                    {"✕"}
                   </button>
                 </div>
               ))}
             </div>
 
-            <div style={st.catAddRow}>
+            <div className="flex gap-2 mb-4">
               <input
                 type="text"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
                 placeholder="Add new category..."
-                style={st.catInput}
-                onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addCategory();
+                }}
+                className="flex-1 py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border"
               />
-              <button onClick={addCategory} style={st.catAddBtn}>Add</button>
+              <button
+                onClick={addCategory}
+                className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-sm font-medium text-slate-700"
+              >
+                Add
+              </button>
             </div>
 
-            <div style={st.catActions}>
-              <button onClick={saveCategories} disabled={catSaving} style={{...st.saveBtn, ...(catSaving ? { opacity: 0.5 } : {})}}>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveCategories}
+                disabled={catSaving}
+                className={`py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white cursor-pointer text-sm font-semibold ${
+                  catSaving ? "opacity-50" : ""
+                }`}
+              >
                 {catSaving ? "Saving..." : "Save categories"}
               </button>
-              {catSaved && <span style={st.savedMsg}>{"\u2713 Saved"}</span>}
-              <button onClick={resetCategories} style={st.resetBtn}>Reset to defaults</button>
+              {catSaved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
+              <button
+                onClick={resetCategories}
+                className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-[13px] text-slate-500"
+              >
+                Reset to defaults
+              </button>
             </div>
           </div>
         </div>
 
         {/* Quick Links */}
-        <div style={st.linksRow}>
-          <a href="/billing" style={st.linkCard}>
-            <span style={{ fontSize: 20 }}>{"\u{1F4B3}"}</span>
+        <div className="flex gap-3">
+          <a
+            href="/billing"
+            className="flex-1 flex items-center gap-2.5 py-4 px-5 bg-white rounded-xl border border-slate-200 no-underline text-slate-700 text-sm font-medium"
+          >
+            <span className="text-xl">{"\u{1F4B3}"}</span>
             <span>Billing and Plan</span>
           </a>
-          <a href="/onboarding" style={st.linkCard}>
-            <span style={{ fontSize: 20 }}>{"\u{1F3E2}"}</span>
+          <a
+            href="/onboarding"
+            className="flex-1 flex items-center gap-2.5 py-4 px-5 bg-white rounded-xl border border-slate-200 no-underline text-slate-700 text-sm font-medium"
+          >
+            <span className="text-xl">{"\u{1F3E2}"}</span>
             <span>Re-run Onboarding</span>
           </a>
         </div>
@@ -241,47 +288,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-const st: Record<string, React.CSSProperties> = {
-  container: { minHeight: "100vh", background: "#f8fafc", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-  content: { maxWidth: 800, margin: "0 auto", padding: "32px 24px" },
-  header: { marginBottom: 32 },
-  backLink: { fontSize: 14, color: "#3b82f6", textDecoration: "none", display: "inline-block", marginBottom: 12 },
-  title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
-  subtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-  section: { marginBottom: 40 },
-  sectionHeader: { marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
-  sectionSubtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-  moduleGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 },
-  moduleCard: { background: "white", borderRadius: 12, border: "2px solid #e2e8f0", padding: "16px 18px", cursor: "pointer", transition: "all 0.15s" },
-  moduleCardActive: { borderColor: "#3b82f6", background: "#f8faff" },
-  moduleCardLocked: { opacity: 0.6, cursor: "not-allowed", background: "#f8fafc" },
-  moduleTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  moduleIcon: { fontSize: 22 },
-  moduleLabel: { fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 4 },
-  moduleDesc: { fontSize: 12, color: "#64748b", lineHeight: 1.4 },
-  toggle: { width: 36, height: 20, borderRadius: 10, background: "#e2e8f0", position: "relative" as const, transition: "background 0.2s" },
-  toggleOn: { background: "#3b82f6" },
-  toggleLocked: { background: "#f1f5f9" },
-  toggleDot: { width: 16, height: 16, borderRadius: 8, background: "white", position: "absolute" as const, top: 2, left: 2, transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" },
-  toggleDotOn: { left: 18 },
-  lockBadge: { marginTop: 8, fontSize: 11, color: "#64748b", background: "#f1f5f9", padding: "3px 8px", borderRadius: 4, display: "inline-block" },
-  saveRow: { display: "flex", alignItems: "center", gap: 12, marginTop: 20 },
-  saveBtn: { padding: "10px 24px", borderRadius: 8, border: "none", background: "#3b82f6", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 600 },
-  savedMsg: { fontSize: 14, color: "#16a34a", fontWeight: 500 },
-
-  catCard: { background: "white", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" },
-  catList: { display: "flex", flexWrap: "wrap" as const, gap: 8, marginBottom: 16 },
-  catItem: { display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "6px 12px" },
-  catName: { fontSize: 13, fontWeight: 500, color: "#166534" },
-  catRemoveBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#94a3b8", padding: "0 2px", lineHeight: 1 },
-  catAddRow: { display: "flex", gap: 8, marginBottom: 16 },
-  catInput: { flex: 1, padding: "10px 14px", fontSize: 14, border: "1px solid #e2e8f0", borderRadius: 8, outline: "none", boxSizing: "border-box" as const },
-  catAddBtn: { padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#334155" },
-  catActions: { display: "flex", alignItems: "center", gap: 12 },
-  resetBtn: { padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 13, color: "#64748b" },
-
-  linksRow: { display: "flex", gap: 12 },
-  linkCard: { flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", background: "white", borderRadius: 12, border: "1px solid #e2e8f0", textDecoration: "none", color: "#334155", fontSize: 14, fontWeight: 500 },
-};
