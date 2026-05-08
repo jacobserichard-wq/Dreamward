@@ -273,6 +273,9 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 **Loose ends:**
 - Add `NEXT_PUBLIC_CALENDLY_URL` to Vercel env vars (Production + Preview + Development). Hardcoded fallback in code keeps welcome-pro working until then. 30 seconds in the dashboard.
+- **Stripe webhook bug — `clients.plan` not updated for trial-state subscriptions.** Logs at 20:33–20:34 May 7 show: POST `/api/stripe/checkout` succeeded, POST `/api/stripe/webhook` returned 200, but `clients.plan` stayed at `starter` while Stripe shows the FlowWork Pro subscription as active and on free trial through May 19 (Customer ID: cus_USmpPDQen1dhti). Most likely cause: webhook handler only updates plan on `invoice.paid` events, not `customer.subscription.created` — which means trial subscriptions never update the plan column until the trial ends and a real invoice is paid. Real customer impact: anyone signing up for Pro and getting bounced from `/welcome-pro` because the DB still shows their pre-checkout plan. Workaround until fixed: manually `UPDATE clients SET plan = 'pro' WHERE email = ...`. Investigation steps: read `/api/stripe/webhook/route.ts` event-type filter, add cases for `customer.subscription.created` and `customer.subscription.updated`.
+- **Welcome-pro Tailwind migration blocked on Pro test account.** Audit complete (`./session-notes/audit-welcome-pro.md`). Migration deferred until either the Stripe webhook bug above is fixed, or a test client is manually upgraded to Pro for verification. Estimated 25–35 min of migration once unblocked.
+- **Onboarding Tailwind migration teed up for next session.** No auth-tier guard, can be verified at `/onboarding` directly. Audit prompt at `./session-notes/onboarding-audit-prompt.md` ready to run.
 
 ---
 
