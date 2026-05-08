@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PageHeader from "../components/PageHeader";
+import { planColor } from "@/lib/planColor";
 
 interface Client {
   id: number;
@@ -34,7 +36,7 @@ export default function AdminPage() {
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
         setClients(data.clients || []);
-      } catch (err) {
+      } catch {
         setError("Failed to load admin data");
       } finally {
         setLoading(false);
@@ -45,9 +47,9 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div style={s.container}>
-        <div style={s.content}>
-          <p style={s.loading}>Loading admin dashboard...</p>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <p className="text-center p-[60px] text-slate-500">Loading admin dashboard...</p>
         </div>
       </div>
     );
@@ -55,11 +57,11 @@ export default function AdminPage() {
 
   if (error) {
     return (
-      <div style={s.container}>
-        <div style={s.content}>
-          <div style={s.errorCard}>
-            <h2 style={{ margin: "0 0 8px", fontSize: 20 }}>{"\u{1F6AB}"} Access Denied</h2>
-            <p style={{ margin: 0, color: "#64748b" }}>{error}</p>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center text-red-800">
+            <h2 className="m-0 mb-2 text-xl">{"\u{1F6AB}"} Access Denied</h2>
+            <p className="m-0 text-slate-500">{error}</p>
           </div>
         </div>
       </div>
@@ -77,85 +79,101 @@ export default function AdminPage() {
   }, {} as Record<string, number>);
 
   return (
-    <div style={s.container}>
-      <div style={s.content}>
-        {/* Header */}
-        <div style={s.header}>
-          <a href="/" style={s.backLink}>{"\u2190"} Back to FlowWork</a>
-          <h1 style={s.title}>{"\u{1F6E0}\uFE0F"} Admin Dashboard</h1>
-          <p style={s.subtitle}>{clients.length} total clients</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader
+          backHref="/"
+          backLabel="FlowWork"
+          title={<>{"\u{1F6E0}️"} Admin Dashboard</>}
+          subtitle={`${clients.length} total clients`}
+        />
 
         {/* Summary Stats */}
-        <div style={s.statGrid}>
-          <div style={s.statCard}>
-            <div style={s.statValue}>{clients.length}</div>
-            <div style={s.statLabel}>Total Clients</div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 mb-8">
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <div className="text-3xl font-extrabold text-slate-900">{clients.length}</div>
+            <div className="text-[13px] text-slate-500 mt-1">Total Clients</div>
           </div>
-          <div style={s.statCard}>
-            <div style={s.statValue}>${totalRevenue}</div>
-            <div style={s.statLabel}>Monthly Revenue</div>
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <div className="text-3xl font-extrabold text-slate-900">${totalRevenue}</div>
+            <div className="text-[13px] text-slate-500 mt-1">Monthly Revenue</div>
           </div>
-          <div style={s.statCard}>
-            <div style={s.statValue}>{planCounts.trial || 0}</div>
-            <div style={s.statLabel}>On Trial</div>
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <div className="text-3xl font-extrabold text-slate-900">{planCounts.trial || 0}</div>
+            <div className="text-[13px] text-slate-500 mt-1">On Trial</div>
           </div>
-          <div style={s.statCard}>
-            <div style={s.statValue}>{(planCounts.starter || 0) + (planCounts.growth || 0) + (planCounts.pro || 0)}</div>
-            <div style={s.statLabel}>Paying</div>
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <div className="text-3xl font-extrabold text-slate-900">
+              {(planCounts.starter || 0) + (planCounts.growth || 0) + (planCounts.pro || 0)}
+            </div>
+            <div className="text-[13px] text-slate-500 mt-1">Paying</div>
           </div>
         </div>
 
         {/* Client Table */}
-        <div style={s.tableCard}>
-          <div style={s.tableHeader}>
-            <h2 style={s.tableTitle}>All Clients</h2>
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="py-4 px-6 border-b border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 m-0">All Clients</h2>
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={s.table}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th style={s.th}>Business</th>
-                  <th style={s.th}>Email</th>
-                  <th style={s.th}>Plan</th>
-                  <th style={s.th}>Industry</th>
-                  <th style={s.th}>Items</th>
-                  <th style={s.th}>This Month</th>
-                  <th style={s.th}>Onboarded</th>
-                  <th style={s.th}>Joined</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Business</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Email</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Plan</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Industry</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Items</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">This Month</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Onboarded</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Joined</th>
                 </tr>
               </thead>
               <tbody>
                 {clients.map((client) => (
-                  <tr key={client.id} style={{...s.tr, cursor: "pointer"}} onClick={() => window.location.href = `/admin/client?id=${client.id}`}>
-                    <td style={s.td}>
-                      <span style={s.businessName}>{client.business_name || "\u2014"}</span>
+                  <tr
+                    key={client.id}
+                    onClick={() => (window.location.href = `/admin/client?id=${client.id}`)}
+                    className="border-b border-slate-100 cursor-pointer"
+                  >
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span className="font-semibold text-slate-900">
+                        {client.business_name || "—"}
+                      </span>
                     </td>
-                    <td style={s.td}>
-                      <span style={s.email}>{client.email}</span>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span className="text-[13px] text-slate-500">{client.email}</span>
                     </td>
-                    <td style={s.td}>
-                      <span style={{
-                        ...s.planBadge,
-                        ...(planStyle(client.plan)),
-                      }}>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span
+                        className={`py-[3px] px-2.5 rounded-[20px] text-xs font-semibold uppercase tracking-[0.3px] ${planColor(client.plan)}`}
+                      >
                         {client.plan}
                       </span>
                     </td>
-                    <td style={s.td}>
-                      <span style={s.industry}>{client.industry || "\u2014"}</span>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span className="text-[13px] text-slate-500 capitalize">
+                        {client.industry || "—"}
+                      </span>
                     </td>
-                    <td style={s.td}>{client.total_items}</td>
-                    <td style={s.td}>{client.items_this_month}</td>
-                    <td style={s.td}>
-                      {client.onboarding_completed
-                        ? <span style={s.checkYes}>{"\u2713"}</span>
-                        : <span style={s.checkNo}>{"\u2717"}</span>
-                      }
+                    <td className="py-3.5 px-4 text-slate-700">{client.total_items}</td>
+                    <td className="py-3.5 px-4 text-slate-700">{client.items_this_month}</td>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      {client.onboarding_completed ? (
+                        <span className="text-green-600 font-bold">{"✓"}</span>
+                      ) : (
+                        <span className="text-red-600 font-bold">{"✗"}</span>
+                      )}
                     </td>
-                    <td style={s.td}>
-                      <span style={s.date}>
-                        {client.created_at ? new Date(client.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "\u2014"}
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span className="text-[13px] text-slate-500">
+                        {client.created_at
+                          ? new Date(client.created_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </span>
                     </td>
                   </tr>
@@ -168,100 +186,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-function planStyle(plan: string): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    trial: { background: "#f1f5f9", color: "#475569" },
-    starter: { background: "#eff6ff", color: "#1d4ed8" },
-    growth: { background: "#f3e8ff", color: "#7c3aed" },
-    pro: { background: "#fef3c7", color: "#92400e" },
-    canceled: { background: "#fee2e2", color: "#991b1b" },
-  };
-  return map[plan] || {};
-}
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  content: { maxWidth: 1100, margin: "0 auto", padding: "32px 24px" },
-  header: { marginBottom: 32 },
-  backLink: { fontSize: 14, color: "#3b82f6", textDecoration: "none", display: "inline-block", marginBottom: 12 },
-  title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
-  subtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-  loading: { textAlign: "center" as const, padding: 60, color: "#64748b" },
-  errorCard: {
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
-    borderRadius: 12,
-    padding: "32px",
-    textAlign: "center" as const,
-    color: "#991b1b",
-  },
-
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 16,
-    marginBottom: 32,
-  },
-  statCard: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "20px 24px",
-  },
-  statValue: { fontSize: 28, fontWeight: 800, color: "#0f172a" },
-  statLabel: { fontSize: 13, color: "#64748b", marginTop: 4 },
-
-  tableCard: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    overflow: "hidden",
-  },
-  tableHeader: {
-    padding: "16px 24px",
-    borderBottom: "1px solid #e2e8f0",
-  },
-  tableTitle: { fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0 },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse" as const,
-    fontSize: 14,
-  },
-  th: {
-    textAlign: "left" as const,
-    padding: "12px 16px",
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#64748b",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-    background: "#f8fafc",
-    borderBottom: "1px solid #e2e8f0",
-  },
-  tr: {
-    borderBottom: "1px solid #f1f5f9",
-  },
-  td: {
-    padding: "14px 16px",
-    color: "#334155",
-  },
-  businessName: { fontWeight: 600, color: "#0f172a" },
-  email: { fontSize: 13, color: "#64748b" },
-  planBadge: {
-    padding: "3px 10px",
-    borderRadius: 20,
-    fontSize: 12,
-    fontWeight: 600,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.3px",
-  },
-  industry: { fontSize: 13, color: "#64748b", textTransform: "capitalize" as const },
-  checkYes: { color: "#16a34a", fontWeight: 700 },
-  checkNo: { color: "#dc2626", fontWeight: 700 },
-  date: { fontSize: 13, color: "#64748b" },
-};
