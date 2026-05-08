@@ -1,6 +1,6 @@
 # FlowWork Product Roadmap
 
-**Small Business Edition** | Updated May 6, 2026 (evening)
+**Small Business Edition** | Updated May 7, 2026
 
 **8 Phases** · **55+ Tasks** · **17 Weeks** · **Phase 0–1 SHIPPED** · **Phase 1.5 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7 SHIPPED (white-glove Tier 1)** · **Phase 2: 3/6 + signin mobile-responsive shipped, dashboard pending**
 
@@ -238,23 +238,40 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 4. Verify on Vercel preview at 320px, 390px, and desktop. Inspect DOM to confirm `style={...}` removed and Tailwind classes applied.
 5. Stop after each commit. One file per commit until the pattern is fully proven.
 
-**Shipped tonight:**
+**Shipped May 6 (evening):**
 - [x] **Tailwind v4 smoke test** — verified JIT scans `app/**/*.tsx` correctly. Commit `23221eb`. — *infra*
 - [x] **Signin page migrated to Tailwind** — first responsive page in the app. 22 lines of utilities replacing 91 lines of inline styles. Mobile-first padding (`p-3 sm:p-6` container, `py-8 px-6 sm:py-11 sm:px-10` card). Verified at 320px, 375px, 390px, and desktop. Commit `009a5a8`. — *UX*
 
-**Discovered during the session (not in original Phase 2 scope, but real):**
-- **Brand mark / header is duplicated across 4–5 pages** (dashboard, welcome-pro, billing, settings, admin). Each rebuilds the FlowWork logo + sign-out independently. Phase 2 mobile work without a shared header means every page rewrites the hamburger logic separately. **Header centralization should happen *before* dashboard mobile work, not after.**
+**Shipped May 7 (sub-session 1 + sub-session 2):**
+- [x] **PolicyDocument migrated to Tailwind** — both `/privacy` and `/terms` benefit from one conversion. 18 element types, list-marker preflight gotcha caught and fixed. Commit `ee388d2`. — *UX*
+- [x] **PageHeader component extracted** at `app/components/PageHeader.tsx` — server component, accepts `backHref`, `backLabel`, `title`, `subtitle?`, `rightSlot?`. Replaces the back-link + title + subtitle pattern duplicated across 4 pages. Commit `949bdab`. — *infra*
+- [x] **planColor helper extracted** at `lib/planColor.ts` — Tailwind class strings for plan-badge colors. Reused by admin and admin/client. Commit `3ba4e59`. — *infra*
+- [x] **Billing migrated to Tailwind** with PageHeader as first consumer. Plan-comparison grid, conditional className composition, dynamic-width usage bar (kept inline as runtime value). Commit `949bdab`. — *UX*
+- [x] **Settings migrated to Tailwind** with PageHeader. Module toggle cards with three-state conditional className composition. Commit `3a31a23`. — *UX*
+- [x] **Admin migrated to Tailwind** with PageHeader. 8-column data table preserved with overflow-x-auto wrapper (intrinsic horizontal scroll on the table, not a regression). Commit `3ba4e59`. — *UX*
+- [x] **Admin/client migrated to Tailwind** with PageHeader's rightSlot for the plan badge. First rightSlot consumer; validated component composition. Commit `79bbc62`. — *UX*
+
+**Discovered May 6 (not in original Phase 2 scope, but real):**
+- **Brand mark / header is duplicated across 4–5 pages** (dashboard, welcome-pro, billing, settings, admin). Each rebuilds the FlowWork logo + sign-out independently. Phase 2 mobile work without a shared header means every page rewrites the hamburger logic separately. **Header centralization should happen *before* dashboard mobile work, not after.** *Update May 7: code-level audit overruled this — see below.*
 - **Geist font inconsistency.** `font-sans` in Tailwind maps to `var(--font-geist-sans)` (loaded by `next/font` somewhere), not the Apple system stack the inline-styled pages use. Signin now renders in Geist; other pages render in Apple system. Probably visually near-identical, but a real inconsistency to resolve eventually (either standardize on Geist via shared layout, or override `font-sans` in `globals.css` `@theme {}`).
 
-**Revised ordering for the remaining mobile-responsive sweep:**
-1. ~~Signin~~ ✅ Shipped tonight
-2. **PolicyDocument** — single shared component, both `/privacy` and `/terms` benefit from one conversion. Many element types (h1/h2/p/li/table) but no new patterns. ~25 minutes.
-3. **Header centralization** — extract shared `<AppHeader />` component used by all logged-in pages. Adds the hamburger pattern *once* instead of 4× in subsequent migrations. ~60 minutes.
-4. **Welcome-pro** — has the Calendly inline widget; cautious refactor (only the wrapper, don't touch `data-url` or `className="calendly-inline-widget"`). ~30 minutes.
-5. **Settings, Admin** — form-heavy, table-heavy pages. ~30 minutes each.
-6. **Dashboard** (`app/page.tsx`) — biggest file (~1280 lines), most state, most edge cases. Save for last; benefits from header already being shared. ~60–90 minutes.
+**Audit-driven discovery May 7:**
+- **Original premise of "extract `<AppHeader>` shared by 4–5 logged-in pages" was wrong.** Code-level audit (saved to `./session-notes/audit-app-header.md`) found dashboard's top bar is unique to one page; what's actually duplicated is the back-link + title + subtitle pattern (`<PageHeader>`). The brand mark itself appears in 5 different visual treatments with no shared sizing or layout. A single `<AppHeader>` would have been three components in a trench coat. Audit overruled the roadmap and saved building the wrong thing.
+- **Tailwind v4 preflight resets `list-style` globally** — must explicitly add `list-disc`/`list-decimal` to `<ul>`/`<ol>` to restore browser defaults. Latent bug if missed; caught during PolicyDocument migration when bullet lists in privacy.md would otherwise have rendered marker-less.
 
-**Loose ends from tonight:**
+**Revised ordering for the remaining mobile-responsive sweep:**
+1. ~~Signin~~ ✅ Shipped May 6
+2. ~~PolicyDocument~~ ✅ Shipped May 7 (commit `ee388d2`)
+3. ~~PageHeader extraction~~ ✅ Shipped May 7 (commit `949bdab`)
+4. ~~Billing~~ ✅ Shipped May 7 (commit `949bdab`)
+5. ~~Settings~~ ✅ Shipped May 7 (commit `3a31a23`)
+6. ~~Admin~~ ✅ Shipped May 7 (commit `3ba4e59` + revert `fd30075`)
+7. ~~Admin/client~~ ✅ Shipped May 7 (commit `79bbc62`)
+8. **Welcome-pro** — has Calendly inline widget; cautious refactor (only the wrapper, don't touch `data-url` or `className="calendly-inline-widget"`). ~30 minutes.
+9. **Onboarding** — multi-step wizard, ~310 lines all inline. ~45 minutes.
+10. **Dashboard** — biggest, most stateful, last. ~60–90 minutes. Has its own unique top bar that doesn't use PageHeader.
+
+**Loose ends:**
 - Add `NEXT_PUBLIC_CALENDLY_URL` to Vercel env vars (Production + Preview + Development). Hardcoded fallback in code keeps welcome-pro working until then. 30 seconds in the dashboard.
 
 ---
@@ -391,7 +408,7 @@ All tiers include a 14-day free trial. CSV upload supports Square, Stripe, Quick
 
 ## Already Shipped (Phases 0 + 1 + 1.5 + Partial 1.6 + 1.7 + Partial 2)
 
-Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, **Tailwind v4 activated and validated (signin page migrated as first mobile-responsive surface)**, security hardening.
+Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, **Tailwind v4 activated and validated (signin page migrated as first mobile-responsive surface)**, **PageHeader component, planColor helper, billing/settings/admin/admin-client/PolicyDocument migrated to Tailwind**, security hardening.
 
 ## Up Next
 
