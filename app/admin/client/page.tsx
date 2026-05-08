@@ -2,6 +2,18 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
+import PageHeader from "../../components/PageHeader";
+import { planColor } from "@/lib/planColor";
+
+function statusColor(status: string): string {
+  const map: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800",
+    paid: "bg-green-100 text-green-800",
+    overdue: "bg-red-100 text-red-800",
+    needs_review: "bg-indigo-100 text-indigo-800",
+  };
+  return map[status] || "";
+}
 
 function ClientDetailContent() {
   const searchParams = useSearchParams();
@@ -19,18 +31,44 @@ function ClientDetailContent() {
     async function load() {
       try {
         const res = await fetch(`/api/admin/client?id=${clientId}`);
-        if (res.status === 403) { setError("Access denied"); setLoading(false); return; }
+        if (res.status === 403) {
+          setError("Access denied");
+          setLoading(false);
+          return;
+        }
         if (!res.ok) throw new Error("Failed to load");
         const json = await res.json();
         setData(json);
-      } catch { setError("Failed to load client"); }
-      finally { setLoading(false); }
+      } catch {
+        setError("Failed to load client");
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [clientId]);
 
-  if (loading) return <div style={s.container}><div style={s.content}><p style={s.loading}>Loading client...</p></div></div>;
-  if (error || !data) return <div style={s.container}><div style={s.content}><div style={s.errorCard}>{error || "Client not found"}</div></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <p className="text-center p-[60px] text-slate-500">Loading client...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center text-red-800">
+            {error || "Client not found"}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { client, settings, items, stats } = data;
 
@@ -39,177 +77,223 @@ function ClientDetailContent() {
   }
 
   function fmtDate(d: string) {
-    return d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "\u2014";
+    return d
+      ? new Date(d).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "—";
   }
 
   return (
-    <div style={s.container}>
-      <div style={s.content}>
-        {/* Header */}
-        <div style={s.header}>
-          <a href="/admin" style={s.backLink}>{"\u2190"} Back to Admin</a>
-          <div style={s.headerRow}>
-            <div>
-              <h1 style={s.title}>{client.business_name || client.email}</h1>
-              <p style={s.subtitle}>{client.email}</p>
-            </div>
-            <span style={{...s.planBadge, ...(planColor(client.plan))}}>{client.plan}</span>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader
+          backHref="/admin"
+          backLabel="Admin"
+          title={client.business_name || client.email}
+          subtitle={client.email}
+          rightSlot={
+            <span
+              className={`py-[3px] px-2.5 rounded-[20px] text-xs font-semibold uppercase tracking-[0.3px] ${planColor(
+                client.plan
+              )}`}
+            >
+              {client.plan}
+            </span>
+          }
+        />
 
         {/* Client Info Grid */}
-        <div style={s.infoGrid}>
-          <div style={s.infoCard}>
-            <h3 style={s.infoTitle}>Account Details</h3>
-            <div style={s.infoRow}><span style={s.infoLabel}>ID</span><span style={s.infoValue}>{client.id}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Industry</span><span style={s.infoValue}>{client.industry || "\u2014"}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Plan</span><span style={s.infoValue}>{client.plan}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Stripe ID</span><span style={s.infoValue}>{client.stripe_customer_id || "None"}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Onboarded</span><span style={s.infoValue}>{client.onboarding_completed ? "\u2713 Yes" : "\u2717 No"}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Joined</span><span style={s.infoValue}>{fmtDate(client.created_at)}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Trial Ends</span><span style={s.infoValue}>{fmtDate(client.trial_ends_at)}</span></div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4 mb-8">
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mt-0 mb-4 pb-3 border-b border-slate-100">
+              Account Details
+            </h3>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">ID</span>
+              <span className="text-[13px] font-medium text-slate-900">{client.id}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Industry</span>
+              <span className="text-[13px] font-medium text-slate-900">{client.industry || "—"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Plan</span>
+              <span className="text-[13px] font-medium text-slate-900">{client.plan}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Stripe ID</span>
+              <span className="text-[13px] font-medium text-slate-900">{client.stripe_customer_id || "None"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Onboarded</span>
+              <span className="text-[13px] font-medium text-slate-900">
+                {client.onboarding_completed ? "✓ Yes" : "✗ No"}
+              </span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Joined</span>
+              <span className="text-[13px] font-medium text-slate-900">{fmtDate(client.created_at)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Trial Ends</span>
+              <span className="text-[13px] font-medium text-slate-900">{fmtDate(client.trial_ends_at)}</span>
+            </div>
           </div>
 
-          <div style={s.infoCard}>
-            <h3 style={s.infoTitle}>Usage Stats</h3>
-            <div style={s.infoRow}><span style={s.infoLabel}>Total Items</span><span style={s.infoValue}>{stats.total_items}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>This Month</span><span style={s.infoValue}>{stats.items_this_month}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Pending</span><span style={s.infoValue}>{stats.pending}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Paid</span><span style={s.infoValue}>{stats.paid}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Overdue</span><span style={s.infoValue}>{stats.overdue}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Total Amount</span><span style={s.infoValue}>{fmt(parseFloat(stats.total_amount))}</span></div>
-            <div style={s.infoRow}><span style={s.infoLabel}>Avg Confidence</span><span style={s.infoValue}>{Math.round(parseFloat(stats.avg_confidence))}%</span></div>
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mt-0 mb-4 pb-3 border-b border-slate-100">
+              Usage Stats
+            </h3>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Total Items</span>
+              <span className="text-[13px] font-medium text-slate-900">{stats.total_items}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">This Month</span>
+              <span className="text-[13px] font-medium text-slate-900">{stats.items_this_month}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Pending</span>
+              <span className="text-[13px] font-medium text-slate-900">{stats.pending}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Paid</span>
+              <span className="text-[13px] font-medium text-slate-900">{stats.paid}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Overdue</span>
+              <span className="text-[13px] font-medium text-slate-900">{stats.overdue}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Total Amount</span>
+              <span className="text-[13px] font-medium text-slate-900">
+                {fmt(parseFloat(stats.total_amount))}
+              </span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-slate-50">
+              <span className="text-[13px] text-slate-500">Avg Confidence</span>
+              <span className="text-[13px] font-medium text-slate-900">
+                {Math.round(parseFloat(stats.avg_confidence))}%
+              </span>
+            </div>
           </div>
 
           {settings && (
-            <div style={s.infoCard}>
-              <h3 style={s.infoTitle}>Settings</h3>
-              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
-                <span style={s.infoLabel}>Active Modules</span>
-                <div style={s.tagRow}>
+            <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mt-0 mb-4 pb-3 border-b border-slate-100">
+                Settings
+              </h3>
+              <div className="flex flex-col gap-2 py-2 border-b border-slate-50">
+                <span className="text-[13px] text-slate-500">Active Modules</span>
+                <div className="flex flex-wrap gap-1.5">
                   {(settings.active_modules || []).map((m: string) => (
-                    <span key={m} style={s.tag}>{m}</span>
+                    <span
+                      key={m}
+                      className="py-1 px-2.5 rounded-[20px] text-xs font-medium bg-blue-50 text-blue-700"
+                    >
+                      {m}
+                    </span>
                   ))}
-                  {(!settings.active_modules || settings.active_modules.length === 0) && <span style={s.infoValue}>Default</span>}
+                  {(!settings.active_modules || settings.active_modules.length === 0) && (
+                    <span className="text-[13px] font-medium text-slate-900">Default</span>
+                  )}
                 </div>
               </div>
-              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
-                <span style={s.infoLabel}>Expense Categories</span>
-                <div style={s.tagRow}>
+              <div className="flex flex-col gap-2 py-2 border-b border-slate-50">
+                <span className="text-[13px] text-slate-500">Expense Categories</span>
+                <div className="flex flex-wrap gap-1.5">
                   {(settings.custom_categories || []).map((c: string) => (
-                    <span key={c} style={s.tagGreen}>{c}</span>
+                    <span
+                      key={c}
+                      className="py-1 px-2.5 rounded-[20px] text-xs font-medium bg-green-50 text-green-600"
+                    >
+                      {c}
+                    </span>
                   ))}
-                  {(!settings.custom_categories || settings.custom_categories.length === 0) && <span style={s.infoValue}>None</span>}
+                  {(!settings.custom_categories || settings.custom_categories.length === 0) && (
+                    <span className="text-[13px] font-medium text-slate-900">None</span>
+                  )}
                 </div>
               </div>
-              <div style={{...s.infoRow, flexDirection: "column" as const, gap: 8}}>
-                <span style={s.infoLabel}>Preferences</span>
-                <span style={s.infoValue}>{settings.preferences && Object.keys(settings.preferences).length > 0 ? Object.entries(settings.preferences).map(([k, v]) => `${k}: ${v}`).join(", ") : "Default"}</span>
+              <div className="flex flex-col gap-2 py-2 border-b border-slate-50">
+                <span className="text-[13px] text-slate-500">Preferences</span>
+                <span className="text-[13px] font-medium text-slate-900">
+                  {settings.preferences && Object.keys(settings.preferences).length > 0
+                    ? Object.entries(settings.preferences)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(", ")
+                    : "Default"}
+                </span>
               </div>
             </div>
           )}
         </div>
 
         {/* Recent Items */}
-        <div style={s.tableCard}>
-          <div style={s.tableHeader}>
-            <h2 style={s.tableTitle}>Recent Items ({items.length})</h2>
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="py-4 px-6 border-b border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 m-0">Recent Items ({items.length})</h2>
           </div>
           {items.length > 0 ? (
-            <div style={{ overflowX: "auto" }}>
-              <table style={s.table}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
-                    <th style={s.th}>Vendor</th>
-                    <th style={s.th}>Category</th>
-                    <th style={s.th}>Amount</th>
-                    <th style={s.th}>Status</th>
-                    <th style={s.th}>Source</th>
-                    <th style={s.th}>Confidence</th>
-                    <th style={s.th}>Date</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Vendor</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Category</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Amount</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Source</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Confidence</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item: any) => (
-                    <tr key={item.id} style={s.tr}>
-                      <td style={s.td}><span style={{ fontWeight: 600 }}>{item.vendor || "\u2014"}</span></td>
-                      <td style={s.td}><span style={{ textTransform: "capitalize" as const }}>{item.category || "\u2014"}</span></td>
-                      <td style={s.td}>{item.amount ? fmt(parseFloat(item.amount)) : "\u2014"}</td>
-                      <td style={s.td}>
-                        <span style={{...s.statusBadge, ...(statusColor(item.status))}}>
+                    <tr key={item.id} className="border-b border-slate-100">
+                      <td className="py-3 px-4 text-slate-700">
+                        <span className="font-semibold">{item.vendor || "—"}</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        <span className="capitalize">{item.category || "—"}</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        {item.amount ? fmt(parseFloat(item.amount)) : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        <span
+                          className={`py-[3px] px-2.5 rounded-[20px] text-[11px] font-semibold uppercase ${statusColor(
+                            item.status
+                          )}`}
+                        >
                           {item.status}
                         </span>
                       </td>
-                      <td style={s.td}><span style={{ fontSize: 12, color: "#64748b" }}>{item.source || "email"}</span></td>
-                      <td style={s.td}>{item.confidence ? `${item.confidence}%` : "\u2014"}</td>
-                      <td style={s.td}><span style={{ fontSize: 13, color: "#64748b" }}>{fmtDate(item.processed_at)}</span></td>
+                      <td className="py-3 px-4 text-slate-700">
+                        <span className="text-xs text-slate-500">{item.source || "email"}</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        {item.confidence ? `${item.confidence}%` : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        <span className="text-[13px] text-slate-500">{fmtDate(item.processed_at)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div style={{ padding: 40, textAlign: "center" as const, color: "#94a3b8" }}>No items yet</div>
+            <div className="p-10 text-center text-slate-400">No items yet</div>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-function planColor(plan: string): React.CSSProperties {
-  const m: Record<string, React.CSSProperties> = {
-    trial: { background: "#f1f5f9", color: "#475569" },
-    starter: { background: "#eff6ff", color: "#1d4ed8" },
-    growth: { background: "#f3e8ff", color: "#7c3aed" },
-    pro: { background: "#fef3c7", color: "#92400e" },
-    canceled: { background: "#fee2e2", color: "#991b1b" },
-  };
-  return m[plan] || {};
-}
-
-function statusColor(status: string): React.CSSProperties {
-  const m: Record<string, React.CSSProperties> = {
-    pending: { background: "#fef3c7", color: "#92400e" },
-    paid: { background: "#dcfce7", color: "#166534" },
-    overdue: { background: "#fee2e2", color: "#991b1b" },
-    needs_review: { background: "#e0e7ff", color: "#3730a3" },
-  };
-  return m[status] || {};
-}
-
-const s: Record<string, React.CSSProperties> = {
-  container: { minHeight: "100vh", background: "#f8fafc", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-  content: { maxWidth: 1100, margin: "0 auto", padding: "32px 24px" },
-  loading: { textAlign: "center" as const, padding: 60, color: "#64748b" },
-  errorCard: { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 32, textAlign: "center" as const, color: "#991b1b" },
-  header: { marginBottom: 32 },
-  backLink: { fontSize: 14, color: "#3b82f6", textDecoration: "none", display: "inline-block", marginBottom: 12 },
-  headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 12 },
-  title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" },
-  subtitle: { fontSize: 14, color: "#64748b", margin: 0 },
-  planBadge: { padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.5px", alignSelf: "flex-start" as const },
-
-  infoGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 32 },
-  infoCard: { background: "white", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" },
-  infoTitle: { fontSize: 14, fontWeight: 600, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.5px", margin: "0 0 16px", paddingBottom: 12, borderBottom: "1px solid #f1f5f9" },
-  infoRow: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f8fafc" },
-  infoLabel: { fontSize: 13, color: "#64748b" },
-  infoValue: { fontSize: 13, fontWeight: 500, color: "#0f172a" },
-
-  tagRow: { display: "flex", flexWrap: "wrap" as const, gap: 6 },
-  tag: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#eff6ff", color: "#1d4ed8" },
-  tagGreen: { padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#16a34a" },
-
-  tableCard: { background: "white", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" },
-  tableHeader: { padding: "16px 24px", borderBottom: "1px solid #e2e8f0" },
-  tableTitle: { fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0 },
-  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 14 },
-  th: { textAlign: "left" as const, padding: "12px 16px", fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.5px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" },
-  tr: { borderBottom: "1px solid #f1f5f9" },
-  td: { padding: "12px 16px", color: "#334155" },
-  statusBadge: { padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const },
-};
 
 export default function ClientDetailPage() {
   return (
