@@ -14,10 +14,10 @@ const INDUSTRIES = [
   { id: "ecommerce", label: "Etsy / Amazon FBA Seller", icon: "\u{1F4E6}" },
   { id: "creative", label: "Photographer / Creative", icon: "\u{1F3A8}" },
   { id: "bookkeeper", label: "Bookkeeper / Small CPA Firm", icon: "\u{1F4CA}" },
-  { id: "nonprofit", label: "Nonprofit Organization", icon: "\u2764\uFE0F" },
+  { id: "nonprofit", label: "Nonprofit Organization", icon: "❤️" },
   { id: "realestate", label: "Real Estate Investor", icon: "\u{1F3E0}" },
-  { id: "fitness", label: "Personal Trainer / Coach", icon: "\u{1F3CB}\uFE0F" },
-  { id: "other", label: "Other", icon: "\u2699\uFE0F" },
+  { id: "fitness", label: "Personal Trainer / Coach", icon: "\u{1F3CB}️" },
+  { id: "other", label: "Other", icon: "⚙️" },
 ];
 
 export default function OnboardingPage() {
@@ -55,28 +55,33 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div style={s.container}>
-      <div style={s.card}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
+      <div className="bg-white rounded-2xl p-6 sm:py-10 sm:px-9 max-w-[560px] w-full shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
         {/* Step indicators */}
-        <div style={s.steps}>
+        <div className="flex gap-2 justify-center mb-8">
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{
-              ...s.stepDot,
-              background: i <= step ? "#3b82f6" : "#e2e8f0",
-            }} />
+            <div
+              key={i}
+              className={`w-10 h-1 rounded-sm transition-colors duration-200 ${
+                i <= step ? "bg-blue-500" : "bg-slate-200"
+              }`}
+            />
           ))}
         </div>
 
         {/* Step 0: Welcome */}
         {step === 0 && (
-          <div style={s.stepContent}>
-            <div style={s.welcomeIcon}>{"\u26A1"}</div>
-            <h1 style={s.title}>Welcome to FlowWork</h1>
-            <p style={s.subtitle}>
+          <div className="flex flex-col items-center text-center">
+            <div className="text-5xl mb-4">{"⚡"}</div>
+            <h1 className="text-[28px] font-bold text-slate-900 m-0 mb-3">Welcome to FlowWork</h1>
+            <p className="text-base text-slate-500 leading-normal max-w-[400px] m-0 mb-8">
               AI-powered accounting automation for your small business.
-              Let's get you set up in under a minute.
+              Let&apos;s get you set up in under a minute.
             </p>
-            <button onClick={() => setStep(1)} style={s.primaryBtn}>
+            <button
+              onClick={() => setStep(1)}
+              className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer"
+            >
               Get started
             </button>
           </div>
@@ -84,22 +89,27 @@ export default function OnboardingPage() {
 
         {/* Step 1: Business Name */}
         {step === 1 && (
-          <div style={s.stepContent}>
-            <h2 style={s.stepTitle}>What's your business called?</h2>
-            <p style={s.stepSubtitle}>This helps us personalize your experience.</p>
+          <div className="flex flex-col items-center text-center">
+            <h2 className="text-[22px] font-bold text-slate-900 m-0 mb-2">What&apos;s your business called?</h2>
+            <p className="text-sm text-slate-500 m-0 mb-6">This helps us personalize your experience.</p>
             <input
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               placeholder="e.g. Meridian Supply Co."
-              style={s.input}
+              className="w-full py-3.5 px-4 text-base border border-slate-200 rounded-[10px] outline-none mb-6 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && businessName.trim()) setStep(2);
               }}
             />
-            <div style={s.btnRow}>
-              <button onClick={() => setStep(0)} style={s.backBtn}>Back</button>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setStep(0)}
+                className="py-3.5 px-6 rounded-[10px] border border-slate-200 bg-white text-slate-500 text-[15px] font-medium cursor-pointer"
+              >
+                Back
+              </button>
               <button
                 onClick={() => {
                   if (!businessName.trim()) {
@@ -109,7 +119,7 @@ export default function OnboardingPage() {
                   setError(null);
                   setStep(2);
                 }}
-                style={s.primaryBtn}
+                className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer"
               >
                 Continue
               </button>
@@ -119,37 +129,36 @@ export default function OnboardingPage() {
 
         {/* Step 2: Industry */}
         {step === 2 && (
-          <div style={s.stepContent}>
-            <h2 style={s.stepTitle}>What type of business do you run?</h2>
-            <p style={s.stepSubtitle}>We'll tailor your categories and features.</p>
-            <div style={s.industryGrid}>
+          <div className="flex flex-col items-center text-center">
+            <h2 className="text-[22px] font-bold text-slate-900 m-0 mb-2">What type of business do you run?</h2>
+            <p className="text-sm text-slate-500 m-0 mb-6">We&apos;ll tailor your categories and features.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full mb-6">
               {INDUSTRIES.map((ind) => (
                 <button
                   key={ind.id}
                   onClick={() => setIndustry(ind.id)}
-                  style={{
-                    ...s.industryBtn,
-                    ...(industry === ind.id ? s.industryBtnActive : {}),
-                  }}
+                  className={`flex items-center gap-2.5 py-3 px-3.5 border rounded-[10px] cursor-pointer text-[13px] text-left transition-all duration-150 outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                    industry === ind.id
+                      ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
                 >
-                  <span style={s.industryIcon}>{ind.icon}</span>
-                  <span style={s.industryLabel}>{ind.label}</span>
+                  <span className="text-lg shrink-0">{ind.icon}</span>
+                  <span className="leading-[1.3]">{ind.label}</span>
                 </button>
               ))}
             </div>
-            <div style={s.btnRow}>
-              <button onClick={() => setStep(1)} style={s.backBtn}>Back</button>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setStep(1)}
+                className="py-3.5 px-6 rounded-[10px] border border-slate-200 bg-white text-slate-500 text-[15px] font-medium cursor-pointer"
+              >
+                Back
+              </button>
               <button
                 onClick={handleComplete}
                 disabled={saving || !industry}
-                style={{
-                  ...s.primaryBtn,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  ...(saving || !industry ? { opacity: 0.5, cursor: "not-allowed" } : {}),
-                }}
+                className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving && <Spinner size={14} color="white" />}
                 {saving ? "Setting up..." : "Launch FlowWork"}
@@ -159,7 +168,7 @@ export default function OnboardingPage() {
         )}
 
         {error && (
-          <div style={{ marginTop: 16 }}>
+          <div className="mt-4">
             <ErrorBanner message={error} onDismiss={() => setError(null)} />
           </div>
         )}
@@ -167,140 +176,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-    padding: 24,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  card: {
-    background: "white",
-    borderRadius: 16,
-    padding: "40px 36px",
-    maxWidth: 560,
-    width: "100%",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-  },
-  steps: {
-    display: "flex",
-    gap: 8,
-    justifyContent: "center",
-    marginBottom: 32,
-  },
-  stepDot: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    transition: "background 0.2s",
-  },
-  stepContent: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    textAlign: "center" as const,
-  },
-  welcomeIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: "0 0 12px",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#64748b",
-    margin: "0 0 32px",
-    lineHeight: 1.5,
-    maxWidth: 400,
-  },
-  stepTitle: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: "0 0 8px",
-  },
-  stepSubtitle: {
-    fontSize: 14,
-    color: "#64748b",
-    margin: "0 0 24px",
-  },
-  input: {
-    width: "100%",
-    padding: "14px 16px",
-    fontSize: 16,
-    border: "1px solid #e2e8f0",
-    borderRadius: 10,
-    outline: "none",
-    marginBottom: 24,
-    boxSizing: "border-box" as const,
-  },
-  industryGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 8,
-    width: "100%",
-    marginBottom: 24,
-  },
-  industryBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "12px 14px",
-    border: "1px solid #e2e8f0",
-    borderRadius: 10,
-    background: "white",
-    cursor: "pointer",
-    fontSize: 13,
-    color: "#334155",
-    textAlign: "left" as const,
-    transition: "all 0.15s",
-  },
-  industryBtnActive: {
-    borderColor: "#3b82f6",
-    background: "#eff6ff",
-    color: "#1e40af",
-    fontWeight: 600,
-  },
-  industryIcon: {
-    fontSize: 18,
-    flexShrink: 0,
-  },
-  industryLabel: {
-    fontSize: 13,
-    lineHeight: 1.3,
-  },
-  btnRow: {
-    display: "flex",
-    gap: 12,
-    width: "100%",
-  },
-  primaryBtn: {
-    flex: 1,
-    padding: "14px 24px",
-    borderRadius: 10,
-    border: "none",
-    background: "#3b82f6",
-    color: "white",
-    cursor: "pointer",
-    fontSize: 15,
-    fontWeight: 600,
-  },
-  backBtn: {
-    padding: "14px 24px",
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    color: "#64748b",
-    cursor: "pointer",
-    fontSize: 15,
-    fontWeight: 500,
-  },
-};
