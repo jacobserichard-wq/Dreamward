@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import type { PlanName } from "./plans";
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-04-22.dahlia"
@@ -25,11 +26,11 @@ export const PLANS = {
   },
 };
 
-export type PlanName = "starter" | "growth" | "pro";
+type PaidPlanName = Extract<PlanName, "starter" | "growth" | "pro">;
 
-export function planFromPriceId(priceId: string | undefined): PlanName | null {
+export function planFromPriceId(priceId: string | undefined): PaidPlanName | null {
   for (const [name, config] of Object.entries(PLANS)) {
-    if (config.priceId === priceId) return name as PlanName;
+    if (config.priceId === priceId) return name as PaidPlanName;
   }
   return null;
 }
