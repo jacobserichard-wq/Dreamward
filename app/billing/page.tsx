@@ -27,7 +27,7 @@ const PLAN_DETAILS: Record<string, { name: string; price: string; features: stri
   trial: {
     name: "Free Trial",
     price: "$0",
-    features: ["1 Gmail account", "25 items/month", "Expense tracking", "Dashboard"],
+    features: ["25 items/month", "Expense tracking", "Dashboard"],
   },
   starter: {
     name: "Starter",
