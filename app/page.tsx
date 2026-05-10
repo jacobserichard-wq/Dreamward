@@ -451,7 +451,7 @@ export default function Home() {
           <>
             {/* Label selector + actions */}
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {availableLabels.map((label) => (
                   <button
                     key={label}
@@ -470,7 +470,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={processWithAI}
                   disabled={processing || emails.length === 0}
