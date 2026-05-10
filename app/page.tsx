@@ -357,43 +357,28 @@ export default function Home() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={styles.container}>
+    <div className="min-h-screen bg-slate-50 font-sans">
       {/* Header */}
-      <header style={styles.header}>
-        <div style={{...styles.headerInner, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+      <header className="bg-gradient-to-br from-slate-800 to-slate-700 text-white px-4 sm:px-8 py-6">
+        <div className="max-w-[1200px] mx-auto flex justify-between items-center">
           <div>
-            <h1 style={styles.logo}>
-              <span style={styles.logoIcon}>{"\u26A1"}</span> FlowWork
+            <h1 className="m-0 text-2xl sm:text-[28px] font-bold">
+              <span className="text-2xl">{"⚡"}</span> FlowWork
             </h1>
-            <p style={styles.tagline}>Accounting Automation</p>
+            <p className="mt-1 mb-0 mx-0 text-white/70 text-sm hidden sm:block">Accounting Automation</p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="flex items-center gap-3">
             {clientInfo && (
-              <a href="/billing" style={{
-                background: "rgba(255,255,255,0.15)",
-                color: "white",
-                padding: "6px 16px",
-                borderRadius: 20,
-                fontSize: 13,
-                fontWeight: 600,
-                textTransform: "uppercase" as const,
-                letterSpacing: "0.5px",
-                textDecoration: "none",
-                cursor: "pointer",
-              }}>
+              <a
+                href="/billing"
+                className="bg-white/15 text-white px-4 py-1.5 rounded-full text-[13px] font-semibold uppercase tracking-wider no-underline cursor-pointer"
+              >
                 {clientInfo.plan}
               </a>
             )}
             <button
               onClick={() => signOut({ callbackUrl: "/signin" })}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255,255,255,0.75)",
-                fontSize: 13,
-                cursor: "pointer",
-                padding: "6px 4px",
-              }}
+              className="bg-transparent text-white/75 text-[13px] cursor-pointer px-1 py-1.5"
             >
               Sign out
             </button>
@@ -402,15 +387,16 @@ export default function Home() {
       </header>
 
       {/* Navigation Tabs */}
-      <nav style={styles.nav}>
+      <nav className="flex bg-white border-b border-slate-200 px-4 sm:px-8 max-w-[1200px] mx-auto">
         {(["emails", "processed", "dashboard"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            style={{
-              ...styles.navTab,
-              ...(activeTab === tab ? styles.navTabActive : {}),
-            }}
+            className={`py-3.5 px-3 sm:px-6 bg-transparent cursor-pointer text-sm font-medium border-b-2 transition-all duration-150 ${
+              activeTab === tab
+                ? "text-slate-800 border-blue-500"
+                : "text-slate-500 border-transparent"
+            }`}
           >
             {tab === "emails" && "\u{1F4E7} Emails"}
             {tab === "processed" && `\u{1F4C4} Processed (${processedItems.length})`}
@@ -419,18 +405,25 @@ export default function Home() {
         ))}
       </nav>
 
-      <main style={styles.main}>
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6">
         {/* Status messages */}
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-        {successMsg && <div style={styles.successBanner}>{successMsg}</div>}
+        {successMsg && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4 text-sm">
+            {successMsg}
+          </div>
+        )}
 
         {/* White-glove backstop: Pro users who haven't visited /welcome-pro yet */}
         {clientInfo?.plan === "pro" && clientInfo?.welcomeProSeen === false && (
-          <div style={styles.welcomeProBanner}>
-            <span style={styles.welcomeProBannerText}>
+          <div className="bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-500 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
+            <span className="font-medium">
               {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your white-glove onboarding call to get started.
             </span>
-            <Link href="/welcome-pro" style={styles.welcomeProBannerBtn}>
+            <Link
+              href="/welcome-pro"
+              className="px-3.5 py-1.5 rounded-md border border-amber-700 bg-white text-amber-900 text-[13px] font-semibold no-underline cursor-pointer"
+            >
               Book your call {"→"}
             </Link>
           </div>
@@ -438,20 +431,14 @@ export default function Home() {
 
         {/* Sample data banner */}
         {processedItems.some((i) => i.source === "sample") && (
-          <div style={styles.sampleBanner}>
-            <span style={styles.sampleBannerText}>
+          <div className="bg-yellow-50 border border-yellow-300 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
+            <span className="font-medium">
               {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when you&apos;re ready to add real data.
             </span>
             <button
               onClick={clearSampleData}
               disabled={clearingSample}
-              style={{
-                ...styles.sampleBannerBtn,
-                ...(clearingSample ? { opacity: 0.6, cursor: "wait" } : {}),
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
+              className="px-3.5 py-1.5 rounded-md border border-yellow-600 bg-white text-amber-800 text-[13px] font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
             >
               {clearingSample && <Spinner size={12} color="#854d0e" />}
               {clearingSample ? "Clearing..." : "Clear sample data"}
@@ -463,18 +450,17 @@ export default function Home() {
         {activeTab === "emails" && (
           <>
             {/* Label selector + actions */}
-            <div style={styles.toolbar}>
-              <div style={styles.labelGroup}>
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+              <div className="flex gap-2">
                 {availableLabels.map((label) => (
                   <button
                     key={label}
                     onClick={() => fetchEmails(label)}
-                    style={{
-                      ...styles.labelBtn,
-                      ...(selectedLabel === label
-                        ? styles.labelBtnActive
-                        : {}),
-                    }}
+                    className={`py-2.5 px-4 rounded-lg border cursor-pointer text-[13px] font-medium transition-all duration-150 ${
+                      selectedLabel === label
+                        ? "bg-slate-800 text-white border-slate-800"
+                        : "bg-white text-slate-600 border-slate-200"
+                    }`}
                   >
                     {label === "Invoices" && "\u{1F4D1}"}
                     {label === "AR Follow Up" && "\u{1F514}"}
@@ -484,39 +470,27 @@ export default function Home() {
                 ))}
               </div>
 
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="flex gap-2">
                 <button
                   onClick={processWithAI}
                   disabled={processing || emails.length === 0}
-                  style={{
-                    ...styles.processBtn,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    ...(processing || emails.length === 0
-                      ? styles.processBtnDisabled
-                      : {}),
-                  }}
+                  className="py-2.5 px-6 rounded-lg bg-green-600 text-white cursor-pointer text-sm font-semibold transition-all duration-150 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processing ? <Spinner size={14} color="white" /> : <span>{"\u{1F916}"}</span>}
                   {processing ? "Processing..." : "Process with AI"}
                 </button>
 
-                <label style={{
-                  ...styles.processBtn,
-                  background: "#3b82f6",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  margin: 0,
-                  ...(uploading ? styles.processBtnDisabled : {}),
-                }}>
+                <label
+                  className={`py-2.5 px-6 rounded-lg bg-blue-500 text-white text-sm font-semibold transition-all duration-150 inline-flex items-center gap-2 m-0 ${
+                    uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                >
                   {uploading ? <Spinner size={14} color="white" /> : <span>{"\u{1F4C1}"}</span>}
                   {uploading ? "Analyzing..." : "Upload CSV"}
                   <input
                     type="file"
                     accept=".csv,.tsv"
-                    style={{ display: "none" }}
+                    className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleUpload(f);
@@ -526,7 +500,7 @@ export default function Home() {
                   />
                 </label>
 
-                <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                <div className="relative inline-flex items-center">
                   <select
                     value={backfillRange}
                     disabled={loading}
@@ -536,17 +510,9 @@ export default function Home() {
                         fetchBackfill(selectedLabel, parseInt(e.target.value));
                       }
                     }}
-                    style={{
-                      padding: "10px 12px",
-                      paddingRight: loading ? 36 : 12,
-                      borderRadius: 8,
-                      border: "1px solid #e2e8f0",
-                      background: "white",
-                      fontSize: 13,
-                      color: "#475569",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.6 : 1,
-                    }}
+                    className={`py-2.5 px-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-600 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                      loading ? "pr-9" : ""
+                    }`}
                   >
                     <option value="">{loading ? "Backfilling..." : "Backfill..."}</option>
                     <option value="30">Last 30 days</option>
@@ -556,7 +522,7 @@ export default function Home() {
                     <option value="365">Last year</option>
                   </select>
                   {loading && (
-                    <div style={{ position: "absolute", right: 10, pointerEvents: "none", color: "#475569" }}>
+                    <div className="absolute right-2.5 pointer-events-none text-slate-600">
                       <Spinner size={14} />
                     </div>
                   )}
@@ -566,29 +532,32 @@ export default function Home() {
 
             {/* Email list */}
             {loading ? (
-              <div style={styles.loadingState}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "#64748b" }}>
+              <div className="text-center p-[60px] text-slate-500 text-[15px]">
+                <div className="inline-flex items-center gap-2.5 text-slate-500">
                   <Spinner size={20} />
                   <span>Loading emails...</span>
                 </div>
               </div>
             ) : emails.length === 0 ? (
-              <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>{"\u{1F4ED}"}</p>
+              <div className="text-center p-[60px] text-slate-400 text-[15px]">
+                <p className="text-5xl mb-2">{"\u{1F4ED}"}</p>
                 <p>Select a label above to fetch emails</p>
               </div>
             ) : (
-              <div style={styles.emailList}>
+              <div className="flex flex-col gap-2">
                 {emails.map((email) => (
-                  <div key={email.id} style={styles.emailCard}>
-                    <div style={styles.emailHeader}>
-                      <span style={styles.emailFrom}>{email.from}</span>
-                      <span style={styles.emailDate}>
+                  <div
+                    key={email.id}
+                    className="bg-white rounded-[10px] py-4 px-5 border border-slate-200 transition-shadow duration-150"
+                  >
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-[13px] font-semibold text-slate-800">{email.from}</span>
+                      <span className="text-xs text-slate-400">
                         {new Date(email.date).toLocaleDateString()}
                       </span>
                     </div>
-                    <div style={styles.emailSubject}>{email.subject}</div>
-                    <div style={styles.emailSnippet}>
+                    <div className="text-sm font-medium text-slate-700 mb-1">{email.subject}</div>
+                    <div className="text-[13px] text-slate-500 leading-snug">
                       {email.snippet || email.body?.substring(0, 120)}
                     </div>
                   </div>
@@ -602,65 +571,64 @@ export default function Home() {
         {activeTab === "processed" && (
           <>
             {processedItems.length === 0 ? (
-              <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>{"\u{1F4CB}"}</p>
+              <div className="text-center p-[60px] text-slate-400 text-[15px]">
+                <p className="text-5xl mb-2">{"\u{1F4CB}"}</p>
                 <p>No processed items yet. Fetch emails and click Process with AI.</p>
               </div>
             ) : (
-              <div style={styles.cardGrid}>
+              <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
                 {processedItems.map((item) => (
-                  <div key={item.id} style={styles.itemCard}>
+                  <div key={item.id} className="bg-white rounded-xl border border-slate-200">
                     {/* Card header with status badge */}
-                    <div style={styles.cardHeader}>
-                      <span style={styles.vendorName}>{item.vendor}</span>
+                    <div className="flex justify-between items-center pt-4 px-5 pb-3 border-b border-slate-100">
+                      <span className="text-base font-bold text-slate-900">{item.vendor}</span>
                       <span
-                        style={{
-                          ...styles.statusBadge,
-                          ...statusStyle(item.status),
-                        }}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider ${statusBadgeClasses(
+                          item.status
+                        )}`}
                       >
                         {item.status.replace("_", " ")}
                       </span>
                     </div>
 
                     {/* Card body */}
-                    <div style={styles.cardBody}>
-                      <div style={styles.cardRow}>
-                        <span style={styles.cardLabel}>Invoice #</span>
-                        <span style={styles.cardValue}>
-                          {item.invoiceNumber}
+                    <div className="py-3 px-5">
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Invoice #</span>
+                        <span className="text-[13px] font-medium text-slate-800">{item.invoiceNumber}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Amount</span>
+                        <span className="text-[15px] font-bold text-slate-900">
+                          ${item.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div style={styles.cardRow}>
-                        <span style={styles.cardLabel}>Amount</span>
-                        <span style={styles.amountValue}>
-                          ${item.amount.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                          })}
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Due Date</span>
+                        <span className="text-[13px] font-medium text-slate-800">
+                          {item.dueDate
+                            ? new Date(item.dueDate).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "-"}
                         </span>
                       </div>
-                      <div style={styles.cardRow}>
-                        <span style={styles.cardLabel}>Due Date</span>
-                        <span style={styles.cardValue}>
-                          {item.dueDate ? new Date(item.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "-"}
-                        </span>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Category</span>
+                        <span className="text-[13px] font-medium text-slate-800">{item.category}</span>
                       </div>
-                      <div style={styles.cardRow}>
-                        <span style={styles.cardLabel}>Category</span>
-                        <span style={styles.cardValue}>{item.category}</span>
-                      </div>
-                      <div style={styles.cardRow}>
-                        <span style={styles.cardLabel}>Confidence</span>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Confidence</span>
                         <span
-                          style={{
-                            ...styles.cardValue,
-                            color:
-                              item.confidence >= 80
-                                ? "#16a34a"
-                                : item.confidence >= 50
-                                ? "#ca8a04"
-                                : "#dc2626",
-                          }}
+                          className={`text-[13px] font-medium ${
+                            item.confidence >= 80
+                              ? "text-green-600"
+                              : item.confidence >= 50
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}
                         >
                           {item.confidence}%
                         </span>
@@ -668,13 +636,11 @@ export default function Home() {
                     </div>
 
                     {/* Summary */}
-                    <p style={styles.cardSummary}>{item.summary}</p>
+                    <p className="pt-2 px-5 pb-3 text-xs text-slate-500 leading-normal m-0">{item.summary}</p>
 
                     {/* Status actions */}
-                    <div style={styles.cardActions}>
-                      {(
-                        ["pending", "paid", "overdue", "needs_review"] as const
-                      ).map((s) => {
+                    <div className="flex gap-1 pt-2 px-4 pb-3 border-t border-slate-100">
+                      {(["pending", "paid", "overdue", "needs_review"] as const).map((s) => {
                         const isUpdating = updatingStatus.has(item.id);
                         const isActive = item.status === s;
                         return (
@@ -682,21 +648,18 @@ export default function Home() {
                             key={s}
                             onClick={() => updateStatus(item.id, s)}
                             disabled={isUpdating}
-                            style={{
-                              ...styles.statusBtn,
-                              ...(isActive ? styles.statusBtnActive : {}),
-                              ...(isUpdating ? { opacity: 0.6, cursor: "wait" } : {}),
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
+                            className={`flex-1 p-1.5 border rounded-md cursor-pointer text-base transition-all duration-150 inline-flex items-center justify-center disabled:opacity-60 disabled:cursor-wait ${
+                              isActive
+                                ? "bg-slate-100 border-slate-400"
+                                : "bg-white border-slate-200"
+                            }`}
                           >
                             {isUpdating && isActive ? (
                               <Spinner size={14} color="#475569" />
                             ) : (
                               <>
-                                {s === "pending" && "\u231B"}
-                                {s === "paid" && "\u2705"}
+                                {s === "pending" && "⌛"}
+                                {s === "paid" && "✅"}
                                 {s === "overdue" && "\u{1F6A8}"}
                                 {s === "needs_review" && "\u{1F440}"}
                               </>
@@ -705,21 +668,11 @@ export default function Home() {
                         );
                       })}
                     </div>
-                    <div style={{ padding: "0 16px 12px", textAlign: "right" as const }}>
+                    <div className="px-4 pb-3 text-right">
                       <button
                         onClick={() => deleteItem(item.id)}
                         disabled={deletingItems.has(item.id)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#94a3b8",
-                          fontSize: 12,
-                          cursor: deletingItems.has(item.id) ? "wait" : "pointer",
-                          padding: "4px 8px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
+                        className="bg-transparent text-slate-400 text-xs cursor-pointer disabled:cursor-wait px-2 py-1 inline-flex items-center gap-1.5"
                       >
                         {deletingItems.has(item.id) && <Spinner size={11} color="#94a3b8" />}
                         {deletingItems.has(item.id) ? "Removing..." : "Remove"}
@@ -734,88 +687,61 @@ export default function Home() {
 
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (
-          <div style={styles.dashboard}>
+          <div>
             {/* Stat cards */}
-            <div style={styles.statGrid}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-8">
               <StatCard
                 label="Total Items"
                 value={stats.total}
                 icon={"\u{1F4E6}"}
-                color="#3b82f6"
+                colorClass="border-t-blue-500"
               />
               <StatCard
                 label="Total Amount"
-                value={`$${stats.totalAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}`}
+                value={`$${stats.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
                 icon={"\u{1F4B0}"}
-                color="#16a34a"
+                colorClass="border-t-green-600"
               />
               <StatCard
                 label="Overdue"
                 value={stats.overdue}
-                sub={`$${stats.overdueAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}`}
+                sub={`$${stats.overdueAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
                 icon={"\u{1F6A8}"}
-                color="#dc2626"
+                colorClass="border-t-red-600"
               />
               <StatCard
                 label="Avg Confidence"
                 value={`${stats.avgConfidence}%`}
                 icon={"\u{1F3AF}"}
-                color="#8b5cf6"
+                colorClass="border-t-violet-500"
               />
             </div>
 
             {/* Status breakdown */}
-            <div style={styles.breakdownSection}>
-              <h3 style={styles.sectionTitle}>Status Breakdown</h3>
-              <div style={styles.breakdownGrid}>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Status Breakdown</h3>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                 {[
-                  {
-                    label: "Pending",
-                    count: stats.pending,
-                    color: "#f59e0b",
-                    icon: "\u231B",
-                  },
-                  {
-                    label: "Overdue",
-                    count: stats.overdue,
-                    color: "#dc2626",
-                    icon: "\u{1F6A8}",
-                  },
-                  {
-                    label: "Needs Review",
-                    count: stats.needsReview,
-                    color: "#6366f1",
-                    icon: "\u{1F440}",
-                  },
-                  {
-                    label: "Paid",
-                    count: stats.paid,
-                    color: "#16a34a",
-                    icon: "\u2705",
-                  },
+                  { label: "Pending", count: stats.pending, borderClass: "border-l-amber-500", icon: "⌛" },
+                  { label: "Overdue", count: stats.overdue, borderClass: "border-l-red-600", icon: "\u{1F6A8}" },
+                  { label: "Needs Review", count: stats.needsReview, borderClass: "border-l-indigo-500", icon: "\u{1F440}" },
+                  { label: "Paid", count: stats.paid, borderClass: "border-l-green-600", icon: "✅" },
                 ].map((item) => (
                   <div
                     key={item.label}
-                    style={{
-                      ...styles.breakdownCard,
-                      borderLeft: `4px solid ${item.color}`,
-                    }}
+                    className={`bg-white rounded-[10px] py-4 px-5 flex items-center gap-3 border border-slate-200 border-l-4 ${item.borderClass}`}
                   >
-                    <span style={styles.breakdownIcon}>{item.icon}</span>
-                    <span style={styles.breakdownCount}>{item.count}</span>
-                    <span style={styles.breakdownLabel}>{item.label}</span>
+                    <span className="text-xl">{item.icon}</span>
+                    <span className="text-2xl font-extrabold text-slate-900">{item.count}</span>
+                    <span className="text-[13px] text-slate-500">{item.label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {processedItems.length === 0 && (
-              <div style={styles.emptyState}>
-                <p style={styles.emptyIcon}>{"\u{1F4CA}"}</p>
+              <div className="text-center p-[60px] text-slate-400 text-[15px]">
+                <p className="text-5xl mb-2">{"\u{1F4CA}"}</p>
                 <p>Process some emails to see dashboard data</p>
               </div>
             )}
@@ -835,10 +761,14 @@ export default function Home() {
           importing={importing}
         />
       </main>
-      <footer style={styles.footer}>
-        <a href="/privacy" style={styles.footerLink}>Privacy</a>
-        <span style={styles.footerDot}>{"·"}</span>
-        <a href="/terms" style={styles.footerLink}>Terms</a>
+      <footer className="max-w-[1200px] mx-auto mt-8 pt-5 px-4 sm:px-8 pb-8 text-[13px] text-slate-400 text-center">
+        <a href="/privacy" className="text-slate-500 no-underline mx-1.5">
+          Privacy
+        </a>
+        <span className="text-slate-300">{"·"}</span>
+        <a href="/terms" className="text-slate-500 no-underline mx-1.5">
+          Terms
+        </a>
       </footer>
     </div>
   );
@@ -851,344 +781,34 @@ function StatCard({
   value,
   sub,
   icon,
-  color,
+  colorClass,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   icon: string;
-  color: string;
+  colorClass: string;
 }) {
   return (
-    <div style={{ ...styles.statCard, borderTop: `3px solid ${color}` }}>
-      <div style={styles.statIcon}>{icon}</div>
-      <div style={styles.statValue}>{value}</div>
-      <div style={styles.statLabel}>{label}</div>
-      {sub && <div style={styles.statSub}>{sub}</div>}
+    <div
+      className={`bg-white rounded-xl p-6 text-center border border-slate-200 border-t-[3px] ${colorClass}`}
+    >
+      <div className="text-[28px] mb-2">{icon}</div>
+      <div className="text-[28px] font-extrabold text-slate-900">{value}</div>
+      <div className="text-[13px] text-slate-500 mt-1">{label}</div>
+      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
     </div>
   );
 }
 
-// ─── Status badge colors ─────────────────────────────────────────────────────
+// ─── Status badge classes ────────────────────────────────────────────────────
 
-function statusStyle(
-  status: string
-): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    pending: { background: "#fef3c7", color: "#92400e" },
-    overdue: { background: "#fee2e2", color: "#991b1b" },
-    paid: { background: "#dcfce7", color: "#166534" },
-    needs_review: { background: "#e0e7ff", color: "#3730a3" },
+function statusBadgeClasses(status: string): string {
+  const map: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800",
+    overdue: "bg-red-100 text-red-800",
+    paid: "bg-green-100 text-green-800",
+    needs_review: "bg-indigo-100 text-indigo-800",
   };
-  return map[status] || {};
+  return map[status] || "";
 }
-
-// ─── Inline Styles ───────────────────────────────────────────────────────────
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  header: {
-    background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-    padding: "24px 32px",
-    color: "white",
-  },
-  headerInner: { maxWidth: 1200, margin: "0 auto" },
-  logo: { margin: 0, fontSize: 28, fontWeight: 700 },
-  logoIcon: { fontSize: 24 },
-  tagline: { margin: "4px 0 0", opacity: 0.7, fontSize: 14 },
-
-  nav: {
-    display: "flex",
-    gap: 0,
-    background: "white",
-    borderBottom: "1px solid #e2e8f0",
-    padding: "0 32px",
-    maxWidth: 1200,
-    margin: "0 auto",
-  },
-  navTab: {
-    padding: "14px 24px",
-    border: "none",
-    background: "none",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#64748b",
-    borderBottom: "2px solid transparent",
-    transition: "all 0.15s",
-  },
-  navTabActive: {
-    color: "#1e293b",
-    borderBottomColor: "#3b82f6",
-  },
-
-  main: { maxWidth: 1200, margin: "0 auto", padding: "24px 32px" },
-
-  successBanner: {
-    background: "#f0fdf4",
-    border: "1px solid #bbf7d0",
-    color: "#166534",
-    padding: "12px 16px",
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  sampleBanner: {
-    background: "#fefce8",
-    border: "1px solid #fde047",
-    color: "#854d0e",
-    padding: "12px 16px",
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 14,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap" as const,
-  },
-  welcomeProBanner: {
-    background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-    border: "1px solid #f59e0b",
-    color: "#78350f",
-    padding: "12px 16px",
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 14,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap" as const,
-  },
-  welcomeProBannerText: {
-    fontWeight: 500,
-  },
-  welcomeProBannerBtn: {
-    padding: "6px 14px",
-    borderRadius: 6,
-    border: "1px solid #b45309",
-    background: "white",
-    color: "#78350f",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 600,
-    textDecoration: "none",
-  },
-  sampleBannerText: {
-    fontWeight: 500,
-  },
-  sampleBannerBtn: {
-    padding: "6px 14px",
-    borderRadius: 6,
-    border: "1px solid #ca8a04",
-    background: "white",
-    color: "#854d0e",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 600,
-  },
-
-  toolbar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-    flexWrap: "wrap" as const,
-    gap: 12,
-  },
-  labelGroup: { display: "flex", gap: 8 },
-  labelBtn: {
-    padding: "10px 18px",
-    borderRadius: 8,
-    border: "1px solid #e2e8f0",
-    background: "white",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 500,
-    color: "#475569",
-    transition: "all 0.15s",
-  },
-  labelBtnActive: {
-    background: "#1e293b",
-    color: "white",
-    borderColor: "#1e293b",
-  },
-  processBtn: {
-    padding: "10px 24px",
-    borderRadius: 8,
-    border: "none",
-    background: "#16a34a",
-    color: "white",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 600,
-    transition: "all 0.15s",
-  },
-  processBtnDisabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
-  },
-
-  loadingState: {
-    textAlign: "center" as const,
-    padding: 60,
-    color: "#64748b",
-    fontSize: 15,
-  },
-  emptyState: {
-    textAlign: "center" as const,
-    padding: 60,
-    color: "#94a3b8",
-    fontSize: 15,
-  },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-
-  emailList: { display: "flex", flexDirection: "column" as const, gap: 8 },
-  emailCard: {
-    background: "white",
-    borderRadius: 10,
-    padding: "16px 20px",
-    border: "1px solid #e2e8f0",
-    transition: "box-shadow 0.15s",
-  },
-  emailHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  emailFrom: { fontSize: 13, fontWeight: 600, color: "#1e293b" },
-  emailDate: { fontSize: 12, color: "#94a3b8" },
-  emailSubject: { fontSize: 14, fontWeight: 500, color: "#334155", marginBottom: 4 },
-  emailSnippet: { fontSize: 13, color: "#64748b", lineHeight: 1.4 },
-
-  cardGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-    gap: 16,
-  },
-  itemCard: {
-    background: "white",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px 20px 12px",
-    borderBottom: "1px solid #f1f5f9",
-  },
-  vendorName: { fontSize: 16, fontWeight: 700, color: "#0f172a" },
-  statusBadge: {
-    padding: "4px 10px",
-    borderRadius: 20,
-    fontSize: 11,
-    fontWeight: 600,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-  },
-  cardBody: { padding: "12px 20px" },
-  cardRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "6px 0",
-    borderBottom: "1px solid #f8fafc",
-  },
-  cardLabel: { fontSize: 13, color: "#64748b" },
-  cardValue: { fontSize: 13, fontWeight: 500, color: "#1e293b" },
-  amountValue: { fontSize: 15, fontWeight: 700, color: "#0f172a" },
-  cardSummary: {
-    padding: "8px 20px 12px",
-    fontSize: 12,
-    color: "#64748b",
-    lineHeight: 1.5,
-    margin: 0,
-  },
-  cardActions: {
-    display: "flex",
-    gap: 4,
-    padding: "8px 16px 12px",
-    borderTop: "1px solid #f1f5f9",
-  },
-  statusBtn: {
-    flex: 1,
-    padding: "6px",
-    border: "1px solid #e2e8f0",
-    borderRadius: 6,
-    background: "white",
-    cursor: "pointer",
-    fontSize: 16,
-    transition: "all 0.15s",
-  },
-  statusBtnActive: {
-    background: "#f1f5f9",
-    borderColor: "#94a3b8",
-  },
-
-  dashboard: {},
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 16,
-    marginBottom: 32,
-  },
-  statCard: {
-    background: "white",
-    borderRadius: 12,
-    padding: 24,
-    textAlign: "center" as const,
-    border: "1px solid #e2e8f0",
-  },
-  statIcon: { fontSize: 28, marginBottom: 8 },
-  statValue: { fontSize: 28, fontWeight: 800, color: "#0f172a" },
-  statLabel: { fontSize: 13, color: "#64748b", marginTop: 4 },
-  statSub: { fontSize: 12, color: "#94a3b8", marginTop: 2 },
-
-  breakdownSection: {},
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#0f172a",
-    marginBottom: 16,
-  },
-  breakdownGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: 12,
-  },
-  breakdownCard: {
-    background: "white",
-    borderRadius: 10,
-    padding: "16px 20px",
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    border: "1px solid #e2e8f0",
-  },
-  breakdownIcon: { fontSize: 20 },
-  breakdownCount: { fontSize: 24, fontWeight: 800, color: "#0f172a" },
-  breakdownLabel: { fontSize: 13, color: "#64748b" },
-
-  footer: {
-    maxWidth: 1200,
-    margin: "32px auto 0",
-    padding: "20px 32px 32px",
-    fontSize: 13,
-    color: "#94a3b8",
-    textAlign: "center" as const,
-  },
-  footerLink: {
-    color: "#64748b",
-    textDecoration: "none",
-    margin: "0 6px",
-  },
-  footerDot: {
-    color: "#cbd5e1",
-  },
-};
