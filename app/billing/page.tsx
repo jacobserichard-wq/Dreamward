@@ -32,12 +32,12 @@ const PLAN_DETAILS: Record<string, { name: string; price: string; features: stri
   starter: {
     name: "Starter",
     price: "$19/mo",
-    features: ["1 Gmail account", "100 items/month", "Expense tracking", "Dashboard"],
+    features: ["100 items/month", "Expense tracking", "Dashboard"],
   },
   growth: {
     name: "Growth",
     price: "$49/mo",
-    features: ["3 Gmail accounts", "Unlimited processing", "Events & mileage", "AR follow-up", "CSV/PDF exports"],
+    features: ["Unlimited processing", "Events & mileage", "AR follow-up", "CSV/PDF exports"],
   },
   pro: {
     name: "Pro",
