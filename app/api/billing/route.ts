@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { getPlanFeatures } from "@/lib/plans";
-import { stripe } from "@/lib/stripe";
 import pool from "@/lib/db";
 
 export async function GET() {
