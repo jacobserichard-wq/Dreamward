@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { stripe, planFromPriceId } from "@/lib/stripe";
 import pool from "@/lib/db";
 import { sendEmail, paymentFailedEmail } from "@/lib/email";
 
@@ -55,9 +55,7 @@ export async function POST(request: NextRequest) {
         let plan = "trial";
         if (status === "active" || status === "trialing") {
           const priceId = subscription.items.data[0]?.price?.id;
-          if (priceId === "price_1TSpgoBeNxvLulr9f4aeZEbD") plan = "starter";
-          else if (priceId === "price_1TSpgpBeNxvLulr9pABRmVqT") plan = "growth";
-          else if (priceId === "price_1TSpgpBeNxvLulr9Wsr5gajq") plan = "pro";
+          plan = planFromPriceId(priceId) ?? "trial";
         } else if (status === "canceled" || status === "unpaid") {
           plan = "canceled";
         }

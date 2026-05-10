@@ -24,3 +24,12 @@ export const PLANS = {
     features: ["Multiple Gmail accounts", "Custom categories", "Tax-time reports", "Schedule C mapping", "Onboarding call"],
   },
 };
+
+export type PlanName = "starter" | "growth" | "pro";
+
+export function planFromPriceId(priceId: string | undefined): PlanName | null {
+  for (const [name, config] of Object.entries(PLANS)) {
+    if (config.priceId === priceId) return name as PlanName;
+  }
+  return null;
+}
