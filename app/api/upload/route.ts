@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { getClientSettings } from "@/lib/db";
+import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
+
+// Slug → display name for prompt rendering. Mirrors app/api/process/route.ts
+// (intentional duplication for now; extract to a shared helper if a third
+// consumer appears).
+const INDUSTRY_DISPLAY_NAMES: Record<Industry, string> = {
+  marketplace: "market vendor / craft seller",
+  freelance: "freelancer / consultant",
+  service: "landscaping / service company",
+  food: "food truck / mobile food business",
+  ecommerce: "Etsy / Amazon FBA seller",
+  creative: "photographer / creative",
+  bookkeeper: "bookkeeper / small CPA firm",
+  nonprofit: "nonprofit organization",
+  realestate: "real estate investor",
+  fitness: "personal trainer / coach",
+  other: "small business",
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,21 +61,21 @@ export async function POST(req: NextRequest) {
     const customCategories: string[] = Array.isArray(settings?.custom_categories)
       ? settings.custom_categories
       : [];
-    const defaultCategories = [
-      "invoice", "expense", "ar_followup",
-      "Office Supplies", "Travel", "Software", "Utilities",
-      "Professional Services", "Insurance", "Payroll",
-    ];
-    const allCategories = customCategories.length > 0
-      ? customCategories
-      : defaultCategories;
+
+    // Industry-aware defaults + customer additions, deduplicated.
+    // Replaces the prior hardcoded fallback array (closes audit-ai-classification §3
+    // gap for the CSV path; mirrors the Gmail-path approach in commit 11.2).
+    const industry = (client.industry ?? "other") as Industry;
+    const industryName = INDUSTRY_DISPLAY_NAMES[industry] ?? INDUSTRY_DISPLAY_NAMES.other;
+    const defaults = getCategoryNamesForIndustry(industry);
+    const allCategories = Array.from(new Set([...defaults, ...customCategories]));
 
     const allDataForClaude = dataRows.slice(0, 200);
 
-    const prompt = `You are a bookkeeping data mapper. Analyze this CSV data and:
+    const prompt = `You are a bookkeeping data mapper for a ${industryName} business. Analyze this CSV data and:
 
 1. Map the columns to these standard fields: vendor, invoice_number, amount, due_date, description
-2. Categorize each row into one of these categories: ${allCategories.join(", ")}
+2. Categorize each row into one of these categories for a ${industryName} business. The category MUST be one of the values below VERBATIM. If no category fits perfectly, use the closest match — do not invent new category names or modify the spelling. Allowed categories: ${allCategories.join(", ")}
 
 HEADERS: ${JSON.stringify(headers)}
 
@@ -146,11 +164,24 @@ Other Accounting Software:
       );
     }
 
+    // Defensively validate each row's category against the allowed list. The
+    // CsvReviewModal will let the user pick from the dropdown for null rows;
+    // mirrors the commit 11.2 validation pattern.
+    const mappedRows = parsed.mapped_rows || [];
+    for (const row of mappedRows) {
+      if (row.category && !allCategories.includes(row.category)) {
+        console.warn(
+          `AI returned invalid category "${row.category}" for industry "${industry}"; dropping.`
+        );
+        row.category = null;
+      }
+    }
+
     return NextResponse.json({
       headers,
       totalRows: dataRows.length,
       columnMapping: parsed.column_mapping,
-      mappedRows: parsed.mapped_rows || [],
+      mappedRows,
       categories: allCategories,
     });
   } catch (error) {
