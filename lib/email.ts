@@ -1,4 +1,5 @@
 const FROM_EMAIL = "FlowWork <hello@flowworks.it.com>";
+const baseUrl = process.env.NEXTAUTH_URL ?? "https://flowworks.it.com";
 
 interface EmailParams {
   to: string;
@@ -46,7 +47,7 @@ export function welcomeEmail(businessName: string) {
           <li>Click Process with AI to extract data automatically</li>
           <li>Review, approve, and track everything from your dashboard</li>
         </ol>
-        <a href="https://flow-work-khaki.vercel.app" style="display: inline-block; padding: 12px 28px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Open FlowWork</a>
+        <a href="${baseUrl}" style="display: inline-block; padding: 12px 28px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Open FlowWork</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">You have a 14-day free trial. No credit card required.</p>
       </div>
     `,
@@ -64,7 +65,7 @@ export function trialExpiringEmail(businessName: string, daysLeft: number) {
           Upgrade now to keep your data and continue automating your accounting.
         </p>
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">Plans start at just $19/month.</p>
-        <a href="https://flow-work-khaki.vercel.app/billing" style="display: inline-block; padding: 12px 28px; background: #16a34a; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">View Plans</a>
+        <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #16a34a; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">View Plans</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">Questions? Just reply to this email.</p>
       </div>
     `,
@@ -81,7 +82,7 @@ export function paymentFailedEmail(businessName: string) {
           Hey ${businessName || "there"}, we were unable to process your latest payment for FlowWork.
           Please update your payment method to avoid any interruption to your service.
         </p>
-        <a href="https://flow-work-khaki.vercel.app/billing" style="display: inline-block; padding: 12px 28px; background: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Update Payment</a>
+        <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Update Payment</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">If you believe this is an error, please reply to this email.</p>
       </div>
     `,
