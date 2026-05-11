@@ -10,15 +10,16 @@ const ALL_MODULES = [
   { id: "events", label: "Events and Sales", description: "Log revenue per market day or event", icon: "\u{1F3EA}", minPlan: "growth" },
   { id: "mileage", label: "Mileage Tracking", description: "Track trips and calculate IRS deductions", icon: "\u{1F697}", minPlan: "growth" },
   { id: "exports", label: "CSV/PDF Exports", description: "Export data for your CPA or records", icon: "\u{1F4E4}", minPlan: "growth" },
-  { id: "custom_categories", label: "Custom Categories", description: "Create your own expense categories", icon: "\u{1F3F7}️", minPlan: "pro" },
+  { id: "custom_categories", label: "Custom Categories", description: "Create your own expense categories", icon: "\u{1F3F7}️" },
   { id: "tax_reports", label: "Tax Reports", description: "Schedule C mapping and quarterly estimates", icon: "\u{1F4CA}", minPlan: "pro" },
 ];
 
-const DEFAULT_CATEGORIES = ["Supplies", "Booth Fees", "Travel/Gas", "Packaging", "Marketing", "Other"];
 const PLAN_RANK: Record<string, number> = { trial: 0, starter: 1, growth: 2, pro: 3 };
 
 export default function SettingsPage() {
   const [plan, setPlan] = useState("trial");
+  const [industry, setIndustry] = useState<string | null>(null);
+  const [industryDefaults, setIndustryDefaults] = useState<string[]>([]);
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -35,8 +36,10 @@ export default function SettingsPage() {
         if (!res.ok) return;
         const data = await res.json();
         setPlan(data.plan);
+        setIndustry(data.industry ?? null);
+        setIndustryDefaults(Array.isArray(data.industryDefaults) ? data.industryDefaults : []);
         setActiveModules(data.settings?.active_modules || ["invoices", "expenses"]);
-        setCategories(data.settings?.custom_categories || DEFAULT_CATEGORIES);
+        setCategories(Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : []);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -85,8 +88,8 @@ export default function SettingsPage() {
     setCatSaved(false);
   };
 
-  const resetCategories = () => {
-    setCategories([...DEFAULT_CATEGORIES]);
+  const clearCustomCategories = () => {
+    setCategories([]);
     setCatSaved(false);
   };
 
@@ -209,7 +212,31 @@ export default function SettingsPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {industryDefaults.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-slate-500 mb-2">
+                  Defaults for {industry || "your business"} — managed automatically
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {industryDefaults.map((name) => (
+                    <span
+                      key={`default-${name}`}
+                      className="rounded-[20px] bg-slate-100 text-slate-600 text-[13px] py-1.5 px-3"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-slate-500 mb-2">Your additions:</p>
             <div className="flex flex-wrap gap-2 mb-4">
+              {categories.length === 0 && (
+                <span className="text-[13px] text-slate-400 italic">
+                  No custom categories yet — add one below.
+                </span>
+              )}
               {categories.map((cat) => (
                 <div
                   key={cat}
@@ -258,10 +285,10 @@ export default function SettingsPage() {
               </button>
               {catSaved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
               <button
-                onClick={resetCategories}
+                onClick={clearCustomCategories}
                 className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-[13px] text-slate-500"
               >
-                Reset to defaults
+                Clear custom categories
               </button>
             </div>
           </div>

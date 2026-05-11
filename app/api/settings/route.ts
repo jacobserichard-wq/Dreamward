@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
+import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
 
 export async function GET() {
   try {
@@ -14,11 +15,15 @@ export async function GET() {
       [client.id]
     );
 
+    const industry = (client.industry ?? "other") as Industry;
+    const industryDefaults = getCategoryNamesForIndustry(industry);
+
     return NextResponse.json({
       settings: result.rows[0] || { active_modules: null, custom_categories: null, preferences: null },
       plan: client.plan,
       industry: client.industry,
       businessName: client.business_name,
+      industryDefaults,
     });
   } catch (error) {
     console.error("Settings GET error:", error);
