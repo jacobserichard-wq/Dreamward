@@ -112,6 +112,8 @@ export async function POST(request: NextRequest) {
             summary: result.summary || "",
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
+            aiClassifiedAt: new Date(),
+            aiModel: "claude-sonnet-4-20250514",
           }, client.id);
           savedCount++;
         } catch (dbErr) {

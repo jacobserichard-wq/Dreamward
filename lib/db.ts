@@ -98,8 +98,9 @@ export async function saveProcessedItem(item: any, clientId: number) {
     "INSERT INTO processed_items " +
     "(vendor, invoice_number, amount, due_date, " +
     "status, category, confidence, summary, " +
-    "raw_email_id, extracted_data, client_id, source) " +
-    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) " +
+    "raw_email_id, extracted_data, client_id, source, " +
+    "ai_classified_at, ai_model, original_ai_category) " +
+    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) " +
     "RETURNING *";
   const vals = [
     item.vendor || "Unknown",
@@ -116,6 +117,9 @@ export async function saveProcessedItem(item: any, clientId: number) {
       : null,
     clientId,
     item.source || "email",
+    item.ai_classified_at || item.aiClassifiedAt || null,
+    item.ai_model || item.aiModel || null,
+    item.original_ai_category || item.originalAiCategory || null,
   ];
   return pool.query(sql, vals);
 }

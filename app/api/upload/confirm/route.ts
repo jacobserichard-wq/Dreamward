@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
           raw_email_id: null,
           extracted_data: null,
           source: "csv_import",
+          ai_classified_at: new Date(),
+          ai_model: "claude-sonnet-4-20250514",
         },
         client.id
       );
