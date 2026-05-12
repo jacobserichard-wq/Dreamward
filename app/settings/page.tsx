@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PageHeader from "../components/PageHeader";
 
 const ALL_MODULES = [
@@ -28,6 +28,17 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [catSaving, setCatSaving] = useState(false);
   const [catSaved, setCatSaved] = useState(false);
+  const [savedModules, setSavedModules] = useState<string[]>([]);
+  const [savedCategories, setSavedCategories] = useState<string[]>([]);
+
+  const modulesDirty = useMemo(
+    () => JSON.stringify(activeModules) !== JSON.stringify(savedModules),
+    [activeModules, savedModules]
+  );
+  const categoriesDirty = useMemo(
+    () => JSON.stringify(categories) !== JSON.stringify(savedCategories),
+    [categories, savedCategories]
+  );
 
   useEffect(() => {
     async function load() {
@@ -38,8 +49,12 @@ export default function SettingsPage() {
         setPlan(data.plan);
         setIndustry(data.industry ?? null);
         setIndustryDefaults(Array.isArray(data.industryDefaults) ? data.industryDefaults : []);
-        setActiveModules(data.settings?.active_modules || ["invoices", "expenses"]);
-        setCategories(Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : []);
+        const initialModules = data.settings?.active_modules || ["invoices", "expenses"];
+        const initialCategories = Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : [];
+        setActiveModules(initialModules);
+        setCategories(initialCategories);
+        setSavedModules(initialModules);
+        setSavedCategories(initialCategories);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -48,6 +63,16 @@ export default function SettingsPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (!modulesDirty && !categoriesDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [modulesDirty, categoriesDirty]);
 
   const toggleModule = (moduleId: string) => {
     setActiveModules((prev) =>
@@ -60,13 +85,17 @@ export default function SettingsPage() {
 
   const saveModules = async () => {
     setSaving(true);
+    const toSave = activeModules;
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activeModules }),
+        body: JSON.stringify({ activeModules: toSave }),
       });
-      if (res.ok) setSaved(true);
+      if (res.ok) {
+        setSavedModules(toSave);
+        setSaved(true);
+      }
     } catch (err) {
       console.error("Save failed:", err);
     } finally {
@@ -95,13 +124,17 @@ export default function SettingsPage() {
 
   const saveCategories = async () => {
     setCatSaving(true);
+    const toSave = categories;
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customCategories: categories }),
+        body: JSON.stringify({ customCategories: toSave }),
       });
-      if (res.ok) setCatSaved(true);
+      if (res.ok) {
+        setSavedCategories(toSave);
+        setCatSaved(true);
+      }
     } catch (err) {
       console.error("Save failed:", err);
     } finally {
@@ -193,14 +226,15 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 mt-5">
             <button
               onClick={saveModules}
-              disabled={saving}
-              className={`py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white cursor-pointer text-sm font-semibold ${
-                saving ? "opacity-50" : ""
-              }`}
+              disabled={saving || !modulesDirty}
+              className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                modulesDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+              } ${saving ? "opacity-50" : ""}`}
             >
               {saving ? "Saving..." : "Save changes"}
             </button>
-            {saved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
+            {modulesDirty && <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>}
+            {!modulesDirty && saved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
           </div>
         </div>
 
@@ -276,14 +310,15 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={saveCategories}
-                disabled={catSaving}
-                className={`py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white cursor-pointer text-sm font-semibold ${
-                  catSaving ? "opacity-50" : ""
-                }`}
+                disabled={catSaving || !categoriesDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  categoriesDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${catSaving ? "opacity-50" : ""}`}
               >
                 {catSaving ? "Saving..." : "Save categories"}
               </button>
-              {catSaved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
+              {categoriesDirty && <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>}
+              {!categoriesDirty && catSaved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
               <button
                 onClick={clearCustomCategories}
                 className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-[13px] text-slate-500"
