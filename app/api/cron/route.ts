@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { sendEmail, trialExpiringEmail } from "@/lib/email";
+import { reclassifyClientItems } from "@/lib/reclassify";
+import { type Industry } from "@/lib/categories";
+
+const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -37,7 +41,60 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, emailsSent: sent, emailsFailed: failed });
+    // Weekly reclassify pass — only runs on Sundays (UTC). Closes the
+    // "mixed-state dashboard" finding fully: customers who never click the
+    // dashboard reclassify button still get their legacy umbrella items
+    // migrated, ~50 per client per week.
+    let reclassifyClientsProcessed = 0;
+    let reclassifyItemsTotal = 0;
+    let reclassifyErrors = 0;
+    if (new Date().getUTCDay() === 0) {
+      try {
+        const candidatesResult = await pool.query<{
+          client_id: number;
+          industry: string | null;
+        }>(
+          `SELECT DISTINCT pi.client_id, c.industry
+           FROM processed_items pi
+           JOIN clients c ON c.id = pi.client_id
+           WHERE pi.category = ANY($1)
+             AND pi.original_ai_category IS NULL`,
+          [UMBRELLA_VALUES]
+        );
+
+        for (const candidate of candidatesResult.rows) {
+          try {
+            const result = await reclassifyClientItems(
+              candidate.client_id,
+              (candidate.industry ?? "other") as Industry
+            );
+            reclassifyClientsProcessed++;
+            reclassifyItemsTotal += result.reclassified;
+          } catch (err) {
+            reclassifyErrors++;
+            console.error(
+              `[cron] reclassify failed for client ${candidate.client_id}:`,
+              err
+            );
+          }
+        }
+
+        console.log(
+          `[cron] reclassify pass: ${reclassifyItemsTotal} items across ${reclassifyClientsProcessed} clients, ${reclassifyErrors} errors`
+        );
+      } catch (err) {
+        console.error("[cron] reclassify pass aggregate failure:", err);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      emailsSent: sent,
+      emailsFailed: failed,
+      reclassifyClientsProcessed,
+      reclassifyItemsTotal,
+      reclassifyErrors,
+    });
   } catch (error) {
     console.error("Cron error:", error);
     return NextResponse.json({ error: "Cron failed" }, { status: 500 });
