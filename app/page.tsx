@@ -367,24 +367,24 @@ export default function Home() {
             </h1>
             <p className="mt-1 mb-0 mx-0 text-white/70 text-sm hidden sm:block">Accounting Automation</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {clientInfo && (
               <a
                 href="/billing"
-                className="bg-white/15 text-white px-4 py-1.5 rounded-full text-[13px] font-semibold uppercase tracking-wider no-underline cursor-pointer"
+                className="bg-white/15 text-white px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-semibold uppercase tracking-wider no-underline cursor-pointer"
               >
                 {clientInfo.plan}
               </a>
             )}
             <Link
               href="/settings"
-              className="bg-transparent text-white/75 text-[13px] no-underline px-1 py-1.5"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
             >
               Settings
             </Link>
             <button
               onClick={() => signOut({ callbackUrl: "/signin" })}
-              className="bg-transparent text-white/75 text-[13px] cursor-pointer px-1 py-1.5"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] cursor-pointer px-1 py-1.5"
             >
               Sign out
             </button>
