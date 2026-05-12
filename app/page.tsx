@@ -44,7 +44,7 @@ export default function Home() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<Label>("Invoices");
-  const [activeTab, setActiveTab] = useState<Tab>("emails");
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
