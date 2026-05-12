@@ -65,6 +65,7 @@ export default function Home() {
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   const [deletingItems, setDeletingItems] = useState<Set<string>>(new Set());
   const [clearingSample, setClearingSample] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
 
   // Load processed items from database
   const loadItems = useCallback(async () => {
@@ -276,6 +277,32 @@ export default function Home() {
     }
   }, [loadItems]);
 
+  // ─── Reclassify legacy umbrella items ──────────────────────────────────────
+
+  const handleReclassify = useCallback(async () => {
+    setReclassifying(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{
+        reclassified: number;
+        remaining: number;
+        total: number;
+      }>("/api/reclassify", { method: "POST" });
+      if (data.remaining > 0) {
+        setSuccessMsg(
+          `Reclassified ${data.reclassified} items. ${data.remaining} remain — click again to continue.`
+        );
+      } else {
+        setSuccessMsg(`Reclassified ${data.reclassified} items. All caught up.`);
+      }
+      await loadItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reclassify failed");
+    } finally {
+      setReclassifying(false);
+    }
+  }, [loadItems]);
+
   // ─── Delete item ───────────────────────────────────────────────────────────
 
   const deleteItem = useCallback(async (id: string) => {
@@ -329,6 +356,14 @@ export default function Home() {
   }, [reviewRows, loadItems]);
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
+
+  // Count legacy umbrella-type items (pre-sub-session-11 classifications still
+  // showing invoice/expense/ar_followup instead of industry-aware categories).
+  // Drives the reclassify banner visibility + button label.
+  const UMBRELLA_VALUES: readonly string[] = ["invoice", "expense", "ar_followup"];
+  const umbrellaCount = processedItems.filter((i) =>
+    UMBRELLA_VALUES.includes(i.category)
+  ).length;
 
   const stats = {
     total: processedItems.length,
@@ -432,6 +467,25 @@ export default function Home() {
             >
               Book your call {"→"}
             </Link>
+          </div>
+        )}
+
+        {/* Reclassify legacy umbrella items banner */}
+        {umbrellaCount > 0 && (
+          <div className="bg-yellow-50 border border-yellow-300 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
+            <span className="font-medium">
+              {"\u{2728}"} {umbrellaCount} legacy item{umbrellaCount === 1 ? "" : "s"} can be reclassified into industry-aware categories.
+            </span>
+            <button
+              onClick={handleReclassify}
+              disabled={reclassifying}
+              className="px-3.5 py-1.5 rounded-md border border-yellow-600 bg-white text-amber-800 text-[13px] font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+            >
+              {reclassifying && <Spinner size={12} color="#854d0e" />}
+              {reclassifying
+                ? "Reclassifying..."
+                : `Reclassify ${umbrellaCount} legacy item${umbrellaCount === 1 ? "" : "s"}`}
+            </button>
           </div>
         )}
 
