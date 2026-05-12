@@ -2,11 +2,11 @@
  * Industry-aware category taxonomies for AI classification.
  *
  * Universal core + per-industry overlay. UNIVERSAL_CATEGORIES contains
- * the 7 categories that appear in 3+ industries per the audit's cross-
+ * the 9 categories that appear in 3+ industries per the audit's cross-
  * industry analysis (Business Insurance, Software & SaaS, Marketing,
- * Payment Processing, Travel & Mileage, Equipment, Professional Services).
- * INDUSTRY_OVERLAY adds industry-specific categories without duplicating
- * the universal ones.
+ * Payment Processing, Travel & Mileage, Equipment, Professional Services,
+ * Telecom & Internet, Utilities). INDUSTRY_OVERLAY adds industry-specific
+ * categories without duplicating the universal ones.
  *
  * Full design rationale: ./session-notes/audit-ai-classification.md.
  * Nonprofit functional classification (program/admin/fundraising) is
@@ -83,6 +83,20 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
     name: "Professional Services",
     description:
       "Accountant, attorney, business consultant, and other professional fees paid for business purposes.",
+    type: "expense",
+    taxDeductible: true,
+  },
+  {
+    name: "Telecom & Internet",
+    description:
+      "Phone, mobile data plans, internet service, business communication lines.",
+    type: "expense",
+    taxDeductible: true,
+  },
+  {
+    name: "Utilities",
+    description:
+      "Electric, gas, water, trash collection — when paid as a business operating expense.",
     type: "expense",
     taxDeductible: true,
   },
@@ -621,13 +635,6 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       name: "Payroll",
       description:
         "Employee salaries, wages, and payroll taxes.",
-      type: "expense",
-      taxDeductible: true,
-    },
-    {
-      name: "Utilities",
-      description:
-        "Business-purpose electric, gas, water, internet, phone.",
       type: "expense",
       taxDeductible: true,
     },
