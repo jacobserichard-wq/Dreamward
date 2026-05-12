@@ -376,6 +376,12 @@ export default function Home() {
                 {clientInfo.plan}
               </a>
             )}
+            <Link
+              href="/settings"
+              className="bg-transparent text-white/75 text-[13px] no-underline px-1 py-1.5"
+            >
+              Settings
+            </Link>
             <button
               onClick={() => signOut({ callbackUrl: "/signin" })}
               className="bg-transparent text-white/75 text-[13px] cursor-pointer px-1 py-1.5"
