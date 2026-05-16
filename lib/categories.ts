@@ -28,6 +28,25 @@ export type Industry =
   | "fitness"
   | "other";
 
+// Slug → prose display name for prompt rendering. Phrased so it slots into
+// "for a ${name} business" — the customer-facing context that anchors every
+// classification prompt. Consumers: /api/process, /api/upload, lib/reclassify.
+// Typed Record<Industry, string> so adding a new Industry slug forces a
+// matching display-name entry at compile time.
+export const INDUSTRY_DISPLAY_NAMES: Record<Industry, string> = {
+  marketplace: "market vendor / craft seller",
+  freelance: "freelancer / consultant",
+  service: "landscaping / service company",
+  food: "food truck / mobile food business",
+  ecommerce: "Etsy / Amazon FBA seller",
+  creative: "photographer / creative",
+  bookkeeper: "bookkeeper / small CPA firm",
+  nonprofit: "nonprofit organization",
+  realestate: "real estate investor",
+  fitness: "personal trainer / coach",
+  other: "small business",
+};
+
 export type Category = {
   name: string;
   description: string;

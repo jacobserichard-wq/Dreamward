@@ -1,27 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import pool from "@/lib/db";
-import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
+import {
+  getCategoryNamesForIndustry,
+  INDUSTRY_DISPLAY_NAMES,
+  type Industry,
+} from "@/lib/categories";
 
 const DEFAULT_BATCH_LIMIT = 50;
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 const AI_MODEL = "claude-sonnet-4-20250514";
-
-// Slug → display name for prompt rendering. Mirrors /api/process and
-// /api/upload (intentional duplication per audit §12 deferred-consolidation
-// loose end; extract to a shared helper if/when a fourth consumer appears).
-const INDUSTRY_DISPLAY_NAMES: Record<Industry, string> = {
-  marketplace: "market vendor / craft seller",
-  freelance: "freelancer / consultant",
-  service: "landscaping / service company",
-  food: "food truck / mobile food business",
-  ecommerce: "Etsy / Amazon FBA seller",
-  creative: "photographer / creative",
-  bookkeeper: "bookkeeper / small CPA firm",
-  nonprofit: "nonprofit organization",
-  realestate: "real estate investor",
-  fitness: "personal trainer / coach",
-  other: "small business",
-};
 
 interface TargetItem {
   id: number;

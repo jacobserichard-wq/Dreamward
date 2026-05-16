@@ -3,27 +3,15 @@ import { saveProcessedItem } from "@/lib/db";
 import pool from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSessionClient } from "@/lib/getClient";
-import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
+import {
+  getCategoryNamesForIndustry,
+  INDUSTRY_DISPLAY_NAMES,
+  type Industry,
+} from "@/lib/categories";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// Slug → display name for prompt rendering. Mirrors app/onboarding/page.tsx
-// INDUSTRIES; kept inline since this is the only consumer outside onboarding.
-const INDUSTRY_DISPLAY_NAMES: Record<Industry, string> = {
-  marketplace: "market vendor / craft seller",
-  freelance: "freelancer / consultant",
-  service: "landscaping / service company",
-  food: "food truck / mobile food business",
-  ecommerce: "Etsy / Amazon FBA seller",
-  creative: "photographer / creative",
-  bookkeeper: "bookkeeper / small CPA firm",
-  nonprofit: "nonprofit organization",
-  realestate: "real estate investor",
-  fitness: "personal trainer / coach",
-  other: "small business",
-};
 
 interface EmailMessage {
   snippet: string;

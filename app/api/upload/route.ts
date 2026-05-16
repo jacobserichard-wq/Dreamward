@@ -1,24 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { getClientSettings } from "@/lib/db";
-import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
-
-// Slug → display name for prompt rendering. Mirrors app/api/process/route.ts
-// (intentional duplication for now; extract to a shared helper if a third
-// consumer appears).
-const INDUSTRY_DISPLAY_NAMES: Record<Industry, string> = {
-  marketplace: "market vendor / craft seller",
-  freelance: "freelancer / consultant",
-  service: "landscaping / service company",
-  food: "food truck / mobile food business",
-  ecommerce: "Etsy / Amazon FBA seller",
-  creative: "photographer / creative",
-  bookkeeper: "bookkeeper / small CPA firm",
-  nonprofit: "nonprofit organization",
-  realestate: "real estate investor",
-  fitness: "personal trainer / coach",
-  other: "small business",
-};
+import {
+  getCategoryNamesForIndustry,
+  INDUSTRY_DISPLAY_NAMES,
+  type Industry,
+} from "@/lib/categories";
 
 export async function POST(req: NextRequest) {
   try {
