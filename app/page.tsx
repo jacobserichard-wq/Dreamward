@@ -28,7 +28,7 @@ interface ProcessedItem {
   amount: number;
   dueDate: string;
   status: "pending" | "overdue" | "paid" | "needs_review";
-  category: "invoice" | "expense" | "ar_followup";
+  category: string;
   confidence: number;
   rawEmailId: string;
   summary: string;
@@ -373,7 +373,7 @@ export default function Home() {
   // Count legacy umbrella-type items (pre-sub-session-11 classifications still
   // showing invoice/expense/ar_followup instead of industry-aware categories).
   // Drives the reclassify banner visibility + button label.
-  const UMBRELLA_VALUES: readonly string[] = ["invoice", "expense", "ar_followup"];
+  const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
   const umbrellaCount = processedItems.filter((i) =>
     UMBRELLA_VALUES.includes(i.category)
   ).length;
