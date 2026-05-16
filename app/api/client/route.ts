@@ -20,6 +20,8 @@ export async function GET() {
       trialEndsAt: client.trial_ends_at,
       onboardingCompleted: client.onboarding_completed,
       welcomeProSeen: client.welcome_pro_seen,
+      proCallBookedAt: client.pro_call_booked_at,
+      proCallScheduledFor: client.pro_call_scheduled_for,
       features: {
         maxItemsPerMonth: features.maxItemsPerMonth === Infinity ? null : features.maxItemsPerMonth,
         modules: features.modules,
