@@ -1,0 +1,48 @@
+-- 0003_add_pro_call_reminder_sent.sql
+-- Tracks whether the Pro onboarding-call reminder email has been sent,
+-- so the daily cron nudges each customer exactly once.
+--
+-- Designed in commit 15.4. Used by app/api/cron/route.ts's daily
+-- Pro-reminder block: a client gets a nudge when plan='pro', booking
+-- hasn't happened (pro_call_booked_at IS NULL), the reminder hasn't
+-- been sent (pro_call_reminder_sent_at IS NULL), and the client
+-- became Pro at least PRO_CALL_REMINDER_DELAY_DAYS ago. The cron
+-- stamps this column only AFTER a successful send — so a failed
+-- Resend call leaves the row eligible for retry on the next run.
+--
+-- Anchor for "became Pro at least N days ago": clients.created_at
+-- (no Pro-upgrade timestamp exists today). A customer who was on
+-- Starter/Growth for a long stretch before upgrading to Pro will
+-- have an old created_at and won't be reminded — accepted MVP
+-- behavior; Pro is the Gmail-integration tier, usually picked at
+-- or near initial signup.
+--
+-- One new nullable column:
+--   pro_call_reminder_sent_at — when the reminder was sent. NULL
+--                               means "not yet sent / eligible for
+--                               a future send if the rest of the
+--                               cron criteria match".
+--
+-- All other booking-state columns from migration 0002
+-- (pro_call_booked_at, pro_call_scheduled_for, calendly_event_uri)
+-- are unaffected.
+--
+-- IF NOT EXISTS makes this idempotent.
+--
+-- Apply on Railway: open the PostgreSQL service → Data tab and
+-- execute the statement below. Confirm with:
+--   \d clients
+-- (or SELECT column_name, data_type FROM information_schema.columns
+--  WHERE table_name = 'clients' AND column_name =
+--  'pro_call_reminder_sent_at';)
+--
+-- Ordering hazard: commit 15.4's cron block writes this column on
+-- every successful Pro-reminder send. Apply this migration on Railway
+-- BEFORE the commit deploys, or the first daily cron run after deploy
+-- will 500 mid-loop on missing-column errors (with the trial-email
+-- block still completing successfully thanks to the outer try/catch,
+-- but no Pro reminders going out and any subsequent cron logic
+-- skipped via the early-throw path).
+
+ALTER TABLE clients
+  ADD COLUMN IF NOT EXISTS pro_call_reminder_sent_at TIMESTAMPTZ;
