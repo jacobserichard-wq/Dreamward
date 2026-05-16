@@ -74,6 +74,95 @@ const creative: SampleItem[] = [
   { vendor: "Backblaze B2", invoice_number: "BB-260415", amount: 28.40, due_date: daysFromToday(-15), status: "paid", category: "expense", confidence: 98, summary: "Cloud backup for raw shoot archives — 6TB stored." },
 ];
 
+const service: SampleItem[] = [
+  { vendor: "Stihl Power Equipment", invoice_number: "STL-44912", amount: 487.00, due_date: daysFromToday(-4), status: "paid", category: "expense", confidence: 96, summary: "Replacement blade set + chainsaw bar oil for spring season." },
+  { vendor: "SiteOne Landscape Supply", invoice_number: "S1L-26-W17", amount: 1248.50, due_date: daysFromToday(-2), status: "paid", category: "expense", confidence: 97, summary: "Bulk mulch, fertilizer pellets, and grass seed delivery." },
+  { vendor: "Greenwood HOA", invoice_number: "INV-2026-041", amount: 3200.00, due_date: daysFromToday(-8), status: "overdue", category: "invoice", confidence: 92, summary: "Monthly common-area landscaping contract — April service complete." },
+  { vendor: "Henderson Residence", invoice_number: "INV-2026-043", amount: 580.00, due_date: daysFromToday(5), status: "pending", category: "invoice", confidence: 94, summary: "Spring cleanup + mulch refresh — half-day visit, April 26." },
+  { vendor: "Westbrook Apartments", invoice_number: "INV-2026-040", amount: 4800.00, due_date: daysFromToday(-18), status: "overdue", category: "ar_followup", confidence: 85, summary: "Q1 grounds maintenance — 3 follow-ups sent, AP says check is cut." },
+  { vendor: "Acme Insurance Group", invoice_number: "ACM-Q2-26", amount: 425.00, due_date: daysFromToday(11), status: "pending", category: "expense", confidence: 93, summary: "General liability + commercial auto Q2 premium." },
+  { vendor: "Pearson Family", invoice_number: "INV-2026-044", amount: 1850.00, due_date: daysFromToday(12), status: "pending", category: "invoice", confidence: 91, summary: "Sod installation — 1,800 sq ft front yard, scheduled May 18." },
+  { vendor: "Shell Fleet", invoice_number: "SHL-26-W18", amount: 268.40, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 98, summary: "Truck and equipment fuel — week of April 28." },
+  { vendor: "Jobber", invoice_number: "JBR-MAY26", amount: 99.00, due_date: daysFromToday(2), status: "pending", category: "expense", confidence: 99, summary: "Scheduling + invoicing software — Core plan monthly." },
+  { vendor: "City of Centennial", invoice_number: "COC-LIC-26", amount: 175.00, due_date: daysFromToday(28), status: "pending", category: "expense", confidence: 95, summary: "Annual landscaping contractor license renewal." },
+  { vendor: "Sunbelt Rentals", invoice_number: "SBR-77291", amount: 320.00, due_date: daysFromToday(-6), status: "paid", category: "expense", confidence: 94, summary: "Stump grinder rental — 2-day Henderson job." },
+  { vendor: "USPS Bulk Mail", invoice_number: "USPS-26-04", amount: 42.80, due_date: daysFromToday(-9), status: "paid", category: "expense", confidence: 96, summary: "Spring promo postcards mailed to 200 nearby homes." },
+];
+
+const ecommerce: SampleItem[] = [
+  { vendor: "Amazon FBA Storage", invoice_number: "AMZ-260415", amount: 348.92, due_date: daysFromToday(-5), status: "paid", category: "expense", confidence: 97, summary: "FBA monthly storage for 280 units across 3 SKUs." },
+  { vendor: "Etsy Seller Fees", invoice_number: "ETSY-APR-26", amount: 412.80, due_date: daysFromToday(-3), status: "paid", category: "expense", confidence: 95, summary: "Listing, transaction, and offsite ads fees — April." },
+  { vendor: "Uline", invoice_number: "ULN-9924418", amount: 286.40, due_date: daysFromToday(-7), status: "paid", category: "expense", confidence: 98, summary: "Branded mailers, tissue paper, and shipping labels restock." },
+  { vendor: "Westbrook Boutique (wholesale)", invoice_number: "INV-2026-051", amount: 2640.00, due_date: daysFromToday(9), status: "pending", category: "invoice", confidence: 88, summary: "Wholesale order: 60 units to retailer — Net 30 terms." },
+  { vendor: "Helium 10", invoice_number: "H10-26-04", amount: 99.00, due_date: daysFromToday(-12), status: "paid", category: "expense", confidence: 99, summary: "Platinum plan — Amazon seller analytics + keyword research." },
+  { vendor: "Sprout Wholesale", invoice_number: "INV-2026-049", amount: 1820.00, due_date: daysFromToday(-15), status: "overdue", category: "ar_followup", confidence: 84, summary: "30-unit wholesale — 15 days late, AR says next pay cycle." },
+  { vendor: "Canva Pro", invoice_number: "CV-PRO-26", amount: 14.99, due_date: daysFromToday(-22), status: "paid", category: "expense", confidence: 99, summary: "Pro plan monthly — product photo edits and listing graphics." },
+  { vendor: "USPS Click-N-Ship", invoice_number: "USPS-260430", amount: 412.18, due_date: daysFromToday(-2), status: "paid", category: "expense", confidence: 99, summary: "April postage — 89 customer shipments." },
+  { vendor: "Printful", invoice_number: "PFL-77284", amount: 248.50, due_date: daysFromToday(-4), status: "paid", category: "expense", confidence: 96, summary: "Print-on-demand fulfillment costs — 32 orders." },
+  { vendor: "Meta Ads", invoice_number: "META-260430", amount: 185.00, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 97, summary: "April spend — retargeting + lookalike campaigns." },
+  { vendor: "Lumi Photo Studio", invoice_number: "PSR-44829", amount: 240.00, due_date: daysFromToday(-10), status: "paid", category: "expense", confidence: 92, summary: "Half-day product photography shoot for spring lineup." },
+  { vendor: "ShipStation", invoice_number: "SS-MAY26", amount: 35.00, due_date: daysFromToday(4), status: "pending", category: "expense", confidence: 99, summary: "Bronze plan monthly — multi-channel shipping management." },
+];
+
+const bookkeeper: SampleItem[] = [
+  { vendor: "QuickBooks Online Advanced", invoice_number: "QB-ADV-26", amount: 235.00, due_date: daysFromToday(-8), status: "paid", category: "expense", confidence: 99, summary: "Advanced plan monthly — supports up to 25 client files." },
+  { vendor: "Hartwell Holdings LLC", invoice_number: "INV-2026-061", amount: 1850.00, due_date: daysFromToday(-12), status: "overdue", category: "invoice", confidence: 91, summary: "April monthly close + bank reconciliation — 5 entities, Net 15." },
+  { vendor: "Westbrook Realty", invoice_number: "INV-2026-063", amount: 750.00, due_date: daysFromToday(6), status: "pending", category: "invoice", confidence: 94, summary: "Monthly bookkeeping retainer — Net 30 terms." },
+  { vendor: "Riverside Cafe", invoice_number: "INV-2026-058", amount: 2400.00, due_date: daysFromToday(-22), status: "overdue", category: "ar_followup", confidence: 80, summary: "Q1 close + sales tax filings — owner unresponsive 3 weeks, escalate." },
+  { vendor: "CPE Solutions Online", invoice_number: "CPE-26-Q2", amount: 285.00, due_date: daysFromToday(3), status: "pending", category: "expense", confidence: 95, summary: "Continuing education — Q2 CPA license credits." },
+  { vendor: "AICPA Membership", invoice_number: "AICPA-2026", amount: 510.00, due_date: daysFromToday(45), status: "pending", category: "expense", confidence: 97, summary: "Annual AICPA member dues + ethics module." },
+  { vendor: "Karbon", invoice_number: "KBN-MAY26", amount: 79.00, due_date: daysFromToday(2), status: "pending", category: "expense", confidence: 99, summary: "Practice management software — Team plan, per-user monthly." },
+  { vendor: "Acuity Insurance", invoice_number: "ACU-26-Q2", amount: 320.00, due_date: daysFromToday(15), status: "pending", category: "expense", confidence: 93, summary: "Professional liability + E&O Q2 premium." },
+  { vendor: "Anderson Contracting", invoice_number: "INV-2026-064", amount: 1200.00, due_date: daysFromToday(11), status: "pending", category: "invoice", confidence: 92, summary: "Monthly bookkeeping + payroll processing — 8 employees." },
+  { vendor: "Dext", invoice_number: "DXT-26-04", amount: 38.00, due_date: daysFromToday(-18), status: "paid", category: "expense", confidence: 98, summary: "Receipt OCR + document capture — per-user monthly." },
+  { vendor: "Iron Mountain", invoice_number: "IM-26-Q1", amount: 144.00, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 94, summary: "Quarterly secure document storage for client files." },
+];
+
+const nonprofit: SampleItem[] = [
+  { vendor: "Bloomerang", invoice_number: "BLM-MAY26", amount: 119.00, due_date: daysFromToday(2), status: "pending", category: "expense", confidence: 99, summary: "Donor management software — Standard plan monthly." },
+  { vendor: "Hartwell Hall (gala venue)", invoice_number: "VEN-44721", amount: 1500.00, due_date: daysFromToday(-3), status: "paid", category: "expense", confidence: 95, summary: "Venue deposit — May 24 spring fundraising gala." },
+  { vendor: "Spring Appeal Print Run", invoice_number: "PRT-44918", amount: 842.50, due_date: daysFromToday(-9), status: "paid", category: "expense", confidence: 96, summary: "Direct mail appeal: 2,400 letters printed, addressed, bulk-mailed." },
+  { vendor: "Henderson Family Foundation", invoice_number: "INV-2026-070", amount: 25000.00, due_date: daysFromToday(-14), status: "overdue", category: "invoice", confidence: 88, summary: "Q1 grant disbursement per agreement — 14 days late, next board meeting." },
+  { vendor: "Westbrook Community Trust", invoice_number: "INV-2026-073", amount: 12000.00, due_date: daysFromToday(18), status: "pending", category: "invoice", confidence: 92, summary: "Approved grant — youth literacy program, scheduled May 22." },
+  { vendor: "Verified Volunteers", invoice_number: "VV-260415", amount: 285.00, due_date: daysFromToday(-7), status: "paid", category: "expense", confidence: 94, summary: "Background checks for 9 new volunteers — spring intake batch." },
+  { vendor: "Sarah Chen (grant writer)", invoice_number: "INV-2026-068", amount: 2200.00, due_date: daysFromToday(-5), status: "paid", category: "expense", confidence: 91, summary: "Contracted grant writer — Henderson Foundation Q3 proposal." },
+  { vendor: "Mailchimp (nonprofit tier)", invoice_number: "MC-NP-26", amount: 22.50, due_date: daysFromToday(-12), status: "paid", category: "expense", confidence: 99, summary: "Email marketing — 15% nonprofit discount applied." },
+  { vendor: "Anonymous Donor (gala pledge)", invoice_number: "INV-2026-067", amount: 5000.00, due_date: daysFromToday(-2), status: "paid", category: "invoice", confidence: 90, summary: "Pledged spring gala contribution — received April 28." },
+  { vendor: "Adobe Acrobat Pro", invoice_number: "ADBE-260420", amount: 19.99, due_date: daysFromToday(-10), status: "paid", category: "expense", confidence: 99, summary: "Annual report PDF assembly — monthly subscription." },
+  { vendor: "Eventbrite", invoice_number: "EB-26-Q1", amount: 184.00, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 95, summary: "Ticketing fees for Q1 community events — 240 attendees." },
+  { vendor: "Anchor Insurance", invoice_number: "ANC-NP-Q2", amount: 580.00, due_date: daysFromToday(22), status: "pending", category: "expense", confidence: 93, summary: "Directors & Officers + general liability Q2 premium." },
+];
+
+const realestate: SampleItem[] = [
+  { vendor: "Local MLS Board", invoice_number: "MLS-26-Q2", amount: 285.00, due_date: daysFromToday(7), status: "pending", category: "expense", confidence: 95, summary: "Q2 MLS access fees + lockbox key renewal." },
+  { vendor: "Sherwin-Williams Pro", invoice_number: "SW-77428", amount: 412.85, due_date: daysFromToday(-4), status: "paid", category: "expense", confidence: 97, summary: "Interior paint + supplies for 1247 Maple flip prep." },
+  { vendor: "Mitchell — 1247 Maple Unit B", invoice_number: "INV-2026-081", amount: 1800.00, due_date: daysFromToday(-10), status: "overdue", category: "invoice", confidence: 89, summary: "April rent — 10 days late, tenant says payday Friday." },
+  { vendor: "Henderson — Unit 4A", invoice_number: "INV-2026-085", amount: 2400.00, due_date: daysFromToday(1), status: "pending", category: "invoice", confidence: 94, summary: "May rent due May 1 — automatic ACH on file." },
+  { vendor: "Staging Solutions", invoice_number: "STG-44721", amount: 1850.00, due_date: daysFromToday(-2), status: "paid", category: "expense", confidence: 92, summary: "30-day staging package for 4892 Birch listing — pickup May 28." },
+  { vendor: "First American Title", invoice_number: "FAT-26-0428", amount: 1200.00, due_date: daysFromToday(-6), status: "paid", category: "expense", confidence: 91, summary: "Title search + insurance — 1247 Maple acquisition." },
+  { vendor: "Wilson Tenants", invoice_number: "INV-2026-079", amount: 1650.00, due_date: daysFromToday(-22), status: "overdue", category: "ar_followup", confidence: 78, summary: "March rent + late fee outstanding — eviction filing prepared." },
+  { vendor: "Stessa", invoice_number: "STS-MAY26", amount: 15.00, due_date: daysFromToday(3), status: "pending", category: "expense", confidence: 99, summary: "Pro plan monthly — rental portfolio accounting + reporting." },
+  { vendor: "Pinpoint Inspections", invoice_number: "PPI-26-04", amount: 425.00, due_date: daysFromToday(-8), status: "paid", category: "expense", confidence: 95, summary: "Pre-purchase inspection — 4892 Birch investment property." },
+  { vendor: "Westbrook Photography", invoice_number: "WBP-77293", amount: 350.00, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 94, summary: "Listing photography + drone shots — 4892 Birch." },
+  { vendor: "Allstate Landlord Policy", invoice_number: "ALL-26-Q2", amount: 685.00, due_date: daysFromToday(14), status: "pending", category: "expense", confidence: 93, summary: "Q2 landlord insurance across 3 rental properties." },
+  { vendor: "Home Depot Pro", invoice_number: "HD-9842118", amount: 728.40, due_date: daysFromToday(-12), status: "paid", category: "expense", confidence: 96, summary: "Materials for 1247 Maple kitchen refresh — backsplash, fixtures, hardware." },
+];
+
+const fitness: SampleItem[] = [
+  { vendor: "Rogue Fitness", invoice_number: "RGE-44918", amount: 1240.00, due_date: daysFromToday(-5), status: "paid", category: "expense", confidence: 96, summary: "Replacement kettlebell set + barbells for class space." },
+  { vendor: "Mindbody", invoice_number: "MBD-MAY26", amount: 159.00, due_date: daysFromToday(2), status: "pending", category: "expense", confidence: 99, summary: "Essential plan monthly — class booking + client management." },
+  { vendor: "Henderson Family", invoice_number: "INV-2026-091", amount: 720.00, due_date: daysFromToday(-3), status: "paid", category: "invoice", confidence: 95, summary: "12-session personal training package — paid in full April 28." },
+  { vendor: "Acme Corp (corporate wellness)", invoice_number: "INV-2026-093", amount: 2800.00, due_date: daysFromToday(8), status: "pending", category: "invoice", confidence: 92, summary: "April on-site yoga sessions — 8 weekly classes, Net 30." },
+  { vendor: "Westbrook Insurance Pros", invoice_number: "WIP-26-Q2", amount: 485.00, due_date: daysFromToday(12), status: "pending", category: "expense", confidence: 94, summary: "Professional liability + general liability Q2 — trainer/studio coverage." },
+  { vendor: "Boutique Studio Lease", invoice_number: "LSE-26-MAY", amount: 1850.00, due_date: daysFromToday(-1), status: "paid", category: "expense", confidence: 98, summary: "May studio rent — 1,200 sqft commercial unit." },
+  { vendor: "Bloom Wellness Co", invoice_number: "INV-2026-089", amount: 1450.00, due_date: daysFromToday(-18), status: "overdue", category: "ar_followup", confidence: 82, summary: "Q1 staff wellness program — 18 days late, HR routing for approval." },
+  { vendor: "Soundtrack Your Brand", invoice_number: "SYB-MAY26", amount: 26.99, due_date: daysFromToday(-9), status: "paid", category: "expense", confidence: 99, summary: "Licensed music streaming — class music, monthly." },
+  { vendor: "Cintas Towel Service", invoice_number: "CIN-77284", amount: 142.00, due_date: daysFromToday(4), status: "pending", category: "expense", confidence: 95, summary: "Weekly towel + laundry service — May invoice." },
+  { vendor: "Garcia Group Training", invoice_number: "INV-2026-088", amount: 480.00, due_date: daysFromToday(15), status: "pending", category: "invoice", confidence: 91, summary: "Bridal-party group training package — 4 sessions, May 15-29." },
+  { vendor: "NASM", invoice_number: "NASM-26-CE", amount: 175.00, due_date: daysFromToday(-12), status: "paid", category: "expense", confidence: 96, summary: "Continuing education — corrective exercise specialist module." },
+  { vendor: "RockTape Supply", invoice_number: "RT-44829", amount: 84.50, due_date: daysFromToday(-7), status: "paid", category: "expense", confidence: 97, summary: "Kinesiology tape and mobility band restock." },
+];
+
 const generic: SampleItem[] = [
   { vendor: "Office Depot", invoice_number: "OD-9942", amount: 84.50, due_date: daysFromToday(-5), status: "paid", category: "expense", confidence: 96, summary: "Office supplies: paper, ink cartridges, pens." },
   { vendor: "Comcast Business", invoice_number: "CB-MAY26", amount: 189.99, due_date: daysFromToday(3), status: "pending", category: "expense", confidence: 98, summary: "Business internet — 500/50 plan, monthly." },
@@ -91,8 +180,14 @@ const generic: SampleItem[] = [
 const INDUSTRY_DATA: Record<string, SampleItem[]> = {
   marketplace,
   freelance,
+  service,
   food,
+  ecommerce,
   creative,
+  bookkeeper,
+  nonprofit,
+  realestate,
+  fitness,
   other: generic,
 };
 
