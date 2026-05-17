@@ -6,20 +6,7 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import EventHistoryList, { type EventSummary } from "../components/EventHistoryList";
-
-interface EventResponse {
-  id: number;
-  clientId: number;
-  name: string;
-  startDate: string;
-  endDate: string;
-  venue: string | null;
-  revenue: number | null;
-  boothFee: number;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 
 export default function EventsPage() {
   const router = useRouter();
@@ -151,11 +138,16 @@ export default function EventsPage() {
         </div>
 
         {showCreateForm && (
-          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-5">
-            <p className="text-sm text-slate-500 m-0">
-              {"\u{1F6E0}"} Event create form coming in commit 5 of sub-session 16.
-            </p>
-          </div>
+          <EventCreateForm
+            existingEvents={events}
+            onCreated={(newEvent) => {
+              // /api/events GET returns events sorted by start_date DESC, id
+              // DESC. A new event is the most recent → prepend.
+              setEvents((prev) => [newEvent, ...prev]);
+              setShowCreateForm(false);
+            }}
+            onCancel={() => setShowCreateForm(false)}
+          />
         )}
 
         <EventHistoryList events={summaries} />
