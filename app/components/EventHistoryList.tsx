@@ -8,6 +8,11 @@ export interface EventSummary {
   startDate: string;
   endDate: string;
   venue: string | null;
+  // Phase 3 sub-session 17 commit 10: per-event aggregate from
+  // /api/events GET. Optional so the type still works for callers that
+  // haven't been migrated to the new aggregate response shape.
+  linkedCount?: number;
+  linkedTotal?: number;
 }
 
 interface Props {
@@ -65,32 +70,51 @@ export default function EventHistoryList({ events }: Props) {
 
   return (
     <ul className="grid grid-cols-1 gap-3 list-none p-0 m-0">
-      {events.map((event) => (
-        <li key={event.id}>
-          <Link
-            href={`/events/${event.id}`}
-            className="block bg-white rounded-xl border border-slate-200 py-4 px-5 no-underline text-slate-900"
-          >
-            <div className="flex justify-between items-start gap-3 flex-wrap">
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold text-slate-900 m-0 mb-1 break-words">
-                  {event.name}
-                </p>
-                <p className="text-sm text-slate-500 m-0">
-                  {formatDateRange(event.startDate, event.endDate)}
-                  {event.venue ? ` · ${event.venue}` : ""}
-                </p>
+      {events.map((event) => {
+        const count = event.linkedCount ?? 0;
+        const total = event.linkedTotal ?? 0;
+        return (
+          <li key={event.id}>
+            <Link
+              href={`/events/${event.id}`}
+              className="block bg-white rounded-xl border border-slate-200 py-4 px-5 no-underline text-slate-900"
+            >
+              <div className="flex justify-between items-start gap-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-semibold text-slate-900 m-0 mb-1 break-words">
+                    {event.name}
+                  </p>
+                  <p className="text-sm text-slate-500 m-0">
+                    {formatDateRange(event.startDate, event.endDate)}
+                    {event.venue ? ` · ${event.venue}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {count > 0 && (
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-slate-700 m-0">
+                        ${total.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                      <p className="text-xs text-slate-400 m-0">
+                        {count} {count === 1 ? "transaction" : "transactions"}
+                      </p>
+                    </div>
+                  )}
+                  <span
+                    aria-hidden="true"
+                    className="text-slate-400 text-lg leading-none pt-0.5"
+                  >
+                    {"→"}
+                  </span>
+                </div>
               </div>
-              <span
-                aria-hidden="true"
-                className="text-slate-400 text-lg leading-none flex-shrink-0 pt-0.5"
-              >
-                {"→"}
-              </span>
-            </div>
-          </Link>
-        </li>
-      ))}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

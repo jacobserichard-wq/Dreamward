@@ -19,6 +19,14 @@ interface EventRow {
   updated_at: string;
 }
 
+// GET list row shape — adds the linked-transactions aggregate from the
+// LEFT JOIN on processed_items (commit 10). Used only by GET; POST returns
+// a bare EventRow.
+interface EventListRow extends EventRow {
+  linked_count: number;
+  linked_total: string | null;
+}
+
 interface CreateEventBody {
   name?: unknown;
   startDate?: unknown;
@@ -42,6 +50,17 @@ function serializeEvent(row: EventRow) {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+// GET response per-event shape — adds linkedTransactions aggregate.
+function serializeEventListEntry(row: EventListRow) {
+  return {
+    ...serializeEvent(row),
+    linkedTransactions: {
+      count: row.linked_count,
+      totalAmount: row.linked_total == null ? 0 : Number(row.linked_total),
+    },
   };
 }
 
@@ -88,16 +107,26 @@ export async function GET() {
       );
     }
 
-    const result = await pool.query<EventRow>(
-      `SELECT id, client_id, name, start_date, end_date, venue,
-              revenue, booth_fee, notes, created_at, updated_at
-         FROM events
-        WHERE client_id = $1
-        ORDER BY start_date DESC, id DESC`,
+    // LEFT JOIN aggregate so each event row carries its linked-transaction
+    // count + sum (commit 10 — design §5.3 deferred from sub-session 16).
+    // GROUP BY events.id is sufficient in Postgres because events.id is
+    // the PK (functional dependency covers the other selected columns).
+    // COALESCE protects against the LEFT JOIN's nulls when zero linked
+    // rows exist.
+    const result = await pool.query<EventListRow>(
+      `SELECT e.id, e.client_id, e.name, e.start_date, e.end_date, e.venue,
+              e.revenue, e.booth_fee, e.notes, e.created_at, e.updated_at,
+              COALESCE(COUNT(pi.id), 0)::int AS linked_count,
+              COALESCE(SUM(pi.amount), 0) AS linked_total
+         FROM events e
+         LEFT JOIN processed_items pi ON pi.event_id = e.id
+        WHERE e.client_id = $1
+        GROUP BY e.id
+        ORDER BY e.start_date DESC, e.id DESC`,
       [client.id]
     );
 
-    return NextResponse.json({ events: result.rows.map(serializeEvent) });
+    return NextResponse.json({ events: result.rows.map(serializeEventListEntry) });
   } catch (error) {
     console.error("Events GET error:", error);
     return NextResponse.json(

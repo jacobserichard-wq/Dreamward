@@ -5,6 +5,8 @@ import Spinner from "./Spinner";
 
 // API contract — matches /api/events POST response (commit 2). Exported so
 // the events page imports a single source of truth for the event shape.
+// linkedTransactions is only populated by GET /api/events (commit 10);
+// POST and PATCH responses omit it, hence optional.
 export interface EventResponse {
   id: number;
   clientId: number;
@@ -17,6 +19,10 @@ export interface EventResponse {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  linkedTransactions?: {
+    count: number;
+    totalAmount: number;
+  };
 }
 
 interface Props {

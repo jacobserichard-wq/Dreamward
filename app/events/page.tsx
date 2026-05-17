@@ -109,6 +109,8 @@ export default function EventsPage() {
     startDate: e.startDate,
     endDate: e.endDate,
     venue: e.venue,
+    linkedCount: e.linkedTransactions?.count ?? 0,
+    linkedTotal: e.linkedTransactions?.totalAmount ?? 0,
   }));
 
   return (
