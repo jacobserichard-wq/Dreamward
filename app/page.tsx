@@ -962,6 +962,7 @@ export default function Home() {
           uploadReview={uploadReview}
           reviewRows={reviewRows}
           setReviewRows={setReviewRows}
+          events={availableEvents}
           onCancel={() => {
             setUploadReview(null);
             setReviewRows([]);

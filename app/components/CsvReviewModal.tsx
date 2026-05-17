@@ -8,6 +8,10 @@ type ReviewRow = {
   due_date: string;
   category: string;
   confidence: number;
+  // Phase 3 sub-session 17: auto-coded event for this row. Null when no
+  // event matches (or matches multiple — design §8.8), or when the user
+  // explicitly clears the assignment in the dropdown below.
+  event_id: number | null;
   _approved: boolean;
 };
 
@@ -15,10 +19,21 @@ type UploadReview = {
   categories: string[];
 };
 
+// Minimal event shape the modal needs. EventResponse[] from the page
+// satisfies this via structural subtyping — extra fields are ignored.
+type ModalEvent = {
+  id: number;
+  name: string;
+};
+
 type Props = {
   uploadReview: UploadReview | null;
   reviewRows: ReviewRow[];
   setReviewRows: (rows: ReviewRow[]) => void;
+  // Available events for the per-row Event dropdown. Empty array hides
+  // the column entirely (Starter clients + non-Starter clients with no
+  // events yet — design §6 + §5.5).
+  events: ModalEvent[];
   onCancel: () => void;
   onConfirm: () => void;
   importing: boolean;
@@ -28,11 +43,13 @@ export default function CsvReviewModal({
   uploadReview,
   reviewRows,
   setReviewRows,
+  events,
   onCancel,
   onConfirm,
   importing,
 }: Props) {
   if (!uploadReview) return null;
+  const showEventColumn = events.length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-3 sm:p-5">
@@ -69,6 +86,9 @@ export default function CsvReviewModal({
                 <th className="py-3 px-2 border-b-2 border-slate-200 text-left">Vendor</th>
                 <th className="py-3 px-2 border-b-2 border-slate-200 text-right">Amount</th>
                 <th className="py-3 px-2 border-b-2 border-slate-200 text-left">Date</th>
+                {showEventColumn && (
+                  <th className="py-3 px-2 border-b-2 border-slate-200 text-left">Event</th>
+                )}
                 <th className="py-3 px-2 border-b-2 border-slate-200 text-left">Category</th>
                 <th className="py-3 px-2 border-b-2 border-slate-200 text-center">Conf.</th>
               </tr>
@@ -96,6 +116,32 @@ export default function CsvReviewModal({
                   <td className="py-2.5 px-2 border-b border-slate-100 text-slate-500">
                     {row.due_date || "-"}
                   </td>
+                  {showEventColumn && (
+                    <td className="py-2.5 px-2 border-b border-slate-100">
+                      <select
+                        value={row.event_id == null ? "" : String(row.event_id)}
+                        onChange={(e) => {
+                          const newValue =
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value);
+                          setReviewRows(
+                            reviewRows.map((r, j) =>
+                              j === i ? { ...r, event_id: newValue } : r
+                            )
+                          );
+                        }}
+                        className="py-1 px-2 rounded-md border border-slate-200 text-xs bg-white max-w-[160px]"
+                      >
+                        <option value="">— None</option>
+                        {events.map((ev) => (
+                          <option key={ev.id} value={String(ev.id)}>
+                            {ev.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td className="py-2.5 px-2 border-b border-slate-100">
                     <select
                       value={row.category}
