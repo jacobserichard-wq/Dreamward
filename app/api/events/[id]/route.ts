@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { computeRoundTripMiles } from "@/lib/distance";
 
 interface EventRow {
   id: number;
@@ -14,6 +15,11 @@ interface EventRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 4 mileage columns (migration 0005).
+  address: string | null;
+  returns_home_nightly: boolean;
+  round_trip_miles: string | null;
+  mileage_computed_at: string | null;
 }
 
 interface EventItemRow {
@@ -40,6 +46,12 @@ interface PatchBody {
   boothFee?: unknown;
   notes?: unknown;
   items?: unknown;
+  // Phase 4: when `address` is present, mileage recomputes (handles both
+  // address changes and the "Recalculate" affordance). `returnsHomeNightly`
+  // updates the column but doesn't trigger a maps API call — per-trip
+  // distance is unchanged; only the displayed total derives differently.
+  address?: unknown;
+  returnsHomeNightly?: unknown;
 }
 
 interface PatchItemInput {
@@ -61,7 +73,27 @@ function serializeEvent(row: EventRow) {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    address: row.address,
+    returnsHomeNightly: row.returns_home_nightly,
+    roundTripMiles: row.round_trip_miles == null ? null : Number(row.round_trip_miles),
+    mileageComputedAt: row.mileage_computed_at,
   };
+}
+
+// Phase 4 §8.2: total event mileage derived from round_trip_miles +
+// returns_home_nightly + day_count. Mirrors the SQL CASE in the GET
+// list query — used here for the single-event GET response so the
+// detail page doesn't need to recompute it client-side.
+function computeTotalMiles(row: EventRow): number | null {
+  if (row.round_trip_miles == null) return null;
+  const rtm = Number(row.round_trip_miles);
+  if (!row.returns_home_nightly) return rtm;
+  // DATE columns come back as YYYY-MM-DD strings; parse as UTC to avoid
+  // tz drift on date-only values, then compute inclusive day count.
+  const start = new Date(`${row.start_date}T00:00:00Z`).getTime();
+  const end = new Date(`${row.end_date}T00:00:00Z`).getTime();
+  const days = Math.round((end - start) / 86400000) + 1;
+  return Math.round(rtm * days * 10) / 10;
 }
 
 function serializeItem(row: EventItemRow) {
@@ -129,7 +161,9 @@ export async function GET(
 
     const eventResult = await pool.query<EventRow>(
       `SELECT id, client_id, name, start_date, end_date, venue,
-              revenue, booth_fee, notes, created_at, updated_at
+              revenue, booth_fee, notes, created_at, updated_at,
+              address, returns_home_nightly, round_trip_miles,
+              mileage_computed_at
          FROM events
         WHERE id = $1 AND client_id = $2`,
       [eventId, client.id]
@@ -166,6 +200,7 @@ export async function GET(
         count: linkedCount,
         totalAmount: linkedTotal,
       },
+      totalMiles: computeTotalMiles(eventResult.rows[0]),
     });
   } catch (error) {
     console.error("Event GET error:", error);
@@ -292,6 +327,49 @@ export async function PATCH(
       values.push(notes);
     }
 
+    // Phase 4: address presence (regardless of whether it actually changed)
+    // triggers a mileage recompute. Handles both genuine address edits AND
+    // the "Recalculate mileage" affordance (commit 6) which PATCHes the
+    // unchanged address. When the new address is null OR the client has no
+    // home_address, miles get nulled out (can't compute → previous value
+    // is stale and should clear).
+    if (body.address !== undefined) {
+      const newAddress =
+        typeof body.address === "string" && body.address.trim().length > 0
+          ? body.address.trim()
+          : null;
+      setClauses.push(`address = $${i++}`);
+      values.push(newAddress);
+
+      const homeAddress =
+        typeof client.home_address === "string" &&
+        client.home_address.trim().length > 0
+          ? client.home_address.trim()
+          : null;
+      let newMiles: number | null = null;
+      if (homeAddress && newAddress) {
+        newMiles = await computeRoundTripMiles(homeAddress, newAddress);
+      }
+      setClauses.push(`round_trip_miles = $${i++}`);
+      values.push(newMiles);
+      setClauses.push(`mileage_computed_at = $${i++}`);
+      values.push(newMiles !== null ? new Date() : null);
+    }
+
+    // returnsHomeNightly updates the column but doesn't trigger a maps
+    // API call — per-trip distance is unchanged, only the displayed
+    // total derives differently (§8.2).
+    if (body.returnsHomeNightly !== undefined) {
+      if (typeof body.returnsHomeNightly !== "boolean") {
+        return NextResponse.json(
+          { error: "returnsHomeNightly must be a boolean" },
+          { status: 400 }
+        );
+      }
+      setClauses.push(`returns_home_nightly = $${i++}`);
+      values.push(body.returnsHomeNightly);
+    }
+
     // Validate items payload up front (before opening a transaction).
     let parsedItems:
       | { productName: string; quantity: number; unitPrice: number }[]
@@ -376,7 +454,9 @@ export async function PATCH(
             SET ${setClauses.join(", ")}
           WHERE id = $${i++} AND client_id = $${i++}
         RETURNING id, client_id, name, start_date, end_date, venue,
-                  revenue, booth_fee, notes, created_at, updated_at`,
+                  revenue, booth_fee, notes, created_at, updated_at,
+                  address, returns_home_nightly, round_trip_miles,
+                  mileage_computed_at`,
         [...values, eventId, client.id]
       );
       if (updateResult.rows.length === 0) {
