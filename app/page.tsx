@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import Spinner from "./components/Spinner";
 import ErrorBanner from "./components/ErrorBanner";
 import CsvReviewModal from "./components/CsvReviewModal";
+import EventCreateForm, { type EventResponse } from "./components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -71,6 +72,14 @@ export default function Home() {
   const [reviewRows, setReviewRows] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
 
+  // Event auto-coding state — Phase 3 sub-session 17. The selector drives
+  // which event uploaded CSV rows auto-code to. "auto" runs per-row date
+  // matching in /api/upload (commit 7); a numeric string is a specific
+  // event id (batch-tag all rows); "create" toggles the inline form.
+  const [availableEvents, setAvailableEvents] = useState<EventResponse[]>([]);
+  const [selectedEventChoice, setSelectedEventChoice] = useState<string>("auto");
+  const [showInlineEventForm, setShowInlineEventForm] = useState(false);
+
   // Backfill state
   const [backfillRange, setBackfillRange] = useState<string>("");
 
@@ -125,6 +134,30 @@ export default function Home() {
     }
     loadClient();
   }, [router]);
+
+  // Load events for the upload event-selector. Gated on Growth+/Pro/trial
+  // — Starter clients see no selector (Events is a Growth-and-Pro feature
+  // per design §6). /api/events returns 403 for Starter, which we treat
+  // as "no events available" silently.
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    let cancelled = false;
+    async function loadEvents() {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) return;
+        const data = (await res.json()) as { events?: EventResponse[] };
+        if (!cancelled) setAvailableEvents(data.events || []);
+      } catch {
+        // Non-fatal — uploads still work, just without the selector.
+      }
+    }
+    loadEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan]);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
@@ -251,27 +284,40 @@ export default function Home() {
 
   // ─── CSV Upload ────────────────────────────────────────────────────────────
 
-  const handleUpload = useCallback(async (file: File) => {
-    setUploading(true);
-    setError(null);
-    setSuccessMsg(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const data = await apiFetch<{ mappedRows: any[]; categories: string[] }>(
-        "/api/upload",
-        { method: "POST", body: formData }
-      );
-      setUploadReview(data);
-      setReviewRows(
-        data.mappedRows.map((r: any, i: number) => ({ ...r, _approved: true, _index: i }))
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }, []);
+  const handleUpload = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      setError(null);
+      setSuccessMsg(null);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        // If the user picked a specific event, batch-tag all rows. "auto"
+        // (default) and "create" (transient state) both omit eventId →
+        // /api/upload runs per-row date matching (commit 7).
+        if (
+          selectedEventChoice !== "auto" &&
+          selectedEventChoice !== "create" &&
+          /^\d+$/.test(selectedEventChoice)
+        ) {
+          formData.append("eventId", selectedEventChoice);
+        }
+        const data = await apiFetch<{ mappedRows: any[]; categories: string[] }>(
+          "/api/upload",
+          { method: "POST", body: formData }
+        );
+        setUploadReview(data);
+        setReviewRows(
+          data.mappedRows.map((r: any, i: number) => ({ ...r, _approved: true, _index: i }))
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [selectedEventChoice]
+  );
 
   // ─── Clear sample data ─────────────────────────────────────────────────────
 
@@ -633,6 +679,65 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* Event auto-coding selector — Growth+/Pro/trial only. Drives
+                handleUpload's batch eventId (or leaves /api/upload to do
+                per-row date matching in commit 7). */}
+            {(clientInfo?.plan === "trial" ||
+              clientInfo?.plan === "growth" ||
+              clientInfo?.plan === "pro") && (
+              <div className="mb-5 flex items-center gap-3 flex-wrap">
+                <label
+                  htmlFor="upload-event-select"
+                  className="text-sm text-slate-600"
+                >
+                  {"\u{1F4C5}"} Auto-code uploaded rows to event:
+                </label>
+                <select
+                  id="upload-event-select"
+                  value={selectedEventChoice}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "create") {
+                      setShowInlineEventForm(true);
+                      setSelectedEventChoice("create");
+                    } else {
+                      setShowInlineEventForm(false);
+                      setSelectedEventChoice(value);
+                    }
+                  }}
+                  disabled={uploading}
+                  className="py-1.5 px-3 rounded-md border border-slate-200 text-sm bg-white text-slate-700 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="auto">Detect by date</option>
+                  {availableEvents.map((event) => (
+                    <option key={event.id} value={String(event.id)}>
+                      {event.name}
+                    </option>
+                  ))}
+                  <option value="create">+ Create new event</option>
+                </select>
+              </div>
+            )}
+
+            {/* Inline event-create form — appears when "+ Create new event"
+                is picked in the selector above. Reuses the standalone form
+                from /events; onCreated adds the new event to the local
+                list and auto-selects it for this upload. */}
+            {showInlineEventForm && (
+              <EventCreateForm
+                existingEvents={availableEvents}
+                onCreated={(newEvent) => {
+                  setAvailableEvents((prev) => [newEvent, ...prev]);
+                  setSelectedEventChoice(String(newEvent.id));
+                  setShowInlineEventForm(false);
+                }}
+                onCancel={() => {
+                  setShowInlineEventForm(false);
+                  setSelectedEventChoice("auto");
+                }}
+              />
+            )}
 
             {/* Email list */}
             {loading ? (
