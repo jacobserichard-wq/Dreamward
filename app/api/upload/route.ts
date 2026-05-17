@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { getClientSettings } from "@/lib/db";
+import pool from "@/lib/db";
 import {
   getCategoryNamesForIndustry,
   INDUSTRY_DISPLAY_NAMES,
   type Industry,
 } from "@/lib/categories";
+import { matchEventByDate } from "@/lib/eventMatch";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +20,41 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
     if (!file) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    }
+
+    // Phase 3 sub-session 17: batch event id (optional). Per design §6,
+    // Starter clients can't use Events at all — silently ignore any
+    // eventId they send rather than 403'ing the upload (uploads still
+    // work, just without auto-coding).
+    const isStarterGated = client.plan === "starter";
+    let batchEventId: number | null = null;
+    const rawEventId = formData.get("eventId");
+    if (
+      !isStarterGated &&
+      typeof rawEventId === "string" &&
+      rawEventId.trim() !== ""
+    ) {
+      const parsed = Number(rawEventId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return NextResponse.json(
+          { error: "Invalid eventId" },
+          { status: 400 }
+        );
+      }
+      // Verify the event belongs to this client — protects against UI
+      // bugs and forged requests (the dropdown only shows the client's
+      // own events, so a wrong id is a real anomaly worth surfacing).
+      const verify = await pool.query<{ id: number }>(
+        `SELECT id FROM events WHERE id = $1 AND client_id = $2`,
+        [parsed, client.id]
+      );
+      if (verify.rowCount === 0) {
+        return NextResponse.json(
+          { error: "Event not found" },
+          { status: 400 }
+        );
+      }
+      batchEventId = parsed;
     }
 
     const text = await file.text();
@@ -161,6 +198,28 @@ Other Accounting Software:
           `AI returned invalid category "${row.category}" for industry "${industry}"; dropping.`
         );
         row.category = null;
+      }
+    }
+
+    // Phase 3 sub-session 17: auto-code each row to an event.
+    //   - Starter plan: skip entirely; every row.event_id = null.
+    //   - batchEventId set: every row gets it (user picked from dropdown).
+    //   - Otherwise: per-row matchEventByDate against the row's due_date.
+    //     Zero matches → null; exactly one → that event id; 2+ overlapping
+    //     events → null (user resolves in the review modal — design §8.8).
+    for (const row of mappedRows) {
+      if (isStarterGated) {
+        row.event_id = null;
+        continue;
+      }
+      if (batchEventId !== null) {
+        row.event_id = batchEventId;
+        continue;
+      }
+      if (typeof row.due_date === "string" && row.due_date.length > 0) {
+        row.event_id = await matchEventByDate(client.id, row.due_date);
+      } else {
+        row.event_id = null;
       }
     }
 
