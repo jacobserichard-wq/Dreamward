@@ -30,6 +30,13 @@ export default function SettingsPage() {
   const [catSaved, setCatSaved] = useState(false);
   const [savedModules, setSavedModules] = useState<string[]>([]);
   const [savedCategories, setSavedCategories] = useState<string[]>([]);
+  // Phase 4: home address — third dirty-tracked section (mirrors the
+  // modules + categories pattern from sub-session 12.4).
+  const [homeAddress, setHomeAddress] = useState("");
+  const [savedHomeAddress, setSavedHomeAddress] = useState("");
+  const [homeAddressSaving, setHomeAddressSaving] = useState(false);
+  const [homeAddressSaved, setHomeAddressSaved] = useState(false);
+  const [homeAddressRecomputeMsg, setHomeAddressRecomputeMsg] = useState<string | null>(null);
 
   const modulesDirty = useMemo(
     () => JSON.stringify(activeModules) !== JSON.stringify(savedModules),
@@ -38,6 +45,10 @@ export default function SettingsPage() {
   const categoriesDirty = useMemo(
     () => JSON.stringify(categories) !== JSON.stringify(savedCategories),
     [categories, savedCategories]
+  );
+  const homeAddressDirty = useMemo(
+    () => homeAddress.trim() !== savedHomeAddress.trim(),
+    [homeAddress, savedHomeAddress]
   );
 
   useEffect(() => {
@@ -51,10 +62,13 @@ export default function SettingsPage() {
         setIndustryDefaults(Array.isArray(data.industryDefaults) ? data.industryDefaults : []);
         const initialModules = data.settings?.active_modules || ["invoices", "expenses"];
         const initialCategories = Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : [];
+        const initialHomeAddress = typeof data.homeAddress === "string" ? data.homeAddress : "";
         setActiveModules(initialModules);
         setCategories(initialCategories);
         setSavedModules(initialModules);
         setSavedCategories(initialCategories);
+        setHomeAddress(initialHomeAddress);
+        setSavedHomeAddress(initialHomeAddress);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -65,14 +79,14 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!modulesDirty && !categoriesDirty) return;
+    if (!modulesDirty && !categoriesDirty && !homeAddressDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [modulesDirty, categoriesDirty]);
+  }, [modulesDirty, categoriesDirty, homeAddressDirty]);
 
   const toggleModule = (moduleId: string) => {
     setActiveModules((prev) =>
@@ -139,6 +153,40 @@ export default function SettingsPage() {
       console.error("Save failed:", err);
     } finally {
       setCatSaving(false);
+    }
+  };
+
+  // Phase 4: save home address. The /api/settings PATCH path recomputes
+  // mileage for every event of this client with an address — bounded
+  // wait while the user sees the "Saving..." state.
+  const saveHomeAddress = async () => {
+    setHomeAddressSaving(true);
+    setHomeAddressRecomputeMsg(null);
+    const toSave = homeAddress.trim();
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ homeAddress: toSave === "" ? null : toSave }),
+      });
+      if (res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          recomputedEventCount?: number;
+        } | null;
+        setSavedHomeAddress(toSave);
+        setHomeAddressSaved(true);
+        if (data && typeof data.recomputedEventCount === "number" && data.recomputedEventCount > 0) {
+          setHomeAddressRecomputeMsg(
+            toSave === ""
+              ? `Cleared mileage on ${data.recomputedEventCount} event${data.recomputedEventCount === 1 ? "" : "s"}.`
+              : `Recalculated mileage for ${data.recomputedEventCount} event${data.recomputedEventCount === 1 ? "" : "s"}.`
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setHomeAddressSaving(false);
     }
   };
 
@@ -326,6 +374,57 @@ export default function SettingsPage() {
                 Clear custom categories
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Phase 4: Home Address — drives event mileage calculation.
+            Saving recomputes mileage for every existing event with an
+            address (closes the events-before-address ordering gap). */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Your home address</h2>
+            <p className="text-sm text-slate-500 m-0">
+              Used to calculate driving mileage for each of your events.
+              FlowWork sends this to Google Maps to look up distances — saved on your account, not shared elsewhere.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <input
+              id="settings-home-address"
+              type="text"
+              value={homeAddress}
+              onChange={(e) => {
+                setHomeAddress(e.target.value);
+                setHomeAddressSaved(false);
+                setHomeAddressRecomputeMsg(null);
+              }}
+              placeholder="123 Main St, Indianapolis, IN 46201"
+              className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-4"
+            />
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveHomeAddress}
+                disabled={homeAddressSaving || !homeAddressDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  homeAddressDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${homeAddressSaving ? "opacity-50" : ""}`}
+              >
+                {homeAddressSaving ? "Saving..." : "Save home address"}
+              </button>
+              {homeAddressDirty && (
+                <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>
+              )}
+              {!homeAddressDirty && homeAddressSaved && (
+                <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>
+              )}
+            </div>
+            {homeAddressRecomputeMsg && (
+              <p className="text-xs text-slate-500 mt-3 m-0">
+                {"\u{1F697}"} {homeAddressRecomputeMsg}
+              </p>
+            )}
           </div>
         </div>
 
