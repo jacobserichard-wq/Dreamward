@@ -82,8 +82,10 @@ export default function EventCreateForm({
   const [startDate, setStartDate] = useState(today);
   const [multiDay, setMultiDay] = useState(false);
   const [endDate, setEndDate] = useState(today);
+  const [returnsHomeNightly, setReturnsHomeNightly] = useState(true);
   const [showProgressive, setShowProgressive] = useState(false);
   const [venue, setVenue] = useState("");
+  const [address, setAddress] = useState("");
   const [boothFee, setBoothFee] = useState("");
   const [revenue, setRevenue] = useState("");
   const [notes, setNotes] = useState("");
@@ -153,9 +155,14 @@ export default function EventCreateForm({
           startDate,
           endDate: effectiveEnd,
           venue: venue.trim() === "" ? null : venue.trim(),
+          address: address.trim() === "" ? null : address.trim(),
           boothFee: boothFeeNum ?? 0,
           revenue: revenueNum,
           notes: notes.trim() === "" ? null : notes.trim(),
+          // returnsHomeNightly only matters for multi-day events. For
+          // single-day, send the DB-default true to be explicit (the
+          // toggle is hidden + inert in that case).
+          returnsHomeNightly: multiDay ? returnsHomeNightly : true,
         }),
       });
       if (!res.ok) {
@@ -250,6 +257,24 @@ export default function EventCreateForm({
         {multiDay ? "Single-day event" : "+ Multi-day event"}
       </button>
 
+      {/* Phase 4: "drove home each night" toggle. Only meaningful for
+          multi-day events — a single-day event has nothing to return
+          home FROM each night. Defaults checked (matches the DB column
+          default + the dominant case for day-trip market vendors). */}
+      {multiDay && (
+        <div className="mb-4">
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={returnsHomeNightly}
+              onChange={(e) => setReturnsHomeNightly(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span>Drove home each night (vs. staying near the venue)</span>
+          </label>
+        </div>
+      )}
+
       <div className="mb-4">
         <button
           type="button"
@@ -257,7 +282,7 @@ export default function EventCreateForm({
           className="text-sm text-slate-600 bg-transparent border-0 p-0 cursor-pointer"
           aria-expanded={showProgressive}
         >
-          {showProgressive ? "− Hide details" : "+ Add venue, booth fee, notes"}
+          {showProgressive ? "− Hide details" : "+ Add venue, address, booth fee, notes"}
         </button>
       </div>
 
@@ -276,6 +301,27 @@ export default function EventCreateForm({
               placeholder="Indianapolis Fairgrounds"
               className={inputClasses}
             />
+          </div>
+          {/* Phase 4: event street address. Optional. When both this and
+              the client's home address are present, /api/events POST
+              computes round-trip mileage via the Distance Matrix API.
+              No special validation here — the maps API geocodes whatever
+              the user types. */}
+          <div>
+            <label htmlFor="event-address" className={labelClasses}>
+              Address
+            </label>
+            <input
+              id="event-address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="123 Main St, Indianapolis, IN"
+              className={inputClasses}
+            />
+            <p className="text-xs text-slate-500 m-0 mt-1">
+              Used to calculate your mileage.
+            </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
