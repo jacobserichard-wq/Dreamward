@@ -441,6 +441,12 @@ export default function Home() {
               </a>
             )}
             <Link
+              href="/events"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+            >
+              Events
+            </Link>
+            <Link
               href="/settings"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
             >
