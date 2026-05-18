@@ -38,6 +38,24 @@ export default function SettingsPage() {
   const [homeAddressSaved, setHomeAddressSaved] = useState(false);
   const [homeAddressRecomputeMsg, setHomeAddressRecomputeMsg] = useState<string | null>(null);
 
+  // Phase 4 commit 8: hide/un-hide industry-default categories. Persisted
+  // under client_settings.preferences.hidden_industry_defaults: string[].
+  // The full preferences object is round-tripped through PATCH so other
+  // fields (none today, but future-proof) aren't clobbered.
+  const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  const [hiddenDefaults, setHiddenDefaults] = useState<string[]>([]);
+  const [savedHiddenDefaults, setSavedHiddenDefaults] = useState<string[]>([]);
+  const [showHiddenDefaults, setShowHiddenDefaults] = useState(false);
+  const [hiddenDefaultsSaving, setHiddenDefaultsSaving] = useState(false);
+  const [hiddenDefaultsSaved, setHiddenDefaultsSaved] = useState(false);
+
+  const hiddenDefaultsDirty = useMemo(
+    () =>
+      JSON.stringify([...hiddenDefaults].sort()) !==
+      JSON.stringify([...savedHiddenDefaults].sort()),
+    [hiddenDefaults, savedHiddenDefaults]
+  );
+
   const modulesDirty = useMemo(
     () => JSON.stringify(activeModules) !== JSON.stringify(savedModules),
     [activeModules, savedModules]
@@ -63,12 +81,26 @@ export default function SettingsPage() {
         const initialModules = data.settings?.active_modules || ["invoices", "expenses"];
         const initialCategories = Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : [];
         const initialHomeAddress = typeof data.homeAddress === "string" ? data.homeAddress : "";
+        // Preferences round-trips as a JSON object so other fields aren't
+        // clobbered when saving hidden_industry_defaults.
+        const rawPrefs =
+          data.settings?.preferences && typeof data.settings.preferences === "object"
+            ? (data.settings.preferences as Record<string, unknown>)
+            : {};
+        const initialHiddenDefaults = Array.isArray(rawPrefs.hidden_industry_defaults)
+          ? (rawPrefs.hidden_industry_defaults as unknown[]).filter(
+              (v): v is string => typeof v === "string"
+            )
+          : [];
         setActiveModules(initialModules);
         setCategories(initialCategories);
         setSavedModules(initialModules);
         setSavedCategories(initialCategories);
         setHomeAddress(initialHomeAddress);
         setSavedHomeAddress(initialHomeAddress);
+        setPreferences(rawPrefs);
+        setHiddenDefaults(initialHiddenDefaults);
+        setSavedHiddenDefaults(initialHiddenDefaults);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -79,14 +111,20 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!modulesDirty && !categoriesDirty && !homeAddressDirty) return;
+    if (
+      !modulesDirty &&
+      !categoriesDirty &&
+      !homeAddressDirty &&
+      !hiddenDefaultsDirty
+    )
+      return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [modulesDirty, categoriesDirty, homeAddressDirty]);
+  }, [modulesDirty, categoriesDirty, homeAddressDirty, hiddenDefaultsDirty]);
 
   const toggleModule = (moduleId: string) => {
     setActiveModules((prev) =>
@@ -153,6 +191,44 @@ export default function SettingsPage() {
       console.error("Save failed:", err);
     } finally {
       setCatSaving(false);
+    }
+  };
+
+  // Phase 4 commit 8: hide/un-hide handlers. The pill X button calls
+  // hideDefault(name); the un-hide section's button calls
+  // unhideDefault(name). Both mutate the live state; the user clicks
+  // "Save hidden defaults" to persist.
+  const hideDefault = (name: string) => {
+    setHiddenDefaults((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setHiddenDefaultsSaved(false);
+  };
+  const unhideDefault = (name: string) => {
+    setHiddenDefaults((prev) => prev.filter((n) => n !== name));
+    setHiddenDefaultsSaved(false);
+  };
+
+  // Phase 4 commit 8: save hidden defaults. Merges into the live
+  // preferences object so other fields aren't clobbered (none today,
+  // but the round-trip is the safe pattern).
+  const saveHiddenDefaults = async () => {
+    setHiddenDefaultsSaving(true);
+    const toSave = [...hiddenDefaults];
+    const newPreferences = { ...preferences, hidden_industry_defaults: toSave };
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (res.ok) {
+        setPreferences(newPreferences);
+        setSavedHiddenDefaults(toSave);
+        setHiddenDefaultsSaved(true);
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setHiddenDefaultsSaving(false);
     }
   };
 
@@ -297,17 +373,81 @@ export default function SettingsPage() {
             {industryDefaults.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-slate-500 mb-2">
-                  Defaults for {industry || "your business"} — managed automatically
+                  Defaults for {industry || "your business"} — click {"✕"} to hide ones you don&apos;t use
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {industryDefaults.map((name) => (
-                    <span
-                      key={`default-${name}`}
-                      className="rounded-[20px] bg-slate-100 text-slate-600 text-[13px] py-1.5 px-3"
+                  {industryDefaults
+                    .filter((name) => !hiddenDefaults.includes(name))
+                    .map((name) => (
+                      <span
+                        key={`default-${name}`}
+                        className="rounded-[20px] bg-slate-100 text-slate-600 text-[13px] py-1.5 px-3 inline-flex items-center gap-1.5"
+                      >
+                        {name}
+                        <button
+                          onClick={() => hideDefault(name)}
+                          title={`Hide ${name}`}
+                          className="bg-transparent border-0 cursor-pointer text-xs text-slate-400 p-0 leading-none"
+                        >
+                          {"✕"}
+                        </button>
+                      </span>
+                    ))}
+                </div>
+
+                {/* Hidden defaults — collapsible "Show hidden (N)" section
+                    so the un-hide path isn't a dead end. */}
+                {hiddenDefaults.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowHiddenDefaults((v) => !v)}
+                      className="bg-transparent border-0 text-xs text-blue-600 cursor-pointer p-0"
+                      aria-expanded={showHiddenDefaults}
                     >
-                      {name}
-                    </span>
-                  ))}
+                      {showHiddenDefaults
+                        ? `− Hide ${hiddenDefaults.length} hidden default${hiddenDefaults.length === 1 ? "" : "s"}`
+                        : `+ Show ${hiddenDefaults.length} hidden default${hiddenDefaults.length === 1 ? "" : "s"}`}
+                    </button>
+                    {showHiddenDefaults && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {hiddenDefaults.map((name) => (
+                          <span
+                            key={`hidden-${name}`}
+                            className="rounded-[20px] border border-dashed border-slate-300 text-slate-400 text-[13px] py-1.5 px-3 inline-flex items-center gap-1.5"
+                          >
+                            {name}
+                            <button
+                              onClick={() => unhideDefault(name)}
+                              title={`Show ${name}`}
+                              className="bg-transparent border-0 cursor-pointer text-xs text-blue-600 p-0 leading-none"
+                            >
+                              {"+"}
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Save controls — same dirty-state pattern as the other
+                    three sections (modules, categories, home address). */}
+                <div className="flex items-center gap-3 mt-4 flex-wrap">
+                  <button
+                    onClick={saveHiddenDefaults}
+                    disabled={hiddenDefaultsSaving || !hiddenDefaultsDirty}
+                    className={`py-2 px-4 rounded-lg border-0 text-white text-xs font-semibold ${
+                      hiddenDefaultsDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                    } ${hiddenDefaultsSaving ? "opacity-50" : ""}`}
+                  >
+                    {hiddenDefaultsSaving ? "Saving..." : "Save hidden defaults"}
+                  </button>
+                  {hiddenDefaultsDirty && (
+                    <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>
+                  )}
+                  {!hiddenDefaultsDirty && hiddenDefaultsSaved && (
+                    <span className="text-xs text-green-600 font-medium">{"✓ Saved"}</span>
+                  )}
                 </div>
               </div>
             )}
