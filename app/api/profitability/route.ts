@@ -161,11 +161,19 @@ export async function GET() {
     // IRS rate fallback: 0.70 matches the migration 0006 seed (2025 rate).
     // If the migration hasn't been applied yet the query returns no rows
     // and we degrade to the constant rather than NaN-ing every mileage
-    // cost downstream. Once 0006 lands this path is dead.
+    // cost downstream. The `rateSource` field on the response is the
+    // honesty flag — clients (commit 7 dashboard) MUST render a visible
+    // "using default IRS rate" notice when this is "fallback", so a
+    // fabricated rate never passes as the real configured value. Once
+    // 0006 lands in production this path becomes dead and `rateSource`
+    // should always be "config".
     const irsRateRaw = appSettingResult.rows[0]?.value;
     const parsedRate = irsRateRaw == null ? NaN : Number(irsRateRaw);
-    const irsMileageRate =
-      Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 0.7;
+    const hasConfiguredRate = Number.isFinite(parsedRate) && parsedRate > 0;
+    const irsMileageRate = hasConfiguredRate ? parsedRate : 0.7;
+    const rateSource: "config" | "fallback" = hasConfiguredRate
+      ? "config"
+      : "fallback";
 
     interface PerEventAccumulator {
       manualRevenue: number;
@@ -298,6 +306,7 @@ export async function GET() {
       bestMarkets,
       worstMarkets,
       irsMileageRate,
+      rateSource,
     });
   } catch (error) {
     console.error("Profitability GET error:", error);
