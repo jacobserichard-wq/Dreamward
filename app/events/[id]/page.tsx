@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "../../components/PageHeader";
 import Spinner from "../../components/Spinner";
 import ErrorBanner from "../../components/ErrorBanner";
 import { type EventResponse } from "../../components/EventCreateForm";
+// Phase 5 commit 4: client-side category source for the manual-expense
+// picker. lib/categories.ts is pure data + pure functions (no Node
+// imports) so it's safe to use in a client component.
+import {
+  getCategoriesForIndustry,
+  type Industry,
+} from "@/lib/categories";
 
 interface EventItem {
   id: number;
@@ -68,6 +75,22 @@ export default function EventDetailPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Phase 5 commit 4: client industry + custom categories for the
+  // manual-expense category picker. Fetched in parallel with the event
+  // load — see loadEvent below.
+  const [clientIndustry, setClientIndustry] = useState<Industry>("other");
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+
+  // Phase 5 commit 4: manual-expense form state.
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseVendor, setExpenseVendor] = useState("");
+  const [expenseDate, setExpenseDate] = useState("");
+  const [expenseDescription, setExpenseDescription] = useState("");
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseError, setExpenseError] = useState<string | null>(null);
+
   // Form state — separate from loaded event so the user can edit freely.
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -104,27 +127,36 @@ export default function EventDetailPage({ params }: PageProps) {
   );
 
   const loadEvent = useCallback(async () => {
-    const res = await fetch(`/api/events/${encodeURIComponent(rawId)}`);
-    if (res.status === 401) {
+    // Phase 5 commit 4: fetch event + settings in parallel. Settings
+    // gives us the client's industry (for the expense-category picker)
+    // and their custom categories. Settings is optional — if it fails
+    // we still render the event with reasonable defaults (industry =
+    // "other", no custom categories).
+    const [eventRes, settingsRes] = await Promise.all([
+      fetch(`/api/events/${encodeURIComponent(rawId)}`),
+      fetch("/api/settings"),
+    ]);
+
+    if (eventRes.status === 401) {
       router.replace(`/signin?callbackUrl=/events/${encodeURIComponent(rawId)}`);
       return;
     }
-    if (res.status === 403) {
+    if (eventRes.status === 403) {
       // Starter — redirect to /events where the upgrade prompt lives.
       router.replace("/events");
       return;
     }
-    if (res.status === 404) {
+    if (eventRes.status === 404) {
       setError("Event not found.");
       setLoading(false);
       return;
     }
-    if (!res.ok) {
-      setError(`Couldn't load event: HTTP ${res.status}`);
+    if (!eventRes.ok) {
+      setError(`Couldn't load event: HTTP ${eventRes.status}`);
       setLoading(false);
       return;
     }
-    const data = (await res.json()) as {
+    const data = (await eventRes.json()) as {
       event: EventResponse;
       items: EventItem[];
       linkedTransactions: LinkedTransactions;
@@ -134,6 +166,22 @@ export default function EventDetailPage({ params }: PageProps) {
     setLinkedTx(data.linkedTransactions);
     setTotalMiles(data.totalMiles ?? null);
     populateForm(data.event, data.items);
+
+    if (settingsRes.ok) {
+      const sData = (await settingsRes.json()) as {
+        industry?: string;
+        settings?: { custom_categories?: unknown };
+      };
+      if (typeof sData.industry === "string") {
+        setClientIndustry(sData.industry as Industry);
+      }
+      const custom = sData.settings?.custom_categories;
+      if (Array.isArray(custom)) {
+        setCustomCategories(
+          custom.filter((c): c is string => typeof c === "string")
+        );
+      }
+    }
     setLoading(false);
   }, [rawId, router, populateForm]);
 
@@ -275,6 +323,98 @@ export default function EventDetailPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "Couldn't save event");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Phase 5 commit 4: expense-category source for the picker. Filters
+  // lib/categories.ts to expense-type entries (universal + industry
+  // overlay), then appends the client's custom categories (assumed
+  // expense per design §3). Deduplicated.
+  const allowedExpenseCategories = useMemo(() => {
+    const lib = getCategoriesForIndustry(clientIndustry)
+      .filter((c) => c.type === "expense")
+      .map((c) => c.name);
+    const merged = Array.from(new Set([...lib, ...customCategories]));
+    return merged.sort((a, b) => a.localeCompare(b));
+  }, [clientIndustry, customCategories]);
+
+  // Phase 5 commit 4: open the form, prefill date to the event's start
+  // date (matches the API default but the visible field reads better).
+  const handleOpenExpenseForm = () => {
+    setExpenseAmount("");
+    setExpenseCategory(allowedExpenseCategories[0] ?? "");
+    setExpenseVendor("");
+    setExpenseDate(event?.startDate ?? "");
+    setExpenseDescription("");
+    setExpenseError(null);
+    setShowExpenseForm(true);
+  };
+
+  const handleCloseExpenseForm = () => {
+    setShowExpenseForm(false);
+    setExpenseError(null);
+  };
+
+  const handleSubmitExpense = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setExpenseError(null);
+
+    // Parse + validate inline so the user gets specific feedback before
+    // we round-trip. The API re-validates everything.
+    const cleaned = expenseAmount.replace(/[$,\s]/g, "");
+    const amountNum = Number(cleaned);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      setExpenseError("Amount must be a positive number.");
+      return;
+    }
+    if (expenseCategory.trim() === "") {
+      setExpenseError("Pick a category.");
+      return;
+    }
+
+    setExpenseSaving(true);
+    try {
+      const res = await fetch(
+        `/api/events/${encodeURIComponent(rawId)}/expenses`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amountNum,
+            category: expenseCategory,
+            vendor:
+              expenseVendor.trim() === "" ? undefined : expenseVendor.trim(),
+            description:
+              expenseDescription.trim() === ""
+                ? undefined
+                : expenseDescription.trim(),
+            date: expenseDate || undefined,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg =
+          (data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : null) ?? `Couldn't add expense (HTTP ${res.status})`;
+        setExpenseError(msg);
+        return;
+      }
+      // Re-fetch the event so totals refresh. The P&L breakdown card
+      // (commit 6) will reflect the new total automatically.
+      await loadEvent();
+      setShowExpenseForm(false);
+      setSuccessMsg("Expense added.");
+    } catch (err) {
+      setExpenseError(
+        err instanceof Error ? err.message : "Couldn't add expense"
+      );
+    } finally {
+      setExpenseSaving(false);
     }
   };
 
@@ -779,6 +919,137 @@ export default function EventDetailPage({ params }: PageProps) {
           >
             + Add item
           </button>
+        </div>
+
+        {/* Phase 5 commit 4: manual per-event expense. Cash expenses
+            (table fee paid in cash, supplies bought en route) that
+            aren't in the imported data. Reuses processed_items with
+            source='manual' via /api/events/[id]/expenses POST. */}
+        <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
+          <div className="flex justify-between items-center mb-3 flex-wrap gap-3">
+            <h2 className="text-lg font-bold text-slate-900 m-0">Manual expenses</h2>
+            {!showExpenseForm && (
+              <button
+                type="button"
+                onClick={handleOpenExpenseForm}
+                className="py-2 px-4 rounded-md border border-slate-200 bg-white text-slate-700 text-sm font-medium cursor-pointer"
+              >
+                + Add expense
+              </button>
+            )}
+          </div>
+
+          {!showExpenseForm ? (
+            <p className="text-sm text-slate-500 m-0">
+              Add cash expenses (booth fee paid in cash, supplies bought en route)
+              that aren&apos;t in your imported data.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmitExpense}>
+              {expenseError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-4 text-sm">
+                  {expenseError}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="exp-amount" className={labelClasses}>
+                    Amount<span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <input
+                    id="exp-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    placeholder="$40"
+                    autoFocus
+                    required
+                    className={inputClasses}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="exp-category" className={labelClasses}>
+                    Category<span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <select
+                    id="exp-category"
+                    value={expenseCategory}
+                    onChange={(e) => setExpenseCategory(e.target.value)}
+                    required
+                    className={inputClasses}
+                  >
+                    {allowedExpenseCategories.length === 0 && (
+                      <option value="">No categories yet</option>
+                    )}
+                    {allowedExpenseCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="exp-vendor" className={labelClasses}>
+                    Vendor (optional)
+                  </label>
+                  <input
+                    id="exp-vendor"
+                    type="text"
+                    value={expenseVendor}
+                    onChange={(e) => setExpenseVendor(e.target.value)}
+                    placeholder="Where you paid"
+                    className={inputClasses}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="exp-date" className={labelClasses}>
+                    Date
+                  </label>
+                  <input
+                    id="exp-date"
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                    className={inputClasses}
+                  />
+                </div>
+              </div>
+              <div className="mb-4">
+                <label htmlFor="exp-description" className={labelClasses}>
+                  Description (optional)
+                </label>
+                <input
+                  id="exp-description"
+                  type="text"
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                  placeholder="What was this for?"
+                  className={inputClasses}
+                />
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="submit"
+                  disabled={expenseSaving}
+                  className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+                >
+                  {expenseSaving && <Spinner size={14} color="white" />}
+                  {expenseSaving ? "Adding..." : "Add expense"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseExpenseForm}
+                  disabled={expenseSaving}
+                  className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Save / Cancel / Delete */}
