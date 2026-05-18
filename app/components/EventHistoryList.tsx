@@ -13,6 +13,9 @@ export interface EventSummary {
   // haven't been migrated to the new aggregate response shape.
   linkedCount?: number;
   linkedTotal?: number;
+  // Phase 4: per-event total mileage (the §8.2 conditional product
+  // computed in SQL — see /api/events GET's CASE expression).
+  totalMiles?: number | null;
 }
 
 interface Props {
@@ -68,53 +71,92 @@ export default function EventHistoryList({ events }: Props) {
     );
   }
 
+  // Phase 4: total business miles across all visible events. The roadmap
+  // calls this "the mileage log" — realized as a per-row column + this
+  // single rolled-up figure rather than a separate screen (design §8.4).
+  // Excludes events where totalMiles is null (event has no address or
+  // client has no home address yet).
+  const totalBusinessMiles = events.reduce(
+    (sum, e) => sum + (e.totalMiles ?? 0),
+    0
+  );
+  const eventsWithMiles = events.filter(
+    (e) => typeof e.totalMiles === "number" && e.totalMiles > 0
+  ).length;
+
   return (
-    <ul className="grid grid-cols-1 gap-3 list-none p-0 m-0">
-      {events.map((event) => {
-        const count = event.linkedCount ?? 0;
-        const total = event.linkedTotal ?? 0;
-        return (
-          <li key={event.id}>
-            <Link
-              href={`/events/${event.id}`}
-              className="block bg-white rounded-xl border border-slate-200 py-4 px-5 no-underline text-slate-900"
-            >
-              <div className="flex justify-between items-start gap-3 flex-wrap">
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold text-slate-900 m-0 mb-1 break-words">
-                    {event.name}
-                  </p>
-                  <p className="text-sm text-slate-500 m-0">
-                    {formatDateRange(event.startDate, event.endDate)}
-                    {event.venue ? ` · ${event.venue}` : ""}
-                  </p>
+    <>
+      {totalBusinessMiles > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 py-4 px-5 mb-4 flex items-baseline justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-1">
+              Total business miles
+            </p>
+            <p className="text-2xl font-bold text-slate-900 m-0">
+              {totalBusinessMiles.toLocaleString("en-US", {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              })}{" "}
+              mi
+            </p>
+          </div>
+          <p className="text-xs text-slate-400 m-0">
+            across {eventsWithMiles} {eventsWithMiles === 1 ? "event" : "events"}
+          </p>
+        </div>
+      )}
+
+      <ul className="grid grid-cols-1 gap-3 list-none p-0 m-0">
+        {events.map((event) => {
+          const count = event.linkedCount ?? 0;
+          const total = event.linkedTotal ?? 0;
+          const miles = event.totalMiles;
+          return (
+            <li key={event.id}>
+              <Link
+                href={`/events/${event.id}`}
+                className="block bg-white rounded-xl border border-slate-200 py-4 px-5 no-underline text-slate-900"
+              >
+                <div className="flex justify-between items-start gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold text-slate-900 m-0 mb-1 break-words">
+                      {event.name}
+                    </p>
+                    <p className="text-sm text-slate-500 m-0">
+                      {formatDateRange(event.startDate, event.endDate)}
+                      {event.venue ? ` · ${event.venue}` : ""}
+                      {typeof miles === "number" && miles > 0
+                        ? ` · ${miles.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mi`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {count > 0 && (
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-slate-700 m-0">
+                          ${total.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                        <p className="text-xs text-slate-400 m-0">
+                          {count} {count === 1 ? "transaction" : "transactions"}
+                        </p>
+                      </div>
+                    )}
+                    <span
+                      aria-hidden="true"
+                      className="text-slate-400 text-lg leading-none pt-0.5"
+                    >
+                      {"→"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {count > 0 && (
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-700 m-0">
-                        ${total.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                      <p className="text-xs text-slate-400 m-0">
-                        {count} {count === 1 ? "transaction" : "transactions"}
-                      </p>
-                    </div>
-                  )}
-                  <span
-                    aria-hidden="true"
-                    className="text-slate-400 text-lg leading-none pt-0.5"
-                  >
-                    {"→"}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }

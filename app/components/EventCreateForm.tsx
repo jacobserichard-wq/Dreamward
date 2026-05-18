@@ -7,6 +7,10 @@ import Spinner from "./Spinner";
 // the events page imports a single source of truth for the event shape.
 // linkedTransactions is only populated by GET /api/events (commit 10);
 // POST and PATCH responses omit it, hence optional.
+// Phase 4: address / returnsHomeNightly / roundTripMiles /
+// mileageComputedAt populated by all three (POST returns them, PATCH
+// updates them, GET returns them). totalMiles populated only by GET
+// list (computed in SQL as the §8.2 conditional product).
 export interface EventResponse {
   id: number;
   clientId: number;
@@ -19,10 +23,15 @@ export interface EventResponse {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  address?: string | null;
+  returnsHomeNightly?: boolean;
+  roundTripMiles?: number | null;
+  mileageComputedAt?: string | null;
   linkedTransactions?: {
     count: number;
     totalAmount: number;
   };
+  totalMiles?: number | null;
 }
 
 interface Props {

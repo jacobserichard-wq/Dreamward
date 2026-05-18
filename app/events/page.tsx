@@ -111,6 +111,7 @@ export default function EventsPage() {
     venue: e.venue,
     linkedCount: e.linkedTransactions?.count ?? 0,
     linkedTotal: e.linkedTransactions?.totalAmount ?? 0,
+    totalMiles: e.totalMiles ?? null,
   }));
 
   return (

@@ -58,9 +58,13 @@ export default function EventDetailPage({ params }: PageProps) {
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [linkedTx, setLinkedTx] = useState<LinkedTransactions | null>(null);
+  const [totalMiles, setTotalMiles] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Phase 4: separate spinner for the Recalculate affordance — doesn't
+  // block the full Save button while a one-shot maps lookup runs.
+  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -70,6 +74,8 @@ export default function EventDetailPage({ params }: PageProps) {
   const [endDate, setEndDate] = useState("");
   const [multiDay, setMultiDay] = useState(false);
   const [venue, setVenue] = useState("");
+  const [address, setAddress] = useState("");
+  const [returnsHomeNightly, setReturnsHomeNightly] = useState(true);
   const [boothFee, setBoothFee] = useState("");
   const [revenue, setRevenue] = useState("");
   const [notes, setNotes] = useState("");
@@ -81,6 +87,8 @@ export default function EventDetailPage({ params }: PageProps) {
       setEndDate(ev.endDate);
       setMultiDay(ev.startDate !== ev.endDate);
       setVenue(ev.venue ?? "");
+      setAddress(ev.address ?? "");
+      setReturnsHomeNightly(ev.returnsHomeNightly ?? true);
       setBoothFee(ev.boothFee === 0 ? "" : String(ev.boothFee));
       setRevenue(ev.revenue == null ? "" : String(ev.revenue));
       setNotes(ev.notes ?? "");
@@ -120,9 +128,11 @@ export default function EventDetailPage({ params }: PageProps) {
       event: EventResponse;
       items: EventItem[];
       linkedTransactions: LinkedTransactions;
+      totalMiles?: number | null;
     };
     setEvent(data.event);
     setLinkedTx(data.linkedTransactions);
+    setTotalMiles(data.totalMiles ?? null);
     populateForm(data.event, data.items);
     setLoading(false);
   }, [rawId, router, populateForm]);
@@ -229,6 +239,11 @@ export default function EventDetailPage({ params }: PageProps) {
           startDate,
           endDate: effectiveEnd,
           venue: venue.trim() === "" ? null : venue.trim(),
+          address: address.trim() === "" ? null : address.trim(),
+          // returnsHomeNightly only meaningful for multi-day events.
+          // For single-day events, send DB-default true to match the
+          // EventCreateForm convention from commit 4.
+          returnsHomeNightly: multiDay ? returnsHomeNightly : true,
           boothFee: boothFeeNum ?? 0,
           revenue: revenueNum,
           notes: notes.trim() === "" ? null : notes.trim(),
@@ -260,6 +275,43 @@ export default function EventDetailPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "Couldn't save event");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Phase 4: Recalculate mileage affordance. PATCHes with the event's
+  // current address — the API's "address presence triggers recompute"
+  // rule fires even though the address hasn't changed, giving us a
+  // safety-net retry path for transient maps API failures or a
+  // corrected home address. Doesn't fail-loud — null result just means
+  // no maps API hit landed; the page re-fetches and shows updated state.
+  const handleRecalculate = async () => {
+    if (!event) return;
+    setRecalculating(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch(`/api/events/${encodeURIComponent(rawId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: event.address ?? null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg =
+          (data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : null) ?? `Couldn't recalculate (HTTP ${res.status})`;
+        setError(msg);
+        return;
+      }
+      // Refresh the page state so totalMiles + roundTripMiles +
+      // mileageComputedAt show the new values.
+      await loadEvent();
+      setSuccessMsg("Mileage recalculated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't recalculate");
+    } finally {
+      setRecalculating(false);
     }
   };
 
@@ -393,6 +445,73 @@ export default function EventDetailPage({ params }: PageProps) {
           )}
         </div>
 
+        {/* Phase 4: Mileage card. Shows total miles for this event (the
+            §8.2 conditional product computed by the API), the single
+            round-trip distance, when it was computed, and a Recalculate
+            affordance. When no address yet OR no home address yet, shows
+            a gentle prompt (no dead ends — design §5). */}
+        <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
+          <div className="flex justify-between items-start gap-3 mb-3 flex-wrap">
+            <h2 className="text-lg font-bold text-slate-900 m-0">Mileage</h2>
+            {event.address && event.roundTripMiles !== null && (
+              <button
+                type="button"
+                onClick={handleRecalculate}
+                disabled={recalculating || saving || deleting}
+                className="py-1.5 px-3 rounded-md border border-slate-200 bg-white text-slate-700 text-xs font-medium cursor-pointer inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+              >
+                {recalculating && <Spinner size={12} />}
+                {recalculating ? "Recalculating..." : "Recalculate"}
+              </button>
+            )}
+          </div>
+
+          {totalMiles !== null ? (
+            <>
+              <p className="text-3xl font-bold text-slate-900 m-0 mb-1">
+                {totalMiles.toLocaleString("en-US", {
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                })}{" "}
+                mi
+              </p>
+              <p className="text-sm text-slate-500 m-0">
+                Total business miles for this event
+                {multiDay && event.returnsHomeNightly
+                  ? ` (${event.roundTripMiles?.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mi round trip × ${Math.round((new Date(`${event.endDate}T00:00:00Z`).getTime() - new Date(`${event.startDate}T00:00:00Z`).getTime()) / 86400000) + 1} days)`
+                  : ""}
+                {multiDay && !event.returnsHomeNightly
+                  ? " (one round trip — stayed near the venue)"
+                  : ""}
+              </p>
+              {event.mileageComputedAt && (
+                <p className="text-xs text-slate-400 mt-2 m-0">
+                  Last computed{" "}
+                  {new Date(event.mileageComputedAt).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              )}
+            </>
+          ) : !event.address ? (
+            <p className="text-sm text-slate-500 m-0">
+              Add an address below to calculate driving mileage for this event.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 m-0">
+              {"\u{1F697}"} Add your home address in{" "}
+              <a href="/settings" className="text-blue-600 no-underline">
+                Settings
+              </a>{" "}
+              to see mileage for this event.
+            </p>
+          )}
+        </div>
+
         {/* Event details — always-editable form */}
         <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
           <h2 className="text-lg font-bold text-slate-900 mb-4 m-0">Details</h2>
@@ -460,6 +579,24 @@ export default function EventDetailPage({ params }: PageProps) {
             {multiDay ? "Single-day event" : "+ Multi-day event"}
           </button>
 
+          {/* Phase 4: "drove home each night" toggle — same UX as
+              EventCreateForm (commit 4). Only meaningful for multi-day
+              events. Changing it triggers no maps API call; just
+              re-derives totalMiles via the §8.2 conditional. */}
+          {multiDay && (
+            <div className="mb-4">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={returnsHomeNightly}
+                  onChange={(e) => setReturnsHomeNightly(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <span>Drove home each night (vs. staying near the venue)</span>
+              </label>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 mb-4">
             <div>
               <label htmlFor="ev-venue" className={labelClasses}>
@@ -473,6 +610,25 @@ export default function EventDetailPage({ params }: PageProps) {
                 placeholder="Indianapolis Fairgrounds"
                 className={inputClasses}
               />
+            </div>
+            {/* Phase 4: event street address. Saving with a new value
+                triggers a maps API call via PATCH's address-presence
+                rule (commit 3). */}
+            <div>
+              <label htmlFor="ev-address" className={labelClasses}>
+                Address
+              </label>
+              <input
+                id="ev-address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="123 Main St, Indianapolis, IN"
+                className={inputClasses}
+              />
+              <p className="text-xs text-slate-500 m-0 mt-1">
+                Used to calculate your mileage.
+              </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
