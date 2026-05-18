@@ -349,7 +349,7 @@ export default function EventCreateForm({
             </div>
             <div>
               <label htmlFor="event-revenue" className={labelClasses}>
-                Revenue (manual)
+                Cash / other income (not from import)
               </label>
               <input
                 id="event-revenue"
@@ -360,6 +360,9 @@ export default function EventCreateForm({
                 placeholder="$0"
                 className={inputClasses}
               />
+              <p className="text-xs text-slate-500 m-0 mt-1">
+                Income you received that isn&apos;t already in your imported data — added to import totals, not a replacement.
+              </p>
             </div>
           </div>
           <div>

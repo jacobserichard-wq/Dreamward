@@ -647,7 +647,7 @@ export default function EventDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <label htmlFor="ev-revenue" className={labelClasses}>
-                  Revenue (manual)
+                  Cash / other income (not from import)
                 </label>
                 <input
                   id="ev-revenue"
@@ -658,6 +658,9 @@ export default function EventDetailPage({ params }: PageProps) {
                   placeholder="$0"
                   className={inputClasses}
                 />
+                <p className="text-xs text-slate-500 m-0 mt-1">
+                  Income you received that isn&apos;t already in your imported data — added to import totals, not a replacement.
+                </p>
               </div>
             </div>
             <div>
