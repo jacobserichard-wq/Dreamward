@@ -416,6 +416,41 @@ export default function Home() {
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
+  // Phase 4: total business miles across all events. Sums totalMiles (the
+  // §8.2 conditional product computed in /api/events GET). availableEvents
+  // is already loaded for the upload event-selector (sub-session 17
+  // commit 6), so this reuses existing state — no additional fetch.
+  const totalBusinessMiles = availableEvents.reduce(
+    (sum, e) => sum + (typeof e.totalMiles === "number" ? e.totalMiles : 0),
+    0
+  );
+
+  // Phase 4: top expense categories by total amount. Roadmap item 6
+  // ("running totals by category") was unimplemented — sub-session 18
+  // recon found the dashboard breakdown rolls up by status only (design
+  // §8.7 → "add a category-level total"). Top 8 by total amount;
+  // omitted rows fall under an "Other" bucket if more than 8 distinct
+  // categories exist with non-zero totals.
+  const categoryStats = (() => {
+    const map = new Map<string, { count: number; total: number }>();
+    for (const item of processedItems) {
+      const c = (item.category || "Uncategorized").trim() || "Uncategorized";
+      const cur = map.get(c) ?? { count: 0, total: 0 };
+      map.set(c, { count: cur.count + 1, total: cur.total + (item.amount || 0) });
+    }
+    const sorted = Array.from(map.entries())
+      .map(([category, v]) => ({ category, count: v.count, total: v.total }))
+      .sort((a, b) => b.total - a.total);
+    const top = sorted.slice(0, 8);
+    const rest = sorted.slice(8);
+    if (rest.length === 0) return top;
+    const restAgg = rest.reduce(
+      (acc, r) => ({ count: acc.count + r.count, total: acc.total + r.total }),
+      { count: 0, total: 0 }
+    );
+    return [...top, { category: `Other (${rest.length})`, ...restAgg }];
+  })();
+
   // Count legacy umbrella-type items (pre-sub-session-11 classifications still
   // showing invoice/expense/ar_followup instead of industry-aware categories).
   // Drives the reclassify banner visibility + button label.
@@ -924,10 +959,25 @@ export default function Home() {
                 icon={"\u{1F3AF}"}
                 colorClass="border-t-violet-500"
               />
+              {/* Phase 4: Business miles stat — sums each event's
+                  §8.2 conditional total. Only renders when there's a
+                  non-zero figure (avoids "0 mi" noise for clients who
+                  haven't entered addresses yet). */}
+              {totalBusinessMiles > 0 && (
+                <StatCard
+                  label="Business Miles"
+                  value={`${totalBusinessMiles.toLocaleString("en-US", {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })} mi`}
+                  icon={"\u{1F697}"}
+                  colorClass="border-t-amber-500"
+                />
+              )}
             </div>
 
             {/* Status breakdown */}
-            <div>
+            <div className="mb-8">
               <h3 className="text-lg font-bold text-slate-900 mb-4">Status Breakdown</h3>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                 {[
@@ -947,6 +997,42 @@ export default function Home() {
                 ))}
               </div>
             </div>
+
+            {/* Phase 4: Top Categories breakdown — closes roadmap item 6
+                ("running totals by category"). Recon found the existing
+                Status Breakdown rolls up by status only, not category;
+                design §8.7 → add a category-level total. Top 8 by
+                summed amount; if >8 distinct categories exist with
+                non-zero totals, the overflow rolls into an "Other (N)"
+                bucket. Hidden when there's nothing to display. */}
+            {categoryStats.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Top Categories</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {categoryStats.map((cat) => (
+                    <div
+                      key={cat.category}
+                      className="bg-white rounded-[10px] py-3 px-5 flex items-center justify-between gap-3 border border-slate-200 border-l-4 border-l-slate-400"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900 m-0 truncate">
+                          {cat.category}
+                        </p>
+                        <p className="text-xs text-slate-500 m-0">
+                          {cat.count} {cat.count === 1 ? "item" : "items"}
+                        </p>
+                      </div>
+                      <p className="text-base font-bold text-slate-900 m-0 flex-shrink-0">
+                        ${cat.total.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {processedItems.length === 0 && (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
