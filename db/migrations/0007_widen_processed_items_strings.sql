@@ -1,0 +1,64 @@
+-- 0007_widen_processed_items_strings.sql
+-- Sub-session 19 follow-up. Widens three narrow VARCHAR(20) columns on
+-- processed_items to TEXT. Designed in this conversation after a user
+-- report: "Reclassify 15 legacy items" returned /api/reclassify 500 with
+-- "value too long for type character varying(20)" because category names
+-- from lib/categories.ts include 40 entries exceeding 20 characters
+-- (e.g., "Marketing & Advertising" at 23, "Packaging & Shipping
+-- Supplies" at 29, "Certifications & Continuing Education" at 37).
+--
+-- Pre-existing latent bug, NOT a Phase 5 regression. The processed_items
+-- table predates the migration folder entirely — no CREATE TABLE for it
+-- exists anywhere in db/migrations/. The VARCHAR(20) constraint was set
+-- on Railway directly during an earlier phase (probably the original
+-- schema creation, pre-sub-session 11's industry-aware taxonomy). The
+-- reclassify path was the first deliberate bulk write to push a long
+-- name through, which is why the bug surfaced now rather than during
+-- Phase 5. /api/process + /api/upload/confirm + the Phase 5 manual
+-- expense POST all share the same column and were similarly at risk
+-- (silent intermittent failures depending on which categories the AI
+-- or user chose).
+--
+-- Three columns affected, all VARCHAR(20) per information_schema:
+--   category — the active bug. Industry taxonomy has 40 names > 20 chars.
+--   status   — currently safe (values are "pending"/"overdue"/"paid"/
+--              "needs_review", longest is 13), but same latent trap if
+--              any new status value > 20 chars is ever added.
+--   source   — currently safe (values are "email"/"gmail"/"manual"),
+--              but same trap. Fixing all three together costs nothing.
+--
+-- ALTER COLUMN ... TYPE TEXT from VARCHAR(n) is a metadata-only
+-- operation in Postgres since v9.2 — no table rewrite, no full table
+-- lock, no risk on large tables. The conversion is "safe and trivial"
+-- per the Postgres docs because TEXT has no length constraint and
+-- VARCHAR has no internal padding (unlike CHAR(n)).
+--
+-- Other string columns on processed_items are already roomy and need
+-- no change (verified via information_schema): vendor VARCHAR(255),
+-- invoice_number VARCHAR(100), raw_email_id VARCHAR(255), summary
+-- TEXT, original_ai_category TEXT, ai_model TEXT.
+--
+-- Apply on Railway via the env-file-based runner (sub-session 19
+-- hardening — never paste the credential):
+--
+--   node --env-file=.env.local scripts/run-migration.mjs \
+--     db/migrations/0007_widen_processed_items_strings.sql
+--
+-- Verify with:
+--   SELECT column_name, data_type, character_maximum_length
+--     FROM information_schema.columns
+--    WHERE table_name = 'processed_items'
+--      AND column_name IN ('category', 'status', 'source');
+-- Expected: all three rows show data_type='text' and
+-- character_maximum_length=NULL.
+--
+-- Ordering hazard: NONE. This migration is purely additive (relaxes a
+-- constraint without changing data or contracts). Existing rows keep
+-- their short values; the change just allows new writes to be longer.
+-- Code that was already running continues to run; code that was
+-- failing intermittently (any path picking a long category name) now
+-- succeeds. Safe to deploy in either order with respect to app code.
+
+ALTER TABLE processed_items ALTER COLUMN category TYPE TEXT;
+ALTER TABLE processed_items ALTER COLUMN status   TYPE TEXT;
+ALTER TABLE processed_items ALTER COLUMN source   TYPE TEXT;
