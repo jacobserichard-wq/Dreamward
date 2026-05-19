@@ -28,6 +28,19 @@ interface LinkedTransactions {
   totalAmount: number;
 }
 
+// Per-event P&L slice from /api/profitability — see app/api/profitability/route.ts.
+// The endpoint returns an array of these; we pick the entry matching this event.
+interface ProfitabilityPerEvent {
+  id: number;
+  revenue: { total: number; manual: number; linked: number };
+  expenses: { total: number; linked: number; manual: number };
+  boothFee: number;
+  totalMiles: number | null;
+  mileageCost: number;
+  profit: number;
+  unknownAmount: number;
+}
+
 // Items in the editor carry strings for the input-control fields so the user
 // can type freely (incomplete numbers, "$" prefix, etc.). Parsed on save.
 interface ItemDraft {
@@ -66,6 +79,14 @@ export default function EventDetailPage({ params }: PageProps) {
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [linkedTx, setLinkedTx] = useState<LinkedTransactions | null>(null);
   const [totalMiles, setTotalMiles] = useState<number | null>(null);
+  // Phase 5 commit 6: per-event P&L breakdown sourced from /api/profitability.
+  // null until first fetch or if the endpoint returns no slice for this event.
+  // rateSource is the honesty flag — "fallback" means the IRS rate isn't from
+  // app_settings (migration 0006 hasn't run or row is missing); we render a
+  // visible notice so the breakdown number isn't taken as fully configured.
+  const [profitability, setProfitability] = useState<ProfitabilityPerEvent | null>(null);
+  const [irsMileageRate, setIrsMileageRate] = useState<number>(0.7);
+  const [rateSource, setRateSource] = useState<"config" | "fallback">("fallback");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -132,9 +153,15 @@ export default function EventDetailPage({ params }: PageProps) {
     // and their custom categories. Settings is optional — if it fails
     // we still render the event with reasonable defaults (industry =
     // "other", no custom categories).
-    const [eventRes, settingsRes] = await Promise.all([
+    //
+    // Phase 5 commit 6: also fetch /api/profitability for the P&L
+    // breakdown card. The endpoint returns an array of per-event slices
+    // for this client; we pick the entry whose id matches this event.
+    // Failure is non-fatal — the P&L card just doesn't render.
+    const [eventRes, settingsRes, profRes] = await Promise.all([
       fetch(`/api/events/${encodeURIComponent(rawId)}`),
       fetch("/api/settings"),
+      fetch("/api/profitability"),
     ]);
 
     if (eventRes.status === 401) {
@@ -180,6 +207,24 @@ export default function EventDetailPage({ params }: PageProps) {
         setCustomCategories(
           custom.filter((c): c is string => typeof c === "string")
         );
+      }
+    }
+
+    // Find this event's slice in the profitability response.
+    if (profRes.ok) {
+      const pData = (await profRes.json()) as {
+        perEvent?: ProfitabilityPerEvent[];
+        irsMileageRate?: number;
+        rateSource?: "config" | "fallback";
+      };
+      const eventIdNum = Number(rawId);
+      const slice = pData.perEvent?.find((e) => e.id === eventIdNum) ?? null;
+      setProfitability(slice);
+      if (typeof pData.irsMileageRate === "number") {
+        setIrsMileageRate(pData.irsMileageRate);
+      }
+      if (pData.rateSource === "config" || pData.rateSource === "fallback") {
+        setRateSource(pData.rateSource);
       }
     }
     setLoading(false);
@@ -552,38 +597,155 @@ export default function EventDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Linked uploads readout — the headline number (§5.4 / §8.1) */}
-        <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
-          <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
-            Sales from linked uploads
-          </p>
-          <p className="text-3xl font-bold text-slate-900 m-0 mb-1">
-            ${formatMoney(linkedTotal)}
-          </p>
-          <p className="text-sm text-slate-500 m-0">
-            across {linkedCount} {linkedCount === 1 ? "transaction" : "transactions"}
-          </p>
-          {(manualRevenue > 0 || itemsSum > 0) && (
-            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              {manualRevenue > 0 && (
-                <div>
-                  <span className="text-slate-500">Manual revenue: </span>
-                  <span className="font-semibold text-slate-700">
-                    ${formatMoney(manualRevenue)}
+        {/* Phase 5 commit 6: Profit & loss breakdown — the headline card.
+            Replaces the prior linked-uploads-only readout. Shows the full
+            P&L model from /api/profitability:
+              revenue (manual + linked income)
+              − booth fee
+              − expenses (linked + manual)
+              − mileage cost (total_miles × IRS rate)
+              = net profit
+            When the API hasn't loaded yet OR returns no slice for this
+            event, we fall through to a minimal headline that still shows
+            linked-upload total + count (the prior behavior). */}
+        {profitability ? (
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
+            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
+              Net profit
+            </p>
+            <p
+              className={`text-3xl font-bold m-0 mb-4 ${
+                profitability.profit >= 0 ? "text-slate-900" : "text-red-700"
+              }`}
+            >
+              {profitability.profit < 0 ? "−" : ""}${formatMoney(Math.abs(profitability.profit))}
+            </p>
+
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">
+                  Revenue
+                  <span className="text-xs text-slate-400 ml-2">
+                    {linkedCount > 0 && profitability.revenue.linked > 0 && (
+                      <>
+                        ${formatMoney(profitability.revenue.linked)} from {linkedCount}{" "}
+                        {linkedCount === 1 ? "linked txn" : "linked txns"}
+                      </>
+                    )}
+                    {profitability.revenue.manual > 0 && (
+                      <>
+                        {linkedCount > 0 && profitability.revenue.linked > 0 ? " + " : ""}
+                        ${formatMoney(profitability.revenue.manual)} manual
+                      </>
+                    )}
                   </span>
-                </div>
-              )}
-              {itemsSum > 0 && (
-                <div>
-                  <span className="text-slate-500">Line-item total: </span>
-                  <span className="font-semibold text-slate-700">
-                    ${formatMoney(itemsSum)}
+                </dt>
+                <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                  +${formatMoney(profitability.revenue.total)}
+                </dd>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">Booth fee</dt>
+                <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                  −${formatMoney(profitability.boothFee)}
+                </dd>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">
+                  Expenses
+                  <span className="text-xs text-slate-400 ml-2">
+                    {profitability.expenses.linked > 0 && (
+                      <>${formatMoney(profitability.expenses.linked)} linked</>
+                    )}
+                    {profitability.expenses.linked > 0 && profitability.expenses.manual > 0 && " + "}
+                    {profitability.expenses.manual > 0 && (
+                      <>${formatMoney(profitability.expenses.manual)} manual</>
+                    )}
                   </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                </dt>
+                <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                  −${formatMoney(profitability.expenses.total)}
+                </dd>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-600">
+                  Mileage cost
+                  {profitability.totalMiles !== null && (
+                    <span className="text-xs text-slate-400 ml-2">
+                      {profitability.totalMiles.toLocaleString("en-US", {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}{" "}
+                      mi × ${irsMileageRate.toFixed(2)}/mi
+                    </span>
+                  )}
+                </dt>
+                <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                  −${formatMoney(profitability.mileageCost)}
+                </dd>
+              </div>
+            </dl>
+
+            {/* Sub-session 19 user feedback: never let a fabricated default
+                value pass as configured. rateSource flag from the API
+                lights up this notice when the IRS rate isn't from
+                app_settings. */}
+            {rateSource === "fallback" && profitability.mileageCost > 0 && (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded mt-3 m-0">
+                Using default IRS mileage rate (${irsMileageRate.toFixed(2)}/mi). Configure it in{" "}
+                <a href="/settings" className="underline">
+                  Settings
+                </a>
+                .
+              </p>
+            )}
+            {profitability.unknownAmount !== 0 && (
+              <p className="text-xs text-slate-500 mt-3 m-0">
+                ${formatMoney(Math.abs(profitability.unknownAmount))} in uncategorized
+                transactions are excluded from this total. Set a category on each one to
+                include them.
+              </p>
+            )}
+          </div>
+        ) : (
+          /* Fallback headline while /api/profitability hasn't loaded or
+              returned no slice. Same data shape as the prior linked-uploads
+              card so the user always sees a useful headline. */
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
+            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
+              Sales from linked uploads
+            </p>
+            <p className="text-3xl font-bold text-slate-900 m-0 mb-1">
+              ${formatMoney(linkedTotal)}
+            </p>
+            <p className="text-sm text-slate-500 m-0">
+              across {linkedCount} {linkedCount === 1 ? "transaction" : "transactions"}
+            </p>
+            {(manualRevenue > 0 || itemsSum > 0) && (
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {manualRevenue > 0 && (
+                  <div>
+                    <span className="text-slate-500">Manual revenue: </span>
+                    <span className="font-semibold text-slate-700">
+                      ${formatMoney(manualRevenue)}
+                    </span>
+                  </div>
+                )}
+                {itemsSum > 0 && (
+                  <div>
+                    <span className="text-slate-500">Line-item total: </span>
+                    <span className="font-semibold text-slate-700">
+                      ${formatMoney(itemsSum)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Phase 4: Mileage card. Shows total miles for this event (the
             §8.2 conditional product computed by the API), the single
