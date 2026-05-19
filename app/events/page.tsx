@@ -132,12 +132,20 @@ export default function EventsPage() {
               ? "Add your first event to start tracking market days."
               : `${events.length} ${events.length === 1 ? "event" : "events"}`}
           </p>
-          <button
-            onClick={() => setShowCreateForm((prev) => !prev)}
-            className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold cursor-pointer"
-          >
-            {showCreateForm ? "Cancel" : "+ New event"}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/profitability"
+              className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
+            >
+              {"\u{1F4CA}"} Profitability
+            </Link>
+            <button
+              onClick={() => setShowCreateForm((prev) => !prev)}
+              className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold cursor-pointer"
+            >
+              {showCreateForm ? "Cancel" : "+ New event"}
+            </button>
+          </div>
         </div>
 
         {showCreateForm && (
