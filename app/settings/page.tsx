@@ -49,6 +49,29 @@ export default function SettingsPage() {
   const [hiddenDefaultsSaving, setHiddenDefaultsSaving] = useState(false);
   const [hiddenDefaultsSaved, setHiddenDefaultsSaved] = useState(false);
 
+  // Phase 5 commit 8: custom income categories. Parallel to the existing
+  // custom_categories (expense-typed). Without this list, a custom income
+  // category like "Wholesale Orders" would be subtracted from revenue as
+  // an expense in /api/profitability — fixed by Option 1 in sub-session 19.
+  // Persisted under preferences.custom_income_categories: string[].
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
+  const [savedIncomeCategories, setSavedIncomeCategories] = useState<string[]>([]);
+  const [newIncomeCategory, setNewIncomeCategory] = useState("");
+  const [incomeCatSaving, setIncomeCatSaving] = useState(false);
+  const [incomeCatSaved, setIncomeCatSaved] = useState(false);
+
+  // Phase 5 commit 8: IRS mileage rate edit. The rate is federal (one row
+  // in app_settings, not per-client) — any user editing it affects every
+  // tenant's mileage math. rateSource tells us whether the loaded value
+  // came from the table (config) or the API's hardcoded fallback (fallback)
+  // so we can label the indicator honestly.
+  const [irsRateInput, setIrsRateInput] = useState("");
+  const [savedIrsRate, setSavedIrsRate] = useState<number>(0.7);
+  const [irsRateSource, setIrsRateSource] = useState<"config" | "fallback">("fallback");
+  const [irsRateSaving, setIrsRateSaving] = useState(false);
+  const [irsRateSaved, setIrsRateSaved] = useState(false);
+  const [irsRateError, setIrsRateError] = useState<string | null>(null);
+
   const hiddenDefaultsDirty = useMemo(
     () =>
       JSON.stringify([...hiddenDefaults].sort()) !==
@@ -68,6 +91,22 @@ export default function SettingsPage() {
     () => homeAddress.trim() !== savedHomeAddress.trim(),
     [homeAddress, savedHomeAddress]
   );
+  const incomeCategoriesDirty = useMemo(
+    () =>
+      JSON.stringify([...incomeCategories].sort()) !==
+      JSON.stringify([...savedIncomeCategories].sort()),
+    [incomeCategories, savedIncomeCategories]
+  );
+  // IRS rate dirty when parsed input differs from saved value. Empty input
+  // is treated as "no change" rather than 0 so accidentally clearing the
+  // field doesn't enable the save button on garbage.
+  const irsRateDirty = useMemo(() => {
+    const trimmed = irsRateInput.trim();
+    if (trimmed === "") return false;
+    const num = Number(trimmed);
+    if (!Number.isFinite(num)) return false;
+    return Math.abs(num - savedIrsRate) > 1e-6;
+  }, [irsRateInput, savedIrsRate]);
 
   useEffect(() => {
     async function load() {
@@ -92,6 +131,11 @@ export default function SettingsPage() {
               (v): v is string => typeof v === "string"
             )
           : [];
+        const initialIncomeCategories = Array.isArray(rawPrefs.custom_income_categories)
+          ? (rawPrefs.custom_income_categories as unknown[]).filter(
+              (v): v is string => typeof v === "string"
+            )
+          : [];
         setActiveModules(initialModules);
         setCategories(initialCategories);
         setSavedModules(initialModules);
@@ -101,6 +145,17 @@ export default function SettingsPage() {
         setPreferences(rawPrefs);
         setHiddenDefaults(initialHiddenDefaults);
         setSavedHiddenDefaults(initialHiddenDefaults);
+        setIncomeCategories(initialIncomeCategories);
+        setSavedIncomeCategories(initialIncomeCategories);
+        // Phase 5 commit 8: IRS rate is global, so it comes back on the
+        // top-level response (not nested under settings.preferences).
+        if (typeof data.irsMileageRate === "number") {
+          setSavedIrsRate(data.irsMileageRate);
+          setIrsRateInput(data.irsMileageRate.toString());
+        }
+        if (data.rateSource === "config" || data.rateSource === "fallback") {
+          setIrsRateSource(data.rateSource);
+        }
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -115,7 +170,9 @@ export default function SettingsPage() {
       !modulesDirty &&
       !categoriesDirty &&
       !homeAddressDirty &&
-      !hiddenDefaultsDirty
+      !hiddenDefaultsDirty &&
+      !incomeCategoriesDirty &&
+      !irsRateDirty
     )
       return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -124,7 +181,14 @@ export default function SettingsPage() {
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [modulesDirty, categoriesDirty, homeAddressDirty, hiddenDefaultsDirty]);
+  }, [
+    modulesDirty,
+    categoriesDirty,
+    homeAddressDirty,
+    hiddenDefaultsDirty,
+    incomeCategoriesDirty,
+    irsRateDirty,
+  ]);
 
   const toggleModule = (moduleId: string) => {
     setActiveModules((prev) =>
@@ -229,6 +293,87 @@ export default function SettingsPage() {
       console.error("Save failed:", err);
     } finally {
       setHiddenDefaultsSaving(false);
+    }
+  };
+
+  // Phase 5 commit 8: income-category handlers + save. Same pattern as
+  // expense categories, but persisted under preferences.custom_income_categories
+  // (the design decision from sub-session 19).
+  const addIncomeCategory = () => {
+    const trimmed = newIncomeCategory.trim();
+    if (!trimmed) return;
+    if (incomeCategories.includes(trimmed)) return;
+    setIncomeCategories((prev) => [...prev, trimmed]);
+    setNewIncomeCategory("");
+    setIncomeCatSaved(false);
+  };
+
+  const removeIncomeCategory = (cat: string) => {
+    setIncomeCategories((prev) => prev.filter((c) => c !== cat));
+    setIncomeCatSaved(false);
+  };
+
+  const saveIncomeCategories = async () => {
+    setIncomeCatSaving(true);
+    const toSave = [...incomeCategories];
+    const newPreferences = { ...preferences, custom_income_categories: toSave };
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (res.ok) {
+        setPreferences(newPreferences);
+        setSavedIncomeCategories(toSave);
+        setIncomeCatSaved(true);
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setIncomeCatSaving(false);
+    }
+  };
+
+  // Phase 5 commit 8: save IRS mileage rate. Validates inline before the
+  // round-trip so the user gets specific feedback. The API re-validates
+  // (sanity ceiling 10/mi). On success, rateSource flips to "config" — a
+  // configured value is now in the table.
+  const saveIrsRate = async () => {
+    setIrsRateError(null);
+    const trimmed = irsRateInput.trim().replace(/^\$/, "");
+    const rate = Number(trimmed);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      setIrsRateError("Rate must be a positive number (dollars per mile).");
+      return;
+    }
+    if (rate > 10) {
+      setIrsRateError("Rate looks too high — did you mean dollars per mile?");
+      return;
+    }
+    setIrsRateSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ irsMileageRate: rate }),
+      });
+      if (res.ok) {
+        setSavedIrsRate(rate);
+        setIrsRateSource("config");
+        setIrsRateSaved(true);
+      } else {
+        const data = await res.json().catch(() => null);
+        const msg =
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : `Couldn't save (HTTP ${res.status})`;
+        setIrsRateError(msg);
+      }
+    } catch (err) {
+      setIrsRateError(err instanceof Error ? err.message : "Couldn't save");
+    } finally {
+      setIrsRateSaving(false);
     }
   };
 
@@ -362,11 +507,17 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Expense Categories */}
+        {/* Categories — expense + income. The industry defaults block
+            inside this section shows both types (categories carry a
+            `type` field in lib/categories.ts); the two pill subsections
+            below are user-added customs, one for each direction.
+            Phase 5 commit 8 added the income subsection — without it,
+            a custom income category like "Wholesale Orders" was
+            subtracted from revenue as an expense by /api/profitability. */}
         <div className="mb-10">
           <div className="mb-5">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Expense Categories</h2>
-            <p className="text-sm text-slate-500 m-0">Customize how your expenses are organized</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Categories</h2>
+            <p className="text-sm text-slate-500 m-0">Customize how your expenses and income are organized</p>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
@@ -452,19 +603,19 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <p className="text-xs text-slate-500 mb-2">Your additions:</p>
+            <p className="text-xs text-slate-700 font-semibold mb-2 mt-2">Custom expense categories</p>
             <div className="flex flex-wrap gap-2 mb-4">
               {categories.length === 0 && (
                 <span className="text-[13px] text-slate-400 italic">
-                  No custom categories yet — add one below.
+                  No custom expense categories yet — add one below.
                 </span>
               )}
               {categories.map((cat) => (
                 <div
                   key={cat}
-                  className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-[20px] py-1.5 px-3"
+                  className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-[20px] py-1.5 px-3"
                 >
-                  <span className="text-[13px] font-medium text-green-800">{cat}</span>
+                  <span className="text-[13px] font-medium text-red-800">{cat}</span>
                   <button
                     onClick={() => removeCategory(cat)}
                     title="Remove category"
@@ -481,7 +632,7 @@ export default function SettingsPage() {
                 type="text"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="Add new category..."
+                placeholder="Add new expense category..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter") addCategory();
                 }}
@@ -495,7 +646,7 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
               <button
                 onClick={saveCategories}
                 disabled={catSaving || !categoriesDirty}
@@ -503,7 +654,7 @@ export default function SettingsPage() {
                   categoriesDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
                 } ${catSaving ? "opacity-50" : ""}`}
               >
-                {catSaving ? "Saving..." : "Save categories"}
+                {catSaving ? "Saving..." : "Save expense categories"}
               </button>
               {categoriesDirty && <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>}
               {!categoriesDirty && catSaved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
@@ -511,8 +662,78 @@ export default function SettingsPage() {
                 onClick={clearCustomCategories}
                 className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-[13px] text-slate-500"
               >
-                Clear custom categories
+                Clear
               </button>
+            </div>
+
+            {/* Phase 5 commit 8: custom income categories. Persisted under
+                preferences.custom_income_categories. Green pills to mirror
+                the visual income/expense distinction used elsewhere. */}
+            <p className="text-xs text-slate-700 font-semibold mb-2 pt-4 border-t border-slate-100">
+              Custom income categories
+            </p>
+            <p className="text-xs text-slate-500 mb-2 m-0">
+              Categories that count as <strong>income</strong> in your profit & loss
+              (e.g. &quot;Wholesale orders&quot;, &quot;Workshop fees&quot;).
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4 mt-2">
+              {incomeCategories.length === 0 && (
+                <span className="text-[13px] text-slate-400 italic">
+                  No custom income categories yet — add one below.
+                </span>
+              )}
+              {incomeCategories.map((cat) => (
+                <div
+                  key={cat}
+                  className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-[20px] py-1.5 px-3"
+                >
+                  <span className="text-[13px] font-medium text-green-800">{cat}</span>
+                  <button
+                    onClick={() => removeIncomeCategory(cat)}
+                    title="Remove category"
+                    className="bg-transparent border-0 cursor-pointer text-xs text-slate-400 px-0.5 py-0 leading-none"
+                  >
+                    {"✕"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newIncomeCategory}
+                onChange={(e) => setNewIncomeCategory(e.target.value)}
+                placeholder="Add new income category..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addIncomeCategory();
+                }}
+                className="flex-1 py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border"
+              />
+              <button
+                onClick={addIncomeCategory}
+                className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white cursor-pointer text-sm font-medium text-slate-700"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveIncomeCategories}
+                disabled={incomeCatSaving || !incomeCategoriesDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  incomeCategoriesDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${incomeCatSaving ? "opacity-50" : ""}`}
+              >
+                {incomeCatSaving ? "Saving..." : "Save income categories"}
+              </button>
+              {incomeCategoriesDirty && (
+                <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>
+              )}
+              {!incomeCategoriesDirty && incomeCatSaved && (
+                <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>
+              )}
             </div>
           </div>
         </div>
@@ -565,6 +786,81 @@ export default function SettingsPage() {
                 {"\u{1F697}"} {homeAddressRecomputeMsg}
               </p>
             )}
+          </div>
+        </div>
+
+        {/* Phase 5 commit 8: IRS mileage rate edit. The rate is federal
+            (one value across the entire app, in app_settings) — editing it
+            changes mileage math for every tenant. The visible indicator
+            tells the user when the stored value is the hardcoded fallback
+            vs. a configured row. */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">IRS mileage rate</h2>
+            <p className="text-sm text-slate-500 m-0">
+              The standard mileage rate ({"$"}per mile) the IRS publishes each
+              year for business driving. Used to compute the mileage-cost line on
+              each event&apos;s profit & loss.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {irsRateSource === "fallback" && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4 text-sm">
+                <strong>Using default rate</strong> (${savedIrsRate.toFixed(2)}/mi).
+                No configured value found — save below to make this the configured
+                rate.
+              </div>
+            )}
+            {irsRateSource === "config" && (
+              <p className="text-xs text-slate-500 m-0 mb-3">
+                Currently configured: <strong>${savedIrsRate.toFixed(2)}/mi</strong>
+              </p>
+            )}
+
+            {irsRateError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
+                {irsRateError}
+              </div>
+            )}
+
+            <label htmlFor="settings-irs-rate" className="block text-sm font-medium text-slate-700 mb-1">
+              Rate (dollars per mile)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                id="settings-irs-rate"
+                type="text"
+                inputMode="decimal"
+                value={irsRateInput}
+                onChange={(e) => {
+                  setIrsRateInput(e.target.value);
+                  setIrsRateSaved(false);
+                  setIrsRateError(null);
+                }}
+                placeholder="0.70"
+                className="w-32 py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+              <button
+                onClick={saveIrsRate}
+                disabled={irsRateSaving || !irsRateDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  irsRateDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${irsRateSaving ? "opacity-50" : ""}`}
+              >
+                {irsRateSaving ? "Saving..." : "Save rate"}
+              </button>
+              {irsRateDirty && (
+                <span className="text-sm text-amber-600 font-medium self-center">Unsaved changes</span>
+              )}
+              {!irsRateDirty && irsRateSaved && (
+                <span className="text-sm text-green-600 font-medium self-center">{"✓ Saved"}</span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 m-0">
+              The IRS publishes one figure per year. Changing this updates the rate
+              everywhere FlowWork computes mileage costs.
+            </p>
           </div>
         </div>
 
