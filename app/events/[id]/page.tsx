@@ -596,6 +596,34 @@ export default function EventDetailPage({ params }: PageProps) {
   const linkedTotal = linkedTx?.totalAmount ?? 0;
   const linkedCount = linkedTx?.count ?? 0;
 
+  // Phase 5 follow-up bug fix #2: P&L card always renders. When
+  // /api/profitability is dark (failing, slow, or returned no slice for
+  // this event), derive a local-shaped estimate from the event fields
+  // we already have on the page — no silent fallthrough to outdated
+  // copy. Treats linked transactions as revenue in the local case,
+  // matching the prior "Sales from linked uploads" card's assumed-
+  // income behavior; classifying income-vs-expense requires the API's
+  // industry-aware splitter. Local-mode net profit therefore doesn't
+  // subtract any linked expenses (we can't see them yet); the
+  // "showing local estimate" notice surfaces the limitation honestly.
+  const pnlSource: "api" | "local" = profitability ? "api" : "local";
+  const localMileageCost =
+    totalMiles !== null ? totalMiles * irsMileageRate : 0;
+  const pnl = profitability ?? {
+    revenue: {
+      total: manualRevenue + linkedTotal,
+      manual: manualRevenue,
+      linked: linkedTotal,
+    },
+    expenses: { total: 0, linked: 0, manual: 0 },
+    boothFee: event.boothFee,
+    totalMiles,
+    mileageCost: localMileageCost,
+    profit:
+      manualRevenue + linkedTotal - event.boothFee - localMileageCost,
+    unknownAmount: 0,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
@@ -613,155 +641,145 @@ export default function EventDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Phase 5 commit 6: Profit & loss breakdown — the headline card.
-            Replaces the prior linked-uploads-only readout. Shows the full
-            P&L model from /api/profitability:
-              revenue (manual + linked income)
-              − booth fee
-              − expenses (linked + manual)
-              − mileage cost (total_miles × IRS rate)
-              = net profit
-            When the API hasn't loaded yet OR returns no slice for this
-            event, we fall through to a minimal headline that still shows
-            linked-upload total + count (the prior behavior). */}
-        {profitability ? (
-          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
-            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
-              Net profit
-            </p>
-            <p
-              className={`text-3xl font-bold m-0 mb-4 ${
-                profitability.profit >= 0 ? "text-slate-900" : "text-red-700"
-              }`}
-            >
-              {profitability.profit < 0 ? "−" : ""}${formatMoney(Math.abs(profitability.profit))}
-            </p>
+        {/* Phase 5 commit 6 + follow-up: Profit & loss breakdown — the
+            headline card. Always renders. When /api/profitability is
+            dark, the `pnl` derivation falls back to a local estimate
+            built from event.revenue (manual), linkedTx, event.boothFee,
+            and totalMiles — the page already has all of these from
+            /api/events/[id]. The notice below tells the user when the
+            shown breakdown is the local estimate vs. the enriched
+            API-classified version. No silent fallthrough to outdated
+            copy: same shape, less enriched. */}
+        <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
+          <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
+            Net profit
+          </p>
+          <p
+            className={`text-3xl font-bold m-0 mb-4 ${
+              pnl.profit >= 0 ? "text-slate-900" : "text-red-700"
+            }`}
+          >
+            {pnl.profit < 0 ? "−" : ""}${formatMoney(Math.abs(pnl.profit))}
+          </p>
 
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">
-                  Revenue
-                  <span className="text-xs text-slate-400 ml-2">
-                    {linkedCount > 0 && profitability.revenue.linked > 0 && (
-                      <>
-                        ${formatMoney(profitability.revenue.linked)} from {linkedCount}{" "}
-                        {linkedCount === 1 ? "linked txn" : "linked txns"}
-                      </>
-                    )}
-                    {profitability.revenue.manual > 0 && (
-                      <>
-                        {linkedCount > 0 && profitability.revenue.linked > 0 ? " + " : ""}
-                        ${formatMoney(profitability.revenue.manual)} manual
-                      </>
-                    )}
-                  </span>
-                </dt>
-                <dd className="font-semibold text-slate-900 whitespace-nowrap">
-                  +${formatMoney(profitability.revenue.total)}
-                </dd>
-              </div>
-
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">Booth fee</dt>
-                <dd className="font-semibold text-slate-900 whitespace-nowrap">
-                  −${formatMoney(profitability.boothFee)}
-                </dd>
-              </div>
-
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">
-                  Expenses
-                  <span className="text-xs text-slate-400 ml-2">
-                    {profitability.expenses.linked > 0 && (
-                      <>${formatMoney(profitability.expenses.linked)} linked</>
-                    )}
-                    {profitability.expenses.linked > 0 && profitability.expenses.manual > 0 && " + "}
-                    {profitability.expenses.manual > 0 && (
-                      <>${formatMoney(profitability.expenses.manual)} manual</>
-                    )}
-                  </span>
-                </dt>
-                <dd className="font-semibold text-slate-900 whitespace-nowrap">
-                  −${formatMoney(profitability.expenses.total)}
-                </dd>
-              </div>
-
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">
-                  Mileage cost
-                  {profitability.totalMiles !== null && (
-                    <span className="text-xs text-slate-400 ml-2">
-                      {profitability.totalMiles.toLocaleString("en-US", {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}{" "}
-                      mi × ${irsMileageRate.toFixed(2)}/mi
-                    </span>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-600">
+                Revenue
+                <span className="text-xs text-slate-400 ml-2">
+                  {linkedCount > 0 && pnl.revenue.linked > 0 && (
+                    <>
+                      ${formatMoney(pnl.revenue.linked)} from {linkedCount}{" "}
+                      {linkedCount === 1 ? "linked txn" : "linked txns"}
+                    </>
                   )}
-                </dt>
-                <dd className="font-semibold text-slate-900 whitespace-nowrap">
-                  −${formatMoney(profitability.mileageCost)}
-                </dd>
-              </div>
-            </dl>
+                  {pnl.revenue.manual > 0 && (
+                    <>
+                      {linkedCount > 0 && pnl.revenue.linked > 0 ? " + " : ""}
+                      ${formatMoney(pnl.revenue.manual)} manual
+                    </>
+                  )}
+                </span>
+              </dt>
+              <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                +${formatMoney(pnl.revenue.total)}
+              </dd>
+            </div>
 
-            {/* Sub-session 19 user feedback: never let a fabricated default
-                value pass as configured. rateSource flag from the API
-                lights up this notice when the IRS rate isn't from
-                app_settings. */}
-            {rateSource === "fallback" && profitability.mileageCost > 0 && (
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded mt-3 m-0">
-                Using default IRS mileage rate (${irsMileageRate.toFixed(2)}/mi). Configure it in{" "}
-                <a href="/settings" className="underline">
-                  Settings
-                </a>
-                .
-              </p>
-            )}
-            {profitability.unknownAmount !== 0 && (
-              <p className="text-xs text-slate-500 mt-3 m-0">
-                ${formatMoney(Math.abs(profitability.unknownAmount))} in uncategorized
-                transactions are excluded from this total. Set a category on each one to
-                include them.
-              </p>
-            )}
-          </div>
-        ) : (
-          /* Fallback headline while /api/profitability hasn't loaded or
-              returned no slice. Same data shape as the prior linked-uploads
-              card so the user always sees a useful headline. */
-          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
-            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-2">
-              Sales from linked uploads
-            </p>
-            <p className="text-3xl font-bold text-slate-900 m-0 mb-1">
-              ${formatMoney(linkedTotal)}
-            </p>
-            <p className="text-sm text-slate-500 m-0">
-              across {linkedCount} {linkedCount === 1 ? "transaction" : "transactions"}
-            </p>
-            {(manualRevenue > 0 || itemsSum > 0) && (
-              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                {manualRevenue > 0 && (
-                  <div>
-                    <span className="text-slate-500">Manual revenue: </span>
-                    <span className="font-semibold text-slate-700">
-                      ${formatMoney(manualRevenue)}
-                    </span>
-                  </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-600">Booth fee</dt>
+              <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                −${formatMoney(pnl.boothFee)}
+              </dd>
+            </div>
+
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-600">
+                Expenses
+                {pnlSource === "api" && (
+                  <span className="text-xs text-slate-400 ml-2">
+                    {pnl.expenses.linked > 0 && (
+                      <>${formatMoney(pnl.expenses.linked)} linked</>
+                    )}
+                    {pnl.expenses.linked > 0 && pnl.expenses.manual > 0 && " + "}
+                    {pnl.expenses.manual > 0 && (
+                      <>${formatMoney(pnl.expenses.manual)} manual</>
+                    )}
+                  </span>
                 )}
-                {itemsSum > 0 && (
-                  <div>
-                    <span className="text-slate-500">Line-item total: </span>
-                    <span className="font-semibold text-slate-700">
-                      ${formatMoney(itemsSum)}
-                    </span>
-                  </div>
+                {pnlSource === "local" && (
+                  <span className="text-xs text-slate-400 ml-2">
+                    not classified yet
+                  </span>
                 )}
-              </div>
-            )}
-          </div>
-        )}
+              </dt>
+              <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                −${formatMoney(pnl.expenses.total)}
+              </dd>
+            </div>
+
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-600">
+                Mileage cost
+                {pnl.totalMiles !== null && (
+                  <span className="text-xs text-slate-400 ml-2">
+                    {pnl.totalMiles.toLocaleString("en-US", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}{" "}
+                    mi × ${irsMileageRate.toFixed(2)}/mi
+                  </span>
+                )}
+              </dt>
+              <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                −${formatMoney(pnl.mileageCost)}
+              </dd>
+            </div>
+          </dl>
+
+          {/* Local-mode notice: the breakdown isn't enriched. The user
+              gets honest numbers but without the income/expense split
+              on linked transactions or the unknown-amount surfacing. */}
+          {pnlSource === "local" && (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-2 rounded mt-3 m-0">
+              {"\u{2139}\u{FE0F}"} Showing local estimate. Linked transactions
+              count as revenue here; the enriched breakdown (with
+              income/expense classification) loads from /api/profitability.
+              If this notice persists, the dashboard endpoint may be
+              unreachable.
+            </p>
+          )}
+          {/* Sub-session 19 user feedback: never let a fabricated default
+              value pass as configured. rateSource flag from the API
+              lights up this notice when the IRS rate isn't from
+              app_settings. Only shows in API mode — in local mode we
+              don't have a real rate source to compare against. */}
+          {pnlSource === "api" && rateSource === "fallback" && pnl.mileageCost > 0 && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded mt-3 m-0">
+              Using default IRS mileage rate (${irsMileageRate.toFixed(2)}/mi). Configure it in{" "}
+              <a href="/settings" className="underline">
+                Settings
+              </a>
+              .
+            </p>
+          )}
+          {pnlSource === "api" && pnl.unknownAmount !== 0 && (
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              ${formatMoney(Math.abs(pnl.unknownAmount))} in uncategorized
+              transactions are excluded from this total. Set a category on each one to
+              include them.
+            </p>
+          )}
+          {/* Items sum surfaces the line-item total when present, since
+              it's not folded into revenue (line items are a sales-log
+              tool, not a separate revenue source). Mirrors the prior
+              card's secondary line. */}
+          {itemsSum > 0 && (
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              Line-item total: <span className="font-semibold text-slate-700">${formatMoney(itemsSum)}</span> across {items.length} {items.length === 1 ? "item" : "items"}.
+            </p>
+          )}
+        </div>
 
         {/* Phase 4: Mileage card. Shows total miles for this event (the
             §8.2 conditional product computed by the API), the single
