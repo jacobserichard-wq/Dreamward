@@ -1,4 +1,26 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
+
+// Phase 5 follow-up bug fix: by default pg parses Postgres DATE (OID
+// 1082) into a JavaScript Date object using server-local midnight,
+// which JSON.stringify then serializes as a full ISO timestamp like
+// "2026-05-19T05:00:00.000Z" (offset from midnight by the server tz).
+// The event detail page's `<input type="date">` rejects that format
+// outright and renders blank, wiping the date on every save round-
+// trip; the profitability dashboard's monthly trend keys off slice(0,7)
+// which can shift to the wrong month with tz drift; market tables show
+// the ugly timestamp string directly to the user.
+//
+// Override the DATE parser to pass values through unchanged — pg hands
+// us the raw "YYYY-MM-DD" string from the wire. Latent since
+// sub-session 16 (Phase 3 commit 1 introduced the events tables); only
+// just surfaced because the round-trip-save flow wasn't being exercised
+// thoroughly before Phase 5 work added the dashboard derivations.
+//
+// TIMESTAMPTZ (OID 1184) stays on the default parser — downstream code
+// wraps timestamp values in `new Date(...)` which handles both Date
+// objects and ISO strings, so there's no comparable break and no need
+// to touch it.
+types.setTypeParser(1082, (val) => val);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
