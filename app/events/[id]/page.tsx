@@ -101,6 +101,13 @@ export default function EventDetailPage({ params }: PageProps) {
   // load — see loadEvent below.
   const [clientIndustry, setClientIndustry] = useState<Industry>("other");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+  // Phase 5 follow-up bug fix: home address is needed to disambiguate
+  // the Mileage card's empty state. The prior conditional inferred
+  // "home address missing" from totalMiles===null + event.address set,
+  // which was wrong when round_trip_miles was null due to a maps-API
+  // failure rather than a missing address. /api/settings already
+  // returns homeAddress; the prior code just discarded it.
+  const [clientHomeAddress, setClientHomeAddress] = useState<string | null>(null);
 
   // Phase 5 commit 4: manual-expense form state.
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -198,6 +205,7 @@ export default function EventDetailPage({ params }: PageProps) {
       const sData = (await settingsRes.json()) as {
         industry?: string;
         settings?: { custom_categories?: unknown };
+        homeAddress?: string | null;
       };
       if (typeof sData.industry === "string") {
         setClientIndustry(sData.industry as Industry);
@@ -208,6 +216,14 @@ export default function EventDetailPage({ params }: PageProps) {
           custom.filter((c): c is string => typeof c === "string")
         );
       }
+      // homeAddress can come back as null when the user hasn't set one.
+      // Trim + empty-string → null so downstream truthy checks behave.
+      const rawHome = sData.homeAddress;
+      const home =
+        typeof rawHome === "string" && rawHome.trim().length > 0
+          ? rawHome.trim()
+          : null;
+      setClientHomeAddress(home);
     }
 
     // Find this event's slice in the profitability response.
@@ -750,12 +766,30 @@ export default function EventDetailPage({ params }: PageProps) {
         {/* Phase 4: Mileage card. Shows total miles for this event (the
             §8.2 conditional product computed by the API), the single
             round-trip distance, when it was computed, and a Recalculate
-            affordance. When no address yet OR no home address yet, shows
-            a gentle prompt (no dead ends — design §5). */}
+            affordance.
+
+            Empty-state branching (Phase 5 follow-up fix): the prior
+            conditional inferred "home address missing" from
+            totalMiles===null + event.address set, which lied when
+            round_trip_miles was null due to a maps-API failure rather
+            than a missing field. Now three real cases:
+
+              1. !event.address                  → "Add an address below"
+              2. !clientHomeAddress              → "Add home address in Settings"
+              3. both set + miles still null     → maps API failed; offer
+                                                   Recalculate as retry
+
+            Recalculate is visible in case 3 as the explicit diagnostic
+            for "is the maps API the real problem". Previously it only
+            rendered when miles already existed, which meant zero way
+            to retry from the failure state. */}
         <div className="bg-white rounded-xl border border-slate-200 py-5 px-6 mb-6">
           <div className="flex justify-between items-start gap-3 mb-3 flex-wrap">
             <h2 className="text-lg font-bold text-slate-900 m-0">Mileage</h2>
-            {event.address && event.roundTripMiles !== null && (
+            {/* Show Recalculate whenever both addresses are set — i.e.,
+                whenever a retry could meaningfully succeed. Includes the
+                miles-already-exist case AND the failure-state case. */}
+            {event.address && clientHomeAddress && (
               <button
                 type="button"
                 onClick={handleRecalculate}
@@ -803,13 +837,20 @@ export default function EventDetailPage({ params }: PageProps) {
             <p className="text-sm text-slate-500 m-0">
               Add an address below to calculate driving mileage for this event.
             </p>
-          ) : (
+          ) : !clientHomeAddress ? (
             <p className="text-sm text-slate-500 m-0">
               {"\u{1F697}"} Add your home address in{" "}
               <a href="/settings" className="text-blue-600 no-underline">
                 Settings
               </a>{" "}
               to see mileage for this event.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 m-0">
+              {"\u{26A0}\u{FE0F}"} Mileage couldn&apos;t be computed for this
+              event. Click <strong>Recalculate</strong> above to try again — if
+              it keeps failing, the Google Maps API may be unconfigured or one
+              of the addresses didn&apos;t geocode.
             </p>
           )}
         </div>
