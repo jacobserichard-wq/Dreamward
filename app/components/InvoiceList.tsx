@@ -4,9 +4,11 @@
 // Pure-presentational. Page owns the data + filter state; this
 // component just renders. Row click navigates to /invoices/[id].
 //
-// Send-reminder action is NOT in this commit — commit 8 (email
-// template + reminder send route) adds the button column and wires
-// the POST /api/invoices/[id]/reminder call.
+// Send Reminder column on each row delegates to the parent's
+// onSendReminder callback. Disabled-state logic (no email /
+// cooldown / cap / terminal status) lives in reminderDisabledReason
+// below — kept in sync with the server-side guards in
+// app/api/invoices/[id]/reminder/route.ts.
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";

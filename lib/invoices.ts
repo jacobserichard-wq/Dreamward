@@ -107,8 +107,12 @@ export function deriveStatus(
   if (currentStatus === "written_off") return "written_off";
   const total = Number(amountTotal);
   const paid = Number(amountPaid);
-  if (paid <= 0) return "open";
-  if (paid >= total) return "paid";
+  // 1e-9 fuzz mirrors recordPayment's overpayment check: an exact-payoff
+  // can drift to paid=$99.9999... in JS Number arithmetic even when pg
+  // NUMERIC stored $100.00 cleanly. Without fuzz, the exact-payoff case
+  // resolves 'partial' instead of 'paid' — invariant violated.
+  if (paid <= 1e-9) return "open";
+  if (paid >= total - 1e-9) return "paid";
   return "partial";
 }
 

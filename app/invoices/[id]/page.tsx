@@ -14,10 +14,11 @@ import type { AgingBucket } from "@/lib/aging";
 // Phase 6 invoice detail page. Mirror of /events/[id] in shape:
 //   - Top: invoice metadata (read-only with [Edit] toggle to inline form)
 //   - Middle: payments history table + record-payment form
+//   - Reminders: last-sent + count + Send button (24h cooldown, 6 cap)
 //   - Bottom: danger zone (Mark as written off, Delete invoice)
 //
-// Reminder section is scaffolded for commit 8 (lib/email arReminderEmail
-// + POST /api/invoices/[id]/reminder). Not in this commit.
+// The Reminders section calls POST /api/invoices/[id]/reminder which
+// sends via Resend with Reply-To = the user's session email.
 
 interface InvoiceDetail {
   id: number;

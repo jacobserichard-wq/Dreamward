@@ -361,87 +361,104 @@ export async function PATCH(
       }
     }
 
-    // If amount_total is changing, re-derive status from the new total
-    // vs. the existing amount_paid (and reject the change if the new
-    // total would leave the invoice overpaid — that's a separate
-    // editorial decision the user should make explicitly).
-    if (newAmountTotal !== undefined) {
-      const currentResult = await pool.query<InvoiceRow>(
-        `SELECT amount_paid, status FROM invoices
-          WHERE id = $1 AND client_id = $2`,
-        [invoiceId, client.id]
+    setClauses.push(`updated_at = NOW()`);
+
+    // Transaction-wrap the amount_total reconciliation + UPDATE so the
+    // existingPaid read and the UPDATE write happen atomically against
+    // concurrent recordPayment / deletePayment writes (which also use
+    // SELECT ... FOR UPDATE on the same row). Without this lock, a TOC-
+    // TTOU race could pass the overpayment-guard validation here while
+    // a parallel payment write moves amount_paid past the new
+    // amount_total — leaving amount_paid > amount_total post-commit.
+    // Identified during the sub-session 20 pre-push audit
+    // (session-notes/audit-phase-6-ar-prebuild-review.md SHIP-FIX #1).
+    const dbClient = await pool.connect();
+    try {
+      await dbClient.query("BEGIN");
+
+      if (newAmountTotal !== undefined) {
+        const currentResult = await dbClient.query<InvoiceRow>(
+          `SELECT amount_paid, status FROM invoices
+            WHERE id = $1 AND client_id = $2
+            FOR UPDATE`,
+          [invoiceId, client.id]
+        );
+        if (currentResult.rows.length === 0) {
+          await dbClient.query("ROLLBACK");
+          return NextResponse.json(
+            { error: "Invoice not found" },
+            { status: 404 }
+          );
+        }
+        const existingPaid = Number(currentResult.rows[0].amount_paid);
+        if (newAmountTotal < existingPaid - 1e-9) {
+          await dbClient.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: `amountTotal (${newAmountTotal}) cannot be less than ` +
+                `amount already paid (${existingPaid}). Delete payments first ` +
+                `or write off the difference.`,
+            },
+            { status: 400 }
+          );
+        }
+        // Re-derive status from (newTotal, existingPaid, currentStatus).
+        // If the caller ALSO sent explicit status, theirs wins for the
+        // non-derived ones (written_off); the derived ones (open/partial/paid)
+        // come from the math.
+        if (explicitStatus !== "written_off") {
+          const derived = deriveStatus(
+            newAmountTotal,
+            existingPaid,
+            currentResult.rows[0].status as InvoiceStatus
+          );
+          // Find and overwrite the status clause if it was already pushed;
+          // otherwise append a new one.
+          const statusIdx = setClauses.findIndex((c) =>
+            c.startsWith("status = ")
+          );
+          if (statusIdx >= 0) {
+            // Overwrite the existing setClause/value with the derived
+            // status. The placeholder index is preserved in the SQL, so we
+            // just swap the value at the same array index.
+            const placeholderMatch = setClauses[statusIdx].match(/\$(\d+)/);
+            if (placeholderMatch) {
+              const placeholderIdx = Number(placeholderMatch[1]) - 1;
+              values[placeholderIdx] = derived;
+            }
+          } else {
+            setClauses.push(`status = $${i++}`);
+            values.push(derived);
+          }
+        }
+      }
+
+      const result = await dbClient.query<InvoiceRow>(
+        `UPDATE invoices
+            SET ${setClauses.join(", ")}
+          WHERE id = $${i++} AND client_id = $${i++}
+        RETURNING id, client_id, customer_name, customer_email, invoice_number,
+                  invoice_date, due_date, amount_total, amount_paid, status,
+                  notes, last_reminder_sent_at, reminder_count,
+                  created_at, updated_at`,
+        [...values, invoiceId, client.id]
       );
-      if (currentResult.rows.length === 0) {
+      if (result.rows.length === 0) {
+        await dbClient.query("ROLLBACK");
         return NextResponse.json(
           { error: "Invoice not found" },
           { status: 404 }
         );
       }
-      const existingPaid = Number(currentResult.rows[0].amount_paid);
-      if (newAmountTotal < existingPaid - 1e-9) {
-        return NextResponse.json(
-          {
-            error: `amountTotal (${newAmountTotal}) cannot be less than ` +
-              `amount already paid (${existingPaid}). Delete payments first ` +
-              `or write off the difference.`,
-          },
-          { status: 400 }
-        );
-      }
-      // Re-derive status from (newTotal, existingPaid, currentStatus).
-      // If the caller ALSO sent explicit status, theirs wins for the
-      // non-derived ones (written_off); the derived ones (open/partial/paid)
-      // come from the math.
-      if (explicitStatus === "written_off") {
-        // keep explicit status as-is
-      } else {
-        const derived = deriveStatus(
-          newAmountTotal,
-          existingPaid,
-          currentResult.rows[0].status as InvoiceStatus
-        );
-        // Find and overwrite the status clause if it was already pushed;
-        // otherwise append a new one.
-        const statusIdx = setClauses.findIndex((c) =>
-          c.startsWith("status = ")
-        );
-        if (statusIdx >= 0) {
-          // Overwrite the existing setClause/value with the derived
-          // status. Trickier than appending — but the placeholder index
-          // is preserved in the SQL, so we just swap the value at the
-          // same array index.
-          const placeholderMatch = setClauses[statusIdx].match(/\$(\d+)/);
-          if (placeholderMatch) {
-            const placeholderIdx = Number(placeholderMatch[1]) - 1;
-            values[placeholderIdx] = derived;
-          }
-        } else {
-          setClauses.push(`status = $${i++}`);
-          values.push(derived);
-        }
-      }
+
+      await dbClient.query("COMMIT");
+      return NextResponse.json({ invoice: serializeInvoice(result.rows[0]) });
+    } catch (txErr) {
+      await dbClient.query("ROLLBACK").catch(() => undefined);
+      throw txErr;
+    } finally {
+      dbClient.release();
     }
-
-    setClauses.push(`updated_at = NOW()`);
-
-    const result = await pool.query<InvoiceRow>(
-      `UPDATE invoices
-          SET ${setClauses.join(", ")}
-        WHERE id = $${i++} AND client_id = $${i++}
-      RETURNING id, client_id, customer_name, customer_email, invoice_number,
-                invoice_date, due_date, amount_total, amount_paid, status,
-                notes, last_reminder_sent_at, reminder_count,
-                created_at, updated_at`,
-      [...values, invoiceId, client.id]
-    );
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Invoice not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ invoice: serializeInvoice(result.rows[0]) });
   } catch (error) {
     console.error("Invoice PATCH error:", error);
     return NextResponse.json(
