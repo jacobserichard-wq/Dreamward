@@ -190,10 +190,15 @@ export default function InvoiceList({
         </div>
       )}
 
-      {/* Invoice rows */}
+      {/* Invoice rows. Two layouts:
+          - Desktop (sm:block ↑): the 7-column table.
+          - Mobile (<sm): stacked cards per design §8.
+          Same data, different layout. Same row-level reminder button
+          logic (reminderDisabledReason / sendingReminderId) reused. */}
       {invoices.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -299,6 +304,80 @@ export default function InvoiceList({
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile stacked cards */}
+          <div className="sm:hidden divide-y divide-slate-100">
+            {invoices.map((inv) => {
+              const days = daysOverdue(inv.dueDate);
+              const reason = reminderDisabledReason(inv);
+              const isSending = sendingReminderId === inv.id;
+              const reminderDisabled = reason !== null || isSending;
+              return (
+                <div
+                  key={inv.id}
+                  onClick={() => router.push(`/invoices/${inv.id}`)}
+                  className="p-4 cursor-pointer hover:bg-slate-50"
+                >
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-slate-900 truncate">
+                        {inv.customerName}
+                      </div>
+                      {inv.customerEmail && (
+                        <div className="text-xs text-slate-500 truncate">
+                          {inv.customerEmail}
+                        </div>
+                      )}
+                    </div>
+                    <AgingBucketChip bucket={inv.agingBucket} compact />
+                  </div>
+
+                  <div className="flex justify-between items-baseline gap-2 mb-2">
+                    <div className="font-semibold text-slate-900">
+                      {formatUsd(inv.amountOutstanding)}
+                      {inv.amountPaid > 0 && (
+                        <span className="text-xs text-slate-500 font-normal ml-1">
+                          of {formatUsd(inv.amountTotal)}
+                        </span>
+                      )}
+                    </div>
+                    {inv.invoiceNumber && (
+                      <div className="text-xs text-slate-500">
+                        #{inv.invoiceNumber}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="text-xs text-slate-500">
+                      Due {inv.dueDate}
+                      {days > 0 && (
+                        <span className="text-red-700 font-medium ml-1">
+                          (+{days}d)
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSendReminder(inv.id);
+                      }}
+                      disabled={reminderDisabled}
+                      title={
+                        reason
+                          ? `Can't send: ${reason}`
+                          : `Send reminder to ${inv.customerEmail}`
+                      }
+                      className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
