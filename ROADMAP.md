@@ -385,7 +385,7 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 - [ ] AR aging buckets: Current, 30-day, 60-day, 90+ day overdue — *feature*
 - [ ] Visual aging report with color-coded urgency — *UX*
-- [ ] Follow-up email templates — one-click send reminder via Gmail — *feature*
+- [ ] Follow-up email templates — one-click send reminder via email — *feature*
 - [ ] Payment recording — mark invoices partially or fully paid — *feature*
 - [ ] Outstanding balance summary on Dashboard — *UX*
 
