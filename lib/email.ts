@@ -5,12 +5,28 @@ interface EmailParams {
   to: string;
   subject: string;
   html: string;
+  // Optional Reply-To header. Phase 6 (AR reminders) sets this to the
+  // user's own email so customer replies thread back to the vendor,
+  // not to FlowWork support.
+  replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html }: EmailParams) {
+export async function sendEmail({ to, subject, html, replyTo }: EmailParams) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY not configured");
+  }
+
+  const payload: Record<string, unknown> = {
+    from: FROM_EMAIL,
+    to,
+    subject,
+    html,
+  };
+  if (replyTo) {
+    // Resend's REST API uses `reply_to` (snake_case) — accepts string or
+    // array. We pass the single user email through.
+    payload.reply_to = replyTo;
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -19,7 +35,7 @@ export async function sendEmail({ to, subject, html }: EmailParams) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
-    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+    body: JSON.stringify(payload),
   });
 
   const data = await res.json().catch(() => null);
@@ -104,6 +120,73 @@ export function paymentFailedEmail(businessName: string) {
         </p>
         <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Update Payment</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">If you believe this is an error, please reply to this email.</p>
+      </div>
+    `,
+  };
+}
+
+// Phase 6 AR follow-up reminder. Polite-but-firm tone — design §7.
+// Sent via Resend with Reply-To = the FlowWork user's own email so
+// the customer's reply threads back to the vendor, not to FlowWork.
+//
+// Subject + body adapt based on whether the invoice is overdue:
+//   - daysOverdue > 0 → "Friendly reminder" subject, "X days ago" body
+//   - daysOverdue ≤ 0 → "A note" subject (gentle nudge before due)
+//
+// The user is NOT shown a preview/edit step in v1 (design §7). Tap
+// Send → email goes. Edit-before-send is a v1.5 candidate.
+export function arReminderEmail(opts: {
+  businessName: string;             // sender's business (clients.business_name)
+  customerName: string;             // recipient (invoices.customer_name)
+  invoiceNumber: string | null;     // invoices.invoice_number, may be null
+  amountOutstanding: number;        // amount_total - amount_paid
+  dueDate: string;                  // YYYY-MM-DD
+  daysOverdue: number;              // may be 0 or negative (gentle nudge mode)
+}) {
+  const {
+    businessName,
+    customerName,
+    invoiceNumber,
+    amountOutstanding,
+    dueDate,
+    daysOverdue,
+  } = opts;
+
+  const invoiceRef = invoiceNumber ? `invoice #${invoiceNumber}` : "your invoice";
+  const formattedAmount = `$${amountOutstanding.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  const overdueLine =
+    daysOverdue > 0
+      ? `That's ${daysOverdue} day${daysOverdue === 1 ? "" : "s"} ago.`
+      : "It's due soon.";
+  const firstName = customerName.split(" ")[0] || customerName;
+
+  return {
+    subject:
+      daysOverdue > 0
+        ? `Friendly reminder: ${invoiceRef} from ${businessName}`
+        : `A note on ${invoiceRef} from ${businessName}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px;">
+        <h1 style="font-size: 22px; color: #0f172a; margin: 0 0 16px;">A note about ${invoiceRef}</h1>
+        <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 16px;">
+          Hi ${firstName},
+        </p>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px;">
+          Hope you're well. This is a friendly reminder that ${invoiceRef}, for
+          <strong>${formattedAmount}</strong>, was due on <strong>${dueDate}</strong>.
+          ${overdueLine} If it's already on the way, please ignore this note.
+        </p>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">
+          Otherwise, you can reply to this email and I'll be happy to help.
+        </p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 4px;">Thanks,</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 24px;">${businessName}</p>
+        <p style="font-size: 12px; color: #94a3b8; margin: 32px 0 0;">
+          Sent via FlowWork. Reply directly to reach ${businessName}.
+        </p>
       </div>
     `,
   };

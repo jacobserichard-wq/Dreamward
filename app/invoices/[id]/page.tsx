@@ -62,6 +62,20 @@ function formatUsd(n: number): string {
   })}`;
 }
 
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const REMINDER_CAP = 6;
+
 export default function InvoiceDetailPage({ params }: PageProps) {
   const { id: rawId } = use(params);
   const router = useRouter();
@@ -90,6 +104,7 @@ export default function InvoiceDetailPage({ params }: PageProps) {
   );
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reminderSending, setReminderSending] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -238,6 +253,27 @@ export default function InvoiceDetailPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!invoice) return;
+    setReminderSending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${rawId}/reminder`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg(`Reminder sent to ${invoice.customerEmail}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send reminder");
+    } finally {
+      setReminderSending(false);
     }
   };
 
@@ -559,6 +595,88 @@ export default function InvoiceDetailPage({ params }: PageProps) {
             />
           )}
         </section>
+
+        {/* Reminders — only meaningful for non-terminal invoices */}
+        {!isTerminal &&
+          (() => {
+            const noEmail = !invoice.customerEmail;
+            const lastSentMs = invoice.lastReminderSentAt
+              ? new Date(invoice.lastReminderSentAt).getTime()
+              : null;
+            const msSinceLast =
+              lastSentMs !== null ? Date.now() - lastSentMs : null;
+            const inCooldown =
+              msSinceLast !== null && msSinceLast < REMINDER_COOLDOWN_MS;
+            const hoursLeft = inCooldown
+              ? Math.ceil(
+                  (REMINDER_COOLDOWN_MS - (msSinceLast ?? 0)) /
+                    (60 * 60 * 1000)
+                )
+              : 0;
+            const atCap = invoice.reminderCount >= REMINDER_CAP;
+            const disabled =
+              noEmail || inCooldown || atCap || reminderSending;
+            const disabledReason = noEmail
+              ? "Add a customer email first"
+              : inCooldown
+                ? `Wait ${hoursLeft}h before re-sending`
+                : atCap
+                  ? `This invoice has hit the ${REMINDER_CAP}-reminder cap`
+                  : null;
+            return (
+              <section className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 m-0 mb-4">
+                  Reminders
+                </h2>
+                <div className="text-sm text-slate-600 mb-4 space-y-1">
+                  <p className="m-0">
+                    Last sent:{" "}
+                    {invoice.lastReminderSentAt ? (
+                      <span className="text-slate-900">
+                        {timeAgo(invoice.lastReminderSentAt)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">never</span>
+                    )}
+                  </p>
+                  <p className="m-0">
+                    Total sent:{" "}
+                    <span className="text-slate-900">
+                      {invoice.reminderCount}
+                    </span>{" "}
+                    of {REMINDER_CAP}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleSendReminder}
+                    disabled={disabled}
+                    title={disabledReason ?? undefined}
+                    className="py-2 px-5 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  >
+                    {reminderSending
+                      ? "Sending..."
+                      : `${"\u{1F4E9}"} Send reminder now`}
+                  </button>
+                  {disabledReason && (
+                    <span className="text-sm text-slate-500">
+                      {disabledReason}
+                    </span>
+                  )}
+                </div>
+                {!disabledReason && invoice.customerEmail && (
+                  <p className="text-xs text-slate-500 mt-2 m-0">
+                    Will email{" "}
+                    <span className="text-slate-700">
+                      {invoice.customerEmail}
+                    </span>
+                    . Replies route back to you.
+                  </p>
+                )}
+              </section>
+            );
+          })()}
 
         {/* Danger zone */}
         <section className="border border-red-200 rounded-xl p-5 bg-red-50/40">
