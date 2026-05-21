@@ -9,6 +9,7 @@ import ErrorBanner from "./components/ErrorBanner";
 import CsvReviewModal from "./components/CsvReviewModal";
 import EventCreateForm, { type EventResponse } from "./components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
+import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,17 @@ export default function Home() {
   const [clearingSample, setClearingSample] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
 
+  // Phase 6: AR summary for the dashboard outstanding-balance card.
+  // Fetched only when the plan supports AR ("ar" module = Growth + Pro
+  // + trial-courtesy). Null while loading or for excluded plans.
+  const [arSummary, setArSummary] = useState<{
+    totalOutstanding: number;
+    overdueOutstanding: number;
+    invoiceCount: number;
+    largestOverdueBucket: AgingBucket | null;
+    largestOverdueAmount: number;
+  } | null>(null);
+
   // Load processed items from database
   const loadItems = useCallback(async () => {
     try {
@@ -154,6 +166,66 @@ export default function Home() {
       }
     }
     loadEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan]);
+
+  // Phase 6: AR summary fetch for the dashboard outstanding-balance card.
+  // Plan-gated on trial/growth/pro (matches /api/invoices isPlanAllowed).
+  // Soft-fail: dashboard renders without the AR card if the endpoint
+  // errors. Limit 1000 to maximize summary accuracy across all invoices
+  // (the API computes summary over the limited rows; at FlowWork scale
+  // 1000 covers every realistic vendor caseload).
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    let cancelled = false;
+    async function loadAr() {
+      try {
+        const res = await fetch("/api/invoices?limit=1000");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          invoices: Array<{ status: string }>;
+          summary: {
+            totalOutstanding: number;
+            overdueOutstanding: number;
+            bucketTotals: Record<AgingBucket, { count: number; amount: number }>;
+          };
+        };
+        if (cancelled) return;
+
+        // Largest overdue bucket = max amount across the overdue buckets
+        // (1–30, 31–60, 61–90, 91+). Used by the "largest bucket: X" copy.
+        let largestBucket: AgingBucket | null = null;
+        let largestAmount = 0;
+        for (const bucket of AGING_BUCKETS_ORDERED) {
+          if (!isOverdue(bucket)) continue;
+          const amt = data.summary.bucketTotals[bucket]?.amount ?? 0;
+          if (amt > largestAmount) {
+            largestAmount = amt;
+            largestBucket = bucket;
+          }
+        }
+
+        // Count only non-terminal invoices (open / partial) for the
+        // dashboard headline "N invoices" copy.
+        const invoiceCount = (data.invoices || []).filter(
+          (i) => i.status !== "paid" && i.status !== "written_off"
+        ).length;
+
+        setArSummary({
+          totalOutstanding: data.summary.totalOutstanding,
+          overdueOutstanding: data.summary.overdueOutstanding,
+          invoiceCount,
+          largestOverdueBucket: largestBucket,
+          largestOverdueAmount: largestAmount,
+        });
+      } catch {
+        // Non-fatal — dashboard still renders without the AR card.
+      }
+    }
+    loadAr();
     return () => {
       cancelled = true;
     };
@@ -997,6 +1069,110 @@ export default function Home() {
                 ))}
               </div>
             </div>
+
+            {/* Phase 6: Outstanding AR card. Plan-gated via the arSummary
+                fetch (Starter never gets a non-null arSummary). Tint based
+                on the overdue share — slate (neutral) → amber (some
+                overdue) → red (≥50% of outstanding is overdue). Click-
+                through routes to /invoices. */}
+            {arSummary !== null && (
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">
+                  Accounts Receivable
+                </h3>
+                {arSummary.invoiceCount === 0 &&
+                arSummary.totalOutstanding === 0 ? (
+                  <Link
+                    href="/invoices/new"
+                    className="block bg-white rounded-xl border border-slate-200 p-5 no-underline hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-700 m-0 mb-1">
+                          No invoices yet
+                        </p>
+                        <p className="text-xs text-slate-500 m-0">
+                          Track wholesale invoices and chase overdue payments.
+                        </p>
+                      </div>
+                      <span className="text-sm text-blue-600 whitespace-nowrap">
+                        Create one →
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  (() => {
+                    const overdueShare =
+                      arSummary.totalOutstanding > 0
+                        ? arSummary.overdueOutstanding /
+                          arSummary.totalOutstanding
+                        : 0;
+                    const tintClasses =
+                      overdueShare >= 0.5
+                        ? "bg-red-50 border-red-200 border-l-4 border-l-red-600"
+                        : arSummary.overdueOutstanding > 0
+                          ? "bg-amber-50 border-amber-200 border-l-4 border-l-amber-600"
+                          : "bg-white border-slate-200 border-l-4 border-l-slate-400";
+                    const headlineTone =
+                      overdueShare >= 0.5
+                        ? "text-red-700"
+                        : arSummary.overdueOutstanding > 0
+                          ? "text-amber-700"
+                          : "text-slate-900";
+                    return (
+                      <Link
+                        href="/invoices"
+                        className={`block rounded-xl border p-5 no-underline hover:shadow-sm transition-shadow ${tintClasses}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-3xl font-bold m-0 mb-1 ${headlineTone}`}
+                            >
+                              $
+                              {arSummary.totalOutstanding.toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+                            </p>
+                            <p className="text-sm text-slate-600 m-0 mb-2">
+                              outstanding across {arSummary.invoiceCount}{" "}
+                              {arSummary.invoiceCount === 1
+                                ? "invoice"
+                                : "invoices"}
+                            </p>
+                            {arSummary.overdueOutstanding > 0 && (
+                              <p className="text-sm text-slate-700 m-0">
+                                {"\u{26A0}"} $
+                                {arSummary.overdueOutstanding.toLocaleString(
+                                  "en-US",
+                                  {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  }
+                                )}{" "}
+                                overdue
+                                {arSummary.largestOverdueBucket && (
+                                  <span className="text-slate-500">
+                                    {" "}
+                                    (largest bucket:{" "}
+                                    {arSummary.largestOverdueBucket})
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-2xl text-slate-400">→</span>
+                        </div>
+                      </Link>
+                    );
+                  })()
+                )}
+              </div>
+            )}
 
             {/* Phase 4: Top Categories breakdown — closes roadmap item 6
                 ("running totals by category"). Recon found the existing

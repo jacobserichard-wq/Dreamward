@@ -25,7 +25,12 @@ export interface InvoiceListEntry {
   amountOutstanding: number;
   status: "open" | "partial" | "paid" | "written_off";
   agingBucket: AgingBucket;
+  lastReminderSentAt: string | null;
+  reminderCount: number;
 }
+
+const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const REMINDER_CAP = 6;
 
 export interface InvoiceListSummary {
   totalOutstanding: number;
@@ -38,6 +43,34 @@ interface InvoiceListProps {
   summary: InvoiceListSummary;
   selectedBucket: AgingBucket | null;
   onSelectBucket: (b: AgingBucket | null) => void;
+  /** Send-reminder click handler. Parent does the fetch + refresh. */
+  onSendReminder: (invoiceId: number) => void;
+  /** ID of the invoice whose reminder is currently being sent (for the
+   *  in-flight spinner state). null when no send is in progress. */
+  sendingReminderId: number | null;
+}
+
+/**
+ * Returns null when the Send Reminder button can be clicked; returns a
+ * short user-visible reason string when the button must be disabled.
+ * Same guard logic as the detail page Reminders section + the server
+ * route — kept in sync so the UI never tries to send when the server
+ * would reject.
+ */
+function reminderDisabledReason(inv: InvoiceListEntry): string | null {
+  if (inv.status === "paid" || inv.status === "written_off") return "Settled";
+  if (!inv.customerEmail) return "No email";
+  if (inv.reminderCount >= REMINDER_CAP) return "At cap";
+  if (inv.lastReminderSentAt) {
+    const elapsed = Date.now() - new Date(inv.lastReminderSentAt).getTime();
+    if (elapsed < REMINDER_COOLDOWN_MS) {
+      const hoursLeft = Math.ceil(
+        (REMINDER_COOLDOWN_MS - elapsed) / (60 * 60 * 1000)
+      );
+      return `${hoursLeft}h cooldown`;
+    }
+  }
+  return null;
 }
 
 function formatUsd(n: number): string {
@@ -62,6 +95,8 @@ export default function InvoiceList({
   summary,
   selectedBucket,
   onSelectBucket,
+  onSendReminder,
+  sendingReminderId,
 }: InvoiceListProps) {
   const router = useRouter();
   const overdueShare =
@@ -178,6 +213,9 @@ export default function InvoiceList({
                   <th className="text-left font-medium text-slate-600 py-2.5 px-3">
                     Status
                   </th>
+                  <th className="text-right font-medium text-slate-600 py-2.5 px-3">
+                    {/* Send reminder column */}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -228,6 +266,31 @@ export default function InvoiceList({
                       </td>
                       <td className="py-2.5 px-3">
                         <AgingBucketChip bucket={inv.agingBucket} compact />
+                      </td>
+                      <td
+                        className="py-2.5 px-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(() => {
+                          const reason = reminderDisabledReason(inv);
+                          const isSending = sendingReminderId === inv.id;
+                          const disabled = reason !== null || isSending;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => onSendReminder(inv.id)}
+                              disabled={disabled}
+                              title={
+                                reason
+                                  ? `Can't send: ${reason}`
+                                  : `Send reminder to ${inv.customerEmail}`
+                              }
+                              className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                              {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

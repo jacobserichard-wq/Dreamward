@@ -28,6 +28,10 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<AgingBucket | null>(null);
+  const [sendingReminderId, setSendingReminderId] = useState<number | null>(
+    null
+  );
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const loadInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -76,6 +80,26 @@ export default function InvoicesPage() {
     }
     load();
   }, [router, loadInvoices]);
+
+  const handleSendReminder = async (invoiceId: number) => {
+    setSendingReminderId(invoiceId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/reminder`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg("Reminder sent.");
+      await loadInvoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send reminder");
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -156,6 +180,18 @@ export default function InvoicesPage() {
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         )}
+        {successMsg && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-4 py-2 mb-4 flex justify-between items-center">
+            <span>{successMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessMsg(null)}
+              className="text-emerald-600 hover:underline cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="flex justify-between items-center mb-5 gap-3 flex-wrap">
           <p className="text-sm text-slate-500 m-0">
@@ -178,6 +214,8 @@ export default function InvoicesPage() {
           summary={safeSummary}
           selectedBucket={selectedBucket}
           onSelectBucket={setSelectedBucket}
+          onSendReminder={handleSendReminder}
+          sendingReminderId={sendingReminderId}
         />
       </div>
     </div>
