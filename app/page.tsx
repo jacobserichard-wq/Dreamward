@@ -600,6 +600,24 @@ export default function Home() {
               Events
             </Link>
             <Link
+              href="/invoices"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+            >
+              Invoices
+            </Link>
+            {/* Phase 7a commit 9: Reports nav link. Pro-only — matches the
+                /reports route plan-gate. Sits between Invoices and Settings
+                to keep the financial-flow grouping (Events → Invoices →
+                Reports → Settings). */}
+            {clientInfo?.plan === "pro" && (
+              <Link
+                href="/reports"
+                className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+              >
+                Reports
+              </Link>
+            )}
+            <Link
               href="/settings"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
             >
