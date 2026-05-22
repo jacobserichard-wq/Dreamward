@@ -1,8 +1,8 @@
 # FlowWork Product Roadmap
 
-**Small Business Edition** | Updated May 11, 2026
+**Small Business Edition** | Updated May 20, 2026
 
-**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phase 0–1 SHIPPED** · **Phase 1.5 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 2: mobile-responsive 10/10 + AI auto-classification (MVP, testing cluster, polish batch) shipped**
+**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a SHIPPED (annual summary + mileage summary + CSV + CPA handoff); Phase 7b (PDF) + Phase 7c (Schedule C line mapping + quarterly estimates) deferred**
 
 ---
 
@@ -336,60 +336,68 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 ---
 
-## Phase 3 — Sales & Event Logging
+## Phase 3 — Sales & Event Logging — SHIPPED
 
 **Week 8–9** | Track revenue per market day — what came in, where, and how
 
-- [ ] New Events tab with quick-entry form: venue, date, revenue, booth fee — *feature*
-- [ ] Events table in PostgreSQL with `client_id` scoping — *backend*
-- [ ] API routes: POST/GET/PATCH `/api/events` — scoped by `client_id` — *backend*
-- [ ] Product sales log — optional line items per event — *feature*
-- [ ] Event history view with sortable list — *UX*
+- [x] New Events tab with quick-entry form: venue, date, revenue, booth fee — *feature*
+- [x] Events table in PostgreSQL with `client_id` scoping — *backend*
+- [x] API routes: POST/GET/PATCH `/api/events` — scoped by `client_id` — *backend*
+- [x] Product sales log — optional line items per event — *feature*
+- [x] Event history view with sortable list — *UX*
 
 **UX considerations for this phase:** "Add event" should be the most obvious action when the tab opens. Defaults: today's date, last venue used, booth fee carried forward from last event at same venue. The phone-at-the-market test: can a vendor log a sale with their phone in one hand while bagging an item with the other?
 
+**Phase 3 shipped (sub-sessions 16 + 17, May 16):** `events` + `event_items` tables (migration `0004`) + auto-coding of uploaded CSV rows to events by date-range match + standalone `/events` page + per-event detail page. Linked-transaction aggregate via LEFT JOIN on `processed_items.event_id`.
+
 ---
 
-## Phase 4 — Expense Categories & Mileage
+## Phase 4 — Expense Categories & Mileage — SHIPPED
 
 **Week 10–11** | Organize spending into tax-ready categories and track mileage
 
-- [ ] Default categories: Supplies, Booth Fees, Travel/Gas, Packaging, Marketing, Other — *feature*
-- [ ] Client-customizable categories — add, rename, or hide per business — *feature*
-- [ ] Auto-categorization via Claude during extraction — *AI*
-- [ ] Mileage log: date, destination, miles driven — *feature*
-- [ ] Mileage table in PostgreSQL + API routes (scoped by `client_id`) — *backend*
-- [ ] Running totals by category on Dashboard — *UX*
+- [x] Default categories: Supplies, Booth Fees, Travel/Gas, Packaging, Marketing, Other — *feature* — *largely subsumed by Phase 2 AI auto-classification's industry-aware taxonomy (87 categories across 11 industries)*
+- [x] Client-customizable categories — add, rename, or hide per business — *feature*
+- [x] Auto-categorization via Claude during extraction — *AI* — *Phase 2 MVP*
+- [x] Mileage log: date, destination, miles driven — *feature*
+- [x] Mileage table in PostgreSQL + API routes — *backend* — *event-coupled mileage on `events` table; no separate mileage table needed*
+- [x] Running totals by category on Dashboard — *UX*
 
 **UX considerations for this phase:** Auto-categorize first, ask second. Show the category Claude picked with an "edit" affordance — don't make users pick from a dropdown by default. Mileage entry should accept "drove to Chicago and back" and figure out the round-trip miles, not require the user to enter exact distance.
 
+**Phase 4 shipped (sub-session 18, May 17–18):** event-coupled mileage via `clients.home_address` + `events.address` + Google Maps Distance Matrix API (`lib/distance.ts`) + Node migration runner (`scripts/run-migration.mjs` — replaced the unreliable Railway web console for multi-statement DDL). Migration `0005` added `round_trip_miles` + `returns_home_nightly` + `mileage_computed_at` on `events`. Dashboard's Top Categories breakdown closed the "running totals by category" roadmap item.
+
 ---
 
-## Phase 5 — Profitability Dashboard
+## Phase 5 — Profitability Dashboard — SHIPPED
 
 **Week 12–13** | Answer the real question: am I making money at each market?
 
-- [ ] Per-event P&L: revenue minus booth fee, gas, supplies — *feature*
-- [ ] Dashboard cards: total revenue, expenses, net profit, avg per event — *UX*
-- [ ] Best/worst markets ranking — which venues are worth going back to — *feature*
-- [ ] Monthly trend charts (revenue, expenses, net margin over time) — *feature*
-- [ ] Recharts or Chart.js integration for visual graphs — *frontend*
+- [x] Per-event P&L: revenue minus booth fee, gas, supplies — *feature*
+- [x] Dashboard cards: total revenue, expenses, net profit, avg per event — *UX*
+- [x] Best/worst markets ranking — which venues are worth going back to — *feature*
+- [x] Monthly trend charts (revenue, expenses, net margin over time) — *feature*
+- [x] Recharts integration for visual graphs — *frontend* — *chose recharts (already-React, smaller bundle than Chart.js)*
 
 **UX considerations for this phase:** Lead with the answer ("You made $X this month"), then offer the breakdown. Use color sparingly — green for profit, red for loss, gray for everything else. No more than 3 charts on the dashboard at once; rest live behind tabs or links.
 
+**Phase 5 shipped (sub-session 19, May 19):** `/api/profitability` aggregate (per-event P&L + portfolio totals + monthly trend + best/worst markets) + `/profitability` portfolio dashboard + per-event P&L card on event detail + `app_settings` table (migration `0006`) with seeded IRS mileage rate. `rateSource: "config" | "fallback"` honesty flag pattern established. Four follow-up bug fixes shipped at close (migration `0007` widened narrow VARCHAR columns; pg DATE type-parser override for tz-drift; Mileage card empty state fix; P&L card silent-fallthrough fix).
+
 ---
 
-## Phase 6 — AR Aging & Follow-ups
+## Phase 6 — AR Aging & Follow-ups — SHIPPED
 
 **Week 14–15** | Track wholesale/consignment invoices and chase overdue payments
 
-- [ ] AR aging buckets: Current, 30-day, 60-day, 90+ day overdue — *feature*
-- [ ] Visual aging report with color-coded urgency — *UX*
-- [ ] Follow-up email templates — one-click send reminder via email — *feature*
-- [ ] Payment recording — mark invoices partially or fully paid — *feature*
-- [ ] Outstanding balance summary on Dashboard — *UX*
+- [x] AR aging buckets: Current, 1–30, 31–60, 61–90, 91+ days overdue — *feature*
+- [x] Visual aging report with color-coded urgency — *UX*
+- [x] Follow-up email templates — one-click send reminder via email (Resend, Reply-To = user's email) — *feature*
+- [x] Payment recording — mark invoices partially or fully paid (with audit-trail payments table) — *feature*
+- [x] Outstanding balance summary on Dashboard — *UX*
 
 **UX considerations for this phase:** Vocabulary stays accounting-standard ("AR aging," "30-day overdue"), but the action is one tap: "Send reminder." Pre-fill the reminder with a sensible polite template; user reviews and sends. Don't make them write the email from scratch.
+
+**Phase 6 shipped (sub-session 20, May 20):** `invoices` + `invoice_payments` tables (migration `0008`) + full CRUD API + `/invoices` list with aging buckets + `/invoices/[id]` detail with payment history + Reminders section (24h cooldown, 6-reminder cap) + Outstanding AR dashboard card. Transactional payment writes via `lib/invoices.ts` with `SELECT ... FOR UPDATE` row lock; aging bucket derived in `lib/aging.ts` (not stored). Pre-push parallel-Claude audit caught 2 SHIP-FIX items (PATCH amount_total TOCTTOU race + mobile card-collapse deviation) fixed in commits 10 + 11 before push.
 
 ---
 
@@ -470,38 +478,34 @@ All tiers include a 14-day free trial. CSV upload supports Square, Stripe, Quick
 
 ---
 
-## Already Shipped (Phases 0 + 1 + 1.5 + Partial 1.6 + 1.7 + Partial 2)
+## Already Shipped (Phases 0 + 1 + 1.5 + Partial 1.6 + Partial 1.7 + 2 + 3 + 4 + 5 + 6 + Partial 7)
 
-Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, **Tailwind v4 activated and validated (signin page migrated as first mobile-responsive surface)**, **PageHeader component, planColor helper, billing/settings/admin/admin-client/PolicyDocument migrated to Tailwind**, **Stripe webhook fix (plan correctly derived from subscription event, not hardcoded in checkout)**, **Stripe webhook signature verification (mandatory `constructEvent`, no fallback parse path)**, **welcome-pro migrated to Tailwind (dark gradient hero, 4-card responsive grid, Calendly widget DOM hooks preserved)**, **onboarding migrated to Tailwind (form input focus rings, mobile-first industry grid, dark gradient parity with welcome-pro)**, **dashboard audit complete (`./session-notes/audit-dashboard.md`)**, **CsvReviewModal extracted to its own component (commit `de9e876`, pure relocation, inline styles preserved for upcoming Tailwind migration)**, **dashboard migrated to Tailwind (third consumer of the dark gradient top bar, `statusBadgeClasses` helper for status pills, dynamic-color prop translation for `StatCard` / breakdown cards / confidence, 320px card grid overflow fix, `CsvReviewModal` migrated alongside)**, **loose-ends batch (planFromPriceId helper, Gmail removed from Starter/Growth/Trial pricing copy, repo-root debris cleared)**, **small follow-ups batch (PlanName consolidated to single canonical export, dead PLANS.features removed, stale gitignore patterns swept)**, **NEXT_PUBLIC_CALENDLY_URL configured in Vercel (Production + Preview) since May 6 — verified May 10**, **small-wins audit batch (PII log removed, dead stripe import deleted, typecheck script added, stale transactional-email URLs fixed — real customer-facing regression)**, **AI auto-classification MVP (industry-aware categorization on both Gmail and CSV ingest paths, customer-facing settings UI showing industry defaults + customer additions)**, **sub-session 11 testing-findings cluster closed (telecom/utilities promoted to universals, default landing tab → Dashboard, settings nav link in dashboard header, dirty-state save UX with beforeunload warning)**, **sub-session 13 polish batch (320px header fix, `processed_items` schema telemetry + `db/migrations/` convention, `/api/reclassify` endpoint + dashboard button, weekly reclassify cron via extracted `lib/reclassify.ts`)**, **Calendly webhook (Phase 1.7 Tier 2) — `invitee.created`/`invitee.canceled` handling with HMAC-SHA256 verification, three-state Pro onboarding-call banner**, **sub-session 15 — small-cleanups batch (`ProcessedItem.category` type widening, `INDUSTRY_DISPLAY_NAMES` consolidation, `welcome_pro_seen` dead-write removal), Pro onboarding-call reminder cron (migration `0003`, daily-send-once flagged on `pro_call_reminder_sent_at`), sample-data parity for all 11 industries + industry-aware categories across all 132 sample items**, security hardening.
+Gmail OAuth + email fetching by label, email history backfill (30–365 days), Claude AI invoice extraction with confidence scoring, PostgreSQL persistence with duplicate prevention, status tracking, dashboard with aggregated stats, multi-tenant client isolation, Stripe subscription integration (checkout, webhooks, portal), CSV upload with AI column auto-mapping (XLSX pending), QuickBooks/Xero/Wave export hints, email notifications via Resend (welcome, payment-failed, trial-expiring on cron), admin dashboard with client management, onboarding flow, module toggles, custom expense categories, usage tracking, item delete/remove, white-glove onboarding for Pro tier (Calendly booking + industry-specific sample data + dashboard banner), inline error messages with actual error text, loading spinners across all async operations, env-var-backed admin allowlist, **NextAuth signin/signout UI with route-protection middleware (Next 16 `proxy.ts`)**, **custom domain `flowworks.it.com` with SSL**, **public Privacy Policy and Terms of Service pages**, **Google Auth Platform branding finalized**, **white-glove Tier 1 fixes (Pro Stripe checkout routes to `/welcome-pro`, Calendly URL configurable + prefilled with client identity, dashboard backstop banner with `welcome_pro_seen` tracking)**, **Tailwind v4 activated and validated (signin page migrated as first mobile-responsive surface)**, **PageHeader component, planColor helper, billing/settings/admin/admin-client/PolicyDocument migrated to Tailwind**, **Stripe webhook fix (plan correctly derived from subscription event, not hardcoded in checkout)**, **Stripe webhook signature verification (mandatory `constructEvent`, no fallback parse path)**, **welcome-pro migrated to Tailwind (dark gradient hero, 4-card responsive grid, Calendly widget DOM hooks preserved)**, **onboarding migrated to Tailwind (form input focus rings, mobile-first industry grid, dark gradient parity with welcome-pro)**, **dashboard audit complete (`./session-notes/audit-dashboard.md`)**, **CsvReviewModal extracted to its own component (commit `de9e876`, pure relocation, inline styles preserved for upcoming Tailwind migration)**, **dashboard migrated to Tailwind (third consumer of the dark gradient top bar, `statusBadgeClasses` helper for status pills, dynamic-color prop translation for `StatCard` / breakdown cards / confidence, 320px card grid overflow fix, `CsvReviewModal` migrated alongside)**, **loose-ends batch (planFromPriceId helper, Gmail removed from Starter/Growth/Trial pricing copy, repo-root debris cleared)**, **small follow-ups batch (PlanName consolidated to single canonical export, dead PLANS.features removed, stale gitignore patterns swept)**, **NEXT_PUBLIC_CALENDLY_URL configured in Vercel (Production + Preview) since May 6 — verified May 10**, **small-wins audit batch (PII log removed, dead stripe import deleted, typecheck script added, stale transactional-email URLs fixed — real customer-facing regression)**, **AI auto-classification MVP (industry-aware categorization on both Gmail and CSV ingest paths, customer-facing settings UI showing industry defaults + customer additions)**, **sub-session 11 testing-findings cluster closed (telecom/utilities promoted to universals, default landing tab → Dashboard, settings nav link in dashboard header, dirty-state save UX with beforeunload warning)**, **sub-session 13 polish batch (320px header fix, `processed_items` schema telemetry + `db/migrations/` convention, `/api/reclassify` endpoint + dashboard button, weekly reclassify cron via extracted `lib/reclassify.ts`)**, **Calendly webhook (Phase 1.7 Tier 2) — `invitee.created`/`invitee.canceled` handling with HMAC-SHA256 verification, three-state Pro onboarding-call banner**, **sub-session 15 — small-cleanups batch (`ProcessedItem.category` type widening, `INDUSTRY_DISPLAY_NAMES` consolidation, `welcome_pro_seen` dead-write removal), Pro onboarding-call reminder cron (migration `0003`, daily-send-once flagged on `pro_call_reminder_sent_at`), sample-data parity for all 11 industries + industry-aware categories across all 132 sample items**, security hardening, **Phase 3 — Sales & Event Logging (`events` + `event_items` tables, migration `0004`, /events page, per-event detail, auto-code uploaded transactions to events by date-range)**, **Phase 4 — Expense Categories & Mileage (event-coupled mileage via Google Maps Distance Matrix, migration `0005` for round_trip_miles + returns_home_nightly + mileage_computed_at, Node migration runner replacing Railway's unreliable web console, dashboard Top Categories breakdown)**, **Phase 5 — Profitability Dashboard (`/api/profitability` aggregate, /profitability portfolio dashboard, per-event P&L on event detail, `app_settings` table with IRS rate seed at migration `0006`, rateSource honesty flag, monthly trend + best/worst markets via recharts)**, **Phase 5 follow-ups (migration `0007` widening narrow VARCHAR columns on processed_items, pg DATE type-parser override fixing tz-drift across the app)**, **Phase 6 — AR Aging & Follow-ups (`invoices` + `invoice_payments` tables at migration `0008`, full CRUD API, /invoices list with aging buckets + filter chips, /invoices/[id] detail with edit + payment history + Reminders, mobile card-collapse below sm breakpoint, Outstanding AR dashboard card with overdue-tint, dashboard nav additions for Invoices)**, **Phase 7a — Annual Tax Reports + CSV + CPA Handoff (`lib/reports.ts` aggregation helper with 7 parallel queries, `lib/csv.ts` RFC 4180 escape, `/api/reports/annual` JSON + CSV download + POST send, /reports page with year picker + summary cards + recharts monthly chart + by-category lists with taxDeductible pills + AR snapshot, Settings CPA Handoff section storing preferences.cpa.email, cpaAnnualSummaryEmail template + sendEmail attachments support, cash-basis math + mileage-rate honesty notice on prior years + dashboard Reports nav link Pro-only)**.
 
 ## Up Next
 
+**Phases 3 / 4 / 5 / 6 / 7a — SHIPPED** (sub-sessions 16 through 21, May 16–20). See per-phase sections above for shipped-summary paragraphs.
+
+**Phase 7 remaining:**
+- **Phase 7b — PDF export.** The natural next greenfield arc. PDF infra decision lives there (`@react-pdf/renderer` is the leading candidate — already-React design language, serverless-compatible, no Puppeteer download). Adds a "Download PDF" alongside "Download CSV" and rides as a second attachment on the Send-to-CPA email. ~6–8 commits, ~3–4 hours.
+- **Phase 7c — Schedule C line mapping + quarterly estimates.** Tax-domain work. The `taxDeductible` flag in `lib/categories.ts` is already in place (half the Schedule C work); the IRS Schedule C lines-8-through-27 mapping is the missing piece. Quarterly estimates need a tax-bracket assumption surface in Settings or on /reports. ~5–7 commits.
+
 **Phase 1.6 remaining:**
-- OAuth Production submission **paused** in favor of tiered auth strategy (Pro-only Gmail integration). See Phase 1.6 strategic decision section.
-- 5 tiered-auth implementation tasks documented in Phase 1.6 — *deferred*, not blocking Phase 2 work.
+- OAuth Production submission **paused** in favor of tiered auth strategy. CASA decision criteria: 50+ active Pro subscribers OR 5+ prospect interviews citing Gmail as the deal-maker OR Pro tier hitting the 100-user cap.
+- 5 tiered-auth implementation tasks documented in Phase 1.6 — deferred, not blocking.
 
-**Phase 1.7 Tier 2 — COMPLETE:**
-1. ~~**Calendly webhook**~~ — ✅ shipped sub-session 14 (commits `defc0a5`, `c72eae6`, `9f47eb3`). Requires two user setup steps before production traffic works — see `commit14.2-report.md`.
-2. ~~**Sample data parity**~~ — ✅ shipped sub-session 15 (commit `713f9fd` filled 6 missing industries, `82837f7` re-categorized all 132 items with industry-aware values).
-3. ~~**Pro reminder cron**~~ — ✅ shipped sub-session 15 (commit `8e38337` + migration `0003`). Anchored on `created_at`; documented limitation for customers who upgrade long after signup.
+**Phase 1.7 Tier 3 — STRATEGIC (deferred):**
+- Admin tooling for call completion + the "priority support SLA" Option A/B product decision. Needs product judgment before code.
 
-**Phase 2 mobile-responsive sweep:** COMPLETE — 10/10 surfaces shipped (signin → dashboard, May 6–10) plus toolbar polish fix (`7f198f6`). Audit-driven discoveries logged in sub-session entries.
+**Documentation / hygiene loose ends:**
+- **README rewrite** (~30–60 min) — currently `create-next-app` boilerplate.
+- **`.env.example` creation** (~20 min) — 12 distinct env vars to document.
+- **Dependency hygiene sweep** (~30–90 min) — `npm audit` moderate items, Next 16.2.4 → 16.2.6 pin, TS 5→6 + Anthropic SDK majors.
+- **Returning-user onboarding guard** (~30 min) — `/onboarding` always starts at step 0 even for already-onboarded users.
+- **Calendly Production setup** (~10 min user-side) — register the Calendly webhook + add `CALENDLY_WEBHOOK_SIGNING_KEY` to Vercel. See `commit14.2-report.md`.
+- **`lib/reports.ts` split** — at ~830 lines after Phase 7a, approaching the threshold where splitting into `lib/reports/aggregate.ts` + `lib/reports/csv.ts` would help reviewability.
 
-**Other Phase 2 items:**
-- **AI auto-classification** — fully shipped across three sub-sessions. Sub-session 11 (MVP: industry-aware classification on both Gmail and CSV ingest paths + customer-facing settings UI). Sub-session 12 (testing-findings cluster: telecom/utilities universals, default landing tab, settings nav link, dirty-state save UX). Sub-session 13 polish batch (schema telemetry + `db/migrations/` convention, `/api/reclassify` endpoint + dashboard button, weekly Sunday cron). The thread is closed.
-- **Google Cloud OAuth Production review** — gated on tiered auth implementation + CASA decision. Not blocking near-term feature work.
-
-**Recommended next coding session:** All near-term feature work is now shipped — Phase 2 (AI auto-classification) and the entirety of Phase 1.7 Tier 1 + Tier 2 (Calendly webhook + Pro reminder cron + sample-data parity). The accumulated small cleanups are also closed. The honest framing of what's left:
-
-- **Phase 1.7 Tier 3** — admin tooling for call completion + the "priority support SLA" Option A/B product decision. Strategic, bigger; needs product judgment before code. The remaining Phase 1.7 work.
-- **Sub-session 10 audit follow-ups** — **README rewrite** (~30–60 min), **`.env.example` creation** (~20 min), **dependency hygiene sweep** (~30–90 min). Could batch as a 1.5–3 hr documentation/hygiene session.
-- **Returning-user onboarding guard** (~30 min) — `/onboarding` always starts at step 0 even for users already onboarded. Not customer-facing yet, but a small UX correctness fix.
-- **Nonprofit fundraising-taxonomy gap** — deferred design question (see loose-ends list). Not quick debt; needs a taxonomy decision before code.
-- **Calendly Production setup steps** — still pending (register the Calendly webhook subscription, add `CALENDLY_WEBHOOK_SIGNING_KEY` to Vercel) before the webhook endpoint can process real production traffic. ~10 min user-side work; see `commit14.2-report.md`.
-- **Phase 1.6 Tiered Auth** — still deferred, gated on CASA decision + Pro-tier demand signal.
-- **Phases 3–7** — Events module, mileage, AR aging, profitability dashboard, tax-time reports. The next *major* arc when ready for new-feature work.
-
-The cleanest "build something new" next session is **Phase 3 (Events module)** — that's the next big feature thread. The cleanest "keep clearing debt" alternative is the **documentation/hygiene batch + returning-user onboarding guard** (~2–4 hr together). The Phase 1.7 Tier 3 strategic decision needs a product call before becoming code-actionable.
+**Recommended next coding session:** The cleanest "build something new" is **Phase 7b (PDF export)** — closes the original `ROADMAP.md` Phase 7 ask ("Export to CSV / PDF") and the design doc explicitly flagged it as the tier-1 next step. The cleanest "polish + close debt" alternative is the **documentation/hygiene batch** — README + .env.example + dependency sweep + onboarding guard can batch as a 1.5–3 hr session. Phase 7c is bigger and tax-domain-correctness sensitive; worth waiting until real customers have used Phase 7a in a tax-filing context before committing to Schedule C line-mapping work.
 
 ---
 
