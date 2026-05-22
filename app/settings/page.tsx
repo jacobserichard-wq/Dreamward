@@ -38,6 +38,17 @@ export default function SettingsPage() {
   const [homeAddressSaved, setHomeAddressSaved] = useState(false);
   const [homeAddressRecomputeMsg, setHomeAddressRecomputeMsg] = useState<string | null>(null);
 
+  // Phase 7a commit 5: CPA email — used by /api/reports/annual/send.
+  // Persisted under preferences.cpa.email. Single optional string;
+  // empty string saves as no-email (the JSONB merge drops the key by
+  // assigning null/missing on save). Mirrors the home-address pattern
+  // exactly: dirty state, saved indicator, disabled-when-clean button.
+  const [cpaEmail, setCpaEmail] = useState("");
+  const [savedCpaEmail, setSavedCpaEmail] = useState("");
+  const [cpaEmailSaving, setCpaEmailSaving] = useState(false);
+  const [cpaEmailSaved, setCpaEmailSaved] = useState(false);
+  const [cpaEmailError, setCpaEmailError] = useState<string | null>(null);
+
   // Phase 4 commit 8: hide/un-hide industry-default categories. Persisted
   // under client_settings.preferences.hidden_industry_defaults: string[].
   // The full preferences object is round-tripped through PATCH so other
@@ -91,6 +102,11 @@ export default function SettingsPage() {
     () => homeAddress.trim() !== savedHomeAddress.trim(),
     [homeAddress, savedHomeAddress]
   );
+
+  const cpaEmailDirty = useMemo(
+    () => cpaEmail.trim() !== savedCpaEmail.trim(),
+    [cpaEmail, savedCpaEmail]
+  );
   const incomeCategoriesDirty = useMemo(
     () =>
       JSON.stringify([...incomeCategories].sort()) !==
@@ -136,6 +152,15 @@ export default function SettingsPage() {
               (v): v is string => typeof v === "string"
             )
           : [];
+        // Phase 7a commit 5: CPA email lives at preferences.cpa.email.
+        // Tolerates either the structured object form or a missing key.
+        const rawCpa = rawPrefs.cpa;
+        const initialCpaEmail =
+          rawCpa &&
+          typeof rawCpa === "object" &&
+          typeof (rawCpa as Record<string, unknown>).email === "string"
+            ? ((rawCpa as Record<string, unknown>).email as string)
+            : "";
         setActiveModules(initialModules);
         setCategories(initialCategories);
         setSavedModules(initialModules);
@@ -147,6 +172,8 @@ export default function SettingsPage() {
         setSavedHiddenDefaults(initialHiddenDefaults);
         setIncomeCategories(initialIncomeCategories);
         setSavedIncomeCategories(initialIncomeCategories);
+        setCpaEmail(initialCpaEmail);
+        setSavedCpaEmail(initialCpaEmail);
         // Phase 5 commit 8: IRS rate is global, so it comes back on the
         // top-level response (not nested under settings.preferences).
         if (typeof data.irsMileageRate === "number") {
@@ -172,7 +199,8 @@ export default function SettingsPage() {
       !homeAddressDirty &&
       !hiddenDefaultsDirty &&
       !incomeCategoriesDirty &&
-      !irsRateDirty
+      !irsRateDirty &&
+      !cpaEmailDirty
     )
       return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -188,6 +216,7 @@ export default function SettingsPage() {
     hiddenDefaultsDirty,
     incomeCategoriesDirty,
     irsRateDirty,
+    cpaEmailDirty,
   ]);
 
   const toggleModule = (moduleId: string) => {
@@ -408,6 +437,46 @@ export default function SettingsPage() {
       console.error("Save failed:", err);
     } finally {
       setHomeAddressSaving(false);
+    }
+  };
+
+  // Phase 7a commit 5: save CPA email to preferences.cpa.email.
+  // Lax email validation client-side (single @, single dot at minimum)
+  // — server can re-validate at send time (commit 8). Empty value
+  // saves as preferences.cpa = { email: "" } which the send route
+  // treats as "not set" (mirrors the customer_email handling pattern
+  // in Phase 6).
+  const saveCpaEmail = async () => {
+    setCpaEmailSaving(true);
+    setCpaEmailError(null);
+    const toSave = cpaEmail.trim();
+    if (toSave !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toSave)) {
+      setCpaEmailError("That doesn't look like a valid email address.");
+      setCpaEmailSaving(false);
+      return;
+    }
+    const newPreferences = {
+      ...preferences,
+      cpa: { email: toSave },
+    };
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (res.ok) {
+        setPreferences(newPreferences);
+        setSavedCpaEmail(toSave);
+        setCpaEmailSaved(true);
+      } else {
+        setCpaEmailError(`Couldn't save: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      setCpaEmailError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setCpaEmailSaving(false);
     }
   };
 
@@ -860,6 +929,68 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 m-0">
               The IRS publishes one figure per year. Changing this updates the rate
               everywhere FlowWork computes mileage costs.
+            </p>
+          </div>
+        </div>
+
+        {/* Phase 7a commit 5: CPA Handoff. Stores preferences.cpa.email.
+            Used by POST /api/reports/annual/send (commit 8) as the
+            destination when the user clicks "Send to CPA" on /reports.
+            Mirror of the home-address section pattern (single field,
+            dirty-state save, ✓/Unsaved indicators). */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">CPA Handoff</h2>
+            <p className="text-sm text-slate-500 m-0">
+              The email FlowWork sends your annual summary to when you click
+              {" "}<strong>Send to CPA</strong> on the Tax Reports page. Your
+              own email goes on Reply-To so your CPA can reply directly to you.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {cpaEmailError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
+                {cpaEmailError}
+              </div>
+            )}
+
+            <label htmlFor="settings-cpa-email" className="block text-sm font-medium text-slate-700 mb-1">
+              CPA email
+            </label>
+            <input
+              id="settings-cpa-email"
+              type="email"
+              value={cpaEmail}
+              onChange={(e) => {
+                setCpaEmail(e.target.value);
+                setCpaEmailSaved(false);
+                setCpaEmailError(null);
+              }}
+              placeholder="alex@cpa-firm.com"
+              className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-4"
+            />
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveCpaEmail}
+                disabled={cpaEmailSaving || !cpaEmailDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  cpaEmailDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${cpaEmailSaving ? "opacity-50" : ""}`}
+              >
+                {cpaEmailSaving ? "Saving..." : "Save CPA email"}
+              </button>
+              {cpaEmailDirty && (
+                <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>
+              )}
+              {!cpaEmailDirty && cpaEmailSaved && (
+                <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              Optional. Leave blank to disable the {"“"}Send to CPA{"”"} button
+              on the Tax Reports page.
             </p>
           </div>
         </div>
