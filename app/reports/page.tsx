@@ -103,6 +103,12 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 7a commit 8: cpaEmailSet drives the Send-to-CPA button's
+  // enabled state. Fetched from /api/settings.preferences.cpa.email
+  // alongside the initial client load.
+  const [cpaEmailSet, setCpaEmailSet] = useState<boolean>(false);
+  const [sending, setSending] = useState(false);
+  const [sentMsg, setSentMsg] = useState<string | null>(null);
 
   const loadReport = useCallback(
     async (y: number) => {
@@ -153,7 +159,29 @@ export default function ReportsPage() {
         const clientData = await clientRes.json();
         setPlan(clientData.plan);
         if (clientData.plan === "pro") {
-          await loadReport(CURRENT_YEAR);
+          // Fire the settings fetch + the initial-year report in
+          // parallel. Settings determines the Send-to-CPA button
+          // enabled state; the report fills the page body.
+          const [, settingsRes] = await Promise.all([
+            loadReport(CURRENT_YEAR),
+            fetch("/api/settings"),
+          ]);
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json().catch(() => null);
+            const prefs =
+              settingsData?.settings?.preferences &&
+              typeof settingsData.settings.preferences === "object"
+                ? (settingsData.settings.preferences as Record<string, unknown>)
+                : {};
+            const rawCpa = prefs.cpa;
+            const cpaEmail =
+              rawCpa &&
+              typeof rawCpa === "object" &&
+              typeof (rawCpa as Record<string, unknown>).email === "string"
+                ? ((rawCpa as Record<string, unknown>).email as string).trim()
+                : "";
+            setCpaEmailSet(cpaEmail.length > 0);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't load page");
@@ -168,6 +196,30 @@ export default function ReportsPage() {
     const newYear = Number(e.target.value);
     setYear(newYear);
     loadReport(newYear);
+  };
+
+  const handleSendToCpa = async () => {
+    setSending(true);
+    setError(null);
+    setSentMsg(null);
+    try {
+      const res = await fetch(`/api/reports/annual/send?year=${year}`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        sentTo?: string;
+        year?: number;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setSentMsg(`Sent ${data.year} summary to ${data.sentTo}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send report");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) {
@@ -251,7 +303,7 @@ export default function ReportsPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <a
               href={`/api/reports/annual/csv?year=${year}`}
               className="py-2 px-4 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium no-underline cursor-pointer hover:bg-slate-50"
@@ -259,10 +311,46 @@ export default function ReportsPage() {
             >
               {"\u{1F4E5}"} Download CSV
             </a>
-            {/* Send-to-CPA button arrives in commit 8 alongside the
-                /api/reports/annual/send route. */}
+            <button
+              type="button"
+              onClick={handleSendToCpa}
+              disabled={!cpaEmailSet || sending || reportLoading || !summary}
+              title={
+                !cpaEmailSet
+                  ? "Set your CPA email in Settings first"
+                  : `Email the ${year} CSV to your CPA`
+              }
+              className={`py-2 px-4 rounded-lg border-0 text-white text-sm font-semibold ${
+                cpaEmailSet && !sending && !reportLoading && summary
+                  ? "bg-blue-500 cursor-pointer"
+                  : "bg-slate-300 cursor-not-allowed"
+              }`}
+            >
+              {sending ? "Sending..." : `${"\u{1F4E7}"} Send to CPA`}
+            </button>
+            {!cpaEmailSet && (
+              <Link
+                href="/settings"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Set CPA email →
+              </Link>
+            )}
           </div>
         </div>
+
+        {sentMsg && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-4 py-2 mb-4 flex justify-between items-center">
+            <span>{sentMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSentMsg(null)}
+              className="text-emerald-600 hover:underline cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {reportLoading && !summary && (
           <p className="text-center p-[40px] text-slate-500">
