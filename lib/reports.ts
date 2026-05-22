@@ -252,6 +252,13 @@ export async function annualSummary(opts: {
     // Outstanding-at-year-end: invoices issued on or before YYYY-12-31,
     // not written off, with amount_total minus payments received by EOY.
     // SQL-side aggregation per design §1 #8.
+    //
+    // No >= start-of-year bound — outstanding at EOY includes invoices
+    // from ANY prior year that are still unpaid by EOY. Only two
+    // parameters here ($1 = client_id, $2 = eoy); passing an unused
+    // `start` would crash node-postgres' parameter-type inference
+    // (`pg_analyze_and_rewrite_varparams` — surfaced during the
+    // sub-session 21 smoke test).
     pool.query<OutstandingRow>(
       `SELECT COALESCE(SUM(
                 i.amount_total
@@ -259,13 +266,13 @@ export async function annualSummary(opts: {
                     (SELECT SUM(ip.amount)
                        FROM invoice_payments ip
                       WHERE ip.invoice_id = i.id
-                        AND ip.paid_at <= $3),
+                        AND ip.paid_at <= $2),
                     0
                   )
               ), 0) AS outstanding
          FROM invoices i
         WHERE i.client_id = $1
-          AND i.invoice_date <= $3
+          AND i.invoice_date <= $2
           AND i.status <> 'written_off'
           AND (
             i.amount_total
@@ -273,11 +280,11 @@ export async function annualSummary(opts: {
                 (SELECT SUM(ip.amount)
                    FROM invoice_payments ip
                   WHERE ip.invoice_id = i.id
-                    AND ip.paid_at <= $3),
+                    AND ip.paid_at <= $2),
                 0
               )
           ) > 0`,
-      [clientId, start, eoy]
+      [clientId, eoy]
     ),
     // AR counts: invoices issued in the year, and (distinct) invoices
     // paid (in full or partially) during the year.
