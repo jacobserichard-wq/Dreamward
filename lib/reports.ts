@@ -131,7 +131,11 @@ interface AppSettingRow {
 // categories we can't place; unknown amounts surface in the summary
 // but are NOT folded into income/expense math (guessing the sign
 // would be worse than silently omitting).
-function buildClassifier(
+//
+// Exported so the CSV route (commit 4) can reuse the same classifier
+// when rendering row-level detail. Keeps the income/expense routing
+// consistent between the JSON aggregate and the CSV ledger.
+export function buildClassifier(
   industry: Industry,
   customIncome: string[],
   customExpense: string[]
