@@ -397,13 +397,17 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 **Week 16–17** | One-click reports to hand your CPA or file Schedule C
 
-- [ ] Annual summary report: total revenue, expenses by category, net profit — *feature*
-- [ ] Mileage summary with IRS standard rate calculation — *feature*
-- [ ] Export to CSV / PDF for CPA handoff — *feature*
-- [ ] Quarterly estimates helper — suggest estimated tax payments — *feature*
-- [ ] Schedule C line-item mapping (which expenses go on which line) — *feature*
+- [x] Annual summary report: total revenue, expenses by category, net profit — *feature* — **shipped in Phase 7a (sub-session 21)**
+- [x] Mileage summary with IRS standard rate calculation — *feature* — **shipped in Phase 7a**
+- [x] Export to CSV for CPA handoff — *feature* — **CSV shipped in Phase 7a; PDF deferred to Phase 7b**
+- [ ] Export to PDF for CPA handoff — *feature* — *Phase 7b*
+- [ ] Quarterly estimates helper — suggest estimated tax payments — *feature* — *Phase 7c*
+- [ ] Schedule C line-item mapping (which expenses go on which line) — *feature* — *Phase 7c (the `taxDeductible` flag in `lib/categories.ts` is half done; line-number mapping is greenfield)*
+- [x] CPA email field in Settings + Send-to-CPA email handoff — *Phase 7a addition (not in original roadmap but is the natural delivery surface)*
 
 **UX considerations for this phase:** The "give this to my CPA" flow is the headline action. One button: generate a PDF + CSV bundle, attach to an email, send to a CPA address the user saved on first use. The Schedule C mapping is power-user territory — visible to those who want it, hidden by default.
+
+**Phase 7a (sub-session 21) shipped**: a Pro user can open `/reports`, pick a year, see summary cards + monthly chart + by-category breakdown + AR snapshot, download the CSV, and email it to their saved CPA with one click. Cash-basis math; mileage-rate honesty notice fires on prior years. Send-to-CPA uses Resend with `Reply-To = user.email` so customer replies route back to the vendor.
 
 ---
 
