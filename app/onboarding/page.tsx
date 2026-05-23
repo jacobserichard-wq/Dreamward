@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
@@ -28,6 +28,40 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sub-session 23 hygiene step 4: returning-user guard. The dashboard
+  // pushes incomplete users HERE, but a completed user who navigates
+  // back to /onboarding directly (browser history, bookmark, retype URL)
+  // would otherwise see step 0 again — confusing, no real harm but
+  // bad UX. Check on mount; redirect to / if onboarding is already
+  // complete. The render path below stays gated on `checking` so we
+  // don't briefly flash step 0 before the redirect fires.
+  const [checking, setChecking] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      try {
+        const data = await apiFetch<{
+          onboardingCompleted?: boolean;
+        }>("/api/client");
+        if (cancelled) return;
+        if (data?.onboardingCompleted === true) {
+          router.replace("/");
+          return;
+        }
+      } catch {
+        // Non-fatal — fall through to render the form. If /api/client
+        // is failing the user has bigger problems than a misrouted
+        // onboarding page.
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    }
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   const handleComplete = async () => {
     if (!businessName.trim()) {
       setError("Please enter your business name");
@@ -53,6 +87,21 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   };
+
+  if (checking) {
+    // Brief loading state while the returning-user check resolves.
+    // Avoids flashing step 0 before the router.replace fires.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
+        <div className="bg-white rounded-2xl py-10 px-9 max-w-[560px] w-full text-center">
+          <Spinner />
+          <p className="text-sm text-slate-500 mt-4 m-0">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
