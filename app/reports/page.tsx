@@ -311,6 +311,15 @@ export default function ReportsPage() {
             >
               {"\u{1F4E5}"} Download CSV
             </a>
+            <a
+              href={`/api/reports/annual/pdf?year=${year}`}
+              className="py-2 px-4 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium no-underline cursor-pointer hover:bg-slate-50"
+              // Same Content-Disposition: attachment pattern; browser saves
+              // instead of inline-renders. PDF route shipped in Phase 7b
+              // commit 4.
+            >
+              {"\u{1F4C4}"} Download PDF
+            </a>
             <button
               type="button"
               onClick={handleSendToCpa}
