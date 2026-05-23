@@ -24,6 +24,7 @@
 import pool from "./db";
 import { getCategoriesForIndustry, type Industry } from "./categories";
 import { csvRow } from "./csv";
+import { renderAnnualPdfBuffer } from "./pdf/annual";
 
 // Synthetic category names for surfaces that don't have one. These appear
 // in byCategory.income alongside real category names.
@@ -834,4 +835,43 @@ export async function renderAnnualCsvBody(opts: {
 
   const filename = `flowwork-${csvBusinessSlug(businessName)}-${year}.csv`;
   return { body, filename };
+}
+
+// ---------------------------------------------------------------------
+// PDF rendering — Phase 7b commit 3.
+//
+// Thin wrapper over lib/pdf/annual:renderAnnualPdfBuffer. The actual
+// renderToBuffer + JSX render lives in the .tsx file so type inference
+// through react-pdf's ReactElement<DocumentProps> signature works
+// without forcing this file to import JSX runtime.
+//
+// Why optional summary parameter: the POST /api/reports/annual/send
+// route (commit 5) computes annualSummary once + passes it to BOTH
+// renderAnnualCsvBody and renderAnnualPdf, avoiding double queries
+// on the same request. Direct GET /api/reports/annual/pdf (commit 4)
+// omits the param and lets this helper fetch it.
+// ---------------------------------------------------------------------
+
+export async function renderAnnualPdf(opts: {
+  clientId: number;
+  year: number;
+  industry: Industry;
+  businessName: string | null;
+  /** Optional pre-computed summary. When omitted, fetched via
+   *  annualSummary. The send route passes its already-computed
+   *  summary to dedupe the query work. */
+  summary?: AnnualSummary;
+}): Promise<{ buffer: Buffer; filename: string }> {
+  const summary =
+    opts.summary ??
+    (await annualSummary({
+      clientId: opts.clientId,
+      year: opts.year,
+      industry: opts.industry,
+    }));
+
+  const businessName = opts.businessName?.trim() || "FlowWork user";
+  const buffer = await renderAnnualPdfBuffer(summary, businessName);
+  const filename = `flowwork-${csvBusinessSlug(opts.businessName)}-${opts.year}.pdf`;
+  return { buffer, filename };
 }

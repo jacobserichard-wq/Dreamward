@@ -24,6 +24,7 @@ import {
   Text,
   View,
   StyleSheet,
+  renderToBuffer,
 } from "@react-pdf/renderer";
 import type { AnnualSummary } from "../reports";
 
@@ -335,5 +336,25 @@ export function AnnualPdfDocument({
         </View>
       </Page>
     </Document>
+  );
+}
+
+/**
+ * Render the annual summary to a PDF Buffer for download / email
+ * attachment. Wrapper around renderToBuffer that lives here (a .tsx
+ * file) so the JSX type inference flows through correctly to
+ * react-pdf's renderToBuffer signature — `React.createElement` in a
+ * .ts file loses the ReactElement<DocumentProps> generic and fails
+ * typecheck.
+ *
+ * Called from lib/reports.ts:renderAnnualPdf (commit 3), which is
+ * the consumer the routes import.
+ */
+export async function renderAnnualPdfBuffer(
+  summary: AnnualSummary,
+  businessName: string
+): Promise<Buffer> {
+  return renderToBuffer(
+    <AnnualPdfDocument summary={summary} businessName={businessName} />
   );
 }
