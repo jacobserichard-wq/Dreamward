@@ -2,7 +2,7 @@
 
 **Small Business Edition** | Updated May 20, 2026
 
-**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a SHIPPED (annual summary + mileage summary + CSV + CPA handoff); Phase 7b (PDF) + Phase 7c (Schedule C line mapping + quarterly estimates) deferred**
+**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a + 7b SHIPPED (annual summary + mileage + CSV + PDF + CPA handoff); Phase 7c (Schedule C line mapping + quarterly estimates) deferred**
 
 ---
 
@@ -407,8 +407,8 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 - [x] Annual summary report: total revenue, expenses by category, net profit — *feature* — **shipped in Phase 7a (sub-session 21)**
 - [x] Mileage summary with IRS standard rate calculation — *feature* — **shipped in Phase 7a**
-- [x] Export to CSV for CPA handoff — *feature* — **CSV shipped in Phase 7a; PDF deferred to Phase 7b**
-- [ ] Export to PDF for CPA handoff — *feature* — *Phase 7b*
+- [x] Export to CSV for CPA handoff — *feature* — **shipped in Phase 7a**
+- [x] Export to PDF for CPA handoff — *feature* — **shipped in Phase 7b (sub-session 22)**
 - [ ] Quarterly estimates helper — suggest estimated tax payments — *feature* — *Phase 7c*
 - [ ] Schedule C line-item mapping (which expenses go on which line) — *feature* — *Phase 7c (the `taxDeductible` flag in `lib/categories.ts` is half done; line-number mapping is greenfield)*
 - [x] CPA email field in Settings + Send-to-CPA email handoff — *Phase 7a addition (not in original roadmap but is the natural delivery surface)*
@@ -484,11 +484,10 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 ## Up Next
 
-**Phases 3 / 4 / 5 / 6 / 7a — SHIPPED** (sub-sessions 16 through 21, May 16–20). See per-phase sections above for shipped-summary paragraphs.
+**Phases 3 / 4 / 5 / 6 / 7a / 7b — SHIPPED** (sub-sessions 16 through 22, May 16–20). See per-phase sections above for shipped-summary paragraphs.
 
 **Phase 7 remaining:**
-- **Phase 7b — PDF export.** The natural next greenfield arc. PDF infra decision lives there (`@react-pdf/renderer` is the leading candidate — already-React design language, serverless-compatible, no Puppeteer download). Adds a "Download PDF" alongside "Download CSV" and rides as a second attachment on the Send-to-CPA email. ~6–8 commits, ~3–4 hours.
-- **Phase 7c — Schedule C line mapping + quarterly estimates.** Tax-domain work. The `taxDeductible` flag in `lib/categories.ts` is already in place (half the Schedule C work); the IRS Schedule C lines-8-through-27 mapping is the missing piece. Quarterly estimates need a tax-bracket assumption surface in Settings or on /reports. ~5–7 commits.
+- **Phase 7c — Schedule C line mapping + quarterly estimates.** Now the natural next greenfield arc. Tax-domain work. The `taxDeductible` flag in `lib/categories.ts` is already in place (half the Schedule C work); the IRS Schedule C lines-8-through-27 mapping is the missing piece. Quarterly estimates need a tax-bracket assumption surface in Settings or on /reports. ~5–7 commits.
 
 **Phase 1.6 remaining:**
 - OAuth Production submission **paused** in favor of tiered auth strategy. CASA decision criteria: 50+ active Pro subscribers OR 5+ prospect interviews citing Gmail as the deal-maker OR Pro tier hitting the 100-user cap.
