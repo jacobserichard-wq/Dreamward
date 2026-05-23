@@ -259,12 +259,16 @@ export function cpaAnnualSummaryEmail(opts: {
           Hi,
         </p>
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px;">
-          Attached is my ${year} business summary from FlowWork for ${businessName}.
-          The CSV includes a top summary section plus the full transaction
-          ledger broken into Income, Expense, and Mileage sections — filter
-          by the <strong>Section</strong> column in Excel or Sheets to isolate
-          each.
+          Attached is my ${year} business summary from FlowWork for ${businessName},
+          in two formats:
         </p>
+        <ul style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px; padding-left: 20px;">
+          <li><strong>PDF</strong> — printable single-page summary for filing /
+            review.</li>
+          <li><strong>CSV</strong> — full transaction ledger broken into
+            Summary, Income, Expense, and Mileage sections. Filter by the
+            <strong>Section</strong> column in Excel or Sheets to isolate each.</li>
+        </ul>
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px;">
           Headline number for ${year}: <strong>${formattedNet}</strong> net profit
           (cash basis).
@@ -275,7 +279,7 @@ export function cpaAnnualSummaryEmail(opts: {
         <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 4px;">Thanks,</p>
         <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 24px;">${signoff}</p>
         <p style="font-size: 12px; color: #94a3b8; margin: 32px 0 0;">
-          Sent via FlowWork. Cash-basis report — income counted when
+          Sent via FlowWork. Cash-basis reports — income counted when
           received, expenses when paid. Verify against source documents
           before filing.
         </p>

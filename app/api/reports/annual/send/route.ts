@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { renderAnnualCsvBody, annualSummary } from "@/lib/reports";
+import { renderAnnualCsvBody, renderAnnualPdf, annualSummary } from "@/lib/reports";
 import { sendEmail, cpaAnnualSummaryEmail } from "@/lib/email";
 import type { Industry } from "@/lib/categories";
 
@@ -107,24 +107,36 @@ export async function POST(req: NextRequest) {
 
     const industry = (client.industry ?? "other") as Industry;
 
-    // Generate CSV body + summary in parallel. annualSummary gives us
-    // the headline net-profit figure for the email cover note;
-    // renderAnnualCsvBody gives us the CSV attachment.
-    const [{ body: csvBody, filename }, summary] = await Promise.all([
-      renderAnnualCsvBody({
-        clientId: client.id,
-        year,
-        industry,
-        businessName: client.business_name ?? null,
-      }),
-      annualSummary({
-        clientId: client.id,
-        year,
-        industry,
-      }),
-    ]);
+    // Phase 7b dedupe-summary refactor: compute annualSummary ONCE,
+    // then parallel-render CSV + PDF using it. PDF render uses the
+    // optional `summary` param to avoid the duplicate annualSummary
+    // call it would otherwise make. Net: 1 summary query + CSV
+    // queries + PDF render in parallel after the summary returns.
+    const summary = await annualSummary({
+      clientId: client.id,
+      year,
+      industry,
+    });
+
+    const [{ body: csvBody, filename: csvFilename }, { buffer: pdfBuffer, filename: pdfFilename }] =
+      await Promise.all([
+        renderAnnualCsvBody({
+          clientId: client.id,
+          year,
+          industry,
+          businessName: client.business_name ?? null,
+        }),
+        renderAnnualPdf({
+          clientId: client.id,
+          year,
+          industry,
+          businessName: client.business_name ?? null,
+          summary, // dedupe — skips the internal annualSummary call
+        }),
+      ]);
 
     const csvBase64 = Buffer.from(csvBody, "utf8").toString("base64");
+    const pdfBase64 = pdfBuffer.toString("base64");
 
     const businessName =
       typeof client.business_name === "string" &&
@@ -158,9 +170,14 @@ export async function POST(req: NextRequest) {
         replyTo: userEmail || undefined,
         attachments: [
           {
-            filename,
+            filename: csvFilename,
             content: csvBase64,
             contentType: "text/csv",
+          },
+          {
+            filename: pdfFilename,
+            content: pdfBase64,
+            contentType: "application/pdf",
           },
         ],
       });
@@ -176,7 +193,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       sentTo: cpaEmail,
       year,
-      filename,
+      // Both filenames so future UI surfaces can display "sent X.csv +
+      // Y.pdf" if it ever wants that detail. Current page just shows
+      // "Sent YYYY summary to <email>" via sentTo + year.
+      csvFilename,
+      pdfFilename,
     });
   } catch (error) {
     console.error("Annual send POST error:", error);
