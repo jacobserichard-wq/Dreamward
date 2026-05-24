@@ -236,12 +236,20 @@ export function AnnualPdfDocument({
                   // in a tax document.
                   const deductLabel =
                     row.taxDeductible === true ? " (D)" : "";
+                  // Phase 7c: append the Schedule C line as a small
+                  // suffix (e.g., "L18", "L20b"). Null when no mapping
+                  // — render no suffix rather than a misleading
+                  // placeholder.
+                  const lineLabel = row.scheduleCLine
+                    ? ` L${row.scheduleCLine}`
+                    : "";
                   return (
                     <View key={row.category} style={styles.catRow}>
                       <View style={styles.catName}>
                         <Text>
                           {row.category}
                           {deductLabel}
+                          {lineLabel}
                         </Text>
                         <Text style={styles.catCount}>
                           {row.count} {row.count === 1 ? "row" : "rows"}
@@ -255,6 +263,27 @@ export function AnnualPdfDocument({
             </View>
           </View>
         </View>
+
+        {/* Phase 7c: Schedule C Summary section. Roll-up by IRS line
+            number for the CPA's filing reference. Only renders if
+            there's any expense activity that mapped to a line. */}
+        {summary.scheduleCSummary.length > 0 && (
+          <View style={styles.section} wrap={false}>
+            <Text style={styles.sectionTitle}>Schedule C Summary</Text>
+            <Text style={{ fontSize: 8, color: "#94a3b8", marginBottom: 6 }}>
+              Expense totals grouped by IRS Schedule C Part II line.
+              Cross-reference when filing.
+            </Text>
+            {summary.scheduleCSummary.map((row) => (
+              <View key={row.line} style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>
+                  Line {row.line} — {row.description}
+                </Text>
+                <Text style={styles.summaryValue}>{fmtUsd(row.total)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* AR Snapshot — conditional on any AR activity. wrap={false}
             keeps the four-row block intact on a single page. */}
