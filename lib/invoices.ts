@@ -41,6 +41,12 @@ export interface InvoiceRow {
   reminder_count: number;
   created_at: string;
   updated_at: string;
+  // Phase 6.5 (sub-session 24): three columns from migration 0009.
+  // Defaults preserve existing manual rows — source='manual',
+  // gmail_message_id=null, needs_review=false.
+  source: "manual" | "email-auto";
+  gmail_message_id: string | null;
+  needs_review: boolean;
 }
 
 export interface InvoicePaymentRow {
@@ -274,4 +280,74 @@ export async function deletePayment(opts: {
   } finally {
     client.release();
   }
+}
+
+// ---------------------------------------------------------------------
+// Phase 6.5 — Review-queue helpers
+// ---------------------------------------------------------------------
+
+/**
+ * Clear the needs_review flag on an auto-detected invoice. Used by the
+ * PATCH /api/invoices/[id]/review approve path. Tenant-scoped via
+ * WHERE client_id = $2. Throws InvoiceNotFoundError when no matching
+ * row exists (404 at the API layer).
+ *
+ * Idempotent — calling this on an already-approved row is a no-op
+ * UPDATE that still returns the current row state.
+ */
+export async function approveInvoice(opts: {
+  invoiceId: number;
+  clientId: number;
+}): Promise<{ invoice: InvoiceRow }> {
+  const { invoiceId, clientId } = opts;
+  const result = await pool.query<InvoiceRow>(
+    `UPDATE invoices
+        SET needs_review = false,
+            updated_at = NOW()
+      WHERE id = $1 AND client_id = $2
+      RETURNING *`,
+    [invoiceId, clientId],
+  );
+  if (result.rowCount === 0) {
+    throw new InvoiceNotFoundError(invoiceId);
+  }
+  return { invoice: result.rows[0] };
+}
+
+/**
+ * Hard-delete an auto-detected invoice the user dismissed as "not a real
+ * invoice." Used by the PATCH /api/invoices/[id]/review dismiss path.
+ *
+ * Hard-delete (not soft-delete via status='written_off') is intentional
+ * — auto-detected rows that aren't real invoices shouldn't pollute the
+ * aging math or the audit trail. The user is saying "this is noise."
+ * The unique index on (client_id, gmail_message_id) means a future
+ * re-ingest of the same email WILL re-create the row, so the user can
+ * recover from an accidental dismiss by clicking "Fetch from Gmail"
+ * again.
+ *
+ * Refuses to dismiss invoices that aren't needs_review=true (a guard
+ * against accidentally hard-deleting manually-entered or already-
+ * approved rows via this endpoint). Manual rows are deleted via the
+ * existing DELETE /api/invoices/[id] route.
+ *
+ * Throws InvoiceNotFoundError if no matching needs_review row exists.
+ */
+export async function dismissInvoice(opts: {
+  invoiceId: number;
+  clientId: number;
+}): Promise<{ deletedId: number }> {
+  const { invoiceId, clientId } = opts;
+  const result = await pool.query<{ id: number }>(
+    `DELETE FROM invoices
+      WHERE id = $1
+        AND client_id = $2
+        AND needs_review = true
+      RETURNING id`,
+    [invoiceId, clientId],
+  );
+  if (result.rowCount === 0) {
+    throw new InvoiceNotFoundError(invoiceId);
+  }
+  return { deletedId: result.rows[0].id };
 }
