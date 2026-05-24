@@ -43,6 +43,19 @@ export default function SettingsPage() {
   // empty string saves as no-email (the JSONB merge drops the key by
   // assigning null/missing on save). Mirrors the home-address pattern
   // exactly: dirty state, saved indicator, disabled-when-clean button.
+  // Phase 7c commit 8: tax bracket assumption for quarterly estimates.
+  // Persisted under preferences.taxBracket = { incomePct, sePct }.
+  // Defaults (22 income, 14.13 SE) mirror DEFAULT_TAX_BRACKET in
+  // lib/quarterly.ts. Single dirty flag covers both inputs since they
+  // save together via one PATCH.
+  const [incomePct, setIncomePct] = useState<string>("22");
+  const [sePct, setSePct] = useState<string>("14.13");
+  const [savedIncomePct, setSavedIncomePct] = useState<string>("22");
+  const [savedSePct, setSavedSePct] = useState<string>("14.13");
+  const [bracketSaving, setBracketSaving] = useState(false);
+  const [bracketSaved, setBracketSaved] = useState(false);
+  const [bracketError, setBracketError] = useState<string | null>(null);
+
   const [cpaEmail, setCpaEmail] = useState("");
   const [savedCpaEmail, setSavedCpaEmail] = useState("");
   const [cpaEmailSaving, setCpaEmailSaving] = useState(false);
@@ -106,6 +119,13 @@ export default function SettingsPage() {
   const cpaEmailDirty = useMemo(
     () => cpaEmail.trim() !== savedCpaEmail.trim(),
     [cpaEmail, savedCpaEmail]
+  );
+
+  const bracketDirty = useMemo(
+    () =>
+      incomePct.trim() !== savedIncomePct.trim() ||
+      sePct.trim() !== savedSePct.trim(),
+    [incomePct, sePct, savedIncomePct, savedSePct]
   );
   const incomeCategoriesDirty = useMemo(
     () =>
@@ -172,6 +192,25 @@ export default function SettingsPage() {
         setSavedHiddenDefaults(initialHiddenDefaults);
         setIncomeCategories(initialIncomeCategories);
         setSavedIncomeCategories(initialIncomeCategories);
+        // Phase 7c: read taxBracket override; fall back to defaults.
+        const rawBracket =
+          rawPrefs.taxBracket &&
+          typeof rawPrefs.taxBracket === "object"
+            ? (rawPrefs.taxBracket as Record<string, unknown>)
+            : {};
+        const initialIncomePct =
+          typeof rawBracket.incomePct === "number"
+            ? String(rawBracket.incomePct)
+            : "22";
+        const initialSePct =
+          typeof rawBracket.sePct === "number"
+            ? String(rawBracket.sePct)
+            : "14.13";
+        setIncomePct(initialIncomePct);
+        setSePct(initialSePct);
+        setSavedIncomePct(initialIncomePct);
+        setSavedSePct(initialSePct);
+
         setCpaEmail(initialCpaEmail);
         setSavedCpaEmail(initialCpaEmail);
         // Phase 5 commit 8: IRS rate is global, so it comes back on the
@@ -200,7 +239,8 @@ export default function SettingsPage() {
       !hiddenDefaultsDirty &&
       !incomeCategoriesDirty &&
       !irsRateDirty &&
-      !cpaEmailDirty
+      !cpaEmailDirty &&
+      !bracketDirty
     )
       return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -217,6 +257,7 @@ export default function SettingsPage() {
     incomeCategoriesDirty,
     irsRateDirty,
     cpaEmailDirty,
+    bracketDirty,
   ]);
 
   const toggleModule = (moduleId: string) => {
@@ -446,6 +487,50 @@ export default function SettingsPage() {
   // saves as preferences.cpa = { email: "" } which the send route
   // treats as "not set" (mirrors the customer_email handling pattern
   // in Phase 6).
+  // Phase 7c commit 8: save tax bracket override. Validates both
+  // values as positive finite numbers; saves the whole pair to
+  // preferences.taxBracket. Empty/default save also clears the
+  // override.
+  const saveTaxBracket = async () => {
+    setBracketSaving(true);
+    setBracketError(null);
+    const incomeNum = Number(incomePct);
+    const seNum = Number(sePct);
+    if (!Number.isFinite(incomeNum) || incomeNum < 0 || incomeNum > 50) {
+      setBracketError("Income tax % must be a number between 0 and 50.");
+      setBracketSaving(false);
+      return;
+    }
+    if (!Number.isFinite(seNum) || seNum < 0 || seNum > 30) {
+      setBracketError("SE tax % must be a number between 0 and 30.");
+      setBracketSaving(false);
+      return;
+    }
+    const newPreferences = {
+      ...preferences,
+      taxBracket: { incomePct: incomeNum, sePct: seNum },
+    };
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (res.ok) {
+        setPreferences(newPreferences);
+        setSavedIncomePct(String(incomeNum));
+        setSavedSePct(String(seNum));
+        setBracketSaved(true);
+      } else {
+        setBracketError(`Couldn't save: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setBracketError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBracketSaving(false);
+    }
+  };
+
   const saveCpaEmail = async () => {
     setCpaEmailSaving(true);
     setCpaEmailError(null);
@@ -991,6 +1076,115 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-3 m-0">
               Optional. Leave blank to disable the {"“"}Send to CPA{"”"} button
               on the Tax Reports page.
+            </p>
+          </div>
+        </div>
+
+        {/* Phase 7c commit 8: Tax bracket assumption. Drives the
+            quarterly-estimate math in /reports (lib/quarterly.ts).
+            Two inputs because the calc is incomePct + sePct; we save
+            them as one pair under preferences.taxBracket. Defaults
+            shown match DEFAULT_TAX_BRACKET (22 income + 14.13 SE =
+            36.13 effective). The "verify with your CPA" disclaimer
+            is mandatory per design §1 #6 — the math is a planning
+            aid, not tax advice. */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Tax bracket assumption</h2>
+            <p className="text-sm text-slate-500 m-0">
+              Used by Tax Reports to suggest quarterly estimated payments. The
+              defaults below cover a typical single-filer in the 22% federal
+              bracket — adjust to match your situation, or leave alone if you
+              aren&apos;t sure.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {bracketError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
+                {bracketError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="settings-income-pct" className="block text-sm font-medium text-slate-700 mb-1">
+                  Income tax %
+                </label>
+                <input
+                  id="settings-income-pct"
+                  type="text"
+                  inputMode="decimal"
+                  value={incomePct}
+                  onChange={(e) => {
+                    setIncomePct(e.target.value);
+                    setBracketSaved(false);
+                    setBracketError(null);
+                  }}
+                  placeholder="22"
+                  className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1 m-0">
+                  Your marginal federal bracket (default 22%).
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="settings-se-pct" className="block text-sm font-medium text-slate-700 mb-1">
+                  Self-employment tax %
+                </label>
+                <input
+                  id="settings-se-pct"
+                  type="text"
+                  inputMode="decimal"
+                  value={sePct}
+                  onChange={(e) => {
+                    setSePct(e.target.value);
+                    setBracketSaved(false);
+                    setBracketError(null);
+                  }}
+                  placeholder="14.13"
+                  className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1 m-0">
+                  Effective SE tax (default 14.13%).
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-4 m-0">
+              Effective set-aside: <strong>
+                {(() => {
+                  const i = Number(incomePct);
+                  const s = Number(sePct);
+                  if (!Number.isFinite(i) || !Number.isFinite(s)) return "—";
+                  return `${(i + s).toFixed(2)}%`;
+                })()}
+              </strong>
+            </p>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveTaxBracket}
+                disabled={bracketSaving || !bracketDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  bracketDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
+                } ${bracketSaving ? "opacity-50" : ""}`}
+              >
+                {bracketSaving ? "Saving..." : "Save tax bracket"}
+              </button>
+              {bracketDirty && (
+                <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>
+              )}
+              {!bracketDirty && bracketSaved && (
+                <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              <strong>Not tax advice.</strong> Quarterly estimates are a
+              rough planning aid based on linear projection of YTD profit.
+              Verify with your CPA before making payments.
             </p>
           </div>
         </div>
