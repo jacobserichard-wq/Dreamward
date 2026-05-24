@@ -226,6 +226,7 @@ export async function GET(req: NextRequest) {
       `SELECT id, client_id, customer_name, customer_email, invoice_number,
               invoice_date, due_date, amount_total, amount_paid, status,
               notes, last_reminder_sent_at, reminder_count,
+              source, gmail_message_id, needs_review,
               created_at, updated_at
          FROM invoices
         WHERE ${whereParts.join(" AND ")}
