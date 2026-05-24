@@ -53,6 +53,13 @@ export type Category = {
   type: "income" | "expense";
   // Omit when ambiguous (e.g. partially deductible, depreciable, depends on context).
   taxDeductible?: boolean;
+  // IRS Schedule C (Form 1040) Part II line number that this expense
+  // maps to. String to allow a/b suffixes (e.g. "20b", "24a", "27a").
+  // Omit for income categories (all map to Line 1 by convention — see
+  // phase-7c-design.md §1 #7). For expenses without a clean fit, use
+  // "27a" (Other expenses, itemize on Part V). Sub-session 24 Phase 7c
+  // commit 1 added the field; commit 2 fills in the mappings.
+  scheduleC?: string;
 };
 
 export const UNIVERSAL_CATEGORIES: Category[] = [
