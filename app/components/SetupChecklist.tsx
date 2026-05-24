@@ -59,7 +59,10 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.gmailConnected,
       action: { kind: "signIn" },
       buttonLabel: "Connect",
-      visibleOn: ["growth", "pro"],
+      // Sub-session 24 follow-up: tightened from growth+pro to pro
+      // only. Matches the /api/gmail Pro-gate from commit 1 + the
+      // README's Pro-only marketing of Gmail auto-fetch.
+      visibleOn: ["pro"],
     },
     {
       id: "upload",

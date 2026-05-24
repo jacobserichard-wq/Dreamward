@@ -908,6 +908,41 @@ export default function Home() {
         {/* ── EMAILS TAB ── */}
         {activeTab === "emails" && (
           <>
+            {/* Sub-session 24 follow-up commit 2: Pro-only upgrade card.
+                After the backend Pro-gate (commit 1) non-Pro plans get
+                labels:[], so the label-pill row below would render
+                empty. Replace the entire Emails-tab workflow with an
+                upgrade card for non-Pro users — they get a clear path
+                to Pro instead of a confused empty UI. */}
+            {clientInfo && clientInfo.plan !== "pro" ? (
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-300 rounded-xl py-8 px-6 text-center">
+                <p className="text-4xl mb-3">{"\u{1F4E7}"}</p>
+                <h3 className="text-lg font-bold text-amber-900 m-0 mb-2">
+                  Gmail auto-fetch is a Pro feature
+                </h3>
+                <p className="text-sm text-amber-800 m-0 mb-5 max-w-md mx-auto leading-relaxed">
+                  Upgrade to Pro ($89/mo) to pull invoices, receipts,
+                  and AR follow-ups directly from your Gmail labels — no
+                  manual uploads. We extract structured data with AI and
+                  categorize each item automatically.
+                </p>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <Link
+                    href="/billing"
+                    className="inline-block py-2.5 px-6 rounded-lg bg-amber-600 text-white text-sm font-semibold no-underline cursor-pointer"
+                  >
+                    View plans
+                  </Link>
+                  <Link
+                    href="/help/gmail-setup"
+                    className="text-sm text-amber-800 hover:underline"
+                  >
+                    Preview the setup guide {"→"}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Label selector + actions */}
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
               <div className="flex flex-wrap gap-2">
@@ -1084,6 +1119,8 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+            )}
+              </>
             )}
           </>
         )}
@@ -1549,20 +1586,32 @@ export default function Home() {
                   you add real data. Pick whichever path fits your
                   workflow.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("emails")}
-                    className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left cursor-pointer hover:bg-blue-100 transition-colors"
-                  >
-                    <div className="text-2xl mb-1.5">{"\u{1F4E7}"}</div>
-                    <div className="text-sm font-semibold text-slate-900 mb-1">
-                      Connect Gmail
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Auto-pull invoices and expenses from your inbox.
-                    </div>
-                  </button>
+                {/* Sub-session 24 follow-up commit 2: Connect-Gmail
+                    path renders only for Pro users (matches the
+                    /api/gmail Pro-gate). Non-Pro users see a 2-card
+                    grid (Upload + Add manually); Pro users see all 3. */}
+                <div
+                  className={`grid grid-cols-1 gap-3 max-w-2xl mx-auto ${
+                    clientInfo?.plan === "pro"
+                      ? "sm:grid-cols-3"
+                      : "sm:grid-cols-2"
+                  }`}
+                >
+                  {clientInfo?.plan === "pro" && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("emails")}
+                      className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left cursor-pointer hover:bg-blue-100 transition-colors"
+                    >
+                      <div className="text-2xl mb-1.5">{"\u{1F4E7}"}</div>
+                      <div className="text-sm font-semibold text-slate-900 mb-1">
+                        Connect Gmail
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Auto-pull invoices and expenses from your inbox.
+                      </div>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setActiveTab("emails")}
