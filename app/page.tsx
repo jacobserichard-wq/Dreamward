@@ -402,6 +402,14 @@ export default function Home() {
 
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
+  // UX commit 4 (sub-session 24): drives the Processed-tab status
+  // filter when a user clicks one of the Status Breakdown pills on
+  // the Dashboard. Null = no filter. Cleared via the chip on the
+  // Processed tab.
+  const [processedStatusFilter, setProcessedStatusFilter] = useState<
+    "pending" | "overdue" | "needs_review" | "paid" | null
+  >(null);
+
   const requestClearSample = useCallback(() => {
     setConfirmClearOpen(true);
   }, []);
@@ -920,14 +928,47 @@ export default function Home() {
         {/* ── PROCESSED TAB ── */}
         {activeTab === "processed" && (
           <>
-            {processedItems.length === 0 ? (
+            {/* UX commit 4: status-filter chip. Visible only when a
+                filter is active (typically set by clicking a Status
+                Breakdown pill on the Dashboard tab). */}
+            {processedStatusFilter && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-600">
+                  Showing only <strong>{processedStatusFilter.replace("_", " ")}</strong> items
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setProcessedStatusFilter(null)}
+                  className="text-sm text-blue-600 hover:underline cursor-pointer"
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
+            {(() => {
+              // Apply the status filter immediately above the empty-
+              // state branch so "no rows after filter" gets a distinct
+              // empty state from "no rows at all."
+              const visibleItems = processedStatusFilter
+                ? processedItems.filter((i) => i.status === processedStatusFilter)
+                : processedItems;
+              return processedItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F4CB}"}</p>
                 <p>No processed items yet. Fetch emails and click Process with AI.</p>
               </div>
+            ) : visibleItems.length === 0 ? (
+              <div className="text-center p-[60px] text-slate-400 text-[15px]">
+                <p className="text-5xl mb-2">{"\u{1F50D}"}</p>
+                <p>
+                  No items match the{" "}
+                  <strong>{processedStatusFilter?.replace("_", " ")}</strong>{" "}
+                  filter.
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
-                {processedItems.map((item) => (
+                {visibleItems.map((item) => (
                   <div key={item.id} className="bg-white rounded-xl border border-slate-200">
                     {/* Card header with status badge */}
                     <div className="flex justify-between items-center pt-4 px-5 pb-3 border-b border-slate-100">
@@ -1031,7 +1072,8 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            )}
+            );
+            })()}
           </>
         )}
 
@@ -1082,24 +1124,38 @@ export default function Home() {
               )}
             </div>
 
-            {/* Status breakdown */}
+            {/* Status breakdown. UX commit 4: pills are now buttons —
+                clicking sends the user to the Processed tab with the
+                matching status filter applied. Addresses audit F4 +
+                F10 (passive badges → actionable). */}
             <div className="mb-8">
               <h3 className="text-lg font-bold text-slate-900 mb-4">Status Breakdown</h3>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                 {[
-                  { label: "Pending", count: stats.pending, borderClass: "border-l-amber-500", icon: "⌛" },
-                  { label: "Overdue", count: stats.overdue, borderClass: "border-l-red-600", icon: "\u{1F6A8}" },
-                  { label: "Needs Review", count: stats.needsReview, borderClass: "border-l-indigo-500", icon: "\u{1F440}" },
-                  { label: "Paid", count: stats.paid, borderClass: "border-l-green-600", icon: "✅" },
+                  { label: "Pending", status: "pending" as const, count: stats.pending, borderClass: "border-l-amber-500", icon: "⌛" },
+                  { label: "Overdue", status: "overdue" as const, count: stats.overdue, borderClass: "border-l-red-600", icon: "\u{1F6A8}" },
+                  { label: "Needs Review", status: "needs_review" as const, count: stats.needsReview, borderClass: "border-l-indigo-500", icon: "\u{1F440}" },
+                  { label: "Paid", status: "paid" as const, count: stats.paid, borderClass: "border-l-green-600", icon: "✅" },
                 ].map((item) => (
-                  <div
+                  <button
                     key={item.label}
-                    className={`bg-white rounded-[10px] py-4 px-5 flex items-center gap-3 border border-slate-200 border-l-4 ${item.borderClass}`}
+                    type="button"
+                    onClick={() => {
+                      setProcessedStatusFilter(item.status);
+                      setActiveTab("processed");
+                    }}
+                    title={
+                      item.count > 0
+                        ? `Show ${item.count} ${item.label.toLowerCase()} item${item.count === 1 ? "" : "s"}`
+                        : `No ${item.label.toLowerCase()} items`
+                    }
+                    className={`bg-white rounded-[10px] py-4 px-5 flex items-center gap-3 border border-slate-200 border-l-4 cursor-pointer text-left hover:bg-slate-50 transition-colors ${item.borderClass} disabled:opacity-60 disabled:cursor-not-allowed`}
+                    disabled={item.count === 0}
                   >
                     <span className="text-xl">{item.icon}</span>
                     <span className="text-2xl font-extrabold text-slate-900">{item.count}</span>
                     <span className="text-[13px] text-slate-500">{item.label}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
