@@ -182,7 +182,7 @@ export function buildClassifier(
 // extended in the future if IRS renumbers (rare). Line 30 included
 // separately since the home-office category targets it directly even
 // though it's outside Part II.
-const SCHEDULE_C_DESCRIPTIONS: Record<string, string> = {
+export const SCHEDULE_C_DESCRIPTIONS: Record<string, string> = {
   "8": "Advertising",
   "9": "Car and truck expenses",
   "10": "Commissions and fees",
@@ -214,7 +214,7 @@ const SCHEDULE_C_DESCRIPTIONS: Record<string, string> = {
 // doesn't carry a scheduleC field — surfaced as null in the response
 // rather than silently bucketed to "27a" so the UI/PDF can render an
 // "unspecified" indicator.
-function buildScheduleCMap(industry: Industry): Map<string, string | null> {
+export function buildScheduleCMap(industry: Industry): Map<string, string | null> {
   const m = new Map<string, string | null>();
   for (const c of getCategoriesForIndustry(industry)) {
     if (c.type !== "expense") continue;
@@ -230,7 +230,7 @@ function buildScheduleCMap(industry: Industry): Map<string, string | null> {
 // === null) are deliberately omitted from the summary — they show on
 // the on-screen expense list with an "unspecified" badge but don't
 // contribute to a Schedule C line that can't be filed against.
-function buildScheduleCSummary(
+export function buildScheduleCSummary(
   expense: Array<{
     category: string;
     count: number;

@@ -20,6 +20,8 @@ import { csvRow } from "../csv";
 import type { Industry } from "../categories";
 import {
   buildClassifier,
+  buildScheduleCMap,
+  buildScheduleCSummary,
   csvBusinessSlug,
   isoYearBounds,
   type AppSettingRow,
@@ -130,6 +132,15 @@ export async function renderAnnualCsvBody(opts: {
   const prefIncome = settings?.preferences?.custom_income_categories;
   const customIncome: string[] = Array.isArray(prefIncome) ? prefIncome : [];
   const classify = buildClassifier(industry, customIncome, customExpense);
+  // Phase 7c: per-category Schedule C line lookup. Mirror of the
+  // aggregate.ts pattern so each Expense row carries its line in the
+  // ScheduleC Line column, and the ScheduleC Summary section at the
+  // end of the body rolls up totals by line. Built once for the year.
+  const scheduleCMap = buildScheduleCMap(industry);
+  // Accumulator of expense totals by category — feeds the ScheduleC
+  // Summary section computed after row iteration. Keeps the CSV
+  // self-contained (no need to call annualSummary just for the rollup).
+  const expenseTotalsByCategory = new Map<string, { count: number; total: number }>();
 
   const irsRaw = appSettingResult.rows[0]?.value;
   const parsedRate = irsRaw == null ? NaN : Number(irsRaw);
@@ -165,6 +176,10 @@ export async function renderAnnualCsvBody(opts: {
     const bf = Number(e.booth_fee);
     if (bf > 0) {
       boothFees += bf;
+      // Booth fees hardcoded to Schedule C line 20b (Rent or lease —
+      // other business property). Matches the lib/categories.ts mapping
+      // for "Booth & Show Fees". Hardcoded here because booth_fee lives
+      // on the events table, not on a categorized processed_items row.
       expenseLines.push(
         csvRow([
           "Expense",
@@ -173,15 +188,26 @@ export async function renderAnnualCsvBody(opts: {
           e.venue ?? e.name,
           "",
           "Booth Fees",
+          "20b",
           formatMoney2(bf),
           `Event #${e.id}`,
         ])
       );
+      // Roll booth fees into the by-category total for the ScheduleC
+      // Summary section.
+      const bk = expenseTotalsByCategory.get("Booth Fees") ?? { count: 0, total: 0 };
+      bk.count += 1;
+      bk.total += bf;
+      expenseTotalsByCategory.set("Booth Fees", bk);
     }
     const miles = e.total_miles == null ? 0 : Number(e.total_miles);
     if (miles > 0) {
       totalMiles += miles;
       const cost = miles * irsRate;
+      // Mileage hardcoded to Schedule C line 9 (Car and truck expenses).
+      // IRS allows either the standard mileage rate OR actual costs;
+      // FlowWork uses standard mileage rate. Either method lands on
+      // line 9.
       mileageLines.push(
         csvRow([
           "Mileage",
@@ -190,6 +216,7 @@ export async function renderAnnualCsvBody(opts: {
           e.name,
           `${miles} mi × $${irsRate.toFixed(2)}`,
           "",
+          "9",
           formatMoney2(cost),
           `Event #${e.id}`,
         ])
@@ -205,6 +232,9 @@ export async function renderAnnualCsvBody(opts: {
     if (!t.due_date) continue;
     if (kind === "income") {
       totalRevenue += amount;
+      // Income → Schedule C line 1 (Gross receipts or sales) by
+      // convention (design §1 #7). All income types map to line 1
+      // for sole-prop filings.
       incomeLines.push(
         csvRow([
           "Income",
@@ -213,12 +243,15 @@ export async function renderAnnualCsvBody(opts: {
           t.vendor ?? "",
           t.summary ?? "",
           t.category ?? "Uncategorized income",
+          "1",
           formatMoney2(amount),
           `Item #${t.id}`,
         ])
       );
     } else if (kind === "expense") {
       totalExpenses += amount;
+      const cat = t.category ?? "Uncategorized expense";
+      const line = scheduleCMap.get(cat) ?? "";
       expenseLines.push(
         csvRow([
           "Expense",
@@ -226,11 +259,17 @@ export async function renderAnnualCsvBody(opts: {
           t.source === "manual" ? "Manual expense" : "Linked expense",
           t.vendor ?? "",
           t.summary ?? "",
-          t.category ?? "Uncategorized expense",
+          cat,
+          line,
           formatMoney2(amount),
           `Item #${t.id}`,
         ])
       );
+      // Roll into the by-category total for ScheduleC Summary.
+      const bk = expenseTotalsByCategory.get(cat) ?? { count: 0, total: 0 };
+      bk.count += 1;
+      bk.total += amount;
+      expenseTotalsByCategory.set(cat, bk);
     }
     // unknown-kind amounts deliberately omitted (see header comment).
   }
@@ -253,7 +292,8 @@ export async function renderAnnualCsvBody(opts: {
         "AR payment received",
         p.customer_name,
         desc,
-        "",
+        "",   // Category slot blank for AR payments
+        "1",  // Income → Schedule C line 1 (Gross receipts)
         formatMoney2(amount),
         notesBits.join(" "),
       ])
@@ -270,6 +310,7 @@ export async function renderAnnualCsvBody(opts: {
     "Vendor/Customer",
     "Description",
     "Category",
+    "Schedule C Line",
     "Amount",
     "Notes",
   ]);
@@ -281,6 +322,7 @@ export async function renderAnnualCsvBody(opts: {
       "",
       "Annual revenue (cash basis)",
       "",
+      "",
       formatMoney2(totalRevenue),
       "",
     ]),
@@ -290,6 +332,7 @@ export async function renderAnnualCsvBody(opts: {
       "Booth fees",
       "",
       "Annual booth fees",
+      "",
       "",
       formatMoney2(boothFees),
       "",
@@ -301,6 +344,7 @@ export async function renderAnnualCsvBody(opts: {
       "",
       "Annual expenses (cash basis)",
       "",
+      "",
       formatMoney2(totalExpenses),
       "",
     ]),
@@ -311,6 +355,7 @@ export async function renderAnnualCsvBody(opts: {
       "",
       `${totalMiles.toFixed(1)} mi × $${irsRate.toFixed(2)}`,
       "",
+      "9",
       formatMoney2(mileageCost),
       "",
     ]),
@@ -321,17 +366,67 @@ export async function renderAnnualCsvBody(opts: {
       "",
       "Revenue − Booth − Expenses − Mileage",
       "",
+      "",
       formatMoney2(netProfit),
       "",
     ]),
   ];
+
+  // Phase 7c ScheduleC Summary section. Roll up expense totals by IRS
+  // Schedule C line via the shared buildScheduleCSummary helper. One
+  // row per distinct line that appears in this year's expense data,
+  // plus a Mileage row (line 9) since mileage is tracked separately
+  // from expense categories above.
+  const expenseArr = Array.from(expenseTotalsByCategory.entries()).map(
+    ([category, v]) => ({
+      category,
+      count: v.count,
+      total: v.total,
+      taxDeductible: null,
+      scheduleCLine: scheduleCMap.get(category) ?? (category === "Booth Fees" ? "20b" : null),
+    })
+  );
+  const scheduleCSummary = buildScheduleCSummary(expenseArr);
+  // Add mileage to the rollup if any. Synthetic row — not in the
+  // expenseArr (mileage tracked separately) but does appear on Schedule
+  // C line 9 (Car and truck expenses).
+  if (mileageCost > 0) {
+    const existing = scheduleCSummary.find((r) => r.line === "9");
+    if (existing) {
+      existing.total += mileageCost;
+      existing.categories.push("Mileage deduction");
+    } else {
+      scheduleCSummary.push({
+        line: "9",
+        description: "Car and truck expenses",
+        total: mileageCost,
+        categories: ["Mileage deduction"],
+      });
+    }
+    // Re-sort since we may have added a row.
+    scheduleCSummary.sort((a, b) => b.total - a.total);
+  }
+  const scheduleCSection = scheduleCSummary.map((r) =>
+    csvRow([
+      "ScheduleC Summary",
+      eoy,
+      `Line ${r.line}`,
+      "",
+      r.description,
+      r.categories.join("; "),
+      r.line,
+      formatMoney2(r.total),
+      "",
+    ])
+  );
 
   const body =
     header +
     summarySection.join("") +
     incomeLines.join("") +
     expenseLines.join("") +
-    mileageLines.join("");
+    mileageLines.join("") +
+    scheduleCSection.join("");
 
   const filename = `flowwork-${csvBusinessSlug(businessName)}-${year}.csv`;
   return { body, filename };
