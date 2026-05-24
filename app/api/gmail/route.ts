@@ -2,12 +2,32 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
+import { getSessionClient } from "@/lib/getClient";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
 
   if (!(session as any)?.accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // Sub-session 24 follow-up: Pro-only gating. Closes a leak where
+  // any signed-in user could trigger Gmail fetches + downstream
+  // Anthropic API spend regardless of their plan. Matches the README
+  // marketing claim that Gmail auto-fetch is a Pro feature, and the
+  // CASA security narrative built on that gating.
+  const client = await getSessionClient();
+  if (!client) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  if (client.plan !== "pro") {
+    return NextResponse.json(
+      {
+        error:
+          "Gmail auto-fetch is a Pro feature. Upgrade your plan to connect Gmail.",
+      },
+      { status: 403 }
+    );
   }
 
   const { searchParams } = new URL(request.url);

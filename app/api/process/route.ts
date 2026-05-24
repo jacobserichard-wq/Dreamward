@@ -31,6 +31,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Sub-session 24 follow-up: Pro-only Gmail processing. Mirrors
+    // the /api/gmail gating one level up so a non-Pro caller can't
+    // forge a request that bypasses the fetch gate by supplying
+    // emails directly. Closes the Anthropic-API-spend leak.
+    if (client.plan !== "pro") {
+      return NextResponse.json(
+        {
+          error:
+            "AI email processing is a Pro feature. Upgrade your plan to enable Gmail auto-fetch + extraction.",
+        },
+        { status: 403 }
+      );
+    }
+
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return NextResponse.json(
         { error: "No emails provided" },
