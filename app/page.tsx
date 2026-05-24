@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import Spinner from "./components/Spinner";
 import ErrorBanner from "./components/ErrorBanner";
 import CsvReviewModal from "./components/CsvReviewModal";
+import ConfirmModal from "./components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "./components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
@@ -392,15 +393,26 @@ export default function Home() {
   );
 
   // ─── Clear sample data ─────────────────────────────────────────────────────
+  //
+  // UX commit 1 (sub-session 24): swapped the legacy window.confirm()
+  // for the shared <ConfirmModal>. The modal-open state lives at the
+  // page level; the actual mutation is unchanged. requestClearSample()
+  // opens the modal; confirmClearSample() runs the DELETE.
 
-  const clearSampleData = useCallback(async () => {
-    if (!confirm("Clear all sample data? You can't undo this.")) return;
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+
+  const requestClearSample = useCallback(() => {
+    setConfirmClearOpen(true);
+  }, []);
+
+  const confirmClearSample = useCallback(async () => {
     setClearingSample(true);
     setError(null);
     try {
       await apiFetch("/api/sample-data", { method: "DELETE" });
       await loadItems();
       setSuccessMsg("Sample data cleared");
+      setConfirmClearOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't clear sample data");
     } finally {
@@ -711,7 +723,7 @@ export default function Home() {
               {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when you&apos;re ready to add real data.
             </span>
             <button
-              onClick={clearSampleData}
+              onClick={requestClearSample}
               disabled={clearingSample}
               className="px-3.5 py-1.5 rounded-md border border-yellow-600 bg-white text-amber-800 text-[13px] font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
             >
@@ -1252,6 +1264,22 @@ export default function Home() {
           }}
           onConfirm={confirmImport}
           importing={importing}
+        />
+
+        {/* ── CLEAR SAMPLE DATA CONFIRMATION ── */}
+        {/* UX commit 1: replaces the legacy window.confirm() with the
+            shared ConfirmModal. Same destructive-op pattern other arcs
+            will adopt (Phase 6.5 dismiss-invoice migrates in commit 8
+            of this arc). */}
+        <ConfirmModal
+          open={confirmClearOpen}
+          title="Clear all sample data?"
+          message="This deletes the example transactions FlowWork seeded for your industry. You can't undo this, but your real data is untouched."
+          confirmLabel="Clear sample data"
+          danger
+          busy={clearingSample}
+          onConfirm={confirmClearSample}
+          onCancel={() => setConfirmClearOpen(false)}
         />
       </main>
       <footer className="max-w-[1200px] mx-auto mt-8 pt-5 px-4 sm:px-8 pb-8 text-[13px] text-slate-400 text-center">
