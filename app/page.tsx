@@ -418,9 +418,22 @@ export default function Home() {
     setClearingSample(true);
     setError(null);
     try {
-      await apiFetch("/api/sample-data", { method: "DELETE" });
+      // UX commit 6: surface the count instead of a generic message.
+      // The DELETE route returns { deleted: number }; rowCount=0 is
+      // a clean no-op (sample data already cleared) — message that
+      // distinctly so the user understands the click did the right
+      // thing even when nothing changed.
+      const data = (await apiFetch<{ deleted?: number }>("/api/sample-data", {
+        method: "DELETE",
+      })) as { deleted?: number } | null;
       await loadItems();
-      setSuccessMsg("Sample data cleared");
+      const deleted =
+        data && typeof data.deleted === "number" ? data.deleted : 0;
+      setSuccessMsg(
+        deleted === 0
+          ? "Sample data was already cleared."
+          : `Cleared ${deleted} sample item${deleted === 1 ? "" : "s"}.`
+      );
       setConfirmClearOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't clear sample data");
