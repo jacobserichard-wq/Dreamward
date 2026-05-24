@@ -93,7 +93,7 @@ export default function OnboardingPage() {
     // Avoids flashing step 0 before the router.replace fires.
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
-        <div className="bg-white rounded-2xl py-10 px-9 max-w-[560px] w-full text-center">
+        <div className="bg-white rounded-2xl p-6 sm:py-10 sm:px-9 max-w-[560px] w-full text-center">
           <Spinner />
           <p className="text-sm text-slate-500 mt-4 m-0">
             Loading...

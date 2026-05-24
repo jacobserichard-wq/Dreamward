@@ -12,16 +12,18 @@
 // file to <500 lines and isolates the @react-pdf/renderer import to
 // pdf.ts → lib/pdf/annual.tsx only.
 
+// Public surface only — the 7 names that were exported from
+// lib/reports.ts before the sub-session 23 split. Internal-helper
+// types (AppSettingRow, CategoryKind, SettingsRow) and the
+// isoYearBounds helper stay exported from ./reports/aggregate (so
+// ./reports/csv can import them sibling-to-sibling) but do NOT
+// re-export through this barrel.
 export {
   annualSummary,
   buildClassifier,
   csvBusinessSlug,
-  isoYearBounds,
   type AnnualSummary,
-  type AppSettingRow,
-  type CategoryKind,
   type RateSource,
-  type SettingsRow,
 } from "./reports/aggregate";
 
 export { renderAnnualCsvBody } from "./reports/csv";
