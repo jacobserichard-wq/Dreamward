@@ -1079,7 +1079,25 @@ export default function Home() {
 
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (
-          <div>
+          <div
+            // UX commit 5: pale-yellow tint when ANY sample data is
+            // present in the processed-items array. Distinct visual
+            // cue that the numbers above shouldn't be trusted as real,
+            // without the heavy-handedness of per-card stamps or a
+            // diagonal SAMPLE watermark. Tint disappears the moment
+            // the user clears sample data.
+            className={
+              processedItems.some((i) => i.source === "sample")
+                ? "relative bg-yellow-50/40 rounded-xl p-4 -m-4"
+                : ""
+            }
+          >
+            {processedItems.some((i) => i.source === "sample") && (
+              <div className="mb-4 text-xs font-semibold text-amber-800 uppercase tracking-wide flex items-center gap-2">
+                <span>{"\u{1F4A1}"}</span>
+                <span>Sample data view — numbers below are examples</span>
+              </div>
+            )}
             {/* Stat cards. UX commit 3: tooltips added on every card +
                 the duplicate "Overdue" card removed (it's still in the
                 Status Breakdown row below, which is the canonical
