@@ -87,6 +87,11 @@ function serializeInvoice(row: InvoiceRow, today: Date = new Date()) {
     notes: row.notes,
     lastReminderSentAt: row.last_reminder_sent_at,
     reminderCount: row.reminder_count,
+    // Phase 6.5 commit 6: ingest-source columns surfaced for the
+    // detail-page banner + "view original email" deep-link.
+    source: row.source,
+    gmailMessageId: row.gmail_message_id,
+    needsReview: row.needs_review,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

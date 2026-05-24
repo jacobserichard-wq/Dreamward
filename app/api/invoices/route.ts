@@ -89,6 +89,12 @@ function serializeInvoice(row: InvoiceRow, today: Date = new Date()) {
     notes: row.notes,
     lastReminderSentAt: row.last_reminder_sent_at,
     reminderCount: row.reminder_count,
+    // Phase 6.5 commit 6: surface the new columns so the UI can badge
+    // auto-detected rows and the review-queue filter chip can count
+    // needs_review separately from the aging buckets.
+    source: row.source,
+    gmailMessageId: row.gmail_message_id,
+    needsReview: row.needs_review,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -111,6 +117,10 @@ function buildSummary(invoices: SerializedInvoice[]) {
   };
   let totalOutstanding = 0;
   let overdueOutstanding = 0;
+  // Phase 6.5 commit 6: count of needs_review rows for the filter
+  // chip label ("Needs review (3)"). Excluded from the regular aging
+  // buckets so the chip is the single source of truth for review state.
+  let needsReviewCount = 0;
   for (const inv of invoices) {
     const bucket = inv.agingBucket;
     bucketTotals[bucket].count += 1;
@@ -119,12 +129,14 @@ function buildSummary(invoices: SerializedInvoice[]) {
       totalOutstanding += inv.amountOutstanding;
       if (isOverdue(bucket)) overdueOutstanding += inv.amountOutstanding;
     }
+    if (inv.needsReview) needsReviewCount += 1;
   }
   return {
     totalOutstanding,
     overdueOutstanding,
     bucketTotals,
     bucketOrder: AGING_BUCKETS_ORDERED,
+    needsReviewCount,
   };
 }
 

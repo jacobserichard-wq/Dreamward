@@ -29,6 +29,11 @@ export interface InvoiceListEntry {
   agingBucket: AgingBucket;
   lastReminderSentAt: string | null;
   reminderCount: number;
+  // Phase 6.5 commit 6 — source + review state from migration 0009.
+  // source='email-auto' shows an "Auto" badge; needsReview=true swaps
+  // the reminder button for Approve / Dismiss inline actions.
+  source: "manual" | "email-auto";
+  needsReview: boolean;
 }
 
 const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -38,6 +43,10 @@ export interface InvoiceListSummary {
   totalOutstanding: number;
   overdueOutstanding: number;
   bucketTotals: Record<AgingBucket, { count: number; amount: number }>;
+  // Phase 6.5 commit 6 — drives the "Needs review (N)" filter chip
+  // label. Counted across the full list (not the filtered view), so
+  // toggling the chip doesn't change its own count.
+  needsReviewCount: number;
 }
 
 interface InvoiceListProps {
@@ -45,11 +54,21 @@ interface InvoiceListProps {
   summary: InvoiceListSummary;
   selectedBucket: AgingBucket | null;
   onSelectBucket: (b: AgingBucket | null) => void;
+  // Phase 6.5 commit 6 — review filter is orthogonal to the bucket
+  // filter; selecting either alone or both narrows the list. Page
+  // owns the state.
+  selectedNeedsReview: boolean;
+  onToggleNeedsReview: () => void;
   /** Send-reminder click handler. Parent does the fetch + refresh. */
   onSendReminder: (invoiceId: number) => void;
   /** ID of the invoice whose reminder is currently being sent (for the
    *  in-flight spinner state). null when no send is in progress. */
   sendingReminderId: number | null;
+  // Phase 6.5 commit 6 — review-queue actions. Parent handles the
+  // PATCH /api/invoices/[id]/review fetch + list refresh.
+  onApprove: (invoiceId: number) => void;
+  onDismiss: (invoiceId: number) => void;
+  reviewingId: number | null;
 }
 
 /**
@@ -97,8 +116,13 @@ export default function InvoiceList({
   summary,
   selectedBucket,
   onSelectBucket,
+  selectedNeedsReview,
+  onToggleNeedsReview,
   onSendReminder,
   sendingReminderId,
+  onApprove,
+  onDismiss,
+  reviewingId,
 }: InvoiceListProps) {
   const router = useRouter();
   const overdueShare =
@@ -129,6 +153,33 @@ export default function InvoiceList({
         )}
       </div>
 
+      {/* Phase 6.5 commit 6: Needs review filter chip. Shown only when
+          at least one row needs review — hidden completely for users
+          who haven't run the Gmail ingest, so the surface doesn't
+          confuse them. Orthogonal to the bucket chips (selecting both
+          intersects the lists). */}
+      {summary.needsReviewCount > 0 && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={onToggleNeedsReview}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition border ${
+              selectedNeedsReview
+                ? "bg-amber-100 text-amber-900 border-amber-300"
+                : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+            }`}
+          >
+            <span>{"⚠️"}</span>
+            Needs review ({summary.needsReviewCount})
+            {selectedNeedsReview && <span className="text-xs">{"×"}</span>}
+          </button>
+          <span className="text-xs text-slate-500">
+            Auto-detected from Gmail — approve or dismiss to clear the
+            review queue.
+          </span>
+        </div>
+      )}
+
       {/* Bucket totals — clickable filter chips */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-5">
         {AGING_BUCKETS_ORDERED.map((bucket) => {
@@ -147,14 +198,24 @@ export default function InvoiceList({
         })}
       </div>
 
-      {selectedBucket && (
-        <div className="mb-4 flex items-center gap-2">
+      {(selectedBucket || selectedNeedsReview) && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
           <span className="text-sm text-slate-600">
-            Filtered to <strong>{selectedBucket}</strong>
+            Filtered to{" "}
+            <strong>
+              {selectedBucket && selectedNeedsReview
+                ? `${selectedBucket} + Needs review`
+                : selectedBucket
+                  ? selectedBucket
+                  : "Needs review"}
+            </strong>
           </span>
           <button
             type="button"
-            onClick={() => onSelectBucket(null)}
+            onClick={() => {
+              if (selectedBucket) onSelectBucket(null);
+              if (selectedNeedsReview) onToggleNeedsReview();
+            }}
             className="text-sm text-blue-600 hover:underline cursor-pointer"
           >
             Clear filter
@@ -235,8 +296,28 @@ export default function InvoiceList({
                       className="border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50"
                     >
                       <td className="py-2.5 px-3">
-                        <div className="font-medium text-slate-900">
-                          {inv.customerName}
+                        <div className="font-medium text-slate-900 flex items-center gap-1.5 flex-wrap">
+                          <span>{inv.customerName}</span>
+                          {/* Phase 6.5 commit 6: Auto badge for
+                              email-detected rows. Distinct visual signal
+                              vs. manual rows — important because the
+                              extraction is fallible. */}
+                          {inv.source === "email-auto" && (
+                            <span
+                              title="Auto-detected from a Gmail email"
+                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                            >
+                              Auto
+                            </span>
+                          )}
+                          {inv.needsReview && (
+                            <span
+                              title="Awaiting your approval"
+                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300"
+                            >
+                              Review
+                            </span>
+                          )}
                         </div>
                         {inv.customerEmail && (
                           <div className="text-xs text-slate-500">
@@ -278,26 +359,55 @@ export default function InvoiceList({
                         className="py-2.5 px-3 text-right"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {(() => {
-                          const reason = reminderDisabledReason(inv);
-                          const isSending = sendingReminderId === inv.id;
-                          const disabled = reason !== null || isSending;
-                          return (
+                        {/* Phase 6.5 commit 6: when a row needs review,
+                            replace the reminder button with Approve /
+                            Dismiss inline actions. Sending a reminder
+                            on an unreviewed auto-detected row would be
+                            embarrassing if the extraction was wrong —
+                            force the user through the review step. */}
+                        {inv.needsReview ? (
+                          <div className="flex gap-1.5 justify-end">
                             <button
                               type="button"
-                              onClick={() => onSendReminder(inv.id)}
-                              disabled={disabled}
-                              title={
-                                reason
-                                  ? `Can't send: ${reason}`
-                                  : `Send reminder to ${inv.customerEmail}`
-                              }
-                              className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              onClick={() => onApprove(inv.id)}
+                              disabled={reviewingId === inv.id}
+                              title="Approve — clears the review flag and lets reminders go out"
+                              className="text-xs py-1 px-2 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
-                              {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                              {reviewingId === inv.id ? "..." : "Approve"}
                             </button>
-                          );
-                        })()}
+                            <button
+                              type="button"
+                              onClick={() => onDismiss(inv.id)}
+                              disabled={reviewingId === inv.id}
+                              title="Dismiss — hard-deletes this row. Re-fetch from Gmail to recover."
+                              className="text-xs py-1 px-2 rounded border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                              {reviewingId === inv.id ? "..." : "Dismiss"}
+                            </button>
+                          </div>
+                        ) : (
+                          (() => {
+                            const reason = reminderDisabledReason(inv);
+                            const isSending = sendingReminderId === inv.id;
+                            const disabled = reason !== null || isSending;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => onSendReminder(inv.id)}
+                                disabled={disabled}
+                                title={
+                                  reason
+                                    ? `Can't send: ${reason}`
+                                    : `Send reminder to ${inv.customerEmail}`
+                                }
+                                className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                              >
+                                {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                              </button>
+                            );
+                          })()
+                        )}
                       </td>
                     </tr>
                   );
@@ -321,8 +431,18 @@ export default function InvoiceList({
                 >
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-slate-900 truncate">
-                        {inv.customerName}
+                      <div className="font-medium text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
+                        <span className="truncate">{inv.customerName}</span>
+                        {inv.source === "email-auto" && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            Auto
+                          </span>
+                        )}
+                        {inv.needsReview && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                            Review
+                          </span>
+                        )}
                       </div>
                       {inv.customerEmail && (
                         <div className="text-xs text-slate-500 truncate">
@@ -358,22 +478,46 @@ export default function InvoiceList({
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSendReminder(inv.id);
-                      }}
-                      disabled={reminderDisabled}
-                      title={
-                        reason
-                          ? `Can't send: ${reason}`
-                          : `Send reminder to ${inv.customerEmail}`
-                      }
-                      className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
-                    </button>
+                    {inv.needsReview ? (
+                      <div
+                        className="flex gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onApprove(inv.id)}
+                          disabled={reviewingId === inv.id}
+                          className="text-xs py-1 px-2 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 disabled:opacity-40 cursor-pointer"
+                        >
+                          {reviewingId === inv.id ? "..." : "Approve"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDismiss(inv.id)}
+                          disabled={reviewingId === inv.id}
+                          className="text-xs py-1 px-2 rounded border border-red-300 bg-red-50 text-red-700 disabled:opacity-40 cursor-pointer"
+                        >
+                          {reviewingId === inv.id ? "..." : "Dismiss"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSendReminder(inv.id);
+                        }}
+                        disabled={reminderDisabled}
+                        title={
+                          reason
+                            ? `Can't send: ${reason}`
+                            : `Send reminder to ${inv.customerEmail}`
+                        }
+                        className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

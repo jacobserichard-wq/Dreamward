@@ -32,6 +32,10 @@ export default function InvoicesPage() {
     null
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // Phase 6.5 commit 6: review-queue filter state + per-row "in-flight"
+  // id while a PATCH /api/invoices/[id]/review is on the wire.
+  const [selectedNeedsReview, setSelectedNeedsReview] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
 
   const loadInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -80,6 +84,62 @@ export default function InvoicesPage() {
     }
     load();
   }, [router, loadInvoices]);
+
+  // Phase 6.5 commit 6: approve/dismiss handlers. Optimistic UI would
+  // be nicer but the count chip needs the server-truth needsReviewCount
+  // to update — reload list is the simpler path.
+  const handleApprove = async (invoiceId: number) => {
+    setReviewingId(invoiceId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg("Invoice approved.");
+      await loadInvoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Approve failed");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const handleDismiss = async (invoiceId: number) => {
+    // Confirm because this is a hard delete. No undo (re-fetch from
+    // Gmail is the recovery path — see lib/invoices.dismissInvoice).
+    if (
+      !window.confirm(
+        "Dismiss this auto-detected invoice? It will be deleted. You can re-fetch from Gmail to recover it."
+      )
+    ) {
+      return;
+    }
+    setReviewingId(invoiceId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss" }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg("Invoice dismissed.");
+      await loadInvoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Dismiss failed");
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const handleSendReminder = async (invoiceId: number) => {
     setSendingReminderId(invoiceId);
@@ -144,12 +204,15 @@ export default function InvoicesPage() {
     );
   }
 
-  // Apply the bucket filter client-side. Summary stays computed over the
-  // full unfiltered list so the bucket-totals chips reflect totals even
-  // when one is selected.
-  const filteredInvoices = selectedBucket
-    ? invoices.filter((i) => i.agingBucket === selectedBucket)
-    : invoices;
+  // Apply the bucket + needs-review filters client-side. Summary stays
+  // computed over the full unfiltered list so the bucket-totals chips
+  // and the needsReviewCount chip reflect totals even when filters are
+  // active.
+  const filteredInvoices = invoices.filter((i) => {
+    if (selectedBucket && i.agingBucket !== selectedBucket) return false;
+    if (selectedNeedsReview && !i.needsReview) return false;
+    return true;
+  });
 
   // When the API didn't return a summary (403 or empty state), fall back
   // to an empty summary so InvoiceList still renders cleanly.
@@ -165,6 +228,7 @@ export default function InvoicesPage() {
       "61–90 days": { count: 0, amount: 0 },
       "91+ days": { count: 0, amount: 0 },
     },
+    needsReviewCount: 0,
   };
 
   return (
@@ -214,8 +278,15 @@ export default function InvoicesPage() {
           summary={safeSummary}
           selectedBucket={selectedBucket}
           onSelectBucket={setSelectedBucket}
+          selectedNeedsReview={selectedNeedsReview}
+          onToggleNeedsReview={() =>
+            setSelectedNeedsReview((v) => !v)
+          }
           onSendReminder={handleSendReminder}
           sendingReminderId={sendingReminderId}
+          onApprove={handleApprove}
+          onDismiss={handleDismiss}
+          reviewingId={reviewingId}
         />
       </div>
     </div>
