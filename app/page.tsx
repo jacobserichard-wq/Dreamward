@@ -9,6 +9,7 @@ import ErrorBanner from "./components/ErrorBanner";
 import CsvReviewModal from "./components/CsvReviewModal";
 import ConfirmModal from "./components/ConfirmModal";
 import StatCard from "./components/StatCard";
+import SetupChecklist from "./components/SetupChecklist";
 import EventCreateForm, { type EventResponse } from "./components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
@@ -102,6 +103,16 @@ export default function Home() {
     largestOverdueBucket: AgingBucket | null;
     largestOverdueAmount: number;
   } | null>(null);
+
+  // UX commit 7 (sub-session 24): settings fields needed by the
+  // SetupChecklist to derive done-state for home-address / CPA email /
+  // tax-bracket items + the checklist's own dismissal state. Fetched
+  // once on mount via /api/settings; null until loaded.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsHomeAddress, setSettingsHomeAddress] = useState<string>("");
+  const [settingsPreferences, setSettingsPreferences] = useState<
+    Record<string, unknown>
+  >({});
 
   // Load processed items from database
   const loadItems = useCallback(async () => {
@@ -232,6 +243,41 @@ export default function Home() {
       cancelled = true;
     };
   }, [clientInfo?.plan]);
+
+  // UX commit 7: settings fetch for the SetupChecklist. Single shot
+  // on mount; refreshed by the dismiss handler when the user closes
+  // the checklist (so the dismissed flag round-trips immediately).
+  // Soft-fail — checklist auto-hides if settings can't load.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          homeAddress?: string | null;
+          settings?: { preferences?: Record<string, unknown> };
+        };
+        if (cancelled) return;
+        setSettingsHomeAddress(
+          typeof data.homeAddress === "string" ? data.homeAddress : ""
+        );
+        setSettingsPreferences(
+          data.settings?.preferences &&
+            typeof data.settings.preferences === "object"
+            ? (data.settings.preferences as Record<string, unknown>)
+            : {}
+        );
+        setSettingsLoaded(true);
+      } catch {
+        // Non-fatal — checklist self-hides if signals can't be derived.
+      }
+    }
+    loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
@@ -409,6 +455,45 @@ export default function Home() {
   const [processedStatusFilter, setProcessedStatusFilter] = useState<
     "pending" | "overdue" | "needs_review" | "paid" | null
   >(null);
+
+  // UX commit 7 (sub-session 24): SetupChecklist dismissal — opens a
+  // confirmation modal, then PATCHes preferences.ux.checklist_dismissed_at
+  // on confirm. Dismissal is "forever" (per design §6 #2); user can
+  // see the same setup steps reflected on /settings if they need to.
+  const [confirmDismissChecklist, setConfirmDismissChecklist] = useState(false);
+  const [dismissingChecklist, setDismissingChecklist] = useState(false);
+
+  const dismissChecklist = useCallback(() => {
+    setConfirmDismissChecklist(true);
+  }, []);
+
+  const confirmDismissChecklistAction = useCallback(async () => {
+    setDismissingChecklist(true);
+    try {
+      const nextPrefs = {
+        ...settingsPreferences,
+        ux: {
+          ...((settingsPreferences.ux as Record<string, unknown>) || {}),
+          checklist_dismissed_at: new Date().toISOString(),
+        },
+      };
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: nextPrefs }),
+      });
+      if (res.ok) {
+        setSettingsPreferences(nextPrefs);
+        setConfirmDismissChecklist(false);
+      } else {
+        setError(`Couldn't hide checklist (HTTP ${res.status})`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't hide checklist");
+    } finally {
+      setDismissingChecklist(false);
+    }
+  }, [settingsPreferences]);
 
   const requestClearSample = useCallback(() => {
     setConfirmClearOpen(true);
@@ -1111,6 +1196,63 @@ export default function Home() {
                 <span>Sample data view — numbers below are examples</span>
               </div>
             )}
+
+            {/* UX commit 7: SetupChecklist. Renders only when:
+                  - settings loaded (otherwise we can't derive done-state)
+                  - checklist not dismissed
+                  - at least one visible item is still un-done (the
+                    component self-hides when all done — guards here
+                    too for early-return clarity)
+                Plan + derived signals computed inline; the component
+                owns the visibility-per-plan + ordering logic. */}
+            {settingsLoaded &&
+              clientInfo &&
+              !(
+                settingsPreferences.ux &&
+                typeof settingsPreferences.ux === "object" &&
+                typeof (settingsPreferences.ux as Record<string, unknown>)
+                  .checklist_dismissed_at === "string"
+              ) && (
+                <SetupChecklist
+                  plan={
+                    (clientInfo.plan as
+                      | "trial"
+                      | "starter"
+                      | "growth"
+                      | "pro") || "trial"
+                  }
+                  gmailConnected={processedItems.some(
+                    (i) => i.source === "gmail" || i.source === "email"
+                  )}
+                  hasRealProcessedItems={processedItems.some(
+                    (i) => i.source !== "sample"
+                  )}
+                  hasSampleItems={processedItems.some(
+                    (i) => i.source === "sample"
+                  )}
+                  homeAddressSet={settingsHomeAddress.trim().length > 0}
+                  cpaEmailSet={(() => {
+                    const cpa = settingsPreferences.cpa;
+                    return (
+                      cpa !== null &&
+                      typeof cpa === "object" &&
+                      typeof (cpa as Record<string, unknown>).email ===
+                        "string" &&
+                      ((cpa as Record<string, unknown>).email as string)
+                        .trim() !== ""
+                    );
+                  })()}
+                  taxBracketSet={
+                    settingsPreferences.taxBracket !== undefined &&
+                    settingsPreferences.taxBracket !== null
+                  }
+                  proCallBooked={proCallBookedAt !== null}
+                  onDismiss={() => dismissChecklist()}
+                  onClearSample={requestClearSample}
+                  onUploadClick={() => setActiveTab("emails")}
+                />
+              )}
+
             {/* Stat cards. UX commit 3: tooltips added on every card +
                 the duplicate "Overdue" card removed (it's still in the
                 Status Breakdown row below, which is the canonical
@@ -1368,6 +1510,20 @@ export default function Home() {
           busy={clearingSample}
           onConfirm={confirmClearSample}
           onCancel={() => setConfirmClearOpen(false)}
+        />
+
+        {/* ── DISMISS SETUP CHECKLIST CONFIRMATION ── */}
+        {/* UX commit 7: confirms before persisting the dismiss flag.
+            Dismissal is "forever" (preferences.ux.checklist_dismissed_at
+            is an ISO timestamp; nothing un-sets it from the UI). */}
+        <ConfirmModal
+          open={confirmDismissChecklist}
+          title="Hide this checklist?"
+          message="You can still find these setup steps individually in Settings. Once hidden, the checklist won't reappear."
+          confirmLabel="Hide checklist"
+          busy={dismissingChecklist}
+          onConfirm={confirmDismissChecklistAction}
+          onCancel={() => setConfirmDismissChecklist(false)}
         />
       </main>
       <footer className="max-w-[1200px] mx-auto mt-8 pt-5 px-4 sm:px-8 pb-8 text-[13px] text-slate-400 text-center">
