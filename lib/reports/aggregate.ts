@@ -21,6 +21,7 @@
 
 import pool from "../db";
 import { getCategoriesForIndustry, type Industry } from "../categories";
+import { computeQuarterlyEstimate, DEFAULT_TAX_BRACKET } from "../quarterly";
 
 // Synthetic category names for surfaces that don't have one. These appear
 // in byCategory.income alongside real category names.
@@ -96,6 +97,10 @@ export interface AnnualSummary {
     amountCollected: number;
     outstandingAsOfYearEnd: number;
   };
+  // Phase 7c: quarterly estimated-tax helper output. null when math
+  // doesn't apply (zero or negative YTD profit — nothing to set aside).
+  // UI/PDF render the panel only when this is non-null.
+  quarterlyEstimate: import("../quarterly").QuarterlyEstimate | null;
 }
 
 // pg row shapes exported for the sibling renderers (csv.ts uses
@@ -104,6 +109,13 @@ export interface SettingsRow {
   custom_categories: string[] | null;
   preferences: {
     custom_income_categories?: string[];
+    // Phase 7c: optional tax bracket override for quarterly estimate
+    // math. Falls back to DEFAULT_TAX_BRACKET (22% income + 14.13%
+    // SE) when missing. Editable in /settings (commit 8).
+    taxBracket?: {
+      incomePct?: number;
+      sePct?: number;
+    };
   } | null;
 }
 
@@ -592,6 +604,21 @@ export async function annualSummary(opts: {
       expense: expenseArr,
     },
     scheduleCSummary,
+    // Phase 7c: quarterly estimate. Skip math entirely when YTD profit
+    // is zero or negative — no set-aside obligation; UI renders nothing.
+    quarterlyEstimate:
+      netProfit > 0
+        ? computeQuarterlyEstimate({
+            ytdProfit: netProfit,
+            incomePct:
+              settings?.preferences?.taxBracket?.incomePct ??
+              DEFAULT_TAX_BRACKET.incomePct,
+            sePct:
+              settings?.preferences?.taxBracket?.sePct ??
+              DEFAULT_TAX_BRACKET.sePct,
+            year,
+          })
+        : null,
     byMonth,
     mileage: {
       totalMiles,
