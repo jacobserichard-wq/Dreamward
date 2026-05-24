@@ -943,6 +943,23 @@ export default function Home() {
               </div>
             ) : (
               <>
+            {/* Sub-session 24 follow-up commit 5: setup-guide hint for
+                Pro users on the Emails tab. Pro users land here AFTER
+                completing OAuth — but if their Gmail doesn't have the
+                three labels yet, the pills below will return empty
+                results with no explanation. The hint link sits right
+                under the page title so a confused user has a one-click
+                path to the setup guide. Always renders for Pro (low
+                visual cost; high diagnostic value for first-runners). */}
+            <div className="mb-3 text-xs text-slate-500">
+              {"\u{1F4A1}"} Don&apos;t see emails when you click a label?{" "}
+              <Link
+                href="/help/gmail-setup"
+                className="text-blue-600 hover:underline font-medium"
+              >
+                See the Gmail label setup guide {"\u{2192}"}
+              </Link>
+            </div>
             {/* Label selector + actions */}
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
               <div className="flex flex-wrap gap-2">
