@@ -285,6 +285,77 @@ export function AnnualPdfDocument({
           </View>
         )}
 
+        {/* Phase 7c commit 10: Quarterly Estimates subsection. Only
+            renders when an estimate was produced (net profit > 0).
+            Mirrors the screen panel's content; layout follows the
+            summary-row pattern for visual consistency with the rest
+            of the PDF. wrap={false} keeps the block on one page. */}
+        {summary.quarterlyEstimate && (
+          <View style={styles.section} wrap={false}>
+            <Text style={styles.sectionTitle}>
+              Quarterly Tax Estimates (Form 1040-ES)
+            </Text>
+            <Text style={{ fontSize: 8, color: "#94a3b8", marginBottom: 6 }}>
+              Linear projection of YTD profit at{" "}
+              {summary.quarterlyEstimate.effectivePct.toFixed(2)}% effective
+              set-aside. Planning aid only — verify with your CPA.
+            </Text>
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                YTD set-aside ({summary.quarterlyEstimate.effectivePct.toFixed(2)}% of {fmtUsd(summary.quarterlyEstimate.ytdProfit)})
+              </Text>
+              <Text style={styles.summaryValue}>
+                {fmtUsd(summary.quarterlyEstimate.ytdSetAside)}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                Projected annual profit ({summary.quarterlyEstimate.quartersElapsed} of 4 quarters elapsed)
+              </Text>
+              <Text style={styles.summaryValue}>
+                {fmtUsd(summary.quarterlyEstimate.projectedAnnualProfit)}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Projected annual tax</Text>
+              <Text style={styles.summaryValue}>
+                {fmtUsd(summary.quarterlyEstimate.projectedAnnualTax)}
+              </Text>
+            </View>
+            <View style={styles.summaryRowTotal}>
+              <Text style={styles.summaryLabel}>Suggested per quarter</Text>
+              <Text style={styles.summaryValueTotal}>
+                {fmtUsd(summary.quarterlyEstimate.suggestedPerQuarter)}
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: "bold",
+                marginTop: 8,
+                marginBottom: 3,
+                color: "#0f172a",
+              }}
+            >
+              {summary.year} federal deadlines
+            </Text>
+            {summary.quarterlyEstimate.deadlines.map((d) => {
+              const isNext = d.dueDate === summary.quarterlyEstimate?.nextDeadline;
+              return (
+                <View key={d.quarter} style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>
+                    Q{d.quarter} — {d.dueDate}
+                    {isNext ? "  (next)" : ""}
+                  </Text>
+                  <Text style={styles.summaryValue} />
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* AR Snapshot — conditional on any AR activity. wrap={false}
             keeps the four-row block intact on a single page. */}
         {hasAr && (
@@ -332,6 +403,20 @@ export function AnnualPdfDocument({
             tax-deductible per the FlowWork category taxonomy. Confirm
             with your CPA — timing and Section 179 elections may affect.
           </Text>
+          <Text style={styles.notesItem}>
+            • L&lt;number&gt; on expense rows and the Schedule C Summary
+            section map to IRS Form 1040 Schedule C Part II line numbers.
+            Defaults — verify mapping with your CPA before filing.
+          </Text>
+          {summary.quarterlyEstimate && (
+            <Text style={styles.notesItem}>
+              • Quarterly estimates are a planning aid based on linear
+              projection of YTD profit at the configured tax bracket.
+              They don&apos;t account for deductions, credits, prior-year
+              safe harbors, state tax, or seasonality. Not tax advice —
+              verify with your CPA before making payments.
+            </Text>
+          )}
           {summary.mileage.rateSource === "current-year-only" && (
             <Text style={styles.notesItem}>
               • Mileage rate (${ratePerMile}) is the current IRS rate. For
