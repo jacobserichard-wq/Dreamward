@@ -666,6 +666,20 @@ export default function Home() {
   const showCallConfirmation =
     isPro && proCallBookedAt !== null && proCallTime !== null && !proCallIsPast;
 
+  // UX commit 8: shared visibility check for the SetupChecklist.
+  // Used by both the dashboard render (commit 7) and the banner
+  // consolidation (commit 8 — Welcome-to-Pro + Sample-data banners
+  // hide when the checklist surfaces those same steps). Computed
+  // here so the render sites stay in sync.
+  const setupChecklistDismissed =
+    settingsPreferences.ux !== undefined &&
+    settingsPreferences.ux !== null &&
+    typeof settingsPreferences.ux === "object" &&
+    typeof (settingsPreferences.ux as Record<string, unknown>)
+      .checklist_dismissed_at === "string";
+  const setupChecklistVisible =
+    settingsLoaded && clientInfo !== null && !setupChecklistDismissed;
+
   const stats = {
     total: processedItems.length,
     pending: processedItems.filter((i) => i.status === "pending").length,
@@ -789,8 +803,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* Pro onboarding-call: prompt (state 1 — not yet booked) */}
-        {showBookPrompt && (
+        {/* Pro onboarding-call: prompt (state 1 — not yet booked).
+            UX commit 8: hide when the SetupChecklist is showing the
+            same "Book your onboarding call" step — the checklist is
+            the canonical setup surface. The banner re-appears if the
+            user dismisses the checklist (per design §6 deferred
+            question: dismissing → soft-reminder banner returns). */}
+        {showBookPrompt && !setupChecklistVisible && (
           <div className="bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-500 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
             <span className="font-medium">
               {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your white-glove onboarding call to get started.
@@ -823,22 +842,30 @@ export default function Home() {
           </div>
         )}
 
-        {/* Sample data banner */}
-        {processedItems.some((i) => i.source === "sample") && (
-          <div className="bg-yellow-50 border border-yellow-300 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
-            <span className="font-medium">
-              {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when you&apos;re ready to add real data.
-            </span>
-            <button
-              onClick={requestClearSample}
-              disabled={clearingSample}
-              className="px-3.5 py-1.5 rounded-md border border-yellow-600 bg-white text-amber-800 text-[13px] font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
-            >
-              {clearingSample && <Spinner size={12} color="#854d0e" />}
-              {clearingSample ? "Clearing..." : "Clear sample data"}
-            </button>
-          </div>
-        )}
+        {/* Sample data banner. UX commit 8: hide when the SetupChecklist
+            is rendering the same "Clear sample data" step — checklist
+            takes precedence as the canonical setup surface. Banner re-
+            appears if the user dismisses the checklist (acts as a
+            soft reminder). The dashboard-tab tint (UX commit 5) still
+            renders regardless of this banner — the tint is about the
+            data view, not the setup workflow. */}
+        {processedItems.some((i) => i.source === "sample") &&
+          !setupChecklistVisible && (
+            <div className="bg-yellow-50 border border-yellow-300 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
+              <span className="font-medium">
+                {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when
+                you&apos;re ready to add real data.
+              </span>
+              <button
+                onClick={requestClearSample}
+                disabled={clearingSample}
+                className="px-3.5 py-1.5 rounded-md border border-yellow-600 bg-white text-amber-800 text-[13px] font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+              >
+                {clearingSample && <Spinner size={12} color="#854d0e" />}
+                {clearingSample ? "Clearing..." : "Clear sample data"}
+              </button>
+            </div>
+          )}
 
         {/* ── EMAILS TAB ── */}
         {activeTab === "emails" && (
@@ -1197,22 +1224,11 @@ export default function Home() {
               </div>
             )}
 
-            {/* UX commit 7: SetupChecklist. Renders only when:
-                  - settings loaded (otherwise we can't derive done-state)
-                  - checklist not dismissed
-                  - at least one visible item is still un-done (the
-                    component self-hides when all done — guards here
-                    too for early-return clarity)
-                Plan + derived signals computed inline; the component
-                owns the visibility-per-plan + ordering logic. */}
-            {settingsLoaded &&
-              clientInfo &&
-              !(
-                settingsPreferences.ux &&
-                typeof settingsPreferences.ux === "object" &&
-                typeof (settingsPreferences.ux as Record<string, unknown>)
-                  .checklist_dismissed_at === "string"
-              ) && (
+            {/* UX commit 7: SetupChecklist. Visibility resolved upstream
+                in `setupChecklistVisible` so the banner-suppression
+                logic in commit 8 stays in sync with this render. The
+                component self-hides when all visible items are done. */}
+            {setupChecklistVisible && clientInfo && (
                 <SetupChecklist
                   plan={
                     (clientInfo.plan as
