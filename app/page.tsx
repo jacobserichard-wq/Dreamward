@@ -8,6 +8,7 @@ import Spinner from "./components/Spinner";
 import ErrorBanner from "./components/ErrorBanner";
 import CsvReviewModal from "./components/CsvReviewModal";
 import ConfirmModal from "./components/ConfirmModal";
+import StatCard from "./components/StatCard";
 import EventCreateForm, { type EventResponse } from "./components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
@@ -1296,31 +1297,6 @@ export default function Home() {
 }
 
 // ─── Stat Card Component ─────────────────────────────────────────────────────
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-  colorClass,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: string;
-  colorClass: string;
-}) {
-  return (
-    <div
-      className={`bg-white rounded-xl p-6 text-center border border-slate-200 border-t-[3px] ${colorClass}`}
-    >
-      <div className="text-[28px] mb-2">{icon}</div>
-      <div className="text-[28px] font-extrabold text-slate-900">{value}</div>
-      <div className="text-[13px] text-slate-500 mt-1">{label}</div>
-      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
 
 // ─── Status badge classes ────────────────────────────────────────────────────
 
