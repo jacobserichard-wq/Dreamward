@@ -69,6 +69,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "General liability, professional liability, business owner's policy, equipment insurance, and other business-purpose insurance premiums.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "15",
   },
   {
     name: "Software & SaaS",
@@ -76,6 +77,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Business software subscriptions, cloud services, productivity tools, and recurring license fees.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "18",
   },
   {
     name: "Marketing & Advertising",
@@ -83,6 +85,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Paid ads, marketing campaigns, content production, brand and promotional materials.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "8",
   },
   {
     name: "Payment Processing Fees",
@@ -90,6 +93,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Credit card processing, payment platform fees (Stripe, Square, PayPal), and bank merchant fees.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "17",
   },
   {
     name: "Travel & Mileage",
@@ -97,6 +101,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Business travel (transportation, lodging), client trips, and vehicle mileage at IRS rate when no dedicated vehicle expense category applies.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "24a",
   },
   {
     name: "Equipment",
@@ -104,6 +109,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Tools, equipment, and machinery purchased for business use. Items over the de minimis threshold are typically depreciated; smaller items immediately expensed.",
     type: "expense",
     // taxDeductible omitted — timing depends on cost and Section 179 election.
+    scheduleC: "13",
   },
   {
     name: "Professional Services",
@@ -111,6 +117,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Accountant, attorney, business consultant, and other professional fees paid for business purposes.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "17",
   },
   {
     name: "Telecom & Internet",
@@ -118,6 +125,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Phone, mobile data plans, internet service, business communication lines.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "25",
   },
   {
     name: "Utilities",
@@ -125,6 +133,7 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Electric, gas, water, trash collection — when paid as a business operating expense.",
     type: "expense",
     taxDeductible: true,
+    scheduleC: "25",
   },
 ];
 
@@ -136,6 +145,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Registration, application, and booth rental for markets, fairs, antique shows, and pop-ups.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "20b",
     },
     {
       name: "Raw Materials & Inventory",
@@ -143,6 +153,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Yarn, leather, beads, clay, wood, fabric, and other inputs that become finished goods.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Packaging & Shipping Supplies",
@@ -150,6 +161,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Mailers, kraft boxes, tissue paper, branded inserts, address labels.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Marketplace & Listing Fees",
@@ -157,6 +169,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Etsy listing/transaction fees, Amazon FBA fees, Shopify subscriptions, and other platform fees beyond payment processing.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Event Sales",
@@ -184,6 +197,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Portion of rent, utilities, and internet attributable to dedicated business use; office furniture and setup.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "30",
     },
     {
       name: "Professional Development",
@@ -191,6 +205,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Courses, books, conference tickets, industry certifications, and continuing-education expenses.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Project Revenue",
@@ -219,6 +234,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Gas, oil, fluids, and routine vehicle operating costs for company trucks and equipment.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "9",
     },
     {
       name: "Vehicle Maintenance & Repair",
@@ -226,6 +242,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Tires, brakes, major repairs, and scheduled maintenance for company vehicles.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "9",
     },
     {
       name: "Subcontractor Labor",
@@ -233,6 +250,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "1099 contractors, day labor, and specialty subs (tree removal, irrigation).",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "11",
     },
     {
       name: "Materials & Plants",
@@ -240,6 +258,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Mulch, sod, seeds, fertilizer, edging, and hardscape materials.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Disposal & Dump Fees",
@@ -247,6 +266,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Yard waste disposal, debris removal, landfill fees.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Licenses & Permits",
@@ -254,6 +274,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Pesticide applicator license, business license, contractor permits.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "23",
     },
     {
       name: "One-Time Jobs",
@@ -276,6 +297,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Wholesale food, beverages, and ingredients from restaurant supply.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Disposable Supplies",
@@ -283,6 +305,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Paper goods, takeout containers, napkins, utensils, cleaning supplies.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Fuel & Vehicle Operating",
@@ -290,6 +313,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Truck gas, generator fuel, oil changes.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "9",
     },
     {
       name: "Vehicle Maintenance & Repair",
@@ -297,6 +321,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Truck tires, mechanical repairs, kitchen equipment service.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "9",
     },
     {
       name: "Propane & Utilities",
@@ -304,6 +329,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Propane refills, commissary kitchen rental, water hookups.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "25",
     },
     {
       name: "Permits & Licenses",
@@ -311,6 +337,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Health permit, mobile vendor license, fire marshal inspection, business license.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "23",
     },
     {
       name: "Service Sales",
@@ -339,6 +366,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Raw materials, finished goods purchased to resell, manufacturing costs.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Marketplace & Platform Fees",
@@ -346,6 +374,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Etsy listing/transaction/payment fees, Amazon referral + FBA fees, Shopify subscription.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Shipping & Postage",
@@ -353,6 +382,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "USPS, UPS, FedEx labels; shipping insurance; international customs fees.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Packaging Materials",
@@ -360,6 +390,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Boxes, polybags, dunnage, branded inserts, tape, address labels.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Photography & Branding",
@@ -367,6 +398,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Product photography, lifestyle shoots, design contractors, brand asset production.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "8",
     },
     {
       name: "Returns & Refunds",
@@ -374,6 +406,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Refunded sales, return shipping costs, restocking fees.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Marketplace Revenue",
@@ -400,6 +433,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Backblaze, SmugMug Pro, NAS drives, archival storage for raw shoots.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "18",
     },
     {
       name: "Studio Rental & Location Fees",
@@ -407,6 +441,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Hourly studio bookings, location permits, model release fees.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "20b",
     },
     {
       name: "Second Shooters & Contractors",
@@ -414,6 +449,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "1099 contractors per shoot, assistant photographers.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "11",
     },
     {
       name: "Albums & Print Lab",
@@ -421,6 +457,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Physical prints for clients, album orders, custom printing.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Wedding & Event Photography",
@@ -449,6 +486,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "CPE credits, AICPA dues, industry-certification renewal.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Office Rent & Utilities",
@@ -456,6 +494,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Physical office space, dedicated business space, utilities.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "20b",
     },
     {
       name: "Payroll & Contractor Labor",
@@ -463,6 +502,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Staff bookkeepers, junior CPAs, tax-season 1099 contractors.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "26",
     },
     {
       name: "Monthly Bookkeeping Retainers",
@@ -493,6 +533,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Direct mission-related expenses: scholarships, grants made to others, program materials, services delivered to beneficiaries.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Payroll & Employee Benefits",
@@ -500,6 +541,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Staff salaries, health insurance, payroll taxes, retirement contributions.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "26",
     },
     {
       name: "Office Rent & Utilities",
@@ -507,6 +549,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Facilities, internet, phone, shared workspace.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "20b",
     },
     {
       name: "Individual Donations",
@@ -535,6 +578,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Interest portion of mortgage payments (not principal).",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "16a",
     },
     {
       name: "Property Tax",
@@ -542,6 +586,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Annual or semi-annual property tax payments.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "23",
     },
     {
       name: "Property Insurance",
@@ -549,6 +594,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Homeowners, landlord, umbrella, flood insurance on rental properties.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "15",
     },
     {
       name: "Repairs & Maintenance",
@@ -556,6 +602,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Routine repairs (plumbing, HVAC service, painting, fixing broken items). Immediately deductible.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "21",
     },
     {
       name: "Capital Improvements",
@@ -563,6 +610,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Roof replacement, HVAC replacement, additions, major renovations. Depreciated over 27.5 years (residential) or 39 years (commercial), not immediately deductible.",
       type: "expense",
       // taxDeductible omitted — depreciable, not immediately deductible.
+      scheduleC: "13",
     },
     {
       name: "Property Management",
@@ -570,6 +618,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Third-party PM fees, leasing commissions, tenant screening.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "17",
     },
     {
       name: "HOA & Utilities",
@@ -577,6 +626,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "HOA dues, water/sewer when paid by owner, common-area electricity.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "25",
     },
     {
       name: "Rental Income",
@@ -605,6 +655,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "NASM, ACE, NSCA renewals, continuing-education courses, industry certifications.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "27a",
     },
     {
       name: "Gym Rent & Studio Space",
@@ -612,6 +663,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Independent training space rental, hourly studio use.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "20b",
     },
     {
       name: "Music & Content Subscriptions",
@@ -619,6 +671,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Spotify Premium for classes, video editing software for online programs.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "18",
     },
     {
       name: "1-on-1 Training",
@@ -649,6 +702,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Product costs for resale or inputs to manufactured goods.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Office Supplies",
@@ -656,6 +710,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Paper, pens, printer ink, small office items.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "22",
     },
     {
       name: "Payroll",
@@ -663,6 +718,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
         "Employee salaries, wages, and payroll taxes.",
       type: "expense",
       taxDeductible: true,
+      scheduleC: "26",
     },
     {
       name: "Service Revenue",
