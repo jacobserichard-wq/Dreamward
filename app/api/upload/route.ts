@@ -8,6 +8,7 @@ import {
   type Industry,
 } from "@/lib/categories";
 import { matchEventByDate } from "@/lib/eventMatch";
+import { parseXlsx } from "@/lib/xlsx";
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,16 +58,36 @@ export async function POST(req: NextRequest) {
       batchEventId = parsed;
     }
 
-    const text = await file.text();
     const fileName = file.name.toLowerCase();
 
     let rows: string[][] = [];
     if (fileName.endsWith(".csv") || fileName.endsWith(".tsv")) {
+      // Text-based formats — read as UTF-8 string and split by delimiter.
+      const text = await file.text();
       const delimiter = fileName.endsWith(".tsv") ? "\t" : ",";
       rows = parseCSV(text, delimiter);
+    } else if (fileName.endsWith(".xlsx")) {
+      // Excel binary — read as ArrayBuffer and run through lib/xlsx.ts.
+      // Only .xlsx (Office Open XML) is supported; legacy .xls (binary
+      // BIFF) is excluded — exceljs's .xls support is read-only via a
+      // separate adapter and rarely-encountered in our target customer
+      // base. If a user uploads .xls we 400 with a helpful message.
+      const buffer = await file.arrayBuffer();
+      rows = await parseXlsx(buffer);
+    } else if (fileName.endsWith(".xls")) {
+      return NextResponse.json(
+        {
+          error:
+            "Legacy .xls files aren't supported. Save the file as .xlsx (Excel: File → Save As → Excel Workbook) and try again.",
+        },
+        { status: 400 }
+      );
     } else {
       return NextResponse.json(
-        { error: "Unsupported file type. Please upload a CSV file." },
+        {
+          error:
+            "Unsupported file type. Please upload a CSV, TSV, or XLSX file.",
+        },
         { status: 400 }
       );
     }

@@ -761,10 +761,13 @@ export default function Home() {
                   }`}
                 >
                   {uploading ? <Spinner size={14} color="white" /> : <span>{"\u{1F4C1}"}</span>}
-                  {uploading ? "Analyzing..." : "Upload CSV"}
+                  {uploading ? "Analyzing..." : "Upload file"}
                   <input
                     type="file"
-                    accept=".csv,.tsv"
+                    // XLSX added alongside CSV/TSV — see lib/xlsx.ts.
+                    // Legacy .xls intentionally excluded (server returns
+                    // a "save as .xlsx" message if uploaded anyway).
+                    accept=".csv,.tsv,.xlsx"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
