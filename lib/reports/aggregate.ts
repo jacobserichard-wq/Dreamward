@@ -54,8 +54,23 @@ export interface AnnualSummary {
       count: number;
       total: number;
       taxDeductible: boolean | null;
+      // Phase 7c: IRS Schedule C Part II line number this category
+      // maps to. null when the category has no scheduleC field set
+      // (rare — categories with truly novel content; would land on
+      // "27a" Other expenses on the actual return).
+      scheduleCLine: string | null;
     }>;
   };
+  // Phase 7c: roll up expense totals by Schedule C line. Sorted by total
+  // descending. One row per distinct line that appears in expense data
+  // for the year. Used by /reports' Schedule C summary panel + by the
+  // PDF's Schedule C summary section.
+  scheduleCSummary: Array<{
+    line: string;
+    description: string;
+    total: number;
+    categories: string[];
+  }>;
   byMonth: Array<{
     month: string; // YYYY-MM
     revenue: number;
@@ -160,6 +175,86 @@ export function buildClassifier(
     if (LEGACY_EXPENSE.has(category)) return "expense";
     return "unknown";
   };
+}
+
+// Phase 7c: IRS Schedule C Part II line descriptions, used to humanize
+// the scheduleCSummary rollup. Lines per the 2025 Schedule C form;
+// extended in the future if IRS renumbers (rare). Line 30 included
+// separately since the home-office category targets it directly even
+// though it's outside Part II.
+const SCHEDULE_C_DESCRIPTIONS: Record<string, string> = {
+  "8": "Advertising",
+  "9": "Car and truck expenses",
+  "10": "Commissions and fees",
+  "11": "Contract labor",
+  "12": "Depletion",
+  "13": "Depreciation and section 179 expense",
+  "14": "Employee benefit programs",
+  "15": "Insurance (other than health)",
+  "16a": "Mortgage interest",
+  "16b": "Interest (other)",
+  "17": "Legal and professional services",
+  "18": "Office expense",
+  "19": "Pension and profit-sharing plans",
+  "20a": "Rent or lease — vehicles, machinery, equipment",
+  "20b": "Rent or lease — other business property",
+  "21": "Repairs and maintenance",
+  "22": "Supplies",
+  "23": "Taxes and licenses",
+  "24a": "Travel",
+  "24b": "Deductible meals",
+  "25": "Utilities",
+  "26": "Wages",
+  "27a": "Other expenses",
+  "30": "Expenses for business use of home",
+};
+
+// Phase 7c: Map of category name → scheduleC line for the requested
+// industry. Mirror of buildTaxDeductibleMap. Null when the category
+// doesn't carry a scheduleC field — surfaced as null in the response
+// rather than silently bucketed to "27a" so the UI/PDF can render an
+// "unspecified" indicator.
+function buildScheduleCMap(industry: Industry): Map<string, string | null> {
+  const m = new Map<string, string | null>();
+  for (const c of getCategoriesForIndustry(industry)) {
+    if (c.type !== "expense") continue;
+    m.set(c.name, c.scheduleC ?? null);
+  }
+  return m;
+}
+
+// Phase 7c: roll up an array of expense category totals by Schedule C
+// line. Each input row contributes its total to the line's running sum
+// and appends its category name to the line's `categories` list.
+// Output sorted by total descending. Unmapped categories (scheduleCLine
+// === null) are deliberately omitted from the summary — they show on
+// the on-screen expense list with an "unspecified" badge but don't
+// contribute to a Schedule C line that can't be filed against.
+function buildScheduleCSummary(
+  expense: Array<{
+    category: string;
+    count: number;
+    total: number;
+    taxDeductible: boolean | null;
+    scheduleCLine: string | null;
+  }>
+): AnnualSummary["scheduleCSummary"] {
+  const buckets = new Map<string, { total: number; categories: string[] }>();
+  for (const row of expense) {
+    if (!row.scheduleCLine) continue;
+    const b = buckets.get(row.scheduleCLine) ?? { total: 0, categories: [] };
+    b.total += row.total;
+    b.categories.push(row.category);
+    buckets.set(row.scheduleCLine, b);
+  }
+  return Array.from(buckets.entries())
+    .map(([line, b]) => ({
+      line,
+      description: SCHEDULE_C_DESCRIPTIONS[line] ?? `Line ${line}`,
+      total: b.total,
+      categories: b.categories,
+    }))
+    .sort((a, b) => b.total - a.total);
 }
 
 // Map of category name → taxDeductible flag for the requested industry.
@@ -342,6 +437,7 @@ export async function annualSummary(opts: {
   const customIncome: string[] = Array.isArray(prefIncome) ? prefIncome : [];
   const classify = buildClassifier(industry, customIncome, customExpense);
   const deductibleMap = buildTaxDeductibleMap(industry);
+  const scheduleCMap = buildScheduleCMap(industry);
 
   // IRS rate + rateSource per phase-7a-tax-reports-design.md §1 #5.
   const irsRaw = appSettingResult.rows[0]?.value;
@@ -466,8 +562,10 @@ export async function annualSummary(opts: {
       count: v.count,
       total: v.total,
       taxDeductible: deductibleMap.get(category) ?? null,
+      scheduleCLine: scheduleCMap.get(category) ?? null,
     }))
     .sort((a, b) => b.total - a.total);
+  const scheduleCSummary = buildScheduleCSummary(expenseArr);
 
   const outstandingAsOfYearEnd = Number(
     outstandingResult.rows[0]?.outstanding ?? 0
@@ -493,6 +591,7 @@ export async function annualSummary(opts: {
       income: incomeArr,
       expense: expenseArr,
     },
+    scheduleCSummary,
     byMonth,
     mileage: {
       totalMiles,
