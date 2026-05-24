@@ -163,30 +163,53 @@ export default function SetupChecklist(props: SetupChecklistProps) {
         />
       </div>
 
-      <ul className="space-y-2 m-0 p-0 list-none">
+      <ul className="space-y-3 m-0 p-0 list-none">
         {visible.map((item) => (
-          <li
-            key={item.id}
-            className="flex items-center justify-between gap-3 text-sm"
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {/* Checkbox circle — filled green when done */}
-              <span
-                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-colors ${
-                  item.done
-                    ? "bg-emerald-500 border-emerald-500 text-white"
-                    : "border-slate-300 text-transparent"
-                }`}
-              >
-                {item.done ? "✓" : ""}
-              </span>
-              <span
-                className={`truncate ${item.done ? "text-slate-400 line-through" : "text-slate-700"}`}
-              >
-                {item.label}
-              </span>
+          <li key={item.id} className="text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {/* Checkbox circle — filled green when done */}
+                <span
+                  className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-colors ${
+                    item.done
+                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      : "border-slate-300 text-transparent"
+                  }`}
+                >
+                  {item.done ? "✓" : ""}
+                </span>
+                <span
+                  className={`truncate ${item.done ? "text-slate-400 line-through" : "text-slate-700"}`}
+                >
+                  {item.label}
+                </span>
+              </div>
+              {!item.done && (
+                <ActionButton
+                  action={item.action}
+                  label={item.buttonLabel}
+                  onClearSample={props.onClearSample}
+                  onUploadClick={props.onUploadClick}
+                />
+              )}
             </div>
-            {!item.done && <ActionButton action={item.action} label={item.buttonLabel} onClearSample={props.onClearSample} onUploadClick={props.onUploadClick} />}
+            {/* Sub-session 24 follow-up commit 4: per-item help link.
+                Only the Gmail item has one today (the rest of the
+                steps are self-explanatory in 1 sentence; the Gmail
+                workflow requires a 3-step setup the OAuth round-trip
+                doesn't cover). Surfaces below the checkbox row,
+                indented under the checkbox circle for visual
+                association without taking right-side button space. */}
+            {item.id === "gmail" && !item.done && (
+              <div className="pl-7 mt-1">
+                <Link
+                  href="/help/gmail-setup"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  What labels do I need? {"\u{2192}"}
+                </Link>
+              </div>
+            )}
           </li>
         ))}
       </ul>
