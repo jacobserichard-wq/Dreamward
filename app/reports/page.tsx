@@ -9,6 +9,8 @@ import ReportSummaryCards from "../components/ReportSummaryCards";
 import ReportByCategoryTable from "../components/ReportByCategoryTable";
 import ReportMonthlyChart from "../components/ReportMonthlyChart";
 import ReportArSnapshot from "../components/ReportArSnapshot";
+import ScheduleCSummaryPanel from "../components/ScheduleCSummaryPanel";
+import QuarterlyEstimatesPanel from "../components/QuarterlyEstimatesPanel";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 6 of 9, per
 // session-notes/phase-7a-tax-reports-design.md §7.
@@ -45,8 +47,33 @@ interface AnnualSummaryResponse {
       count: number;
       total: number;
       taxDeductible: boolean | null;
+      // Phase 7c commit 9: Schedule C line surfaces in the category
+      // table (badge) and the dedicated summary panel below.
+      scheduleCLine: string | null;
     }>;
   };
+  // Phase 7c commit 9: Schedule C rollup — built by
+  // lib/reports/aggregate.ts.buildScheduleCSummary from the byCategory
+  // expense rows. Empty array when nothing maps.
+  scheduleCSummary: Array<{
+    line: string;
+    description: string;
+    total: number;
+    categories: string[];
+  }>;
+  // Phase 7c commit 9: quarterly estimate. Null when net profit ≤ 0
+  // (loss year — no tax owed). Math from lib/quarterly.ts.
+  quarterlyEstimate: {
+    effectivePct: number;
+    ytdProfit: number;
+    ytdSetAside: number;
+    quartersElapsed: number;
+    projectedAnnualProfit: number;
+    projectedAnnualTax: number;
+    suggestedPerQuarter: number;
+    nextDeadline: string | null;
+    deadlines: { quarter: number; dueDate: string }[];
+  } | null;
   byMonth: Array<{
     month: string;
     revenue: number;
@@ -378,6 +405,14 @@ export default function ReportsPage() {
               netProfit={summary.summary.netProfit}
             />
 
+            {/* Phase 7c commit 9: quarterly estimates panel. Renders an
+                explanatory message when estimate is null (loss year). */}
+            <QuarterlyEstimatesPanel
+              year={summary.year}
+              netProfit={summary.summary.netProfit}
+              estimate={summary.quarterlyEstimate}
+            />
+
             {/* Mileage rate honesty notice — design §1 #5. Only renders
                 when the rate isn't certain to be year-correct. */}
             {summary.mileage.rateSource === "current-year-only" && (
@@ -413,6 +448,13 @@ export default function ReportsPage() {
             <ReportByCategoryTable
               income={summary.byCategory.income}
               expense={summary.byCategory.expense}
+            />
+
+            {/* Phase 7c commit 9: Schedule C rollup. Renders nothing
+                when scheduleCSummary is empty (no categories mapped). */}
+            <ScheduleCSummaryPanel
+              year={summary.year}
+              rows={summary.scheduleCSummary}
             />
 
             <ReportArSnapshot

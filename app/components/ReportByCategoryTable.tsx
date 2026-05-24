@@ -9,6 +9,11 @@
 //   - null  → "deductibility unspecified" muted pill (the Phase 5
 //             convention for categories where timing / Section 179
 //             elections make a single boolean misleading)
+//
+// Phase 7c commit 9: expense rows also carry a Schedule C line
+// badge ("L18", "L8", etc.) when the category has a mapping in
+// lib/categories.ts. Badge omitted (not rendered) for categories
+// without a mapping — matches the PDF + CSV behavior.
 
 interface IncomeRow {
   category: string;
@@ -21,6 +26,7 @@ interface ExpenseRow {
   count: number;
   total: number;
   taxDeductible: boolean | null;
+  scheduleCLine: string | null;
 }
 
 interface ReportByCategoryTableProps {
@@ -114,6 +120,14 @@ export default function ReportByCategoryTable({
                   <div className="flex items-baseline gap-1.5 flex-wrap">
                     <span className="text-slate-700 truncate">{row.category}</span>
                     <DeductibilityPill value={row.taxDeductible} />
+                    {row.scheduleCLine && (
+                      <span
+                        title={`Schedule C Part II Line ${row.scheduleCLine}`}
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                      >
+                        L{row.scheduleCLine}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-slate-400">
                     {row.count} {row.count === 1 ? "row" : "rows"}
