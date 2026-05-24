@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -463,6 +463,14 @@ export default function Home() {
   const [confirmDismissChecklist, setConfirmDismissChecklist] = useState(false);
   const [dismissingChecklist, setDismissingChecklist] = useState(false);
 
+  // UX commit 10: first-visit auto-scroll. Anchors the SetupChecklist
+  // in the viewport on first paint when there's no real data yet —
+  // matches the audit's "no next step" finding. One-shot per session
+  // via the autoScrolledRef guard; subsequent re-renders don't
+  // re-scroll (annoying as the user clicks around).
+  const checklistAnchorRef = useRef<HTMLDivElement | null>(null);
+  const autoScrolledRef = useRef(false);
+
   const dismissChecklist = useCallback(() => {
     setConfirmDismissChecklist(true);
   }, []);
@@ -679,6 +687,36 @@ export default function Home() {
       .checklist_dismissed_at === "string";
   const setupChecklistVisible =
     settingsLoaded && clientInfo !== null && !setupChecklistDismissed;
+
+  // UX commit 10: first-visit detection (audit §6 #3 locked value).
+  // Derived runtime check — onboarding done + no real items yet.
+  // Combined with setupChecklistVisible to gate the auto-scroll.
+  const isFirstVisit =
+    clientInfo?.onboardingCompleted === true &&
+    !processedItems.some((i) => i.source !== "sample");
+
+  // UX commit 10: first-visit auto-scroll effect. Fires once per
+  // session when the checklist becomes visible + we're a first-visit
+  // user. autoScrolledRef guards against repeat scrolls on every
+  // re-render. Smooth-scrolls the checklist anchor into the viewport.
+  // Effect placed after the derivations it depends on (hooks order
+  // still consistent across renders — that's all React requires).
+  useEffect(() => {
+    if (autoScrolledRef.current) return;
+    if (!setupChecklistVisible) return;
+    if (!isFirstVisit) return;
+    if (activeTab !== "dashboard") return;
+    if (!checklistAnchorRef.current) return;
+    // Defer one tick so the ref attaches after the conditional render.
+    const id = window.setTimeout(() => {
+      checklistAnchorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      autoScrolledRef.current = true;
+    }, 100);
+    return () => window.clearTimeout(id);
+  }, [setupChecklistVisible, isFirstVisit, activeTab]);
 
   const stats = {
     total: processedItems.length,
@@ -1227,7 +1265,11 @@ export default function Home() {
             {/* UX commit 7: SetupChecklist. Visibility resolved upstream
                 in `setupChecklistVisible` so the banner-suppression
                 logic in commit 8 stays in sync with this render. The
-                component self-hides when all visible items are done. */}
+                component self-hides when all visible items are done.
+                UX commit 10: ref attached to a wrapping div so the
+                first-visit auto-scroll effect can target a stable
+                anchor regardless of the conditional inside. */}
+            <div ref={checklistAnchorRef}>
             {setupChecklistVisible && clientInfo && (
                 <SetupChecklist
                   plan={
@@ -1268,6 +1310,7 @@ export default function Home() {
                   onUploadClick={() => setActiveTab("emails")}
                 />
               )}
+            </div>
 
             {/* Stat cards. UX commit 3: tooltips added on every card +
                 the duplicate "Overdue" card removed (it's still in the
