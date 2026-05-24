@@ -1038,32 +1038,31 @@ export default function Home() {
         {/* ── DASHBOARD TAB ── */}
         {activeTab === "dashboard" && (
           <div>
-            {/* Stat cards */}
+            {/* Stat cards. UX commit 3: tooltips added on every card +
+                the duplicate "Overdue" card removed (it's still in the
+                Status Breakdown row below, which is the canonical
+                location for status-level counts). */}
             <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-8">
               <StatCard
                 label="Total Items"
                 value={stats.total}
                 icon={"\u{1F4E6}"}
                 colorClass="border-t-blue-500"
+                tooltip="All invoices and expenses FlowWork has processed from your Gmail, file uploads, and manual entry."
               />
               <StatCard
                 label="Total Amount"
                 value={`$${stats.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
                 icon={"\u{1F4B0}"}
                 colorClass="border-t-green-600"
-              />
-              <StatCard
-                label="Overdue"
-                value={stats.overdue}
-                sub={`$${stats.overdueAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-                icon={"\u{1F6A8}"}
-                colorClass="border-t-red-600"
+                tooltip="Sum of every processed item's amount. Includes both income and expenses — see Reports for a net-profit view."
               />
               <StatCard
                 label="Avg Confidence"
                 value={`${stats.avgConfidence}%`}
                 icon={"\u{1F3AF}"}
                 colorClass="border-t-violet-500"
+                tooltip="How confident the AI was about its categorization, averaged across all items. 90%+ rarely needs review; items below get flagged in 'Needs Review'."
               />
               {/* Phase 4: Business miles stat — sums each event's
                   §8.2 conditional total. Only renders when there's a
@@ -1078,6 +1077,7 @@ export default function Home() {
                   })} mi`}
                   icon={"\u{1F697}"}
                   colorClass="border-t-amber-500"
+                  tooltip="Round-trip miles across all your events. Multiply by the IRS rate in Settings to get your federal mileage deduction."
                 />
               )}
             </div>
