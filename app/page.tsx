@@ -1489,10 +1489,63 @@ export default function Home() {
               </div>
             )}
 
+            {/* UX commit 9: empty-state CTA card. Replaces the prior
+                dead text ("Process some emails to see dashboard data")
+                with a 3-path coaching card surfaced exactly when the
+                user has cleared sample data and has no real items yet.
+                Each path is a one-click route to the relevant ingest
+                surface — no hunting through the nav. */}
             {processedItems.length === 0 && (
-              <div className="text-center p-[60px] text-slate-400 text-[15px]">
-                <p className="text-5xl mb-2">{"\u{1F4CA}"}</p>
-                <p>Process some emails to see dashboard data</p>
+              <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
+                <p className="text-5xl mb-3">{"\u{1F4CA}"}</p>
+                <h3 className="text-lg font-bold text-slate-900 m-0 mb-2">
+                  Add your first transaction
+                </h3>
+                <p className="text-sm text-slate-500 m-0 mb-6 max-w-md mx-auto">
+                  FlowWork starts populating this dashboard the moment
+                  you add real data. Pick whichever path fits your
+                  workflow.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("emails")}
+                    className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left cursor-pointer hover:bg-blue-100 transition-colors"
+                  >
+                    <div className="text-2xl mb-1.5">{"\u{1F4E7}"}</div>
+                    <div className="text-sm font-semibold text-slate-900 mb-1">
+                      Connect Gmail
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Auto-pull invoices and expenses from your inbox.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("emails")}
+                    className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-left cursor-pointer hover:bg-emerald-100 transition-colors"
+                  >
+                    <div className="text-2xl mb-1.5">{"\u{1F4C1}"}</div>
+                    <div className="text-sm font-semibold text-slate-900 mb-1">
+                      Upload a file
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      CSV, TSV, or XLSX export from your accounting tool.
+                    </div>
+                  </button>
+                  <Link
+                    href="/invoices/new"
+                    className="bg-violet-50 border border-violet-200 rounded-lg p-4 text-left cursor-pointer hover:bg-violet-100 transition-colors no-underline block"
+                  >
+                    <div className="text-2xl mb-1.5">{"\u{270F}"}</div>
+                    <div className="text-sm font-semibold text-slate-900 mb-1">
+                      Add manually
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Create your first invoice by hand.
+                    </div>
+                  </Link>
+                </div>
               </div>
             )}
           </div>
