@@ -9,6 +9,7 @@ import InvoiceList, {
   type InvoiceListEntry,
   type InvoiceListSummary,
 } from "../components/InvoiceList";
+import FetchFromGmailModal from "../components/FetchFromGmailModal";
 import type { AgingBucket } from "@/lib/aging";
 
 // Phase 6 list surface. Mirrors the events-page pattern (commit-3 era
@@ -36,6 +37,8 @@ export default function InvoicesPage() {
   // id while a PATCH /api/invoices/[id]/review is on the wire.
   const [selectedNeedsReview, setSelectedNeedsReview] = useState(false);
   const [reviewingId, setReviewingId] = useState<number | null>(null);
+  // Phase 6.5 commit 7: Fetch-from-Gmail modal open state.
+  const [fetchModalOpen, setFetchModalOpen] = useState(false);
 
   const loadInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -265,12 +268,25 @@ export default function InvoicesPage() {
                   invoices.length === 1 ? "invoice" : "invoices"
                 }`}
           </p>
-          <Link
-            href="/invoices/new"
-            className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold no-underline cursor-pointer"
-          >
-            + New invoice
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Phase 6.5 commit 7: Fetch from Gmail button — Growth+
+                only (matches the API guard). Hidden on starter, but
+                starter already gets the upgrade-prompt screen at the
+                top of the file. */}
+            <button
+              type="button"
+              onClick={() => setFetchModalOpen(true)}
+              className="py-2.5 px-5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50"
+            >
+              {"\u{1F4E5}"} Fetch from Gmail
+            </button>
+            <Link
+              href="/invoices/new"
+              className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold no-underline cursor-pointer"
+            >
+              + New invoice
+            </Link>
+          </div>
         </div>
 
         <InvoiceList
@@ -287,6 +303,35 @@ export default function InvoicesPage() {
           onApprove={handleApprove}
           onDismiss={handleDismiss}
           reviewingId={reviewingId}
+        />
+
+        {/* Phase 6.5 commit 7: Fetch-from-Gmail modal. Lives at the
+            page root so the inset-0 overlay covers the full viewport.
+            onFetch resolves with the API response; the modal owns
+            the busy/result/error states. After fetch lands, parent
+            reloads the list + auto-toggles the review filter on so
+            the new rows are immediately visible. */}
+        <FetchFromGmailModal
+          open={fetchModalOpen}
+          onClose={() => setFetchModalOpen(false)}
+          onFetch={async (opts) => {
+            const res = await fetch("/api/invoices/ingest", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(opts),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(data.error || `HTTP ${res.status}`);
+            }
+            // Refresh the list immediately so the new rows + the
+            // updated needsReviewCount appear under the modal. Flip
+            // the filter on if anything was inserted so the user
+            // doesn't have to find the rows manually.
+            await loadInvoices();
+            if (data.inserted > 0) setSelectedNeedsReview(true);
+            return data;
+          }}
         />
       </div>
     </div>
