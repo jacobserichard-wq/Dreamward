@@ -2,7 +2,7 @@
 
 **Small Business Edition** | Updated May 23, 2026
 
-**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 7 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a + 7b + 7c SHIPPED (annual summary + mileage + CSV + PDF + CPA handoff + Schedule C line mapping + quarterly estimates)**
+**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 6.5 / 7 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a + 7b + 7c SHIPPED (annual summary + mileage + CSV + PDF + CPA handoff + Schedule C line mapping + quarterly estimates); Phase 6.5 SHIPPED (AR auto-detect from Gmail)**
 
 ---
 
@@ -385,6 +385,27 @@ What's still aspirational: "Direct line to our team. Most questions answered sam
 
 ---
 
+## Phase 6.5 — AR Auto-Detect from Gmail — SHIPPED
+
+**Week 17** | Apply the invoice-extraction pipeline to AR — pull customer invoices the user sent (or received) from Gmail and land them in `/invoices`.
+
+- [x] Schema delta on `invoices`: `source`, `gmail_message_id`, `needs_review` columns + dedup unique partial index (migration `0009`)
+- [x] Pure Claude extraction helper `lib/invoiceIngest.ts` (subject pre-filter + AR-targeted extraction prompt + strict per-field normalization)
+- [x] `POST /api/invoices/ingest` route (Gmail fetch with body → keyword pre-filter → Claude extraction in chunks of 20 → confidence ≥ 60 filter → dedup-aware bulk INSERT)
+- [x] `PATCH /api/invoices/[id]/review` route with `{ action: "approve" | "dismiss" }` (approve clears `needs_review`; dismiss HARD-deletes — recover by re-fetching)
+- [x] `/invoices` page additions: "Auto" + "Review" pills, "Needs review (N)" filter chip, inline Approve/Dismiss buttons (replace Send Reminder while needsReview=true to prevent embarrassing reminders on unreviewed extractions), Fetch from Gmail modal with label/date/maxResults inputs and a result summary
+
+**Designed in** `session-notes/phase-6.5-design.md` (locked the audit's default §6 recommendations). Plan-gated Growth+ (mirrors Phase 6). Cost: roughly $0.01 per email scanned through the extractor.
+
+**Phase 6.5b candidates (deferred):**
+- PDF attachment OCR (most professional invoices are PDF attachments; v1 ships body-text extraction only and flags PDF-only messages for manual entry)
+- Daily cron alongside trial-expiring / reclassify (once false-positive rate is known from real usage)
+- Detail-page review banner + "View original email" Gmail deep-link
+- Reverse direction: parse customer replies for "I paid" signals (Phase 6.6 — payment ingestion)
+- Smart customer-name matching (avoid creating "Acme Corp" when "Acme Corporation" already exists)
+
+---
+
 ## Phase 6 — AR Aging & Follow-ups — SHIPPED
 
 **Week 14–15** | Track wholesale/consignment invoices and chase overdue payments
@@ -488,9 +509,11 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 ## Up Next
 
-**Phases 3 / 4 / 5 / 6 / 7a / 7b / 7c — SHIPPED** (sub-sessions 16 through 24, May 16–23). See per-phase sections above for shipped-summary paragraphs.
+**Phases 3 / 4 / 5 / 6 / 6.5 / 7a / 7b / 7c — SHIPPED** (sub-sessions 16 through 24, May 16–23). See per-phase sections above for shipped-summary paragraphs.
 
 **Phase 7 — DONE.** All four originally-planned tasks (annual summary, mileage, CSV/PDF export, Schedule C line mapping, quarterly estimates) are shipped, plus the Phase 7a addition of CPA email handoff.
+
+**Phase 6.5 (sub-session 24) shipped**: AR auto-detect from Gmail. Migration `0009` adds `source`, `gmail_message_id`, `needs_review` to invoices. `lib/invoiceIngest.ts` carries the pure Claude extraction; `/api/invoices/ingest` chains Gmail fetch + body extraction + keyword pre-filter + chunked Claude extraction + dedup-aware INSERT. `/invoices` UI gains Auto + Review pills, a "Needs review (N)" filter chip, inline Approve/Dismiss buttons, and a "Fetch from Gmail" modal. Designed with the default §6 decisions (SENT+user-label sources, body-text only no PDF, auto-save with review queue, confidence ≥ 60 gate, user-triggered fetch). Growth+ gated.
 
 **Phase 1.6 remaining:**
 - OAuth Production submission **paused** in favor of tiered auth strategy. CASA decision criteria: 50+ active Pro subscribers OR 5+ prospect interviews citing Gmail as the deal-maker OR Pro tier hitting the 100-user cap.
@@ -507,7 +530,7 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 - **Calendly Production setup** (~10 min user-side) — register the Calendly webhook + add `CALENDLY_WEBHOOK_SIGNING_KEY` to Vercel. See `commit14.2-report.md`.
 - ~~**`lib/reports.ts` split**~~ — done as a Phase 7c precursor (commit `6e2b87d`). Split into `lib/reports/aggregate.ts` + `lib/reports/csv.ts` + barrel re-export.
 
-**Recommended next coding session:** With Phase 7 closed, the natural greenfield arcs are **Phase 6.5 — AR auto-detect from Gmail** (apply the invoice-extraction pipeline to AR — currently a manual-entry-only surface) and **CSV upload XLSX support** (small dep add, removes a recurring user friction point). Polish + close-debt alternatives: the Anthropic SDK + Next + TS dep majors batch, or admin tooling for Phase 1.7 Tier 3.
+**Recommended next coding session:** With Phases 6.5 + 7 + XLSX shipped this session, the next-up arcs are **Phase 6.5b polish** (PDF attachment OCR + detail-page review banner + cron-driven fetch) and the deferred **dep majors** (TypeScript 5→6, ESLint 9→10, Anthropic SDK 0.92→0.98 — each wants a dedicated test pass). Polish + close-debt alternatives: admin tooling for Phase 1.7 Tier 3, or the lingering 5 moderate transitive vulns (will resolve once next-auth + Next bump their postcss + uuid deps).
 
 ---
 
