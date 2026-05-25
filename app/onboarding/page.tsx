@@ -1,226 +1,348 @@
 "use client";
 
-import { useState, useEffect } from "react";
+// app/onboarding/page.tsx
+//
+// Sub-session 24 flow redesign commit 5 of 7. Rewrites the legacy
+// 2-step onboarding form as the tier-aware SetupChecklist surface.
+//
+// The legacy form's industry pick + business name collection moves
+// into the checklist's "tell_us_about_business" item (commit 4 added
+// the inline form render). All other tier-specific setup steps live
+// alongside it — same checklist a Pro user sees with white-glove
+// highlighted, a Trial user just sees the minimal subset.
+//
+// Removed the returning-user guard from the legacy version — the
+// new /onboarding is the canonical "setup checklist anytime" surface
+// (commit 6 adds a nav link from /dashboard so users can revisit).
+// onboarding_completed=true users land here without being bounced
+// back to /dashboard; their form item just renders as ✓ Done.
+//
+// Skip mutations PATCH /api/settings with preferences.ux.checklist_items_skipped
+// (the JSONB sub-key extends the preferences.ux shape introduced in the
+// UX First-Run arc). Confirm modal wraps the skip per locked decision #4.
+
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import SetupChecklist from "../components/SetupChecklist";
+import ConfirmModal from "../components/ConfirmModal";
 import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import { apiFetch } from "@/lib/apiFetch";
 
-const INDUSTRIES = [
-  { id: "marketplace", label: "Market Vendor / Craft Seller", icon: "\u{1F3EA}" },
-  { id: "freelance", label: "Freelancer / Consultant", icon: "\u{1F4BC}" },
-  { id: "service", label: "Landscaping / Service Co", icon: "\u{1F333}" },
-  { id: "food", label: "Food Truck / Mobile Business", icon: "\u{1F69A}" },
-  { id: "ecommerce", label: "Etsy / Amazon FBA Seller", icon: "\u{1F4E6}" },
-  { id: "creative", label: "Photographer / Creative", icon: "\u{1F3A8}" },
-  { id: "bookkeeper", label: "Bookkeeper / Small CPA Firm", icon: "\u{1F4CA}" },
-  { id: "nonprofit", label: "Nonprofit Organization", icon: "❤️" },
-  { id: "realestate", label: "Real Estate Investor", icon: "\u{1F3E0}" },
-  { id: "fitness", label: "Personal Trainer / Coach", icon: "\u{1F3CB}️" },
-  { id: "other", label: "Other", icon: "⚙️" },
-];
+type Plan = "trial" | "starter" | "growth" | "pro";
+
+interface ClientInfo {
+  plan: Plan;
+  businessName: string | null;
+  industry: string | null;
+  proCallBookedAt: string | null;
+  proCallScheduledFor: string | null;
+}
+
+interface SettingsResponse {
+  homeAddress?: string | null;
+  settings?: {
+    preferences?: Record<string, unknown>;
+  };
+}
+
+interface ItemSummary {
+  hasSample: boolean;
+  hasReal: boolean;
+  hasGmail: boolean;
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [businessName, setBusinessName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sub-session 23 hygiene step 4: returning-user guard. The dashboard
-  // pushes incomplete users HERE, but a completed user who navigates
-  // back to /onboarding directly (browser history, bookmark, retype URL)
-  // would otherwise see step 0 again — confusing, no real harm but
-  // bad UX. Check on mount; redirect to / if onboarding is already
-  // complete. The render path below stays gated on `checking` so we
-  // don't briefly flash step 0 before the redirect fires.
-  const [checking, setChecking] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    async function check() {
-      try {
-        const data = await apiFetch<{
-          onboardingCompleted?: boolean;
-        }>("/api/client");
-        if (cancelled) return;
-        if (data?.onboardingCompleted === true) {
-          router.replace("/dashboard");
-          return;
-        }
-      } catch {
-        // Non-fatal — fall through to render the form. If /api/client
-        // is failing the user has bigger problems than a misrouted
-        // onboarding page.
-      } finally {
-        if (!cancelled) setChecking(false);
+  // Sourced from /api/client + /api/settings + counts.
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
+  const [homeAddress, setHomeAddress] = useState<string>("");
+  const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  const [itemSummary, setItemSummary] = useState<ItemSummary>({
+    hasSample: false,
+    hasReal: false,
+    hasGmail: false,
+  });
+  const [eventCount, setEventCount] = useState(0);
+  const [invoiceCount, setInvoiceCount] = useState(0);
+
+  // Skip flow state.
+  const [pendingSkipId, setPendingSkipId] = useState<string | null>(null);
+  const [skipping, setSkipping] = useState(false);
+
+  // ── Load everything the checklist needs in parallel ────────────
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [clientRes, settingsRes, itemsRes, eventsRes, invoicesRes] =
+        await Promise.allSettled([
+          fetch("/api/client"),
+          fetch("/api/settings"),
+          fetch("/api/items"),
+          fetch("/api/events"),
+          fetch("/api/invoices?limit=1"),
+        ]);
+
+      // /api/client — required; bail to /signin if unauthenticated
+      if (clientRes.status === "fulfilled" && clientRes.value.ok) {
+        const data = (await clientRes.value.json()) as ClientInfo;
+        setClientInfo(data);
+      } else if (clientRes.status === "fulfilled" && clientRes.value.status === 401) {
+        router.replace("/signin?callbackUrl=/onboarding");
+        return;
       }
+
+      if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
+        const data = (await settingsRes.value.json()) as SettingsResponse;
+        setHomeAddress(typeof data.homeAddress === "string" ? data.homeAddress : "");
+        setPreferences(
+          data.settings?.preferences &&
+            typeof data.settings.preferences === "object"
+            ? (data.settings.preferences as Record<string, unknown>)
+            : {}
+        );
+      }
+
+      if (itemsRes.status === "fulfilled" && itemsRes.value.ok) {
+        const data = (await itemsRes.value.json()) as {
+          items?: Array<{ source?: string }>;
+        };
+        const items = Array.isArray(data.items) ? data.items : [];
+        setItemSummary({
+          hasSample: items.some((i) => i.source === "sample"),
+          hasReal: items.some((i) => i.source !== "sample"),
+          hasGmail: items.some(
+            (i) => i.source === "gmail" || i.source === "email"
+          ),
+        });
+      }
+
+      if (eventsRes.status === "fulfilled" && eventsRes.value.ok) {
+        const data = (await eventsRes.value.json()) as {
+          events?: unknown[];
+        };
+        setEventCount(Array.isArray(data.events) ? data.events.length : 0);
+      }
+
+      if (invoicesRes.status === "fulfilled" && invoicesRes.value.ok) {
+        const data = (await invoicesRes.value.json()) as {
+          invoices?: unknown[];
+        };
+        setInvoiceCount(
+          Array.isArray(data.invoices) ? data.invoices.length : 0
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't load setup data");
+    } finally {
+      setLoading(false);
     }
-    check();
-    return () => {
-      cancelled = true;
-    };
   }, [router]);
 
-  const handleComplete = async () => {
-    if (!businessName.trim()) {
-      setError("Please enter your business name");
-      return;
-    }
-    if (!industry) {
-      setError("Please select your industry");
-      return;
-    }
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
-    setSaving(true);
-    setError(null);
+  // ── Skip / unskip handlers ─────────────────────────────────────
+  const handleRequestSkip = useCallback((itemId: string) => {
+    setPendingSkipId(itemId);
+  }, []);
 
+  const handleConfirmSkip = useCallback(async () => {
+    if (!pendingSkipId) return;
+    setSkipping(true);
     try {
-      const data = await apiFetch<{ plan: string }>("/api/onboarding", {
+      const currentUx =
+        (preferences.ux as Record<string, unknown> | undefined) ?? {};
+      const currentSkipped =
+        (currentUx.checklist_items_skipped as Record<string, string>) ?? {};
+      const nextSkipped = {
+        ...currentSkipped,
+        [pendingSkipId]: new Date().toISOString(),
+      };
+      const nextPrefs = {
+        ...preferences,
+        ux: { ...currentUx, checklist_items_skipped: nextSkipped },
+      };
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: nextPrefs }),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      setPreferences(nextPrefs);
+      setPendingSkipId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't skip item");
+    } finally {
+      setSkipping(false);
+    }
+  }, [pendingSkipId, preferences]);
+
+  const handleUnskip = useCallback(
+    async (itemId: string) => {
+      try {
+        const currentUx =
+          (preferences.ux as Record<string, unknown> | undefined) ?? {};
+        const currentSkipped = {
+          ...((currentUx.checklist_items_skipped as Record<string, string>) ?? {}),
+        };
+        delete currentSkipped[itemId];
+        const nextPrefs = {
+          ...preferences,
+          ux: { ...currentUx, checklist_items_skipped: currentSkipped },
+        };
+        const res = await fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preferences: nextPrefs }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setPreferences(nextPrefs);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't un-skip item");
+      }
+    },
+    [preferences]
+  );
+
+  // ── Business-info form submit (the new inline item) ────────────
+  const handleSubmitBusinessInfo = useCallback(
+    async (data: { businessName: string; industry: string }) => {
+      const res = await apiFetch<{ plan: string }>("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessName: businessName.trim(), industry }),
+        body: JSON.stringify(data),
       });
-      router.push(data.plan === "pro" ? "/welcome-pro" : "/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't complete onboarding");
-      setSaving(false);
-    }
-  };
+      // Re-load clientInfo so the checklist item flips to ✓ Done.
+      // Don't redirect — the checklist might have other items pending.
+      await loadAll();
+      // No router.push — user stays on /onboarding to finish or skip
+      // remaining items. Per design §6 (loose onboarding-completed
+      // semantics), they can leave anytime via the "All set!" CTA card
+      // or by closing the tab.
+      return res as unknown as void;
+    },
+    [loadAll]
+  );
 
-  if (checking) {
-    // Brief loading state while the returning-user check resolves.
-    // Avoids flashing step 0 before the router.replace fires.
+  // ── Render gates ───────────────────────────────────────────────
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
         <div className="bg-white rounded-2xl p-6 sm:py-10 sm:px-9 max-w-[560px] w-full text-center">
           <Spinner />
-          <p className="text-sm text-slate-500 mt-4 m-0">
-            Loading...
-          </p>
+          <p className="text-sm text-slate-500 mt-4 m-0">Loading setup...</p>
         </div>
       </div>
     );
   }
 
+  if (!clientInfo) {
+    // Defensive: /api/client failed without 401. Show an error rather
+    // than render the checklist with garbage state.
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <ErrorBanner
+          message={error ?? "Couldn't load your account info."}
+          onDismiss={() => setError(null)}
+        />
+      </div>
+    );
+  }
+
+  const skipped =
+    (preferences.ux &&
+      typeof preferences.ux === "object" &&
+      (preferences.ux as Record<string, unknown>).checklist_items_skipped) ||
+    {};
+
+  const industrySet =
+    typeof clientInfo.industry === "string" &&
+    clientInfo.industry.length > 0 &&
+    typeof clientInfo.businessName === "string" &&
+    clientInfo.businessName.length > 0;
+
+  const cpaEmailSet = (() => {
+    const cpa = preferences.cpa;
+    return (
+      cpa !== null &&
+      typeof cpa === "object" &&
+      typeof (cpa as Record<string, unknown>).email === "string" &&
+      ((cpa as Record<string, unknown>).email as string).trim() !== ""
+    );
+  })();
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-700 p-4 sm:p-6 font-sans">
-      <div className="bg-white rounded-2xl p-6 sm:py-10 sm:px-9 max-w-[560px] w-full shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
-        {/* Step indicators */}
-        <div className="flex gap-2 justify-center mb-8">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className={`w-10 h-1 rounded-sm transition-colors duration-200 ${
-                i <= step ? "bg-blue-500" : "bg-slate-200"
-              }`}
-            />
-          ))}
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[820px] mx-auto py-8 px-4 sm:px-6">
+        {/* Branded header for the public-facing onboarding surface */}
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="text-sm text-slate-500 hover:text-slate-700 no-underline inline-flex items-center gap-1"
+          >
+            {"\u{2190}"} <span>FlowWork</span>
+          </Link>
         </div>
 
-        {/* Step 0: Welcome */}
-        {step === 0 && (
-          <div className="flex flex-col items-center text-center">
-            <div className="text-5xl mb-4">{"⚡"}</div>
-            <h1 className="text-[28px] font-bold text-slate-900 m-0 mb-3">Welcome to FlowWork</h1>
-            <p className="text-base text-slate-500 leading-normal max-w-[400px] m-0 mb-8">
-              AI-powered accounting automation for your small business.
-              Let&apos;s get you set up in under a minute.
-            </p>
-            <button
-              onClick={() => setStep(1)}
-              className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer"
-            >
-              Get started
-            </button>
-          </div>
-        )}
-
-        {/* Step 1: Business Name */}
-        {step === 1 && (
-          <div className="flex flex-col items-center text-center">
-            <h2 className="text-[22px] font-bold text-slate-900 m-0 mb-2">What&apos;s your business called?</h2>
-            <p className="text-sm text-slate-500 m-0 mb-6">This helps us personalize your experience.</p>
-            <input
-              type="text"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="e.g. Meridian Supply Co."
-              className="w-full py-3.5 px-4 text-base border border-slate-200 rounded-[10px] outline-none mb-6 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && businessName.trim()) setStep(2);
-              }}
-            />
-            <div className="flex gap-3 w-full">
-              <button
-                onClick={() => setStep(0)}
-                className="py-3.5 px-6 rounded-[10px] border border-slate-200 bg-white text-slate-500 text-[15px] font-medium cursor-pointer"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => {
-                  if (!businessName.trim()) {
-                    setError("Please enter your business name");
-                    return;
-                  }
-                  setError(null);
-                  setStep(2);
-                }}
-                className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer"
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Industry */}
-        {step === 2 && (
-          <div className="flex flex-col items-center text-center">
-            <h2 className="text-[22px] font-bold text-slate-900 m-0 mb-2">What type of business do you run?</h2>
-            <p className="text-sm text-slate-500 m-0 mb-6">We&apos;ll tailor your categories and features.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full mb-6">
-              {INDUSTRIES.map((ind) => (
-                <button
-                  key={ind.id}
-                  onClick={() => setIndustry(ind.id)}
-                  className={`flex items-center gap-2.5 py-3 px-3.5 border rounded-[10px] cursor-pointer text-[13px] text-left transition-all duration-150 outline-none focus:ring-2 focus:ring-blue-500/30 ${
-                    industry === ind.id
-                      ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
-                      : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                >
-                  <span className="text-lg shrink-0">{ind.icon}</span>
-                  <span className="leading-[1.3]">{ind.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3 w-full">
-              <button
-                onClick={() => setStep(1)}
-                className="py-3.5 px-6 rounded-[10px] border border-slate-200 bg-white text-slate-500 text-[15px] font-medium cursor-pointer"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleComplete}
-                disabled={saving || !industry}
-                className="flex-1 py-3.5 px-6 rounded-[10px] border-0 bg-blue-500 text-white text-[15px] font-semibold cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving && <Spinner size={14} color="white" />}
-                {saving ? "Setting up..." : "Launch FlowWork"}
-              </button>
-            </div>
-          </div>
-        )}
-
         {error && (
-          <div className="mt-4">
-            <ErrorBanner message={error} onDismiss={() => setError(null)} />
-          </div>
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
         )}
+
+        <SetupChecklist
+          mode="onboarding"
+          plan={clientInfo.plan}
+          gmailConnected={itemSummary.hasGmail}
+          hasRealProcessedItems={itemSummary.hasReal}
+          hasSampleItems={itemSummary.hasSample}
+          homeAddressSet={homeAddress.trim().length > 0}
+          cpaEmailSet={cpaEmailSet}
+          taxBracketSet={
+            preferences.taxBracket !== undefined &&
+            preferences.taxBracket !== null
+          }
+          proCallBooked={clientInfo.proCallBookedAt !== null}
+          industrySet={industrySet}
+          hasEvents={eventCount > 0}
+          hasInvoices={invoiceCount > 0}
+          businessName={clientInfo.businessName ?? ""}
+          industry={clientInfo.industry ?? ""}
+          skipped={skipped as Record<string, string>}
+          onDismiss={() => {
+            /* dismiss disabled in onboarding mode */
+          }}
+          onClearSample={() => {
+            // The clear-sample action lives on the dashboard. Send
+            // the user there with a hint; they come back if they
+            // want via the dashboard's nav link (commit 6).
+            router.push("/dashboard");
+          }}
+          onUploadClick={() => {
+            // Same pattern — file input lives on the dashboard.
+            router.push("/dashboard");
+          }}
+          onSkip={handleRequestSkip}
+          onUnskip={handleUnskip}
+          onSubmitBusinessInfo={handleSubmitBusinessInfo}
+        />
+
+        <ConfirmModal
+          open={pendingSkipId !== null}
+          title="Skip this step?"
+          message="Skipped steps won't appear on your checklist anymore. You can un-skip them from the bottom of this page if you change your mind."
+          confirmLabel="Skip permanently"
+          busy={skipping}
+          onConfirm={handleConfirmSkip}
+          onCancel={() => setPendingSkipId(null)}
+        />
       </div>
     </div>
   );
