@@ -29,6 +29,9 @@ export interface ChannelRow {
   emptyAddHref: string | null;
   emptyAddLabel: string | null;
   proGated: boolean;
+  /** Where clicking a populated channel card drills to.
+   *  null = no click target (typically coming-soon channels). */
+  drillHref?: string | null;
 }
 
 export interface ChannelTableProps {

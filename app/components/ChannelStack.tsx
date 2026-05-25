@@ -160,12 +160,27 @@ function ChannelCard({
         ? "text-emerald-700"
         : "text-red-700";
 
-  return (
-    <div
-      className={`border border-slate-200 rounded-lg p-3 group ${
-        channel.comingSoon ? "opacity-50" : "hover:border-slate-300"
-      }`}
-    >
+  // Drill-down: when the channel has data AND has a drillHref, the
+  // whole card becomes a clickable link to the relevant source-of-
+  // truth surface (Markets → /events, Wholesale → /invoices, etc.).
+  // Coming-soon channels never get a drill target. The empty-state
+  // CTA path already has its own link, so this only matters when
+  // hasData=true.
+  const drillTarget =
+    channel.hasData && channel.drillHref && !channel.comingSoon
+      ? channel.drillHref
+      : null;
+
+  const cardClasses = `border border-slate-200 rounded-lg p-3 group block ${
+    channel.comingSoon
+      ? "opacity-50"
+      : drillTarget
+        ? "hover:border-blue-400 hover:shadow-sm cursor-pointer transition-all"
+        : "hover:border-slate-300"
+  }`;
+
+  const cardContent = (
+    <>
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <span className="text-xl flex-shrink-0">{channel.icon}</span>
@@ -187,7 +202,14 @@ function ChannelCard({
         </div>
         <button
           type="button"
-          onClick={onCollapse}
+          onClick={(e) => {
+            // stopPropagation so clicking collapse-X doesn't also
+            // trigger the card's drill-down navigation when the
+            // whole card is wrapped in a Link.
+            e.stopPropagation();
+            e.preventDefault();
+            onCollapse();
+          }}
           title={`Hide ${channel.label}`}
           aria-label={`Hide ${channel.label}`}
           className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-0 text-sm leading-none flex-shrink-0"
@@ -248,6 +270,16 @@ function ChannelCard({
           )}
         </>
       )}
-    </div>
+    </>
+  );
+
+  // Conditionally wrap in Link OR div. Coming-soon channels +
+  // channels with no data never get the link (nothing to drill to).
+  return drillTarget ? (
+    <Link href={drillTarget} className={cardClasses}>
+      {cardContent}
+    </Link>
+  ) : (
+    <div className={cardClasses}>{cardContent}</div>
   );
 }

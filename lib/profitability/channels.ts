@@ -54,6 +54,10 @@ export interface ChannelMeta {
   /** True if the channel requires a Pro plan to add (UI swaps the
    *  href to /billing for non-Pro users) */
   proGated: boolean;
+  /** Where clicking a populated channel card drills the user to.
+   *  null for coming-soon channels (no click). The whole card
+   *  becomes a Link when this is non-null AND the channel has data. */
+  drillHref: string | null;
 }
 
 /** The fixed canonical channel list rendered on the dashboard table
@@ -68,6 +72,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/integrations",
     emptyAddLabel: "Connect Shopify",
     proGated: true,
+    drillHref: "/integrations",
   },
   {
     id: "markets",
@@ -77,6 +82,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/events/new",
     emptyAddLabel: "Add your first event",
     proGated: false,
+    drillHref: "/events",
   },
   {
     id: "wholesale",
@@ -86,6 +92,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/invoices/new",
     emptyAddLabel: "Create your first invoice",
     proGated: false,
+    drillHref: "/invoices",
   },
   {
     id: "service",
@@ -95,6 +102,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/invoices/new",
     emptyAddLabel: "Add a service invoice",
     proGated: false,
+    drillHref: "/invoices",
   },
   {
     id: "gmail",
@@ -104,6 +112,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/help/gmail-setup",
     emptyAddLabel: "Set up Gmail labels",
     proGated: true,
+    drillHref: "/dashboard?tab=processed&filter=gmail",
   },
   {
     id: "uploads",
@@ -113,6 +122,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: "/dashboard",
     emptyAddLabel: "Upload a file",
     proGated: false,
+    drillHref: "/dashboard?tab=processed",
   },
   {
     id: "etsy",
@@ -122,6 +132,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: null,
     emptyAddLabel: null,
     proGated: false,
+    drillHref: null,
   },
   {
     id: "square",
@@ -131,6 +142,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: null,
     emptyAddLabel: null,
     proGated: false,
+    drillHref: null,
   },
   {
     id: "woocommerce",
@@ -140,6 +152,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddHref: null,
     emptyAddLabel: null,
     proGated: false,
+    drillHref: null,
   },
 ] as const;
 
@@ -190,6 +203,8 @@ export interface ChannelMetrics {
   emptyAddHref: string | null;
   emptyAddLabel: string | null;
   proGated: boolean;
+  /** Where clicking a populated channel card drills the user to */
+  drillHref: string | null;
 }
 
 export interface ChannelAggregateResult {
@@ -311,6 +326,7 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
       emptyAddHref: meta.emptyAddHref,
       emptyAddLabel: meta.emptyAddLabel,
       proGated: meta.proGated,
+      drillHref: meta.drillHref,
     });
   }
 
