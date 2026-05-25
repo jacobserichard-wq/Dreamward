@@ -1,24 +1,31 @@
 // app/components/SetupChecklist.tsx
 //
-// UX First-Run commit 7 of 11 (sub-session 24, UX arc).
-// Extended in flow-redesign commit 3 of 8 (sub-session 24, flow arc)
-// with per-item skip plumbing + "Show N skipped" expander.
+// Sub-session 24 commit history:
+//   UX First-Run commit 7  — initial dashboard checklist
+//   Flow-redesign commit 3 — per-item skip plumbing + Show-Skipped expander
+//   Flow-redesign commit 4 — mode prop + 3 new items + white-glove section
 //
-// Pure-presentational checklist surface. Renders up to 7 setup steps;
-// visibility per item is plan-gated + each item's done-state is derived
-// from runtime data passed in by the parent (no fetches in this
-// component).
+// Pure-presentational. Two rendering modes:
 //
-// Self-hides when:
+//   mode="dashboard" (default, backward-compat)
+//     - Renders today's behavior: dismiss X, auto-hide when all done,
+//       7 items max, no white-glove section, no form item
+//
+//   mode="onboarding"
+//     - First-class onboarding surface — no dismiss X, "All set!" CTA
+//       when all visible done, white-glove highlighted top section for
+//       Pro users, includes the inline "Tell us about your business"
+//       form item + add_first_event + add_first_invoice
+//
+// Self-hides (dashboard mode) when:
 //   - preferences.ux.checklist_dismissed_at is set (parent gate), OR
 //   - all visible non-skipped items are done
 //
-// Page owns every mutation (clear sample, upload click, skip, unskip).
+// In onboarding mode, self-hides nothing — instead renders an "All set!"
+// CTA card pointing to the dashboard.
 //
-// Backward-compat: the new skipped/onSkip/onUnskip props are optional
-// with safe defaults (empty map + no-op callbacks). The dashboard call
-// site (UX First-Run commit 7) keeps working unchanged; flow-redesign
-// commit 4 wires the new behavior in.
+// Page owns every mutation (clear sample, upload click, skip, unskip,
+// business-info submit).
 
 "use client";
 
@@ -26,61 +33,123 @@ import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 
+type ChecklistMode = "dashboard" | "onboarding";
+
 export interface SetupChecklistProps {
   plan: "trial" | "starter" | "growth" | "pro";
-  // Derived signals from existing home-page data:
-  gmailConnected: boolean;          // any processed_item with source='gmail'
-  hasRealProcessedItems: boolean;   // any source != 'sample'
-  hasSampleItems: boolean;          // any source == 'sample'
-  homeAddressSet: boolean;          // settings.homeAddress non-null
-  cpaEmailSet: boolean;             // settings.preferences.cpa.email non-empty
-  taxBracketSet: boolean;           // settings.preferences.taxBracket defined
-  proCallBooked: boolean;           // clients.pro_call_booked_at non-null
-  // Mutation hooks (page-owned):
+  /** Rendering mode. Defaults "dashboard" to preserve backward compat
+   *  with the existing call site (commit 7 of the prior UX arc). */
+  mode?: ChecklistMode;
+
+  // Derived signals (existing):
+  gmailConnected: boolean;
+  hasRealProcessedItems: boolean;
+  hasSampleItems: boolean;
+  homeAddressSet: boolean;
+  cpaEmailSet: boolean;
+  taxBracketSet: boolean;
+  proCallBooked: boolean;
+
+  // Derived signals (new for onboarding mode):
+  /** True when client.industry + client.business_name are both set. */
+  industrySet?: boolean;
+  /** True when the user has at least one event row. */
+  hasEvents?: boolean;
+  /** True when the user has at least one invoice row. */
+  hasInvoices?: boolean;
+
+  // Form state for the inline business-info item (onboarding mode):
+  businessName?: string;
+  industry?: string;
+
+  // Mutation hooks (existing):
   onDismiss: () => void;
   onClearSample: () => void;
   onUploadClick: () => void;
-  // Flow-redesign commit 3: per-item skip plumbing. Optional for
-  // backward compat — dashboard call site can omit these and skip
-  // behavior is silently absent.
-  /** Map of itemId → ISO timestamp when skipped. Absent key = not skipped. */
+
+  // Mutation hooks (skip plumbing — commit 3):
   skipped?: Record<string, string>;
-  /** Called when the user clicks the per-item Skip button. Parent
-   *  typically opens a ConfirmModal then PATCHes preferences. */
   onSkip?: (itemId: string) => void;
-  /** Called when the user clicks "Un-skip" in the expander. Immediate;
-   *  no confirmation (un-skipping is non-destructive). */
   onUnskip?: (itemId: string) => void;
+
+  // Mutation hooks (new — onboarding mode):
+  /** Commits the inline business-info form item. Parent typically
+   *  POSTs to /api/onboarding and updates clients.business_name +
+   *  clients.industry. */
+  onSubmitBusinessInfo?: (data: {
+    businessName: string;
+    industry: string;
+  }) => Promise<void>;
 }
 
 interface ChecklistItem {
   id: string;
   label: string;
   done: boolean;
+  /** Per item, the right-side action. The new "form" kind renders an
+   *  inline industry-picker + business-name form (commit 4); other
+   *  kinds map to standard mutation buttons (commit 3 + earlier). */
   action:
     | { kind: "signIn" }
     | { kind: "upload" }
     | { kind: "clearSample" }
     | { kind: "link"; href: string }
-    | { kind: "linkHash"; href: string };
+    | { kind: "linkHash"; href: string }
+    | { kind: "form" };
   buttonLabel: string;
-  // Plans where this item should appear.
   visibleOn: Array<"trial" | "starter" | "growth" | "pro">;
-  // Flow-redesign commit 3: whether the user can skip this item.
-  // Defaults true. The future "tell_us_about_business" item (commit 5)
-  // will be the first non-skippable item — industry pick drives AI
-  // categorization, can't be defaulted away.
   skippable?: boolean;
+  /** Modes where this item should render. Defaults to both. The
+   *  business-info form item only makes sense on the onboarding
+   *  surface (the dashboard never asks for industry/name). */
+  modes?: ChecklistMode[];
 }
 
+// Industries roll over from the legacy /onboarding form so the new
+// flow surfaces the same 11 options. Editing this list also
+// updates the legacy form (single source of truth for sub-session 24
+// onward).
+const INDUSTRIES = [
+  { id: "marketplace", label: "Market Vendor / Craft Seller", icon: "\u{1F3EA}" },
+  { id: "freelance", label: "Freelancer / Consultant", icon: "\u{1F4BC}" },
+  { id: "service", label: "Landscaping / Service Co", icon: "\u{1F333}" },
+  { id: "food", label: "Food Truck / Mobile Business", icon: "\u{1F69A}" },
+  { id: "ecommerce", label: "Etsy / Amazon FBA Seller", icon: "\u{1F4E6}" },
+  { id: "creative", label: "Photographer / Creative", icon: "\u{1F3A8}" },
+  { id: "bookkeeper", label: "Bookkeeper / Small CPA Firm", icon: "\u{1F4CA}" },
+  { id: "nonprofit", label: "Nonprofit Organization", icon: "\u{2764}\u{FE0F}" },
+  { id: "realestate", label: "Real Estate Investor", icon: "\u{1F3E0}" },
+  { id: "fitness", label: "Personal Trainer / Coach", icon: "\u{1F3CB}\u{FE0F}" },
+  { id: "other", label: "Other", icon: "\u{2699}\u{FE0F}" },
+];
+
 export default function SetupChecklist(props: SetupChecklistProps) {
-  // Local expander state for the "Show N skipped items" section.
-  // Defaults closed — user opts in to seeing the skipped list.
+  const mode: ChecklistMode = props.mode ?? "dashboard";
   const [showSkipped, setShowSkipped] = useState(false);
+
+  // Inline form state for the business-info item (onboarding-only).
+  // Initialized from props so a partially-completed value persists
+  // across re-renders.
+  const [bizName, setBizName] = useState(props.businessName ?? "");
+  const [bizIndustry, setBizIndustry] = useState(props.industry ?? "");
+  const [bizSaving, setBizSaving] = useState(false);
+  const [bizError, setBizError] = useState<string | null>(null);
 
   const skipped = props.skipped ?? {};
 
   const items: ChecklistItem[] = [
+    // ── Form item: industry + business name (onboarding-only) ──────
+    {
+      id: "tell_us_about_business",
+      label: "Tell us about your business",
+      done: props.industrySet ?? false,
+      action: { kind: "form" },
+      buttonLabel: "Save",
+      visibleOn: ["trial", "starter", "growth", "pro"],
+      skippable: false,                // locked decision #6 — required
+      modes: ["onboarding"],           // dashboard never asks this
+    },
+    // ── Existing items ─────────────────────────────────────────────
     {
       id: "gmail",
       label: "Connect Gmail to auto-pull invoices",
@@ -104,6 +173,24 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       action: { kind: "link", href: "/settings" },
       buttonLabel: "Open Settings",
       visibleOn: ["trial", "starter", "growth", "pro"],
+    },
+    // ── New items (commit 4): event + invoice. Only meaningful on
+    //    plans where those modules exist (growth + pro). ────────────
+    {
+      id: "add_first_event",
+      label: "Add your first event (market, fair, gig)",
+      done: props.hasEvents ?? false,
+      action: { kind: "link", href: "/events" },
+      buttonLabel: "Open Events",
+      visibleOn: ["growth", "pro"],
+    },
+    {
+      id: "add_first_invoice",
+      label: "Add your first invoice (AR follow-up)",
+      done: props.hasInvoices ?? false,
+      action: { kind: "link", href: "/invoices" },
+      buttonLabel: "Open Invoices",
+      visibleOn: ["growth", "pro"],
     },
     {
       id: "sample_cleared",
@@ -129,63 +216,111 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       buttonLabel: "Open Settings",
       visibleOn: ["pro"],
     },
-    {
-      id: "onboarding_call",
-      label: "Book your white-glove onboarding call",
-      done: props.proCallBooked,
-      action: { kind: "link", href: "/welcome-pro" },
-      buttonLabel: "Book",
-      visibleOn: ["pro"],
-    },
   ];
 
-  // Visible-for-this-plan, minus any item the user has skipped.
-  const planVisible = items.filter((i) => i.visibleOn.includes(props.plan));
+  // White-glove item: rendered in its own highlighted section above
+  // the regular list (locked decision #7). Conceptually a checklist
+  // item but rendered separately for visual prominence.
+  const whiteGloveItem: ChecklistItem = {
+    id: "onboarding_call",
+    label: "Book your white-glove onboarding call",
+    done: props.proCallBooked,
+    action: { kind: "link", href: "/welcome-pro" },
+    buttonLabel: "Book your call",
+    visibleOn: ["pro"],
+  };
+
+  // Apply mode-visibility (default = both modes), plan-visibility,
+  // and skip filtering.
+  const planVisible = items.filter(
+    (i) =>
+      i.visibleOn.includes(props.plan) &&
+      (i.modes ?? ["dashboard", "onboarding"]).includes(mode)
+  );
   const visible = planVisible.filter((i) => !skipped[i.id]);
-  // Skipped items shown to this user (skipped + plan-visible only —
-  // a Trial user who skipped a Pro item that was never visible to
-  // them doesn't see it here either).
   const skippedVisible = planVisible.filter((i) => skipped[i.id]);
 
-  const doneCount = visible.filter((i) => i.done).length;
+  const whiteGloveVisible =
+    mode === "onboarding" &&
+    whiteGloveItem.visibleOn.includes(props.plan) &&
+    !skipped[whiteGloveItem.id];
 
-  // Self-hide when nothing left to do.
-  if (visible.length === 0 || doneCount === visible.length) {
-    // Edge case: user has skipped items but no active items left.
-    // Still hide — the expander can be re-opened from /settings later
-    // if we ship that surface. For v1, an empty checklist is hidden.
+  // Total visible count INCLUDING white-glove for the progress denominator.
+  const totalVisible = visible.length + (whiteGloveVisible ? 1 : 0);
+  const doneCount =
+    visible.filter((i) => i.done).length +
+    (whiteGloveVisible && whiteGloveItem.done ? 1 : 0);
+
+  // Dashboard self-hide: nothing left or all done. Onboarding mode
+  // renders an "All set" card instead (no auto-hide).
+  if (mode === "dashboard" && (visible.length === 0 || doneCount === totalVisible)) {
     return null;
   }
 
-  const percent = Math.round((doneCount / visible.length) * 100);
+  // Onboarding mode "All set" CTA — replaces the checklist when every
+  // visible item (incl white-glove if present) is done or skipped.
+  if (mode === "onboarding" && totalVisible > 0 && doneCount === totalVisible) {
+    return <AllSetCard />;
+  }
+
+  const percent = totalVisible > 0 ? Math.round((doneCount / totalVisible) * 100) : 100;
+
+  // Headings differ by mode (design §5 table).
+  const headingTitle =
+    mode === "onboarding"
+      ? "Welcome to FlowWork — let's get you set up"
+      : "Get FlowWork running";
+
+  const handleBizSubmit = async () => {
+    if (!props.onSubmitBusinessInfo) return;
+    setBizError(null);
+    if (!bizName.trim()) {
+      setBizError("Please enter your business name.");
+      return;
+    }
+    if (!bizIndustry) {
+      setBizError("Please pick an industry.");
+      return;
+    }
+    setBizSaving(true);
+    try {
+      await props.onSubmitBusinessInfo({
+        businessName: bizName.trim(),
+        industry: bizIndustry,
+      });
+    } catch (err) {
+      setBizError(err instanceof Error ? err.message : "Couldn't save");
+    } finally {
+      setBizSaving(false);
+    }
+  };
 
   return (
-    <div
-      // Visual hierarchy: brighter than the surrounding banners, sits
-      // at the top of the dashboard to anchor the first-time experience.
-      className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm"
-    >
+    <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
       <div className="flex justify-between items-start mb-3 gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-slate-900 m-0 mb-1">
-            Get FlowWork running
+            {headingTitle}
           </h2>
           <p className="text-sm text-slate-500 m-0">
-            {doneCount} of {visible.length} steps complete
+            {doneCount} of {totalVisible} steps complete
           </p>
         </div>
-        <button
-          type="button"
-          onClick={props.onDismiss}
-          aria-label="Hide this checklist"
-          title="Hide this checklist"
-          className="text-slate-400 hover:text-slate-600 cursor-pointer text-xl leading-none px-2 py-1"
-        >
-          {"×"}
-        </button>
+        {/* Dismiss X only on dashboard mode — onboarding can't be
+            dismissed (it's the whole page). */}
+        {mode === "dashboard" && (
+          <button
+            type="button"
+            onClick={props.onDismiss}
+            aria-label="Hide this checklist"
+            title="Hide this checklist"
+            className="text-slate-400 hover:text-slate-600 cursor-pointer text-xl leading-none px-2 py-1"
+          >
+            {"×"}
+          </button>
+        )}
       </div>
 
-      {/* Progress bar */}
       <div
         className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4"
         role="progressbar"
@@ -199,12 +334,48 @@ export default function SetupChecklist(props: SetupChecklistProps) {
         />
       </div>
 
+      {/* White-glove highlighted section (onboarding + pro only) */}
+      {whiteGloveVisible && !whiteGloveItem.done && (
+        <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white rounded-lg p-5 mb-5">
+          <div className="flex justify-between items-start gap-3 flex-wrap mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{"\u{1F3AF}"}</span>
+              <span className="bg-amber-400 text-amber-950 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+                Free — included with Pro
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => props.onSkip?.(whiteGloveItem.id)}
+              title="Skip the onboarding call"
+              className="text-xs text-white/70 hover:text-white cursor-pointer bg-transparent border-0"
+            >
+              Skip
+            </button>
+          </div>
+          <h3 className="text-lg font-bold m-0 mb-1">
+            Book your white-glove onboarding call
+          </h3>
+          <p className="text-sm text-white/90 m-0 mb-4 leading-relaxed">
+            A FlowWork team member walks you through Gmail setup, label
+            filters, your first CSV import, and your CPA handoff —
+            personally, in 30 minutes. The fastest way to get the most
+            out of your Pro tier.
+          </p>
+          <Link
+            href={whiteGloveItem.action.kind === "link" ? whiteGloveItem.action.href : "/welcome-pro"}
+            className="inline-block py-2 px-5 rounded-lg bg-white text-violet-700 hover:bg-slate-100 text-sm font-semibold no-underline cursor-pointer"
+          >
+            {whiteGloveItem.buttonLabel} {"\u{2192}"}
+          </Link>
+        </div>
+      )}
+
       <ul className="space-y-3 m-0 p-0 list-none">
         {visible.map((item) => (
           <li key={item.id} className="text-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                {/* Checkbox circle — filled green when done */}
                 <span
                   className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-colors ${
                     item.done
@@ -220,7 +391,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
                   {item.label}
                 </span>
               </div>
-              {!item.done && (
+              {!item.done && item.action.kind !== "form" && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <ActionButton
                     action={item.action}
@@ -228,10 +399,6 @@ export default function SetupChecklist(props: SetupChecklistProps) {
                     onClearSample={props.onClearSample}
                     onUploadClick={props.onUploadClick}
                   />
-                  {/* Flow-redesign commit 3: per-item skip. Renders
-                      only when onSkip is provided (backward compat for
-                      the dashboard call site until commit 4 wires it)
-                      and the item is skippable (skippable !== false). */}
                   {props.onSkip && item.skippable !== false && (
                     <button
                       type="button"
@@ -245,6 +412,52 @@ export default function SetupChecklist(props: SetupChecklistProps) {
                 </div>
               )}
             </div>
+            {/* Inline form for the business-info item. Renders below
+                the checkbox row, inset like the Gmail help link. */}
+            {!item.done && item.action.kind === "form" && (
+              <div className="pl-7 mt-3 space-y-3">
+                {bizError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-xs">
+                    {bizError}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={bizName}
+                  onChange={(e) => setBizName(e.target.value)}
+                  placeholder="Business name"
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 box-border"
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {INDUSTRIES.map((ind) => {
+                    const selected = bizIndustry === ind.id;
+                    return (
+                      <button
+                        key={ind.id}
+                        type="button"
+                        onClick={() => setBizIndustry(ind.id)}
+                        className={`text-left p-2.5 rounded-lg border text-xs flex items-center gap-2 cursor-pointer transition-colors ${
+                          selected
+                            ? "border-blue-500 bg-blue-50 text-blue-900"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="text-base">{ind.icon}</span>
+                        <span className="truncate">{ind.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBizSubmit}
+                  disabled={bizSaving}
+                  className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60"
+                >
+                  {bizSaving ? "Saving..." : "Save and continue"}
+                </button>
+              </div>
+            )}
             {item.id === "gmail" && !item.done && (
               <div className="pl-7 mt-1">
                 <Link
@@ -259,11 +472,6 @@ export default function SetupChecklist(props: SetupChecklistProps) {
         ))}
       </ul>
 
-      {/* Flow-redesign commit 3: "Show N skipped" expander. Only
-          renders when skipped items exist AND parent provided onUnskip
-          (so users can actually un-skip from inside the component).
-          Mirrors the existing "Show hidden defaults" pattern in
-          /settings — collapsed by default, opt-in to revisit. */}
       {skippedVisible.length > 0 && props.onUnskip && (
         <div className="mt-4 pt-3 border-t border-slate-100">
           <button
@@ -304,15 +512,41 @@ export default function SetupChecklist(props: SetupChecklistProps) {
   );
 }
 
-// Per-item action button. Five action kinds map to four mutation
-// mechanisms (signIn, upload click, sample-clear, link nav).
+// "All set!" CTA card — replaces the checklist when every visible item
+// is done or skipped in onboarding mode. Routes the user to the
+// dashboard so they can start working.
+function AllSetCard() {
+  return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center">
+      <div className="text-5xl mb-3">{"\u{2705}"}</div>
+      <h2 className="text-xl font-bold text-emerald-900 m-0 mb-2">
+        You&apos;re all set!
+      </h2>
+      <p className="text-sm text-emerald-800 m-0 mb-5 max-w-md mx-auto">
+        Setup is complete. Your dashboard is ready — start uploading
+        files, processing emails, or tracking events.
+      </p>
+      <Link
+        href="/dashboard"
+        className="inline-block py-2.5 px-6 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold no-underline cursor-pointer"
+      >
+        Go to dashboard {"\u{2192}"}
+      </Link>
+    </div>
+  );
+}
+
+// Per-item action button. Six action kinds map to five mutation
+// mechanisms (signIn, upload, clearSample, link, form). The form
+// kind is handled inline above (renders a multi-field form below
+// the checkbox row); ActionButton never receives it.
 function ActionButton({
   action,
   label,
   onClearSample,
   onUploadClick,
 }: {
-  action: ChecklistItem["action"];
+  action: Exclude<ChecklistItem["action"], { kind: "form" }>;
   label: string;
   onClearSample: () => void;
   onUploadClick: () => void;
@@ -325,8 +559,6 @@ function ActionButton({
       return (
         <button
           type="button"
-          // Flow-redesign commit 1: callbackUrl bumped from "/" to
-          // "/dashboard" since the root is now the marketing landing.
           onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className={buttonClass}
         >
