@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 
 const ALL_MODULES = [
@@ -96,6 +97,19 @@ export default function SettingsPage() {
   const [irsRateSaved, setIrsRateSaved] = useState(false);
   const [irsRateError, setIrsRateError] = useState<string | null>(null);
 
+  // Vehicle config (gas price + MPG) drives the operating-rate
+  // mileage cost on profitability surfaces. Defaults match
+  // lib/mileageRates.ts constants — $3.67/gal + 30 mpg = $0.12/mi.
+  // Persisted under preferences.vehicle.{gas_price_per_gallon, mpg}.
+  const [gasPriceInput, setGasPriceInput] = useState<string>("3.67");
+  const [mpgInput, setMpgInput] = useState<string>("30");
+  const [savedGasPrice, setSavedGasPrice] = useState<string>("3.67");
+  const [savedMpg, setSavedMpg] = useState<string>("30");
+  const [vehicleSourceConfig, setVehicleSourceConfig] = useState(false);
+  const [vehicleSaving, setVehicleSaving] = useState(false);
+  const [vehicleSaved, setVehicleSaved] = useState(false);
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
+
   const hiddenDefaultsDirty = useMemo(
     () =>
       JSON.stringify([...hiddenDefaults].sort()) !==
@@ -143,6 +157,24 @@ export default function SettingsPage() {
     if (!Number.isFinite(num)) return false;
     return Math.abs(num - savedIrsRate) > 1e-6;
   }, [irsRateInput, savedIrsRate]);
+
+  const vehicleDirty = useMemo(
+    () =>
+      gasPriceInput.trim() !== savedGasPrice.trim() ||
+      mpgInput.trim() !== savedMpg.trim(),
+    [gasPriceInput, mpgInput, savedGasPrice, savedMpg]
+  );
+
+  // Live preview of operating rate computed from current inputs
+  // (defensive: falls back to dashes when inputs are non-numeric).
+  const operatingRatePreview = useMemo(() => {
+    const gas = Number(gasPriceInput);
+    const mpg = Number(mpgInput);
+    if (!Number.isFinite(gas) || !Number.isFinite(mpg) || gas <= 0 || mpg <= 0) {
+      return "—";
+    }
+    return `$${(gas / mpg).toFixed(2)}/mi`;
+  }, [gasPriceInput, mpgInput]);
 
   useEffect(() => {
     async function load() {
@@ -222,6 +254,31 @@ export default function SettingsPage() {
         if (data.rateSource === "config" || data.rateSource === "fallback") {
           setIrsRateSource(data.rateSource);
         }
+
+        // Vehicle config (gas + MPG). Lives under preferences.vehicle.
+        // Falls back to display defaults when not set; sourceConfig
+        // flag tells the UI whether both values are user-configured.
+        const rawVehicle =
+          rawPrefs.vehicle &&
+          typeof rawPrefs.vehicle === "object" &&
+          rawPrefs.vehicle !== null
+            ? (rawPrefs.vehicle as Record<string, unknown>)
+            : {};
+        const rawGas =
+          typeof rawVehicle.gas_price_per_gallon === "number"
+            ? rawVehicle.gas_price_per_gallon
+            : null;
+        const rawMpg =
+          typeof rawVehicle.mpg === "number" ? rawVehicle.mpg : null;
+        const initialGasPrice =
+          rawGas !== null && rawGas > 0 ? String(rawGas) : "3.67";
+        const initialMpg =
+          rawMpg !== null && rawMpg > 0 ? String(rawMpg) : "30";
+        setGasPriceInput(initialGasPrice);
+        setMpgInput(initialMpg);
+        setSavedGasPrice(initialGasPrice);
+        setSavedMpg(initialMpg);
+        setVehicleSourceConfig(rawGas !== null && rawMpg !== null);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -240,7 +297,8 @@ export default function SettingsPage() {
       !incomeCategoriesDirty &&
       !irsRateDirty &&
       !cpaEmailDirty &&
-      !bracketDirty
+      !bracketDirty &&
+      !vehicleDirty
     )
       return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -258,6 +316,7 @@ export default function SettingsPage() {
     irsRateDirty,
     cpaEmailDirty,
     bracketDirty,
+    vehicleDirty,
   ]);
 
   const toggleModule = (moduleId: string) => {
@@ -528,6 +587,55 @@ export default function SettingsPage() {
       setBracketError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBracketSaving(false);
+    }
+  };
+
+  // Save vehicle preferences (gas price + MPG). Validates both
+  // values inline before round-trip; persists under
+  // preferences.vehicle = { gas_price_per_gallon, mpg }. Once saved
+  // the operating-rate flips from "default" to "config" on the
+  // server side, which surfaces in /profitability + dashboard rate
+  // labeling.
+  const saveVehicle = async () => {
+    setVehicleSaving(true);
+    setVehicleError(null);
+    const gasNum = Number(gasPriceInput);
+    const mpgNum = Number(mpgInput);
+    if (!Number.isFinite(gasNum) || gasNum < 0.5 || gasNum > 20) {
+      setVehicleError(
+        "Gas price must be a positive number between $0.50 and $20 per gallon."
+      );
+      setVehicleSaving(false);
+      return;
+    }
+    if (!Number.isFinite(mpgNum) || mpgNum < 5 || mpgNum > 200) {
+      setVehicleError("MPG must be a number between 5 and 200.");
+      setVehicleSaving(false);
+      return;
+    }
+    const newPreferences = {
+      ...preferences,
+      vehicle: { gas_price_per_gallon: gasNum, mpg: mpgNum },
+    };
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (res.ok) {
+        setPreferences(newPreferences);
+        setSavedGasPrice(String(gasNum));
+        setSavedMpg(String(mpgNum));
+        setVehicleSourceConfig(true);
+        setVehicleSaved(true);
+      } else {
+        setVehicleError(`Couldn't save: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setVehicleError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setVehicleSaving(false);
     }
   };
 
@@ -952,9 +1060,12 @@ export default function SettingsPage() {
           <div className="mb-5">
             <h2 className="text-lg font-bold text-slate-900 mb-1">IRS mileage rate</h2>
             <p className="text-sm text-slate-500 m-0">
-              The standard mileage rate ({"$"}per mile) the IRS publishes each
-              year for business driving. Used to compute the mileage-cost line on
-              each event&apos;s profit & loss.
+              The standard rate the IRS publishes each year for business
+              driving. <strong>Used for tax surfaces only</strong>:
+              Schedule C mileage deduction on the Annual Report + quarterly
+              tax estimates. For day-to-day profitability views, FlowWork
+              uses the Operating rate below (gas ÷ MPG — the actual
+              cash cost of driving).
             </p>
           </div>
 
@@ -1012,8 +1123,135 @@ export default function SettingsPage() {
               )}
             </div>
             <p className="text-xs text-slate-500 m-0">
-              The IRS publishes one figure per year. Changing this updates the rate
-              everywhere FlowWork computes mileage costs.
+              The IRS publishes this figure once per year. Changing it
+              updates only the tax-deduction calculation on /reports
+              and quarterly estimates.
+            </p>
+          </div>
+        </div>
+
+        {/* Vehicle (operating rate) — drives the gas-cost-per-mile
+            calculation used on /profitability and dashboard Channels.
+            Honest cash impact of driving. Distinct from the IRS rate
+            above (which is tax-deduction territory). */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">
+              Your vehicle
+            </h2>
+            <p className="text-sm text-slate-500 m-0">
+              We compute the cash cost of each mile you drive as{" "}
+              <strong>gas price ÷ MPG</strong>. Used on the dashboard +{" "}
+              <Link href="/profitability" className="underline">
+                /profitability
+              </Link>{" "}
+              to show real out-of-pocket driving costs. Defaults to a
+              typical sedan ($3.67/gal × 30 mpg = $0.12/mi).
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {!vehicleSourceConfig && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4 text-sm">
+                <strong>Using default values</strong> — set yours below
+                so profitability calculations reflect what your car
+                actually costs to drive.
+              </div>
+            )}
+
+            {vehicleError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
+                {vehicleError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label
+                  htmlFor="settings-gas-price"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  Gas price ($/gallon)
+                </label>
+                <input
+                  id="settings-gas-price"
+                  type="text"
+                  inputMode="decimal"
+                  value={gasPriceInput}
+                  onChange={(e) => {
+                    setGasPriceInput(e.target.value);
+                    setVehicleSaved(false);
+                    setVehicleError(null);
+                  }}
+                  placeholder="3.67"
+                  className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1 m-0">
+                  Local average where you usually fill up. Update every
+                  few months if prices shift.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="settings-mpg"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  Vehicle MPG
+                </label>
+                <input
+                  id="settings-mpg"
+                  type="text"
+                  inputMode="decimal"
+                  value={mpgInput}
+                  onChange={(e) => {
+                    setMpgInput(e.target.value);
+                    setVehicleSaved(false);
+                    setVehicleError(null);
+                  }}
+                  placeholder="30"
+                  className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1 m-0">
+                  Sedan ≈ 30, truck/van ≈ 18-22, hybrid/EV ≈ 40+
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-4 m-0">
+              Operating rate: <strong>{operatingRatePreview}</strong>
+            </p>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveVehicle}
+                disabled={vehicleSaving || !vehicleDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  vehicleDirty
+                    ? "bg-blue-500 cursor-pointer"
+                    : "bg-slate-300 cursor-not-allowed"
+                } ${vehicleSaving ? "opacity-50" : ""}`}
+              >
+                {vehicleSaving ? "Saving..." : "Save vehicle"}
+              </button>
+              {vehicleDirty && (
+                <span className="text-sm text-amber-600 font-medium">
+                  Unsaved changes
+                </span>
+              )}
+              {!vehicleDirty && vehicleSaved && (
+                <span className="text-sm text-green-600 font-medium">
+                  {"✓ Saved"}
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              <strong>Note:</strong> Operating rate is just gas — it
+              doesn&apos;t cover maintenance, insurance, or depreciation.
+              For your Schedule C deduction, FlowWork uses the IRS
+              standard rate above ($0.70/mi covers all those things).
+              Both are correct for their purpose.
             </p>
           </div>
         </div>
