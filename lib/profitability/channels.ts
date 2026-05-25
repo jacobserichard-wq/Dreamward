@@ -169,6 +169,16 @@ export interface ChannelTxnRow {
   /** Type tag derived by the caller via the industry-aware classifier
    *  (matches the existing /api/profitability pattern). */
   kind: "income" | "expense" | "unknown";
+  /** Phase 9.3 commit 2: explicit channel set by the user at expense-
+   *  entry time. When non-null, the classifier uses this verbatim
+   *  instead of deriving from source/event_id/category. Backfilled
+   *  on existing rows via migration 0011 so rollup totals don't shift.
+   *  null = fall back to derivation (legacy rows, ingested rows that
+   *  haven't been touched by the user yet). Required field (not
+   *  optional) so the type predicate in the route handler can narrow
+   *  cleanly — callers pass `null` for rows where the SELECT doesn't
+   *  include the column. */
+  channel: string | null;
 }
 
 /** One event row + its mileage_cost (already computed via IRS rate). */
@@ -252,7 +262,16 @@ const CATEGORY_TO_CHANNEL: Record<string, ChannelId> = {
   "Client Work": "service",
 };
 
+/** Set of valid channel IDs — used to validate user-supplied
+ *  explicit channel values from row.channel before trusting them.
+ *  Built once at module load from the canonical channel list. */
+const VALID_CHANNEL_IDS = new Set<ChannelId>(
+  CANONICAL_CHANNELS.map((c) => c.id)
+);
+
 /** Categorize a single income row into a channel. Priority:
+ *  0. Phase 9.3: explicit row.channel set by user → use verbatim
+ *     (if it's a valid known channel ID)
  *  1. source='shopify' → Shopify channel (Shopify backfill / webhook)
  *  2. source IN ('gmail','email') → Gmail channel
  *  3. event_id IS NOT NULL → Markets channel (event-linked income)
@@ -261,6 +280,10 @@ const CATEGORY_TO_CHANNEL: Record<string, ChannelId> = {
  *  6. anything else → Uploads channel (catch-all for unknown income)
  */
 function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
+  // Phase 9.3 commit 2: explicit channel beats derivation
+  if (row.channel && VALID_CHANNEL_IDS.has(row.channel as ChannelId)) {
+    return row.channel as ChannelId;
+  }
   if (row.source === "shopify") return "shopify";
   if (row.source === "gmail" || row.source === "email") return "gmail";
   if (row.event_id !== null) return "markets";
@@ -274,14 +297,22 @@ function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
  *  attribution) — or return null if the expense should fall into
  *  the unallocated overhead pool.
  *
- *  v1 rules (intentionally conservative — over-allocate = wrong;
- *  under-allocate = honest):
- *  - event_id IS NOT NULL → Markets channel
- *  - source='shopify' AND kind='expense' → Shopify channel
- *    (future: Shopify subscription + transaction fees; v1 mostly $0)
- *  - everything else → null (overhead pool)
+ *  Priority:
+ *  0. Phase 9.3: explicit row.channel set by user → use verbatim
+ *  1. event_id IS NOT NULL → Markets channel
+ *  2. source='shopify' AND kind='expense' → Shopify channel
+ *     (future: Shopify subscription + transaction fees; v1 mostly $0)
+ *  3. everything else → null (overhead pool)
+ *
+ *  Conservative-by-default — over-allocate is wrong; under-allocate
+ *  is honest. The explicit channel column is the user's escape
+ *  hatch to attribute overhead that we couldn't auto-derive.
  */
 function classifyExpenseRow(row: ChannelTxnRow): ChannelId | null {
+  // Phase 9.3 commit 2: explicit channel beats derivation
+  if (row.channel && VALID_CHANNEL_IDS.has(row.channel as ChannelId)) {
+    return row.channel as ChannelId;
+  }
   if (row.event_id !== null) return "markets";
   if (row.source === "shopify") return "shopify";
   return null;

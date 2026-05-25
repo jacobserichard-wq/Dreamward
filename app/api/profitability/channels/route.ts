@@ -44,6 +44,10 @@ interface TxnRow {
   category: string | null;
   source: string | null;
   event_id: number | null;
+  /** Phase 9.3: explicit channel set by the user at expense-entry
+   *  time (or backfilled from existing signals by migration 0011).
+   *  When non-null, the channels classifier uses this verbatim. */
+  channel: string | null;
 }
 
 interface SettingsRow {
@@ -123,7 +127,7 @@ export async function GET(req: NextRequest) {
           // (matches /api/reports/annual). Some legacy rows may have
           // null due_date — exclude them from the rollup rather than
           // guess (would skew which year they land in).
-          `SELECT amount, category, source, event_id
+          `SELECT amount, category, source, event_id, channel
              FROM processed_items
             WHERE client_id = $1
               AND due_date IS NOT NULL
@@ -181,6 +185,9 @@ export async function GET(req: NextRequest) {
           source: r.source,
           event_id: r.event_id,
           kind: classify(r.category),
+          // Phase 9.3 commit 2: pass through the explicit channel
+          // column so the classifier can honor user-set tags.
+          channel: r.channel,
         };
       })
       .filter((r): r is ChannelTxnRow => r !== null);
