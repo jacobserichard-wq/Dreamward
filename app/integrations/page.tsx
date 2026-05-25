@@ -21,7 +21,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
@@ -32,7 +32,30 @@ interface ClientInfo {
   plan: string;
 }
 
+// Phase 8b fix-up (post-push 1): wrap the inner component (which uses
+// useSearchParams) in <Suspense> so Next 15+ static prerendering can
+// build the page. Without the Suspense boundary, the build fails
+// with "missing-suspense-with-csr-bailout" at the /integrations route.
+// Pattern per https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
 export default function IntegrationsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 font-sans">
+          <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+            <p className="text-center p-[60px] text-slate-500">
+              Loading integrations…
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <IntegrationsPageInner />
+    </Suspense>
+  );
+}
+
+function IntegrationsPageInner() {
   const router = useRouter();
   const params = useSearchParams();
 
