@@ -27,6 +27,7 @@ import ExpenseForm, {
   type ExpenseFormEvent,
   type ExpenseFormSubmit,
 } from "../components/ExpenseForm";
+import ConfirmModal from "../components/ConfirmModal";
 import {
   CANONICAL_CHANNELS,
   type ChannelMeta,
@@ -110,9 +111,14 @@ export default function ExpensesPage() {
 
   // For the form modal
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [clientInfo, setClientInfo] = useState<ClientInfoResponse | null>(null);
   const [categories, setCategories] = useState<ExpenseFormCategory[]>([]);
   const [events, setEvents] = useState<ExpenseFormEvent[]>([]);
+
+  // Delete-confirm modal state
+  const [pendingDelete, setPendingDelete] = useState<ExpenseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ── Data loaders ──────────────────────────────────────────────
   const loadExpenses = useCallback(async (channelFilter: string | null) => {
@@ -215,10 +221,15 @@ export default function ExpensesPage() {
   }, [activeFilter, loadExpenses, loading]);
 
   // ── Save handler (passed to form) ─────────────────────────────
+  // Switches between POST (new) and PATCH (edit) based on whether
+  // `editing` is set when the form submits.
   const handleSaveExpense = useCallback(
     async (data: ExpenseFormSubmit) => {
-      const res = await fetch("/api/expenses", {
-        method: "POST",
+      const isEdit = editing !== null;
+      const url = isEdit ? `/api/expenses/${editing.id}` : "/api/expenses";
+      const method = isEdit ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
@@ -227,10 +238,38 @@ export default function ExpensesPage() {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       setFormOpen(false);
+      setEditing(null);
       await loadExpenses(activeFilter);
     },
-    [activeFilter, loadExpenses]
+    [activeFilter, editing, loadExpenses]
   );
+
+  // ── Open form in edit mode for an existing row ────────────────
+  const openEdit = useCallback((expense: ExpenseRow) => {
+    setEditing(expense);
+    setFormOpen(true);
+  }, []);
+
+  // ── Delete handler (called from ConfirmModal) ─────────────────
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/expenses/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setPendingDelete(null);
+      await loadExpenses(activeFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete expense");
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete, activeFilter, loadExpenses]);
 
   // ── Compute per-channel filter counts for chip badges ─────────
   const channelCounts = useMemo(() => {
@@ -330,6 +369,7 @@ export default function ExpensesPage() {
                   <th className="text-left py-2.5 px-4 font-medium">Category</th>
                   <th className="text-left py-2.5 px-4 font-medium">Channel</th>
                   <th className="text-right py-2.5 px-4 font-medium">Amount</th>
+                  <th className="w-10" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -338,7 +378,9 @@ export default function ExpensesPage() {
                   return (
                     <tr
                       key={e.id}
-                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50"
+                      onClick={() => openEdit(e)}
+                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50 cursor-pointer group"
+                      title="Click to edit"
                     >
                       <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
                         {fmtDate(e.dueDate)}
@@ -363,6 +405,20 @@ export default function ExpensesPage() {
                       <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
                         {fmtUsd(e.amount)}
                       </td>
+                      <td
+                        className="py-3 pr-3 text-right"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(e)}
+                          title={`Delete expense from ${e.vendor || "this vendor"}`}
+                          aria-label="Delete expense"
+                          className="text-slate-300 hover:text-red-600 cursor-pointer bg-transparent border-0 text-base leading-none px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          {"\u{00D7}"}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -384,8 +440,30 @@ export default function ExpensesPage() {
         open={formOpen}
         categories={categories}
         events={events}
+        editing={editing}
         onSave={handleSaveExpense}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+      />
+
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="Delete this expense?"
+        message={
+          pendingDelete
+            ? `Remove "${pendingDelete.vendor || "Unknown"}" (${fmtUsd(
+                pendingDelete.amount
+              )}) from your records. This can't be undone, but your channel/profitability totals will recompute immediately.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
       />
     </div>
   );

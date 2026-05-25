@@ -64,6 +64,20 @@ export interface ExpenseFormProps {
   /** Pre-selected event — useful when launching from an event detail
    *  page. Implies channel='markets'. */
   defaultEventId?: number | null;
+  /** Phase 9.3.1: when provided, form runs in EDIT mode — pre-fills
+   *  every field from this expense and submits via PATCH instead of
+   *  POST. The parent's onSave handler is responsible for picking
+   *  the right HTTP method based on whether editing was set. */
+  editing?: {
+    id: number;
+    vendor: string | null;
+    amount: number;
+    dueDate: string | null;
+    category: string | null;
+    channel: string | null;
+    eventId: number | null;
+    notes: string | null;
+  } | null;
   onSave: (data: ExpenseFormSubmit) => Promise<void>;
   onClose: () => void;
 }
@@ -90,6 +104,7 @@ export default function ExpenseForm({
   events,
   defaultChannel = null,
   defaultEventId = null,
+  editing = null,
   onSave,
   onClose,
 }: ExpenseFormProps) {
@@ -105,10 +120,21 @@ export default function ExpenseForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset state when modal re-opens (avoids stale data leaking
-  // between consecutive Add-expense actions).
+  // Reset state when modal re-opens. Two paths:
+  // - editing=null → fresh "Add expense" form (empty fields,
+  //   today's date, optional pre-selected channel/event)
+  // - editing!=null → pre-fill every field from the existing row
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setVendor(editing.vendor ?? "");
+      setAmount(String(editing.amount));
+      setDueDate(editing.dueDate ?? todayIso());
+      setCategory(editing.category ?? "");
+      setChannel(editing.channel ?? "");
+      setEventId(editing.eventId !== null ? String(editing.eventId) : "");
+      setNotes(editing.notes ?? "");
+    } else {
       setVendor("");
       setAmount("");
       setDueDate(todayIso());
@@ -116,9 +142,9 @@ export default function ExpenseForm({
       setChannel(defaultChannel ?? "");
       setEventId(defaultEventId !== null ? String(defaultEventId) : "");
       setNotes("");
-      setError(null);
     }
-  }, [open, defaultChannel, defaultEventId]);
+    setError(null);
+  }, [open, editing, defaultChannel, defaultEventId]);
 
   // Esc to close (when not saving)
   useEffect(() => {
@@ -197,11 +223,12 @@ export default function ExpenseForm({
           id="expense-form-title"
           className="text-lg font-bold text-slate-900 m-0 mb-1"
         >
-          Add an expense
+          {editing ? "Edit expense" : "Add an expense"}
         </h2>
         <p className="text-xs text-slate-500 m-0 mb-5">
-          Tag it to a channel so it shows up in the right profit
-          breakdown.
+          {editing
+            ? "Change any field below + save. Channel tag drives which profit breakdown this rolls into."
+            : "Tag it to a channel so it shows up in the right profit breakdown."}
         </p>
 
         {error && (
@@ -363,7 +390,7 @@ export default function ExpenseForm({
             className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
           >
             {saving && <Spinner size={12} color="white" />}
-            {saving ? "Saving..." : "Save expense"}
+            {saving ? "Saving..." : editing ? "Save changes" : "Save expense"}
           </button>
         </div>
       </div>
