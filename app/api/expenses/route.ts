@@ -53,7 +53,11 @@ interface ProcessedItemRow {
   event_id: number | null;
   status: string | null;
   notes: string | null;
-  created_at: string;
+  // Real column name in processed_items is `processed_at` (the table
+  // predates the migration folder; it doesn't have a `created_at`).
+  // We map this to createdAt in the API response for nicer JS naming
+  // but the SQL ref is processed_at.
+  processed_at: string;
 }
 
 // ---------------------------------------------------------------------
@@ -147,7 +151,7 @@ export async function GET(req: NextRequest) {
 
     const result = await pool.query<ProcessedItemRow>(
       `SELECT id, vendor, amount, due_date, category, source, channel,
-              event_id, status, notes, created_at
+              event_id, status, notes, processed_at
          FROM processed_items
         WHERE ${where.join(" AND ")}
         ORDER BY due_date DESC NULLS LAST, id DESC
@@ -191,7 +195,7 @@ export async function GET(req: NextRequest) {
         eventId: r.event_id,
         status: r.status,
         notes: r.notes,
-        createdAt: r.created_at,
+        createdAt: r.processed_at,
       })),
       summary: {
         totalAmount,
@@ -348,14 +352,14 @@ export async function POST(req: NextRequest) {
       `INSERT INTO processed_items (
          client_id, vendor, amount, due_date, category,
          source, channel, event_id, status, notes,
-         invoice_number, confidence, summary, created_at, updated_at
+         invoice_number, confidence, summary, processed_at, updated_at
        ) VALUES (
          $1, $2, $3, $4, $5,
          'manual', $6, $7, 'paid', $8,
          '', 100, $9, NOW(), NOW()
        )
        RETURNING id, vendor, amount, due_date, category, source,
-                 channel, event_id, status, notes, created_at`,
+                 channel, event_id, status, notes, processed_at`,
       [
         client.id,
         body.vendor.trim(),
@@ -382,7 +386,7 @@ export async function POST(req: NextRequest) {
         eventId: row.event_id,
         status: row.status,
         notes: row.notes,
-        createdAt: row.created_at,
+        createdAt: row.processed_at,
       },
     });
   } catch (err) {
