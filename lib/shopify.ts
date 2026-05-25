@@ -236,6 +236,34 @@ export function verifyWebhookHmac(
  * Sub-phase 8c layers paginated helpers on top; 8d uses this for
  * webhook subscription management.
  */
+/**
+ * Bare REST POST against Shopify's admin API. Used by webhook
+ * subscription registration (8d) + future write-back operations.
+ */
+export async function shopifyPost<T = unknown>(opts: {
+  shopDomain: string;
+  accessToken: string;
+  path: string;
+  body: unknown;
+}): Promise<T> {
+  const { apiVersion } = loadEnv();
+  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}${opts.path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": opts.accessToken,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(opts.body),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Shopify POST ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
+  }
+  return (await res.json()) as T;
+}
+
 export async function shopifyGet<T = unknown>(opts: {
   shopDomain: string;
   accessToken: string;
@@ -452,6 +480,160 @@ export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
         name: li.name,
         quantity: li.quantity,
         price: li.price,
+      })),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------
+// Webhook subscriptions (Phase 8d)
+// ---------------------------------------------------------------------
+
+/** The webhook topics FlowWork subscribes to on connect. Each fires
+ *  a POST to /api/shopify/webhook with the corresponding payload. */
+export const SHOPIFY_WEBHOOK_TOPICS = [
+  "orders/create",
+  "orders/updated",
+  "orders/cancelled",
+  "refunds/create",
+] as const;
+
+export type ShopifyWebhookTopic = (typeof SHOPIFY_WEBHOOK_TOPICS)[number];
+
+/**
+ * Register a webhook subscription with Shopify. Returns the webhook
+ * id (which we persist on shopify_connections.webhook_subscription_ids
+ * so the disconnect flow can clean them up).
+ *
+ * Shopify deduplicates by (topic, address) — re-subscribing the same
+ * topic+address combo returns the existing webhook ID rather than
+ * creating a duplicate. So this is safe to call on reconnect.
+ *
+ * @param address the public URL Shopify will POST to on each event
+ */
+export async function subscribeWebhook(opts: {
+  shopDomain: string;
+  accessToken: string;
+  topic: ShopifyWebhookTopic;
+  address: string;
+}): Promise<{ id: string }> {
+  const result = await shopifyPost<{
+    webhook: { id: number; topic: string; address: string; format: string };
+  }>({
+    shopDomain: opts.shopDomain,
+    accessToken: opts.accessToken,
+    path: "/webhooks.json",
+    body: {
+      webhook: {
+        topic: opts.topic,
+        address: opts.address,
+        format: "json",
+      },
+    },
+  });
+  return { id: String(result.webhook.id) };
+}
+
+/**
+ * Delete a webhook subscription. Best-effort caller — the disconnect
+ * route logs failures but doesn't block on them (a webhook to a
+ * deleted FlowWork connection is harmless — the receiver 404s on
+ * its own client_id lookup).
+ */
+export async function unsubscribeWebhook(opts: {
+  shopDomain: string;
+  accessToken: string;
+  webhookId: string;
+}): Promise<void> {
+  const { apiVersion } = loadEnv();
+  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/webhooks/${opts.webhookId}.json`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "X-Shopify-Access-Token": opts.accessToken,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok && res.status !== 404) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Shopify DELETE webhook ${opts.webhookId}: HTTP ${res.status} ${body.slice(0, 200)}`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Refund mapping (Phase 8d)
+// ---------------------------------------------------------------------
+
+/** Minimal subset of Shopify's Refund schema used by the webhook
+ *  handler. transactions[] is the source of truth for the refund
+ *  amount (refund_line_items[] only covers product-side amounts
+ *  excluding tax/shipping refunds). */
+export interface ShopifyRefund {
+  id: number;
+  order_id: number;
+  created_at: string;
+  processed_at: string | null;
+  note: string | null;
+  transactions: Array<{
+    id: number;
+    amount: string;        // decimal-as-string, positive even for refunds
+    kind: string;          // 'refund' | 'capture' | 'authorization' | etc.
+    status: string;        // 'success' | 'failure' | 'pending'
+    gateway: string | null;
+  }>;
+  refund_line_items: Array<{
+    line_item_id: number;
+    quantity: number;
+    subtotal: string;
+  }>;
+}
+
+/** Refund mapped into a NEGATIVE processed_items row. The original
+ *  order's row stays untouched (positive); the refund is a separate
+ *  row with source_ref_id = 'refund-{refundId}' so reports can show
+ *  gross sales + refunds separately when desired.
+ *
+ *  Caller passes the original order's customer name (looked up via
+ *  the original processed_items row) — we don't have it on the
+ *  refund payload itself. */
+export function mapRefundToProcessedItem(opts: {
+  refund: ShopifyRefund;
+  originalOrderName: string;        // e.g., "#1001"
+  customerName: string;             // copied from the original order's vendor field
+  currency: string;                 // ISO 4217 from the original order
+}): MappedOrderRow {
+  // Sum successful refund transactions. Shopify reports amounts as
+  // positive strings; we negate for the processed_items row so
+  // downstream sum-of-amounts produces correct net revenue.
+  const refundAmount = opts.refund.transactions
+    .filter((t) => t.kind === "refund" && t.status === "success")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const date = (opts.refund.processed_at || opts.refund.created_at).slice(0, 10);
+
+  return {
+    vendor: opts.customerName,
+    invoice_number: `${opts.originalOrderName}-refund`,
+    amount: -refundAmount,
+    due_date: date,
+    status: "paid",                     // refund completed = paid
+    category: "Online Sales",            // negative income, same category
+    source: "shopify",
+    source_ref_id: `refund-${opts.refund.id}`,
+    confidence: 100,
+    summary: `Refund of ${opts.currency} ${refundAmount.toFixed(2)} for order ${opts.originalOrderName}`,
+    extracted_data: {
+      shopify_refund_id: opts.refund.id,
+      shopify_order_id: opts.refund.order_id,
+      currency: opts.currency,
+      note: opts.refund.note,
+      line_item_count: opts.refund.refund_line_items.length,
+      transactions: opts.refund.transactions.map((t) => ({
+        kind: t.kind,
+        amount: t.amount,
+        status: t.status,
       })),
     },
   };
