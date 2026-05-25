@@ -47,6 +47,10 @@ interface ConnectionState {
   lastSyncAt?: string | null;
   lastSyncStatus?: string | null;
   lastSyncError?: string | null;
+  /** Number of registered Shopify webhook subscriptions. Non-zero
+   *  means real-time sync is active; zero means degraded mode (data
+   *  still flows via daily cron, but at ~24h latency). */
+  webhookCount?: number;
   backfill?: {
     startedAt: string | null;
     completedAt: string | null;
@@ -287,19 +291,47 @@ export default function ShopifyConnectionCard() {
               )}
             </div>
 
-            {/* Sync status — minimal in 8b; richer in 8c/8d */}
-            {state.lastSyncAt && (
-              <div className="text-xs text-slate-500">
-                Last sync:{" "}
-                {new Date(state.lastSyncAt).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}{" "}
-                · {state.lastSyncStatus ?? "unknown"}
-              </div>
-            )}
+            {/* Sync status — last_sync_at + live-sync indicator (8d) */}
+            <div className="flex items-center gap-3 flex-wrap text-xs">
+              {/* Live sync indicator: green dot when webhooks are
+                  registered, amber when degraded. */}
+              {typeof state.webhookCount === "number" && (
+                <span
+                  className={`inline-flex items-center gap-1.5 font-medium ${
+                    state.webhookCount > 0
+                      ? "text-emerald-700"
+                      : "text-amber-700"
+                  }`}
+                  title={
+                    state.webhookCount > 0
+                      ? `${state.webhookCount} webhook subscription${state.webhookCount === 1 ? "" : "s"} active — new orders sync within seconds`
+                      : "Webhooks not registered — new orders sync via daily reconciliation only (~24h latency)"
+                  }
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      state.webhookCount > 0
+                        ? "bg-emerald-500"
+                        : "bg-amber-500"
+                    }`}
+                  />
+                  {state.webhookCount > 0
+                    ? "Live sync active"
+                    : "Degraded sync"}
+                </span>
+              )}
+              {state.lastSyncAt && (
+                <span className="text-slate-500">
+                  Last sync:{" "}
+                  {new Date(state.lastSyncAt).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
 
             {/* Phase 8c: backfill progress UI. Four conditional states:
                 - in-progress (started but not completed, not capped) →

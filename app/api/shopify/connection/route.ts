@@ -28,6 +28,7 @@ interface ShopifyConnectionRow {
   last_sync_at: string | null;
   last_sync_status: string | null;
   last_sync_error: string | null;
+  webhook_subscription_ids: string[];
   backfill_started_at: string | null;
   backfill_completed_at: string | null;
   backfill_total_orders: number | null;
@@ -65,6 +66,7 @@ export async function GET() {
               last_sync_at,
               last_sync_status,
               last_sync_error,
+              webhook_subscription_ids,
               backfill_started_at,
               backfill_completed_at,
               backfill_total_orders,
@@ -89,6 +91,11 @@ export async function GET() {
       lastSyncAt: row.last_sync_at,
       lastSyncStatus: row.last_sync_status,
       lastSyncError: row.last_sync_error,
+      // Phase 8d: webhook count for the "Live sync" indicator. Non-
+      // zero = real-time webhook delivery is wired; zero = degraded
+      // (webhook registration failed at OAuth time; daily cron is
+      // still running so data still flows, just at 24h latency).
+      webhookCount: row.webhook_subscription_ids.length,
       backfill: {
         startedAt: row.backfill_started_at,
         completedAt: row.backfill_completed_at,

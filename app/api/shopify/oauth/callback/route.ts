@@ -38,6 +38,8 @@ import {
   normalizeShopDomain,
   exchangeCodeForToken,
   verifyOAuthCallbackHmac,
+  subscribeWebhook,
+  SHOPIFY_WEBHOOK_TOPICS,
 } from "@/lib/shopify";
 import { encryptForDb } from "@/lib/crypto";
 
@@ -169,6 +171,51 @@ export async function GET(req: NextRequest) {
         ? "You already have a Shopify store connected. Disconnect the existing one before connecting a new store."
         : "Couldn't save the Shopify connection. Please try again.";
     return redirectWithError(req, msg);
+  }
+
+  // ── 7b. Register webhooks (Phase 8d) ──────────────────────────
+  // Subscribe to orders/create + orders/updated + orders/cancelled
+  // + refunds/create so we get real-time updates. The webhook IDs
+  // get persisted on shopify_connections.webhook_subscription_ids
+  // so the disconnect flow can DELETE them on Shopify's side.
+  //
+  // Best-effort: failures get logged but DON'T block the connect.
+  // Daily reconciliation cron (8e) compensates if any webhook
+  // never fires. User can also re-trigger registration manually
+  // by disconnecting + reconnecting.
+  try {
+    const webhookAddress = new URL(
+      "/api/shopify/webhook",
+      req.url
+    ).toString();
+    const webhookIds: string[] = [];
+    for (const topic of SHOPIFY_WEBHOOK_TOPICS) {
+      try {
+        const { id } = await subscribeWebhook({
+          shopDomain,
+          accessToken: tokenResult.accessToken,
+          topic,
+          address: webhookAddress,
+        });
+        webhookIds.push(id);
+      } catch (err) {
+        console.warn(`Webhook subscribe failed for topic ${topic}:`, err);
+      }
+    }
+    if (webhookIds.length > 0) {
+      await pool.query(
+        `UPDATE shopify_connections
+            SET webhook_subscription_ids = $1,
+                updated_at = NOW()
+          WHERE client_id = $2`,
+        [webhookIds, client.id]
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "Webhook registration block failed (will rely on daily cron):",
+      err
+    );
   }
 
   // ── 8. Kick off the backfill (fire-and-forget) ─────────────────
