@@ -26,9 +26,9 @@ import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
 
 export const metadata = {
-  title: "FlowWork — Bookkeeping that runs itself",
+  title: "FlowWork — Mission control for your money",
   description:
-    "Connect Gmail, upload CSVs, send your CPA a clean PDF — all in 5 clicks. Built for solo founders, market vendors, freelancers, and small CPA firms.",
+    "One bookkeeping ledger for every revenue source. Sync Shopify, pull invoices from Gmail, upload CSV/XLSX from Square/Stripe/QuickBooks — and hand your CPA a clean Schedule C at tax time.",
 };
 
 export default async function MarketingLandingPage() {
@@ -56,20 +56,24 @@ export default async function MarketingLandingPage() {
           </Link>
         </div>
 
-        {/* Hero */}
+        {/* Hero. Phase 8f: pivoted to "command center" positioning
+            now that Shopify integration is live. Headline reframes
+            FlowWork as the unified-revenue control plane vs Shopify's
+            "we only see our own orders" scope. AI references softened
+            throughout (Jacob feedback: "AI" word is polarizing for
+            the bookkeeper-audience reader; describe the outcome, not
+            the mechanism). */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-12 sm:pt-20 pb-16 sm:pb-24 text-center">
           <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
-            Bookkeeping that runs itself.
+            Mission control for your money.
           </h2>
-          {/* Hero sub-block: "Ready to stop chasing receipts?" + the
-              5-minutes reassurance, pulled up from the old footer CTA
-              section so the hero carries the conversion-driving copy
-              and the long-form features bullets render right below. */}
           <p className="text-xl sm:text-2xl font-semibold text-white m-0 mb-2 leading-snug">
-            Ready to stop chasing receipts?
+            Stop chasing receipts across five different platforms.
           </p>
-          <p className="text-base text-white/80 max-w-xl mx-auto m-0 mb-8 leading-relaxed">
-            Set up takes 5 minutes. Your CPA will thank you at tax time.
+          <p className="text-base text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
+            FlowWork pulls from Shopify, Gmail, and CSV uploads —
+            categorizes everything automatically — and hands your CPA a
+            clean Schedule C at tax time.
           </p>
           <SignInButton label="Start your free trial &rarr;" />
           <p className="text-xs text-white/60 mt-4">
@@ -78,30 +82,75 @@ export default async function MarketingLandingPage() {
         </div>
       </header>
 
-      {/* Feature bullets */}
+      {/* Feature bullets. Phase 8f rewrite: Shopify-led ordering +
+          softened AI language throughout. Card #1 leads with the
+          actual new differentiator. Card #4 folds mileage into the
+          CPA-handoff card (still surfaced, just consolidated). */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FeatureCard
+            icon={"\u{1F6D2}"}
+            title="Sync your Shopify store"
+            body="Connect once. FlowWork pulls every order, refund, and shipping fee automatically. Coming soon: Etsy, Square, WooCommerce."
+          />
+          <FeatureCard
             icon={"\u{1F4E7}"}
-            title="Auto-pull from Gmail"
-            body="Label invoices and receipts in Gmail. FlowWork fetches them automatically — no copy-paste, no forwarding."
+            title="Reads your Gmail invoices"
+            body="Label vendor bills in Gmail; FlowWork extracts vendor, amount, date, and category in seconds. 90%+ correct on the first pass."
           />
           <FeatureCard
-            icon={"\u{1F916}"}
-            title="AI extracts every field"
-            body="Claude reads each email and pulls vendor, amount, date, and category. 90%+ accurate on the first pass."
-          />
-          <FeatureCard
-            icon={"\u{1F697}"}
-            title="Mileage tracked for you"
-            body="Add an event, FlowWork computes round-trip miles via Google Maps and applies the IRS rate."
+            icon={"\u{1F4C1}"}
+            title="Upload from anywhere"
+            body="CSV or XLSX from Square, Stripe, QuickBooks, Xero, Wave — column mapping happens automatically. No template required."
           />
           <FeatureCard
             icon={"\u{1F4CA}"}
-            title="One-click CPA handoff"
-            body="Annual summary + Schedule C line mapping + quarterly estimates, exported as CSV and PDF to your CPA's inbox."
+            title="CPA-ready in one click"
+            body="Annual summary with Schedule C line mapping + quarterly estimates + mileage deductions, exported as CSV and PDF to your CPA's inbox."
           />
         </div>
+      </section>
+
+      {/* "Where your money moves" section. Phase 8f addition:
+          reinforces the multi-source story right before pricing.
+          Concrete platform names = SEO + reassurance for visitors
+          searching e.g. "shopify quickbooks alternative". Coming-
+          soon list signals roadmap without commitment. */}
+      <section className="max-w-[1100px] mx-auto px-4 sm:px-8 pb-12 sm:pb-16">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2">
+            Where your money moves
+          </h3>
+          <p className="text-sm sm:text-base text-slate-600 m-0">
+            One ledger for every channel.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <ChannelCard
+            icon={"\u{1F6D2}"}
+            label="Shopify"
+            blurb="Live sync of orders, refunds, fees"
+          />
+          <ChannelCard
+            icon={"\u{1F4E7}"}
+            label="Gmail"
+            blurb="Vendor invoices, customer payments"
+          />
+          <ChannelCard
+            icon={"\u{1F4C1}"}
+            label="CSV / XLSX"
+            blurb="Square, Stripe, QuickBooks, Xero, Wave"
+          />
+          <ChannelCard
+            icon={"\u{1F697}"}
+            label="Events"
+            blurb="Markets, fairs, pop-ups with auto-mileage"
+          />
+        </div>
+        <p className="text-center text-xs text-slate-500 mt-6">
+          <strong className="text-slate-700">Coming next:</strong>{" "}
+          Etsy · Square · WooCommerce · Stripe Connect
+        </p>
       </section>
 
       {/* Pricing */}
@@ -161,14 +210,19 @@ export default async function MarketingLandingPage() {
               ctaLabel="Start with Growth"
               highlighted
             />
+            {/* Phase 8f: Pro tile updated to lead with Shopify
+                integration (the new Pro-only headline feature).
+                "Custom categories" dropped from visible bullets
+                (still exists in product; weaker selling point than
+                the other 4). */}
             <PricingTile
               name="Pro"
               price="$89"
               priceSub="/month"
               features={[
                 "Everything in Growth",
+                "Shopify integration",
                 "Gmail auto-fetch",
-                "Custom categories",
                 "Tax reports + Schedule C",
                 "White-glove onboarding call",
               ]}
@@ -219,6 +273,27 @@ function FeatureCard({
         {title}
       </h4>
       <p className="text-sm text-slate-600 m-0 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+// Phase 8f addition. Smaller + denser than FeatureCard — fits in a
+// 4-column grid even on mobile (2 cols at sm:, 4 at md+). Used by
+// the "Where your money moves" section.
+function ChannelCard({
+  icon,
+  label,
+  blurb,
+}: {
+  icon: string;
+  label: string;
+  blurb: string;
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+      <div className="text-2xl mb-2">{icon}</div>
+      <div className="text-sm font-semibold text-slate-900 mb-1">{label}</div>
+      <div className="text-xs text-slate-500 leading-snug">{blurb}</div>
     </div>
   );
 }
