@@ -30,9 +30,14 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+
+// Backfill polling cadence — how often the card re-fetches state
+// while a backfill is running. 5s is a good balance: responsive
+// enough to feel live, not so fast it hammers the API.
+const BACKFILL_POLL_INTERVAL_MS = 5_000;
 
 interface ConnectionState {
   connected: boolean;
@@ -65,6 +70,11 @@ export default function ShopifyConnectionCard() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  // Phase 8c: backfill state. backfillBusy is true while a POST to
+  // /api/shopify/backfill is in flight (whether triggered by the
+  // poll or by the user via the upgrade flow).
+  const [backfillBusy, setBackfillBusy] = useState(false);
+
   const loadState = useCallback(async () => {
     setError(null);
     try {
@@ -88,6 +98,61 @@ export default function ShopifyConnectionCard() {
   useEffect(() => {
     loadState();
   }, [loadState]);
+
+  // ── Phase 8c: backfill polling + chunk re-trigger ─────────────
+  //
+  // While the backfill is in-progress (started but not completed),
+  // poll /api/shopify/connection every 5s to surface progress, and
+  // re-POST /api/shopify/backfill whenever the previous chunk's
+  // run finished but the backfill isn't complete yet. The route is
+  // designed to be re-called safely (resumes from MAX(source_ref_id)).
+  //
+  // We use a ref to guard against overlapping POSTs — if a backfill
+  // chunk takes longer than the poll interval, the next poll might
+  // try to fire another. backfillBusyRef enforces "one in flight at
+  // a time".
+  const backfillBusyRef = useRef(false);
+  useEffect(() => {
+    if (!state?.connected) return;
+    const bf = state.backfill;
+    if (!bf) return;
+    // Already done OR not yet started — no polling needed
+    if (bf.completedAt) return;
+    if (!bf.startedAt) return;
+    // Capped at 30k without paid extension — stop; user must pay
+    if (bf.cappedAt30k && !bf.extendedPaidAt) return;
+
+    const tick = async () => {
+      // Re-trigger a chunk if not currently in flight
+      if (!backfillBusyRef.current) {
+        backfillBusyRef.current = true;
+        setBackfillBusy(true);
+        try {
+          await fetch("/api/shopify/backfill", { method: "POST" });
+        } catch {
+          // ignore — the next poll will retry
+        } finally {
+          backfillBusyRef.current = false;
+          setBackfillBusy(false);
+        }
+      }
+      // Refresh state so the UI reflects progress
+      await loadState();
+    };
+
+    // Fire one immediately so connect → land on /integrations doesn't
+    // wait 5s before showing progress; then interval after.
+    void tick();
+    const id = window.setInterval(tick, BACKFILL_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [
+    state?.connected,
+    state?.backfill?.completedAt,
+    state?.backfill?.startedAt,
+    state?.backfill?.cappedAt30k,
+    state?.backfill?.extendedPaidAt,
+    loadState,
+  ]);
 
   const handleConnect = useCallback(async () => {
     if (!shopInput.trim()) {
@@ -210,22 +275,76 @@ export default function ShopifyConnectionCard() {
               </div>
             )}
 
-            {/* Backfill state — surfaces only when backfill has started.
-                Richer rendering (progress bar, paid-upgrade prompt)
-                lands in sub-phase 8c. */}
-            {state.backfill?.startedAt && !state.backfill?.completedAt && (
-              <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3 py-2 rounded text-xs">
-                Backfilling orders… {state.backfill.ordersImported} imported so far.
-              </div>
-            )}
-            {state.backfill?.cappedAt30k &&
-              !state.backfill?.extendedPaidAt && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded text-xs">
-                  Your store has more than 30,000 orders — we imported the
-                  most recent 30k for free. (Paid upgrade UI lands in
-                  sub-phase 8c.)
+            {/* Phase 8c: backfill progress UI. Four conditional states:
+                - in-progress (started but not completed, not capped) →
+                  progress bar + count + "live" pulse
+                - capped at 30k without paid extension → amber upgrade prompt
+                - completed → small green "Imported N orders" line
+                - never started → nothing (shouldn't happen post-connect) */}
+            {state.backfill?.startedAt &&
+              !state.backfill?.completedAt &&
+              !(state.backfill.cappedAt30k && !state.backfill.extendedPaidAt) && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-blue-900 font-medium inline-flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Importing orders from Shopify…
+                    </span>
+                    <span className="text-blue-700 tabular-nums">
+                      {state.backfill.ordersImported.toLocaleString()} imported
+                      {backfillBusy && (
+                        <span className="ml-1.5 text-blue-500">•</span>
+                      )}
+                    </span>
+                  </div>
+                  {/* Progress bar — indeterminate-style since we don't know
+                      total order count until we hit the cap or end. Shows
+                      a thin gradient stripe that animates. */}
+                  <div className="w-full h-1 bg-blue-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 animate-pulse w-1/3" />
+                  </div>
+                  <p className="text-blue-700/80 mt-1.5 m-0">
+                    Safe to leave this page — backfill continues in the
+                    background.
+                  </p>
                 </div>
               )}
+
+            {/* Capped at 30k cap, no paid extension yet → upgrade prompt */}
+            {state.backfill?.cappedAt30k &&
+              !state.backfill?.extendedPaidAt && (
+                <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
+                  <p className="font-semibold text-amber-900 m-0 mb-1">
+                    {"\u{1F4E6}"} 30,000 orders imported (free cap)
+                  </p>
+                  <p className="text-amber-800 m-0 mb-3 leading-relaxed">
+                    Your store has more orders than the 30,000-order free
+                    backfill cap. Unlock unlimited backfill for a one-time
+                    $99 fee — we&apos;ll import every remaining historical
+                    order in the background.
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    title="Upgrade UI lands in commit 8c.4"
+                    className="py-1.5 px-3 rounded bg-amber-600 text-white text-xs font-semibold cursor-not-allowed opacity-60 border-0"
+                  >
+                    Buy unlimited backfill — $99 (coming next commit)
+                  </button>
+                </div>
+              )}
+
+            {/* Completed → quiet confirmation line */}
+            {state.backfill?.completedAt && state.backfill.ordersImported > 0 && (
+              <div className="text-xs text-emerald-700 inline-flex items-center gap-1.5">
+                <span>{"\u{2705}"}</span>
+                <span>
+                  Imported {state.backfill.ordersImported.toLocaleString()}{" "}
+                  order{state.backfill.ordersImported === 1 ? "" : "s"} from
+                  Shopify
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button

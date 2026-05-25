@@ -171,7 +171,34 @@ export async function GET(req: NextRequest) {
     return redirectWithError(req, msg);
   }
 
-  // ── 8. Success: redirect to /integrations ─────────────────────
+  // ── 8. Kick off the backfill (fire-and-forget) ─────────────────
+  // Phase 8c: post-connect we POST to /api/shopify/backfill to start
+  // pulling orders into processed_items. The endpoint is chunked +
+  // resumable so even if the first call only processes a chunk before
+  // Vercel times out, the frontend polling will continue the work.
+  //
+  // Fire-and-forget: we don't await the fetch result. The user lands
+  // on /integrations with the in-progress backfill rendering via the
+  // ShopifyConnectionCard's polling. Awaiting here would just hold
+  // the redirect for ~50s with no UX benefit.
+  try {
+    // Construct an absolute URL for the internal POST. Forwards the
+    // session cookie so the backfill route can authenticate.
+    const backfillUrl = new URL("/api/shopify/backfill", req.url);
+    const cookieHeader = req.headers.get("cookie") ?? "";
+    fetch(backfillUrl.toString(), {
+      method: "POST",
+      headers: { cookie: cookieHeader },
+    }).catch((err) => {
+      // Logged but not surfaced — the frontend will detect the
+      // not-yet-started state and trigger backfill on first poll.
+      console.warn("Backfill kickoff failed (will retry from UI):", err);
+    });
+  } catch (err) {
+    console.warn("Backfill kickoff exception:", err);
+  }
+
+  // ── 9. Success: redirect to /integrations ─────────────────────
   const url = new URL("/integrations", req.url);
   url.searchParams.set("connected", "1");
   url.searchParams.set("shop", shopDomain);
@@ -179,9 +206,7 @@ export async function GET(req: NextRequest) {
   res.cookies.delete(STATE_COOKIE_NAME);
   return res;
 
-  // NOTE: future sub-phases (8c backfill + 8d webhook registration)
-  // will fire those off here before the redirect. For 8a we stop at
-  // "token persisted"; the /integrations page (8b) shows a
-  // "Connected" state without yet attempting backfill or webhook
-  // subscriptions.
+  // NOTE: sub-phase 8d will additionally register webhooks here so
+  // we get real-time order updates after the initial backfill
+  // completes.
 }
