@@ -28,6 +28,65 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
+
+        // Phase 8c commit 5: fork on the flowwork_event metadata to
+        // distinguish the Shopify backfill upgrade (mode='payment',
+        // no subscription) from the standard subscription checkout
+        // (mode='subscription'). Set by the upgrade-backfill route's
+        // session create call.
+        const flowworkEvent = session.metadata?.flowwork_event;
+
+        if (flowworkEvent === "shopify_backfill_upgrade") {
+          // ── Shopify backfill $99 one-time payment ─────────────
+          const connectionIdRaw = session.metadata?.flowwork_connection_id;
+          const paymentIntentId =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : null;
+          if (!connectionIdRaw) {
+            console.error(
+              "shopify_backfill_upgrade webhook missing flowwork_connection_id metadata"
+            );
+            break;
+          }
+          const connectionId = parseInt(connectionIdRaw, 10);
+          if (!Number.isInteger(connectionId)) {
+            console.error(
+              "shopify_backfill_upgrade webhook: invalid connection_id metadata:",
+              connectionIdRaw
+            );
+            break;
+          }
+
+          // Flip the paid marker + reset the cap so the existing
+          // backfill route + the frontend polling can resume
+          // pulling orders past the 30k limit. last_sync_status set
+          // to 'in_progress' so the UI knows to start polling again.
+          await pool.query(
+            `UPDATE shopify_connections
+                SET backfill_extended_paid_at = NOW(),
+                    backfill_capped_at_30k = false,
+                    stripe_payment_intent_id = $1,
+                    last_sync_status = 'in_progress',
+                    last_sync_error = NULL,
+                    updated_at = NOW()
+              WHERE id = $2`,
+            [paymentIntentId, connectionId]
+          );
+          console.log(
+            `Shopify backfill upgrade paid for connection ${connectionId} (payment_intent=${paymentIntentId})`
+          );
+
+          // Don't trigger backfill here — the frontend polling logic
+          // (ShopifyConnectionCard's useEffect) re-runs on the next
+          // /integrations mount + sees the new flags + resumes
+          // polling/POSTing the backfill route. Triggering from this
+          // webhook would require system-level auth on the backfill
+          // route, which we deliberately avoided.
+          break;
+        }
+
+        // ── Standard subscription checkout (existing behavior) ──
         const clientId = session.metadata?.clientId;
         const customerId = session.customer;
         const subscriptionId = session.subscription;
