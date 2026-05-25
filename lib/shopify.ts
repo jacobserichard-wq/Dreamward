@@ -225,7 +225,7 @@ export function verifyWebhookHmac(
 }
 
 // ---------------------------------------------------------------------
-// API client (used by future sub-phases 8c + 8d)
+// API client (used by sub-phases 8c + 8d)
 // ---------------------------------------------------------------------
 
 /**
@@ -233,8 +233,8 @@ export function verifyWebhookHmac(
  * via the X-Shopify-Access-Token header. URL is built from the shop
  * domain + pinned SHOPIFY_API_VERSION + caller-supplied path.
  *
- * Future commits (8c backfill, 8d webhook handlers) will layer
- * paginated helpers on top of this. v1 just exports the primitive.
+ * Sub-phase 8c layers paginated helpers on top; 8d uses this for
+ * webhook subscription management.
  */
 export async function shopifyGet<T = unknown>(opts: {
   shopDomain: string;
@@ -254,4 +254,205 @@ export async function shopifyGet<T = unknown>(opts: {
     throw new Error(`Shopify GET ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
   }
   return (await res.json()) as T;
+}
+
+// ---------------------------------------------------------------------
+// Order types + pagination (Phase 8c)
+// ---------------------------------------------------------------------
+
+/** Minimal subset of Shopify's Order schema we actually need for
+ *  bookkeeping. Shopify returns dozens more fields; we only pull
+ *  what we use to keep the JSON payload small + the DB row tight. */
+export interface ShopifyOrder {
+  id: number;                          // numeric order ID (e.g., 5234567890123)
+  order_number: number;                // human-friendly number (e.g., 1001)
+  name: string;                        // formatted "#1001"
+  created_at: string;                  // ISO timestamp
+  updated_at: string;
+  processed_at: string | null;         // when the order was placed
+  cancelled_at: string | null;
+  total_price: string;                 // decimal-as-string (Shopify uses string to avoid float drift)
+  subtotal_price: string;
+  total_tax: string;
+  total_shipping_price_set: {
+    shop_money: { amount: string; currency_code: string };
+  } | null;
+  currency: string;                    // ISO 4217, e.g., "USD"
+  financial_status: string | null;     // 'paid' | 'pending' | 'refunded' | 'partially_refunded' | 'voided' | null
+  fulfillment_status: string | null;
+  customer: {
+    id: number;
+    email: string | null;
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
+  line_items: Array<{
+    id: number;
+    name: string;
+    quantity: number;
+    price: string;
+  }>;
+}
+
+/**
+ * Fetch a single page of orders. Shopify's REST pagination uses
+ * cursor-based `since_id` — pass the last order's ID to get the
+ * next page (orders sorted by ID ascending = chronological).
+ *
+ * Returns the orders + nextSinceId. nextSinceId is the last order's
+ * ID if a full page came back, OR null when fewer than `limit`
+ * orders returned (indicates end of history).
+ *
+ * @param sinceId pass 0 (or omit) for the first call
+ * @param limit 1-250 (Shopify max); 250 is most efficient
+ * @param status 'any' to include cancelled + open; default Shopify
+ *               behavior is 'open' which excludes cancelled
+ */
+export async function listOrders(opts: {
+  shopDomain: string;
+  accessToken: string;
+  sinceId?: number;
+  limit?: number;
+  status?: "open" | "closed" | "cancelled" | "any";
+}): Promise<{ orders: ShopifyOrder[]; nextSinceId: number | null }> {
+  const limit = Math.min(Math.max(opts.limit ?? 250, 1), 250);
+  const params = new URLSearchParams({
+    limit: String(limit),
+    status: opts.status ?? "any",
+    // Restrict to fields we actually use. Keeps the JSON payload
+    // ~5-10x smaller than the default response.
+    fields: [
+      "id",
+      "order_number",
+      "name",
+      "created_at",
+      "updated_at",
+      "processed_at",
+      "cancelled_at",
+      "total_price",
+      "subtotal_price",
+      "total_tax",
+      "total_shipping_price_set",
+      "currency",
+      "financial_status",
+      "fulfillment_status",
+      "customer",
+      "line_items",
+    ].join(","),
+  });
+  if (opts.sinceId && opts.sinceId > 0) {
+    params.set("since_id", String(opts.sinceId));
+  }
+  const result = await shopifyGet<{ orders: ShopifyOrder[] }>({
+    shopDomain: opts.shopDomain,
+    accessToken: opts.accessToken,
+    path: `/orders.json?${params.toString()}`,
+  });
+  const orders = result.orders ?? [];
+  const nextSinceId =
+    orders.length === limit ? orders[orders.length - 1].id : null;
+  return { orders, nextSinceId };
+}
+
+// ---------------------------------------------------------------------
+// Order → processed_item mapper
+// ---------------------------------------------------------------------
+
+/** Result row shape ready to bind into a parameterized INSERT into
+ *  the processed_items table. */
+export interface MappedOrderRow {
+  vendor: string;
+  invoice_number: string;
+  amount: number;
+  due_date: string;          // YYYY-MM-DD (pg DATE)
+  status: string;            // 'paid' | 'pending' | 'cancelled'
+  category: string;          // hardcoded "Online Sales" (see comment)
+  source: "shopify";
+  source_ref_id: string;     // Shopify order ID as string for the unique-index
+  confidence: number;        // 100 — direct API, no AI extraction
+  summary: string;
+  extracted_data: Record<string, unknown>;
+}
+
+/**
+ * Map a Shopify order into the processed_items row shape.
+ *
+ * Design choices:
+ * - vendor = customer name (first + last) OR email OR "Unknown".
+ *   "vendor" is a misnomer here — for income rows it's the customer.
+ *   We're reusing the existing column to keep the data model simple.
+ * - amount = total_price (includes tax + shipping; matches what
+ *   actually hit the store's bank account)
+ * - due_date = processed_at OR created_at, truncated to YYYY-MM-DD
+ *   (matches the pg DATE type-parser override from sub-session 19)
+ * - status: 'paid' if Shopify financial_status='paid'; 'cancelled'
+ *   if cancelled_at non-null; otherwise 'pending'
+ * - category = "Online Sales" hardcoded. The Etsy/Shopify/Instagram
+ *   income category in lib/categories.ts:181 was literally written
+ *   for this case. Skipping the per-order Claude call saves ~$1.50
+ *   per customer per month + makes backfill ~10x faster. User can
+ *   re-categorize manually if needed.
+ * - confidence = 100 — direct API data, no AI extraction involved
+ * - extracted_data captures the rich Shopify metadata (tax breakdown,
+ *   shipping cost, line items, fulfillment status) for downstream
+ *   reporting + future sales-tax features
+ */
+export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
+  const customerName = order.customer
+    ? [order.customer.first_name, order.customer.last_name]
+        .filter((n): n is string => typeof n === "string" && n.trim() !== "")
+        .join(" ") ||
+      order.customer.email ||
+      "Unknown customer"
+    : "Unknown customer";
+
+  // Date selection: processed_at is when the order was placed +
+  // payment captured. Falls back to created_at for older orders that
+  // predate Shopify's processed_at field.
+  const isoDate = order.processed_at || order.created_at;
+  const dueDate = isoDate.slice(0, 10); // YYYY-MM-DD
+
+  // Status mapping
+  let status: string;
+  if (order.cancelled_at) {
+    status = "cancelled";
+  } else if (order.financial_status === "paid") {
+    status = "paid";
+  } else if (
+    order.financial_status === "refunded" ||
+    order.financial_status === "partially_refunded"
+  ) {
+    status = "paid"; // the original sale still happened; refund is a separate row in 8d
+  } else {
+    status = "pending";
+  }
+
+  return {
+    vendor: customerName,
+    invoice_number: order.name || `#${order.order_number}`,
+    amount: Number(order.total_price),
+    due_date: dueDate,
+    status,
+    category: "Online Sales",
+    source: "shopify",
+    source_ref_id: String(order.id),
+    confidence: 100,
+    summary: `Shopify order ${order.name} — ${order.line_items.length} item${order.line_items.length === 1 ? "" : "s"}, ${order.currency} ${order.total_price}`,
+    extracted_data: {
+      shopify_order_id: order.id,
+      order_number: order.order_number,
+      currency: order.currency,
+      subtotal: order.subtotal_price,
+      tax: order.total_tax,
+      shipping: order.total_shipping_price_set?.shop_money.amount ?? "0.00",
+      financial_status: order.financial_status,
+      fulfillment_status: order.fulfillment_status,
+      cancelled_at: order.cancelled_at,
+      line_items: order.line_items.map((li) => ({
+        name: li.name,
+        quantity: li.quantity,
+        price: li.price,
+      })),
+    },
+  };
 }
