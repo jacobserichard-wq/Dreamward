@@ -61,14 +61,19 @@ export default async function MarketingLandingPage() {
           <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
             Bookkeeping that runs itself.
           </h2>
-          <p className="text-base sm:text-lg text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
-            Connect Gmail, upload CSVs, send your CPA a clean PDF — all
-            in 5 clicks. Built for solo founders, market vendors,
-            freelancers, and small CPA firms.
+          {/* Hero sub-block: "Ready to stop chasing receipts?" + the
+              5-minutes reassurance, pulled up from the old footer CTA
+              section so the hero carries the conversion-driving copy
+              and the long-form features bullets render right below. */}
+          <p className="text-xl sm:text-2xl font-semibold text-white m-0 mb-2 leading-snug">
+            Ready to stop chasing receipts?
+          </p>
+          <p className="text-base text-white/80 max-w-xl mx-auto m-0 mb-8 leading-relaxed">
+            Set up takes 5 minutes. Your CPA will thank you at tax time.
           </p>
           <SignInButton label="Start your free trial &rarr;" />
           <p className="text-xs text-white/60 mt-4">
-            No credit card required. 25 items/month free, forever.
+            14-day free trial. No credit card required.
           </p>
         </div>
       </header>
@@ -116,7 +121,7 @@ export default async function MarketingLandingPage() {
             <PricingTile
               name="Trial"
               price="Free"
-              priceSub="forever"
+              priceSub="for 14 days"
               features={[
                 "25 items/month",
                 "Invoices, expenses, dashboard",
@@ -139,6 +144,10 @@ export default async function MarketingLandingPage() {
               ctaLabel="Start with Starter"
               highlighted={false}
             />
+            {/* Growth carries the "Most popular" highlight — the
+                middle tier is the natural conversion sweet spot for
+                growing small businesses (unlimited items + events +
+                AR + exports without the Pro price tag). */}
             <PricingTile
               name="Growth"
               price="$49"
@@ -150,7 +159,7 @@ export default async function MarketingLandingPage() {
                 "CSV/PDF exports",
               ]}
               ctaLabel="Start with Growth"
-              highlighted={false}
+              highlighted
             />
             <PricingTile
               name="Pro"
@@ -164,7 +173,7 @@ export default async function MarketingLandingPage() {
                 "White-glove onboarding call",
               ]}
               ctaLabel="Start with Pro"
-              highlighted
+              highlighted={false}
             />
           </div>
 
@@ -173,17 +182,6 @@ export default async function MarketingLandingPage() {
             anytime — your data exports cleanly to CSV.
           </p>
         </div>
-      </section>
-
-      {/* Footer CTA */}
-      <section className="py-12 sm:py-16 text-center">
-        <h3 className="text-xl sm:text-2xl font-bold text-slate-900 m-0 mb-3">
-          Ready to stop chasing receipts?
-        </h3>
-        <p className="text-sm text-slate-600 max-w-md mx-auto m-0 mb-6">
-          Set up takes 5 minutes. Your CPA will thank you at tax time.
-        </p>
-        <SignInButton label="Start your free trial &rarr;" />
       </section>
 
       {/* Footer */}
