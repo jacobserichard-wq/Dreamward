@@ -1,22 +1,28 @@
 // app/components/SetupChecklist.tsx
 //
-// UX First-Run commit 7 of 11. Designed in
-// session-notes/ux-firstrun-design.md §4 + §5.
+// UX First-Run commit 7 of 11 (sub-session 24, UX arc).
+// Extended in flow-redesign commit 3 of 8 (sub-session 24, flow arc)
+// with per-item skip plumbing + "Show N skipped" expander.
 //
-// Pure-presentational checklist surface for the home-page dashboard.
-// Renders up to 7 setup steps; visibility per item is plan-gated +
-// each item's done-state is derived from runtime data already loaded
-// on the home page (no extra fetches inside this component).
+// Pure-presentational checklist surface. Renders up to 7 setup steps;
+// visibility per item is plan-gated + each item's done-state is derived
+// from runtime data passed in by the parent (no fetches in this
+// component).
 //
 // Self-hides when:
-//   - preferences.ux.checklist_dismissed_at is set, OR
-//   - all visible items are done
+//   - preferences.ux.checklist_dismissed_at is set (parent gate), OR
+//   - all visible non-skipped items are done
 //
-// Page owns every mutation (clear sample, upload click) — this
-// component just renders + calls back.
+// Page owns every mutation (clear sample, upload click, skip, unskip).
+//
+// Backward-compat: the new skipped/onSkip/onUnskip props are optional
+// with safe defaults (empty map + no-op callbacks). The dashboard call
+// site (UX First-Run commit 7) keeps working unchanged; flow-redesign
+// commit 4 wires the new behavior in.
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 
@@ -34,6 +40,17 @@ export interface SetupChecklistProps {
   onDismiss: () => void;
   onClearSample: () => void;
   onUploadClick: () => void;
+  // Flow-redesign commit 3: per-item skip plumbing. Optional for
+  // backward compat — dashboard call site can omit these and skip
+  // behavior is silently absent.
+  /** Map of itemId → ISO timestamp when skipped. Absent key = not skipped. */
+  skipped?: Record<string, string>;
+  /** Called when the user clicks the per-item Skip button. Parent
+   *  typically opens a ConfirmModal then PATCHes preferences. */
+  onSkip?: (itemId: string) => void;
+  /** Called when the user clicks "Un-skip" in the expander. Immediate;
+   *  no confirmation (un-skipping is non-destructive). */
+  onUnskip?: (itemId: string) => void;
 }
 
 interface ChecklistItem {
@@ -47,11 +64,22 @@ interface ChecklistItem {
     | { kind: "link"; href: string }
     | { kind: "linkHash"; href: string };
   buttonLabel: string;
-  // Plans where this item should appear. Mirrors §4 of the design doc.
+  // Plans where this item should appear.
   visibleOn: Array<"trial" | "starter" | "growth" | "pro">;
+  // Flow-redesign commit 3: whether the user can skip this item.
+  // Defaults true. The future "tell_us_about_business" item (commit 5)
+  // will be the first non-skippable item — industry pick drives AI
+  // categorization, can't be defaulted away.
+  skippable?: boolean;
 }
 
 export default function SetupChecklist(props: SetupChecklistProps) {
+  // Local expander state for the "Show N skipped items" section.
+  // Defaults closed — user opts in to seeing the skipped list.
+  const [showSkipped, setShowSkipped] = useState(false);
+
+  const skipped = props.skipped ?? {};
+
   const items: ChecklistItem[] = [
     {
       id: "gmail",
@@ -59,9 +87,6 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.gmailConnected,
       action: { kind: "signIn" },
       buttonLabel: "Connect",
-      // Sub-session 24 follow-up: tightened from growth+pro to pro
-      // only. Matches the /api/gmail Pro-gate from commit 1 + the
-      // README's Pro-only marketing of Gmail auto-fetch.
       visibleOn: ["pro"],
     },
     {
@@ -114,12 +139,23 @@ export default function SetupChecklist(props: SetupChecklistProps) {
     },
   ];
 
-  const visible = items.filter((i) => i.visibleOn.includes(props.plan));
+  // Visible-for-this-plan, minus any item the user has skipped.
+  const planVisible = items.filter((i) => i.visibleOn.includes(props.plan));
+  const visible = planVisible.filter((i) => !skipped[i.id]);
+  // Skipped items shown to this user (skipped + plan-visible only —
+  // a Trial user who skipped a Pro item that was never visible to
+  // them doesn't see it here either).
+  const skippedVisible = planVisible.filter((i) => skipped[i.id]);
+
   const doneCount = visible.filter((i) => i.done).length;
 
-  // Self-hide when nothing left to do. (Dismissal is handled at the
-  // page level — page won't render us at all when dismissed_at set.)
-  if (visible.length === 0 || doneCount === visible.length) return null;
+  // Self-hide when nothing left to do.
+  if (visible.length === 0 || doneCount === visible.length) {
+    // Edge case: user has skipped items but no active items left.
+    // Still hide — the expander can be re-opened from /settings later
+    // if we ship that surface. For v1, an empty checklist is hidden.
+    return null;
+  }
 
   const percent = Math.round((doneCount / visible.length) * 100);
 
@@ -185,21 +221,30 @@ export default function SetupChecklist(props: SetupChecklistProps) {
                 </span>
               </div>
               {!item.done && (
-                <ActionButton
-                  action={item.action}
-                  label={item.buttonLabel}
-                  onClearSample={props.onClearSample}
-                  onUploadClick={props.onUploadClick}
-                />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ActionButton
+                    action={item.action}
+                    label={item.buttonLabel}
+                    onClearSample={props.onClearSample}
+                    onUploadClick={props.onUploadClick}
+                  />
+                  {/* Flow-redesign commit 3: per-item skip. Renders
+                      only when onSkip is provided (backward compat for
+                      the dashboard call site until commit 4 wires it)
+                      and the item is skippable (skippable !== false). */}
+                  {props.onSkip && item.skippable !== false && (
+                    <button
+                      type="button"
+                      onClick={() => props.onSkip?.(item.id)}
+                      title={`Skip "${item.label}" permanently`}
+                      className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer bg-transparent border-0 px-1"
+                    >
+                      Skip
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-            {/* Sub-session 24 follow-up commit 4: per-item help link.
-                Only the Gmail item has one today (the rest of the
-                steps are self-explanatory in 1 sentence; the Gmail
-                workflow requires a 3-step setup the OAuth round-trip
-                doesn't cover). Surfaces below the checkbox row,
-                indented under the checkbox circle for visual
-                association without taking right-side button space. */}
             {item.id === "gmail" && !item.done && (
               <div className="pl-7 mt-1">
                 <Link
@@ -213,13 +258,54 @@ export default function SetupChecklist(props: SetupChecklistProps) {
           </li>
         ))}
       </ul>
+
+      {/* Flow-redesign commit 3: "Show N skipped" expander. Only
+          renders when skipped items exist AND parent provided onUnskip
+          (so users can actually un-skip from inside the component).
+          Mirrors the existing "Show hidden defaults" pattern in
+          /settings — collapsed by default, opt-in to revisit. */}
+      {skippedVisible.length > 0 && props.onUnskip && (
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowSkipped((v) => !v)}
+            className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer bg-transparent border-0 p-0"
+            aria-expanded={showSkipped}
+          >
+            {showSkipped
+              ? `− Hide ${skippedVisible.length} skipped item${skippedVisible.length === 1 ? "" : "s"}`
+              : `+ Show ${skippedVisible.length} skipped item${skippedVisible.length === 1 ? "" : "s"}`}
+          </button>
+          {showSkipped && (
+            <ul className="mt-2 space-y-1.5 m-0 p-0 list-none">
+              {skippedVisible.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 text-xs"
+                >
+                  <span className="text-slate-400 line-through truncate">
+                    {item.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => props.onUnskip?.(item.id)}
+                    title={`Show "${item.label}" again`}
+                    className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0 flex-shrink-0"
+                  >
+                    Un-skip
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 // Per-item action button. Five action kinds map to four mutation
-// mechanisms (signIn, upload click, sample-clear, link nav). Keeps
-// the JSX above tidy.
+// mechanisms (signIn, upload click, sample-clear, link nav).
 function ActionButton({
   action,
   label,
@@ -239,7 +325,9 @@ function ActionButton({
       return (
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          // Flow-redesign commit 1: callbackUrl bumped from "/" to
+          // "/dashboard" since the root is now the marketing landing.
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className={buttonClass}
         >
           {label} {"→"}
