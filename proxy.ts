@@ -19,6 +19,14 @@
 //   /api/test-email    — diagnostic endpoint, kept reachable for debugging
 //   /api/cron          — invoked by Vercel Cron with Bearer ${CRON_SECRET}
 //   /api/stripe/webhook — invoked by Stripe with stripe-signature header
+//   /api/shopify/oauth/callback — Shopify redirects merchants here after
+//                                 they install the FlowWork app. No
+//                                 NextAuth session at the moment of the
+//                                 hit (Shopify is the referrer); the route
+//                                 itself checks session + CSRF state +
+//                                 Shopify HMAC. Phase 8a sub-session 24.
+//   /api/shopify/webhook — invoked by Shopify with X-Shopify-Hmac-SHA256
+//                          header; route verifies the signature. Phase 8d.
 //
 // If you add a new route that needs to be public, leave it OUT of the matcher.
 // If you add a new route that needs auth, add it explicitly below.
@@ -47,6 +55,7 @@ export const config = {
     "/api/process/:path*",
     "/api/sample-data/:path*",
     "/api/settings/:path*",
+    "/api/shopify/oauth/initiate/:path*",
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",
