@@ -28,7 +28,7 @@ import SignInButton from "./components/SignInButton";
 export const metadata = {
   title: "FlowWork — Mission control for your money",
   description:
-    "One bookkeeping ledger for every revenue source. Sync Shopify, pull invoices from Gmail, upload CSV/XLSX from Square/Stripe/QuickBooks — and hand your CPA a clean Schedule C at tax time.",
+    "One dashboard for every revenue source. Sync Shopify, pull invoices from Gmail, upload CSV/XLSX from Square/Stripe/QuickBooks — and see which channels are profitable so you can decide where to focus.",
 };
 
 export default async function MarketingLandingPage() {
@@ -56,24 +56,26 @@ export default async function MarketingLandingPage() {
           </Link>
         </div>
 
-        {/* Hero. Phase 8f: pivoted to "command center" positioning
-            now that Shopify integration is live. Headline reframes
-            FlowWork as the unified-revenue control plane vs Shopify's
-            "we only see our own orders" scope. AI references softened
-            throughout (Jacob feedback: "AI" word is polarizing for
-            the bookkeeper-audience reader; describe the outcome, not
-            the mechanism). */}
+        {/* Hero. Phase 8f shipped the "command center" positioning;
+            Phase 9 prelude reframes the sub-copy from "tax-time
+            workflow" to "decision-support layer" per Jacob's read:
+            we're NOT QuickBooks (no double-entry, no bank rec); we
+            ARE a centralized revenue/expense aggregator that helps
+            business owners decide what's working. Tax-time / CPA
+            handoff stays in the features section but no longer
+            leads the headline pitch. AI language stays softened
+            (Jacob's other call). */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-12 sm:pt-20 pb-16 sm:pb-24 text-center">
           <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
             Mission control for your money.
           </h2>
           <p className="text-xl sm:text-2xl font-semibold text-white m-0 mb-2 leading-snug">
-            Stop chasing receipts across five different platforms.
+            One dashboard. Every revenue source. Smarter business decisions.
           </p>
           <p className="text-base text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
-            FlowWork pulls from Shopify, Gmail, and CSV uploads —
-            categorizes everything automatically — and hands your CPA a
-            clean Schedule C at tax time.
+            FlowWork pulls every dollar into one dashboard — so you can
+            see which channels are profitable, where your money&apos;s
+            going, and what your CPA needs at tax time.
           </p>
           <SignInButton label="Start your free trial &rarr;" />
           <p className="text-xs text-white/60 mt-4">
