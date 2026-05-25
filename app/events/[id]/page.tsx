@@ -36,7 +36,12 @@ interface ProfitabilityPerEvent {
   expenses: { total: number; linked: number; manual: number };
   boothFee: number;
   totalMiles: number | null;
+  /** Mileage cost at the OPERATING rate (gas ÷ MPG). Used in the
+   *  profit math — honest cash impact of driving. */
   mileageCost: number;
+  /** Mileage cost at the IRS standard rate. Surfaced as the
+   *  Schedule C deduction value alongside the operating cost. */
+  irsMileageCost?: number;
   profit: number;
   unknownAmount: number;
 }
@@ -87,6 +92,11 @@ export default function EventDetailPage({ params }: PageProps) {
   const [profitability, setProfitability] = useState<ProfitabilityPerEvent | null>(null);
   const [irsMileageRate, setIrsMileageRate] = useState<number>(0.7);
   const [rateSource, setRateSource] = useState<"config" | "fallback">("fallback");
+  // Phase 9.2 follow-up: operating rate (gas ÷ MPG) from
+  // preferences.vehicle. Drives the cash-impact mileage cost in the
+  // P&L; the IRS-rate value above remains available for the Schedule
+  // C deduction line shown alongside.
+  const [operatingRate, setOperatingRate] = useState<number>(3.67 / 30);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -232,6 +242,7 @@ export default function EventDetailPage({ params }: PageProps) {
         perEvent?: ProfitabilityPerEvent[];
         irsMileageRate?: number;
         rateSource?: "config" | "fallback";
+        operatingRate?: number;
       };
       const eventIdNum = Number(rawId);
       const slice = pData.perEvent?.find((e) => e.id === eventIdNum) ?? null;
@@ -241,6 +252,9 @@ export default function EventDetailPage({ params }: PageProps) {
       }
       if (pData.rateSource === "config" || pData.rateSource === "fallback") {
         setRateSource(pData.rateSource);
+      }
+      if (typeof pData.operatingRate === "number" && pData.operatingRate > 0) {
+        setOperatingRate(pData.operatingRate);
       }
     }
     setLoading(false);
@@ -607,7 +621,12 @@ export default function EventDetailPage({ params }: PageProps) {
   // subtract any linked expenses (we can't see them yet); the
   // "showing local estimate" notice surfaces the limitation honestly.
   const pnlSource: "api" | "local" = profitability ? "api" : "local";
+  // Local-mode mileage costs at BOTH rates. mileageCost (operating)
+  // drives the profit math; irsMileageCost surfaces as the Schedule
+  // C deduction value alongside.
   const localMileageCost =
+    totalMiles !== null ? totalMiles * operatingRate : 0;
+  const localIrsMileageCost =
     totalMiles !== null ? totalMiles * irsMileageRate : 0;
   const pnl = profitability ?? {
     revenue: {
@@ -619,10 +638,21 @@ export default function EventDetailPage({ params }: PageProps) {
     boothFee: event.boothFee,
     totalMiles,
     mileageCost: localMileageCost,
+    irsMileageCost: localIrsMileageCost,
     profit:
       manualRevenue + linkedTotal - event.boothFee - localMileageCost,
     unknownAmount: 0,
   };
+  // Schedule C deduction value — for the side-by-side display in
+  // the Mileage row. Falls back to local computation when API
+  // didn't return irsMileageCost (e.g., older clients during
+  // deploy gap).
+  const scheduleCDeduction =
+    pnl.irsMileageCost !== undefined
+      ? pnl.irsMileageCost
+      : pnl.totalMiles !== null
+        ? pnl.totalMiles * irsMileageRate
+        : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -720,14 +750,14 @@ export default function EventDetailPage({ params }: PageProps) {
 
             <div className="flex justify-between gap-3">
               <dt className="text-slate-600">
-                Mileage cost
+                Mileage cost (gas)
                 {pnl.totalMiles !== null && (
                   <span className="text-xs text-slate-400 ml-2">
                     {pnl.totalMiles.toLocaleString("en-US", {
                       minimumFractionDigits: 1,
                       maximumFractionDigits: 1,
                     })}{" "}
-                    mi × ${irsMileageRate.toFixed(2)}/mi
+                    mi × ${operatingRate.toFixed(2)}/mi
                   </span>
                 )}
               </dt>
@@ -736,6 +766,31 @@ export default function EventDetailPage({ params }: PageProps) {
               </dd>
             </div>
           </dl>
+
+          {/* Schedule C deduction value at IRS rate. Surfaced
+              alongside the operating cost above so the user sees
+              BOTH numbers: what the drive actually cost (gas) +
+              what they can deduct on their tax return (IRS rate).
+              The two serve different purposes — the IRS rate
+              includes depreciation + maintenance + insurance +
+              gas; gas-only is just the cash impact. */}
+          {pnl.totalMiles !== null && pnl.totalMiles > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-baseline justify-between gap-3 text-xs">
+              <span className="text-slate-500">
+                {"\u{1F4CB}"} Schedule C mileage deduction
+                <span className="text-slate-400 ml-2">
+                  ({pnl.totalMiles.toLocaleString("en-US", {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}{" "}
+                  mi × ${irsMileageRate.toFixed(2)}/mi IRS rate)
+                </span>
+              </span>
+              <span className="font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
+                ${formatMoney(scheduleCDeduction)}
+              </span>
+            </div>
+          )}
 
           {/* Local-mode notice: the breakdown isn't enriched. The user
               gets honest numbers but without the income/expense split
@@ -754,13 +809,14 @@ export default function EventDetailPage({ params }: PageProps) {
               lights up this notice when the IRS rate isn't from
               app_settings. Only shows in API mode — in local mode we
               don't have a real rate source to compare against. */}
-          {pnlSource === "api" && rateSource === "fallback" && pnl.mileageCost > 0 && (
+          {pnlSource === "api" && rateSource === "fallback" && scheduleCDeduction > 0 && (
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded mt-3 m-0">
-              Using default IRS mileage rate (${irsMileageRate.toFixed(2)}/mi). Configure it in{" "}
+              Schedule C deduction is using the default IRS rate (${irsMileageRate.toFixed(2)}/mi).
+              Configure it in{" "}
               <a href="/settings" className="underline">
                 Settings
               </a>
-              .
+              {" "}so your annual report uses the current published rate.
             </p>
           )}
           {pnlSource === "api" && pnl.unknownAmount !== 0 && (
