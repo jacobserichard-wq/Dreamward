@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -9,7 +9,6 @@ import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import ConfirmModal from "../components/ConfirmModal";
 import StatCard from "../components/StatCard";
-import SetupChecklist from "../components/SetupChecklist";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
@@ -103,16 +102,6 @@ export default function Home() {
     largestOverdueBucket: AgingBucket | null;
     largestOverdueAmount: number;
   } | null>(null);
-
-  // UX commit 7 (sub-session 24): settings fields needed by the
-  // SetupChecklist to derive done-state for home-address / CPA email /
-  // tax-bracket items + the checklist's own dismissal state. Fetched
-  // once on mount via /api/settings; null until loaded.
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [settingsHomeAddress, setSettingsHomeAddress] = useState<string>("");
-  const [settingsPreferences, setSettingsPreferences] = useState<
-    Record<string, unknown>
-  >({});
 
   // Load processed items from database
   const loadItems = useCallback(async () => {
@@ -243,41 +232,6 @@ export default function Home() {
       cancelled = true;
     };
   }, [clientInfo?.plan]);
-
-  // UX commit 7: settings fetch for the SetupChecklist. Single shot
-  // on mount; refreshed by the dismiss handler when the user closes
-  // the checklist (so the dismissed flag round-trips immediately).
-  // Soft-fail — checklist auto-hides if settings can't load.
-  useEffect(() => {
-    let cancelled = false;
-    async function loadSettings() {
-      try {
-        const res = await fetch("/api/settings");
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          homeAddress?: string | null;
-          settings?: { preferences?: Record<string, unknown> };
-        };
-        if (cancelled) return;
-        setSettingsHomeAddress(
-          typeof data.homeAddress === "string" ? data.homeAddress : ""
-        );
-        setSettingsPreferences(
-          data.settings?.preferences &&
-            typeof data.settings.preferences === "object"
-            ? (data.settings.preferences as Record<string, unknown>)
-            : {}
-        );
-        setSettingsLoaded(true);
-      } catch {
-        // Non-fatal — checklist self-hides if signals can't be derived.
-      }
-    }
-    loadSettings();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
@@ -456,52 +410,7 @@ export default function Home() {
     "pending" | "overdue" | "needs_review" | "paid" | null
   >(null);
 
-  // UX commit 7 (sub-session 24): SetupChecklist dismissal — opens a
-  // confirmation modal, then PATCHes preferences.ux.checklist_dismissed_at
-  // on confirm. Dismissal is "forever" (per design §6 #2); user can
-  // see the same setup steps reflected on /settings if they need to.
-  const [confirmDismissChecklist, setConfirmDismissChecklist] = useState(false);
-  const [dismissingChecklist, setDismissingChecklist] = useState(false);
 
-  // UX commit 10: first-visit auto-scroll. Anchors the SetupChecklist
-  // in the viewport on first paint when there's no real data yet —
-  // matches the audit's "no next step" finding. One-shot per session
-  // via the autoScrolledRef guard; subsequent re-renders don't
-  // re-scroll (annoying as the user clicks around).
-  const checklistAnchorRef = useRef<HTMLDivElement | null>(null);
-  const autoScrolledRef = useRef(false);
-
-  const dismissChecklist = useCallback(() => {
-    setConfirmDismissChecklist(true);
-  }, []);
-
-  const confirmDismissChecklistAction = useCallback(async () => {
-    setDismissingChecklist(true);
-    try {
-      const nextPrefs = {
-        ...settingsPreferences,
-        ux: {
-          ...((settingsPreferences.ux as Record<string, unknown>) || {}),
-          checklist_dismissed_at: new Date().toISOString(),
-        },
-      };
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences: nextPrefs }),
-      });
-      if (res.ok) {
-        setSettingsPreferences(nextPrefs);
-        setConfirmDismissChecklist(false);
-      } else {
-        setError(`Couldn't hide checklist (HTTP ${res.status})`);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't hide checklist");
-    } finally {
-      setDismissingChecklist(false);
-    }
-  }, [settingsPreferences]);
 
   const requestClearSample = useCallback(() => {
     setConfirmClearOpen(true);
@@ -674,50 +583,6 @@ export default function Home() {
   const showCallConfirmation =
     isPro && proCallBookedAt !== null && proCallTime !== null && !proCallIsPast;
 
-  // UX commit 8: shared visibility check for the SetupChecklist.
-  // Used by both the dashboard render (commit 7) and the banner
-  // consolidation (commit 8 — Welcome-to-Pro + Sample-data banners
-  // hide when the checklist surfaces those same steps). Computed
-  // here so the render sites stay in sync.
-  const setupChecklistDismissed =
-    settingsPreferences.ux !== undefined &&
-    settingsPreferences.ux !== null &&
-    typeof settingsPreferences.ux === "object" &&
-    typeof (settingsPreferences.ux as Record<string, unknown>)
-      .checklist_dismissed_at === "string";
-  const setupChecklistVisible =
-    settingsLoaded && clientInfo !== null && !setupChecklistDismissed;
-
-  // UX commit 10: first-visit detection (audit §6 #3 locked value).
-  // Derived runtime check — onboarding done + no real items yet.
-  // Combined with setupChecklistVisible to gate the auto-scroll.
-  const isFirstVisit =
-    clientInfo?.onboardingCompleted === true &&
-    !processedItems.some((i) => i.source !== "sample");
-
-  // UX commit 10: first-visit auto-scroll effect. Fires once per
-  // session when the checklist becomes visible + we're a first-visit
-  // user. autoScrolledRef guards against repeat scrolls on every
-  // re-render. Smooth-scrolls the checklist anchor into the viewport.
-  // Effect placed after the derivations it depends on (hooks order
-  // still consistent across renders — that's all React requires).
-  useEffect(() => {
-    if (autoScrolledRef.current) return;
-    if (!setupChecklistVisible) return;
-    if (!isFirstVisit) return;
-    if (activeTab !== "dashboard") return;
-    if (!checklistAnchorRef.current) return;
-    // Defer one tick so the ref attaches after the conditional render.
-    const id = window.setTimeout(() => {
-      checklistAnchorRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-      autoScrolledRef.current = true;
-    }, 100);
-    return () => window.clearTimeout(id);
-  }, [setupChecklistVisible, isFirstVisit, activeTab]);
-
   const stats = {
     total: processedItems.length,
     pending: processedItems.filter((i) => i.status === "pending").length,
@@ -788,6 +653,18 @@ export default function Home() {
                 Reports
               </Link>
             )}
+            {/* Flow-redesign commit 6: Setup checklist nav link.
+                /onboarding is the canonical setup surface now (locked
+                decision #3 removed the dashboard checklist). The link
+                here lets users revisit setup anytime to complete or
+                un-skip items. */}
+            <Link
+              href="/onboarding"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+              title="Open the setup checklist"
+            >
+              Setup
+            </Link>
             <Link
               href="/settings"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
@@ -842,12 +719,13 @@ export default function Home() {
         )}
 
         {/* Pro onboarding-call: prompt (state 1 — not yet booked).
-            UX commit 8: hide when the SetupChecklist is showing the
-            same "Book your onboarding call" step — the checklist is
-            the canonical setup surface. The banner re-appears if the
-            user dismisses the checklist (per design §6 deferred
-            question: dismissing → soft-reminder banner returns). */}
-        {showBookPrompt && !setupChecklistVisible && (
+            Flow-redesign commit 6: SetupChecklist moved off the
+            dashboard to /onboarding (locked decision #3); this
+            banner is now unconditional again. The white-glove call
+            also appears as the highlighted top section of the
+            onboarding checklist — duplicate-but-different surfaces
+            for the same action. */}
+        {showBookPrompt && (
           <div className="bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-500 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
             <span className="font-medium">
               {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your white-glove onboarding call to get started.
@@ -880,15 +758,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Sample data banner. UX commit 8: hide when the SetupChecklist
-            is rendering the same "Clear sample data" step — checklist
-            takes precedence as the canonical setup surface. Banner re-
-            appears if the user dismisses the checklist (acts as a
-            soft reminder). The dashboard-tab tint (UX commit 5) still
-            renders regardless of this banner — the tint is about the
-            data view, not the setup workflow. */}
-        {processedItems.some((i) => i.source === "sample") &&
-          !setupChecklistVisible && (
+        {/* Sample data banner. Flow-redesign commit 6: unconditional
+            again — SetupChecklist moved to /onboarding. The dashboard-
+            tab tint (UX commit 5) still renders alongside this banner. */}
+        {processedItems.some((i) => i.source === "sample") && (
             <div className="bg-yellow-50 border border-yellow-300 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
               <span className="font-medium">
                 {"\u{1F4A1}"} You&apos;re viewing sample data. Clear it when
@@ -1316,55 +1189,10 @@ export default function Home() {
               </div>
             )}
 
-            {/* UX commit 7: SetupChecklist. Visibility resolved upstream
-                in `setupChecklistVisible` so the banner-suppression
-                logic in commit 8 stays in sync with this render. The
-                component self-hides when all visible items are done.
-                UX commit 10: ref attached to a wrapping div so the
-                first-visit auto-scroll effect can target a stable
-                anchor regardless of the conditional inside. */}
-            <div ref={checklistAnchorRef}>
-            {setupChecklistVisible && clientInfo && (
-                <SetupChecklist
-                  plan={
-                    (clientInfo.plan as
-                      | "trial"
-                      | "starter"
-                      | "growth"
-                      | "pro") || "trial"
-                  }
-                  gmailConnected={processedItems.some(
-                    (i) => i.source === "gmail" || i.source === "email"
-                  )}
-                  hasRealProcessedItems={processedItems.some(
-                    (i) => i.source !== "sample"
-                  )}
-                  hasSampleItems={processedItems.some(
-                    (i) => i.source === "sample"
-                  )}
-                  homeAddressSet={settingsHomeAddress.trim().length > 0}
-                  cpaEmailSet={(() => {
-                    const cpa = settingsPreferences.cpa;
-                    return (
-                      cpa !== null &&
-                      typeof cpa === "object" &&
-                      typeof (cpa as Record<string, unknown>).email ===
-                        "string" &&
-                      ((cpa as Record<string, unknown>).email as string)
-                        .trim() !== ""
-                    );
-                  })()}
-                  taxBracketSet={
-                    settingsPreferences.taxBracket !== undefined &&
-                    settingsPreferences.taxBracket !== null
-                  }
-                  proCallBooked={proCallBookedAt !== null}
-                  onDismiss={() => dismissChecklist()}
-                  onClearSample={requestClearSample}
-                  onUploadClick={() => setActiveTab("emails")}
-                />
-              )}
-            </div>
+            {/* Flow-redesign commit 6: SetupChecklist removed from
+                dashboard per locked decision #3. Setup lives at
+                /onboarding now (single canonical surface). A "Setup
+                checklist" link in the top nav routes users there. */}
 
             {/* Stat cards. UX commit 3: tooltips added on every card +
                 the duplicate "Overdue" card removed (it's still in the
@@ -1690,19 +1518,6 @@ export default function Home() {
           onCancel={() => setConfirmClearOpen(false)}
         />
 
-        {/* ── DISMISS SETUP CHECKLIST CONFIRMATION ── */}
-        {/* UX commit 7: confirms before persisting the dismiss flag.
-            Dismissal is "forever" (preferences.ux.checklist_dismissed_at
-            is an ISO timestamp; nothing un-sets it from the UI). */}
-        <ConfirmModal
-          open={confirmDismissChecklist}
-          title="Hide this checklist?"
-          message="You can still find these setup steps individually in Settings. Once hidden, the checklist won't reappear."
-          confirmLabel="Hide checklist"
-          busy={dismissingChecklist}
-          onConfirm={confirmDismissChecklistAction}
-          onCancel={() => setConfirmDismissChecklist(false)}
-        />
       </main>
       <footer className="max-w-[1200px] mx-auto mt-8 pt-5 px-4 sm:px-8 pb-8 text-[13px] text-slate-400 text-center">
         <a href="/privacy" className="text-slate-500 no-underline mx-1.5">
