@@ -8,11 +8,14 @@ import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import ConfirmModal from "../components/ConfirmModal";
-import StatCard from "../components/StatCard";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
-import ChannelTable, {
-  type ChannelRow,
-} from "../components/ChannelTable";
+import type { ChannelRow } from "../components/ChannelTable";
+import SalesBanner from "../components/SalesBanner";
+import ActionItemsStrip from "../components/ActionItemsStrip";
+import ChannelStack from "../components/ChannelStack";
+import UpcomingEventsCard, {
+  type UpcomingEvent,
+} from "../components/UpcomingEventsCard";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
 
@@ -275,7 +278,19 @@ export default function Home() {
             // Default: collapse the 3 coming-soon channels so the
             // initial dashboard view isn't cluttered with rows the
             // user can't act on yet.
-            setCollapsedChannels(["etsy", "square", "woocommerce"]);
+            setCollapsedChannels([
+              // Phase 9.2 default: only Shopify + Markets visible
+              // on the dashboard by default per Jacob's redesign.
+              // User restores any channel via "Add another channel"
+              // in the ChannelStack.
+              "wholesale",
+              "service",
+              "gmail",
+              "uploads",
+              "etsy",
+              "square",
+              "woocommerce",
+            ]);
             setCollapsedChannelsLoaded(true);
           }
           return;
@@ -297,12 +312,36 @@ export default function Home() {
           ? (dashPref.collapsed_channels as string[]).filter(
               (v) => typeof v === "string"
             )
-          : ["etsy", "square", "woocommerce"];
+          : [
+              // Phase 9.2 default: only Shopify + Markets visible
+              // on the dashboard by default per Jacob's redesign.
+              // User restores any channel via "Add another channel"
+              // in the ChannelStack.
+              "wholesale",
+              "service",
+              "gmail",
+              "uploads",
+              "etsy",
+              "square",
+              "woocommerce",
+            ];
         setCollapsedChannels(collapsed);
         setCollapsedChannelsLoaded(true);
       } catch {
         if (!cancelled) {
-          setCollapsedChannels(["etsy", "square", "woocommerce"]);
+          setCollapsedChannels([
+              // Phase 9.2 default: only Shopify + Markets visible
+              // on the dashboard by default per Jacob's redesign.
+              // User restores any channel via "Add another channel"
+              // in the ChannelStack.
+              "wholesale",
+              "service",
+              "gmail",
+              "uploads",
+              "etsy",
+              "square",
+              "woocommerce",
+            ]);
           setCollapsedChannelsLoaded(true);
         }
       }
@@ -679,31 +718,30 @@ export default function Home() {
     0
   );
 
-  // Phase 4: top expense categories by total amount. Roadmap item 6
-  // ("running totals by category") was unimplemented — sub-session 18
-  // recon found the dashboard breakdown rolls up by status only (design
-  // §8.7 → "add a category-level total"). Top 8 by total amount;
-  // omitted rows fall under an "Other" bucket if more than 8 distinct
-  // categories exist with non-zero totals.
-  const categoryStats = (() => {
-    const map = new Map<string, { count: number; total: number }>();
-    for (const item of processedItems) {
-      const c = (item.category || "Uncategorized").trim() || "Uncategorized";
-      const cur = map.get(c) ?? { count: 0, total: 0 };
-      map.set(c, { count: cur.count + 1, total: cur.total + (item.amount || 0) });
-    }
-    const sorted = Array.from(map.entries())
-      .map(([category, v]) => ({ category, count: v.count, total: v.total }))
-      .sort((a, b) => b.total - a.total);
-    const top = sorted.slice(0, 8);
-    const rest = sorted.slice(8);
-    if (rest.length === 0) return top;
-    const restAgg = rest.reduce(
-      (acc, r) => ({ count: acc.count + r.count, total: acc.total + r.total }),
-      { count: 0, total: 0 }
-    );
-    return [...top, { category: `Other (${rest.length})`, ...restAgg }];
+  // Phase 9.2: categoryStats derivation removed — Top Categories
+  // section moved off the dashboard (now lives on /reports as the
+  // by-category breakdown). The dashboard's command-center
+  // positioning prioritizes channel-level decision support over
+  // category-level expense buckets.
+
+  // Phase 9.2: upcoming events for the right-column card. Filters
+  // availableEvents (already loaded for the upload event selector)
+  // where start_date >= today, sorted by start_date ASC. Limit
+  // imposed by the UpcomingEventsCard's visibleLimit prop.
+  const todayIso = (() => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   })();
+  const upcomingEvents: UpcomingEvent[] = availableEvents
+    .filter((e) => e.startDate >= todayIso)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      venue: e.venue,
+    }));
 
   // Count legacy umbrella-type items (pre-sub-session-11 classifications still
   // showing invoice/expense/ar_followup instead of industry-aware categories).
@@ -837,6 +875,18 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Phase 9.2: ActionItemsStrip — pill row showing pending user
+          actions (Needs Review count + Overdue $). Auto-hides when
+          both are zero. Lives below the top nav header per Jacob's
+          "under the invoices at the top by settings" placement
+          guidance — surfaces actionable items prominently without
+          cluttering the main content area. */}
+      <ActionItemsStrip
+        needsReviewCount={stats.needsReview}
+        overdueAmount={arSummary?.overdueOutstanding ?? 0}
+        loading={!clientInfo}
+      />
 
       {/* Navigation Tabs */}
       <nav className="flex bg-white border-b border-slate-200 px-4 sm:px-8 max-w-[1200px] mx-auto">
@@ -1351,285 +1401,98 @@ export default function Home() {
                 /onboarding now (single canonical surface). A "Setup
                 checklist" link in the top nav routes users there. */}
 
-            {/* Stat cards. UX commit 3: tooltips added on every card +
-                the duplicate "Overdue" card removed (it's still in the
-                Status Breakdown row below, which is the canonical
-                location for status-level counts). */}
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-8">
-              <StatCard
-                label="Total Items"
-                value={stats.total}
-                icon={"\u{1F4E6}"}
-                colorClass="border-t-blue-500"
-                tooltip="All invoices and expenses FlowWork has processed from your Gmail, file uploads, and manual entry."
-              />
-              <StatCard
-                label="Total Amount"
-                value={`$${stats.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-                icon={"\u{1F4B0}"}
-                colorClass="border-t-green-600"
-                tooltip="Sum of every processed item's amount. Includes both income and expenses — see Reports for a net-profit view."
-              />
-              <StatCard
-                label="Avg Confidence"
-                value={`${stats.avgConfidence}%`}
-                icon={"\u{1F3AF}"}
-                colorClass="border-t-violet-500"
-                tooltip="How confident the AI was about its categorization, averaged across all items. 90%+ rarely needs review; items below get flagged in 'Needs Review'."
-              />
-              {/* Phase 4: Business miles stat — sums each event's
-                  §8.2 conditional total. Only renders when there's a
-                  non-zero figure (avoids "0 mi" noise for clients who
-                  haven't entered addresses yet). */}
-              {totalBusinessMiles > 0 && (
-                <StatCard
-                  label="Business Miles"
-                  value={`${totalBusinessMiles.toLocaleString("en-US", {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })} mi`}
-                  icon={"\u{1F697}"}
-                  colorClass="border-t-amber-500"
-                  tooltip="Round-trip miles across all your events. Multiply by the IRS rate in Settings to get your federal mileage deduction."
-                />
-              )}
+            {/* Phase 9.2 dashboard pivot per Jacob's "command center"
+                redesign. Replaces the prior stat-cards + Status
+                Breakdown + AR + ChannelTable + Top Categories layout
+                with a focused 3-section structure:
+                  1. SalesBanner (3 big numbers: Sales / Expenses / Net)
+                  2. 2-column grid: ChannelStack (left) + UpcomingEventsCard (right)
+                  3. Empty-state CTA (only when truly no data)
+                Removed sections live elsewhere now:
+                  - Status Breakdown counts → ActionItemsStrip (below
+                    top nav) for the urgent ones (Needs Review,
+                    Overdue), demoted to /processed and /invoices
+                    pages for browsing
+                  - AR card → ActionItemsStrip overdue pill + /invoices
+                  - Top Categories → /reports already shows by-category
+                    breakdowns
+                  - Stat cards (Avg Confidence, Business Miles, Total
+                    Items) → removed as low-decision-value vanity metrics */}
+            <SalesBanner
+              totalSales={channelData?.totalRevenue ?? 0}
+              totalExpenses={
+                channelData
+                  ? channelData.channels.reduce(
+                      (sum, c) => sum + c.directExpenses,
+                      0
+                    ) + channelData.overhead
+                  : 0
+              }
+              netProfit={channelData?.netProfit ?? 0}
+              year={dashboardCurrentYear}
+              loading={!channelData || !collapsedChannelsLoaded}
+            />
+
+            {/* Phase 9.2: AR card removed. Overdue $ now surfaces in
+                the ActionItemsStrip below the top nav as a click-
+                through pill → /invoices?status=overdue. The full AR
+                summary lives on /invoices (already its own page). */}
+
+            {/* Phase 9.2: 2-column grid — ChannelStack (vertical
+                channel cards) on the left + UpcomingEventsCard
+                (Events + Promotions placeholder) on the right. The
+                grid stacks to single-column on mobile (< lg). Both
+                cards render with their own loading state, so the
+                grid renders eagerly + each card shows skeletons.
+
+                "See full breakdown →" link on the top-right routes
+                to /profitability for the full ChannelTable detail
+                view (which keeps the year picker + mode toggle). */}
+            <div className="flex items-center justify-end mb-3">
+              <Link
+                href="/profitability"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                See full channel breakdown {"\u{2192}"}
+              </Link>
             </div>
-
-            {/* Status breakdown. UX commit 4: pills are now buttons —
-                clicking sends the user to the Processed tab with the
-                matching status filter applied. Addresses audit F4 +
-                F10 (passive badges → actionable). */}
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Status Breakdown</h3>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-                {[
-                  { label: "Pending", status: "pending" as const, count: stats.pending, borderClass: "border-l-amber-500", icon: "⌛" },
-                  { label: "Overdue", status: "overdue" as const, count: stats.overdue, borderClass: "border-l-red-600", icon: "\u{1F6A8}" },
-                  { label: "Needs Review", status: "needs_review" as const, count: stats.needsReview, borderClass: "border-l-indigo-500", icon: "\u{1F440}" },
-                  { label: "Paid", status: "paid" as const, count: stats.paid, borderClass: "border-l-green-600", icon: "✅" },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      setProcessedStatusFilter(item.status);
-                      setActiveTab("processed");
-                    }}
-                    title={
-                      item.count > 0
-                        ? `Show ${item.count} ${item.label.toLowerCase()} item${item.count === 1 ? "" : "s"}`
-                        : `No ${item.label.toLowerCase()} items`
-                    }
-                    className={`bg-white rounded-[10px] py-4 px-5 flex items-center gap-3 border border-slate-200 border-l-4 cursor-pointer text-left hover:bg-slate-50 transition-colors ${item.borderClass} disabled:opacity-60 disabled:cursor-not-allowed`}
-                    disabled={item.count === 0}
-                  >
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="text-2xl font-extrabold text-slate-900">{item.count}</span>
-                    <span className="text-[13px] text-slate-500">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Phase 6: Outstanding AR card. Plan-gated via the arSummary
-                fetch (Starter never gets a non-null arSummary). Tint based
-                on the overdue share — slate (neutral) → amber (some
-                overdue) → red (≥50% of outstanding is overdue). Click-
-                through routes to /invoices. */}
-            {arSummary !== null && (
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">
-                  Accounts Receivable
-                </h3>
-                {arSummary.invoiceCount === 0 &&
-                arSummary.totalOutstanding === 0 ? (
-                  <Link
-                    href="/invoices/new"
-                    className="block bg-white rounded-xl border border-slate-200 p-5 no-underline hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-slate-700 m-0 mb-1">
-                          No invoices yet
-                        </p>
-                        <p className="text-xs text-slate-500 m-0">
-                          Track wholesale invoices and chase overdue payments.
-                        </p>
-                      </div>
-                      <span className="text-sm text-blue-600 whitespace-nowrap">
-                        Create one →
-                      </span>
-                    </div>
-                  </Link>
-                ) : (
-                  (() => {
-                    const overdueShare =
-                      arSummary.totalOutstanding > 0
-                        ? arSummary.overdueOutstanding /
-                          arSummary.totalOutstanding
-                        : 0;
-                    const tintClasses =
-                      overdueShare >= 0.5
-                        ? "bg-red-50 border-red-200 border-l-4 border-l-red-600"
-                        : arSummary.overdueOutstanding > 0
-                          ? "bg-amber-50 border-amber-200 border-l-4 border-l-amber-600"
-                          : "bg-white border-slate-200 border-l-4 border-l-slate-400";
-                    const headlineTone =
-                      overdueShare >= 0.5
-                        ? "text-red-700"
-                        : arSummary.overdueOutstanding > 0
-                          ? "text-amber-700"
-                          : "text-slate-900";
-                    return (
-                      <Link
-                        href="/invoices"
-                        className={`block rounded-xl border p-5 no-underline hover:shadow-sm transition-shadow ${tintClasses}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-3xl font-bold m-0 mb-1 ${headlineTone}`}
-                            >
-                              $
-                              {arSummary.totalOutstanding.toLocaleString(
-                                "en-US",
-                                {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                }
-                              )}
-                            </p>
-                            <p className="text-sm text-slate-600 m-0 mb-2">
-                              outstanding across {arSummary.invoiceCount}{" "}
-                              {arSummary.invoiceCount === 1
-                                ? "invoice"
-                                : "invoices"}
-                            </p>
-                            {arSummary.overdueOutstanding > 0 && (
-                              <p className="text-sm text-slate-700 m-0">
-                                {"\u{26A0}"} $
-                                {arSummary.overdueOutstanding.toLocaleString(
-                                  "en-US",
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  }
-                                )}{" "}
-                                overdue
-                                {arSummary.largestOverdueBucket && (
-                                  <span className="text-slate-500">
-                                    {" "}
-                                    (largest bucket:{" "}
-                                    {arSummary.largestOverdueBucket})
-                                  </span>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-2xl text-slate-400">→</span>
-                        </div>
-                      </Link>
-                    );
-                  })()
-                )}
-              </div>
-            )}
-
-            {/* Phase 9.1: Channel Profitability table. Per Jacob's
-                "command center" framing, this is the primary decision-
-                support surface on the dashboard. Full table with all
-                canonical channels (even empty ones with add-CTAs).
-                Renders only when channel data has loaded — soft-hides
-                during initial fetch to avoid layout shift. Year
-                picker (commit 6) sits above the table; current +
-                3 prior, matching /reports + /profitability. */}
-            {channelData && collapsedChannelsLoaded && (
-              <div>
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <label
-                    htmlFor="dashboard-channel-year"
-                    className="text-xs font-medium text-slate-500 uppercase tracking-wide"
-                  >
-                    Period
-                  </label>
-                  <select
-                    id="dashboard-channel-year"
-                    value={channelYear}
-                    onChange={(e) => setChannelYear(Number(e.target.value))}
-                    className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
-                  >
-                    {[
-                      dashboardCurrentYear,
-                      dashboardCurrentYear - 1,
-                      dashboardCurrentYear - 2,
-                      dashboardCurrentYear - 3,
-                    ].map((y) => (
-                      <option key={y} value={y}>
-                        {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
-                      </option>
-                    ))}
-                  </select>
-                  <Link
-                    href="/profitability"
-                    className="text-xs text-blue-600 hover:underline ml-auto"
-                  >
-                    See full breakdown {"\u{2192}"}
-                  </Link>
-                </div>
-                <ChannelTable
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+              {/* Left: Channels (vertical) */}
+              {channelData && collapsedChannelsLoaded ? (
+                <ChannelStack
                   channels={channelData.channels}
-                  overhead={channelData.overhead}
-                  totalRevenue={channelData.totalRevenue}
-                  netProfit={channelData.netProfit}
-                  mode={channelMode}
-                  onToggleMode={() =>
-                    setChannelMode((m) =>
-                      m === "attributable" ? "allocated" : "attributable"
-                    )
-                  }
+                  maxRevenue={Math.max(
+                    ...channelData.channels.map((c) => c.revenue),
+                    1
+                  )}
                   collapsedChannels={collapsedChannels}
                   onToggleCollapse={toggleChannelCollapse}
                   isPro={clientInfo?.plan === "pro"}
-                  variant="dashboard"
                 />
-              </div>
-            )}
-
-            {/* Phase 4: Top Categories breakdown — closes roadmap item 6
-                ("running totals by category"). Recon found the existing
-                Status Breakdown rolls up by status only, not category;
-                design §8.7 → add a category-level total. Top 8 by
-                summed amount; if >8 distinct categories exist with
-                non-zero totals, the overflow rolls into an "Other (N)"
-                bucket. Hidden when there's nothing to display. */}
-            {categoryStats.length > 0 && (
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Top Categories</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {categoryStats.map((cat) => (
-                    <div
-                      key={cat.category}
-                      className="bg-white rounded-[10px] py-3 px-5 flex items-center justify-between gap-3 border border-slate-200 border-l-4 border-l-slate-400"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-900 m-0 truncate">
-                          {cat.category}
-                        </p>
-                        <p className="text-xs text-slate-500 m-0">
-                          {cat.count} {cat.count === 1 ? "item" : "items"}
-                        </p>
-                      </div>
-                      <p className="text-base font-bold text-slate-900 m-0 flex-shrink-0">
-                        ${cat.total.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
-                  ))}
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <div className="h-5 w-32 bg-slate-100 rounded animate-pulse mb-4" />
+                  <div className="space-y-2">
+                    {[0, 1].map((i) => (
+                      <div
+                        key={i}
+                        className="h-16 bg-slate-50 rounded animate-pulse"
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* Right: Upcoming Events + Promotions */}
+              <UpcomingEventsCard
+                events={upcomingEvents}
+                loading={availableEvents.length === 0 && !clientInfo}
+              />
+            </div>
+
+            {/* Phase 9.2: Top Categories removed from dashboard.
+                Same data lives on /reports as the by-category
+                breakdown — that's the canonical surface now. */}
 
             {/* UX commit 9: empty-state CTA card. Replaces the prior
                 dead text ("Process some emails to see dashboard data")
