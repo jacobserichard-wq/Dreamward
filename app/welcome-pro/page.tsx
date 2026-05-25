@@ -46,12 +46,12 @@ export default function WelcomeProPage() {
       try {
         const res = await fetch("/api/client");
         if (!res.ok) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const data = await res.json();
         if (data.plan !== "pro") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         setIdentity({
@@ -61,7 +61,7 @@ export default function WelcomeProPage() {
         });
         setCheckingPlan(false);
       } catch {
-        router.replace("/");
+        router.replace("/dashboard");
       }
     }
     loadClient();
@@ -72,7 +72,7 @@ export default function WelcomeProPage() {
     setError(null);
     try {
       await apiFetch("/api/sample-data", { method: "POST" });
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load sample data");
       setLoadingSample(false);
@@ -175,7 +175,7 @@ export default function WelcomeProPage() {
               {loadingSample && <Spinner size={14} color="white" />}
               {loadingSample ? "Loading sample data..." : "Load sample data"}
             </button>
-            <a href="/" className="text-slate-500 text-sm no-underline font-medium">
+            <a href="/dashboard" className="text-slate-500 text-sm no-underline font-medium">
               Skip and start fresh {"→"}
             </a>
           </div>

@@ -8,6 +8,9 @@
 // not listed is public.
 //
 // Public by intentional omission:
+//   /                  — marketing landing page (sub-session 24 flow redesign)
+//                        Authenticated users get a server-side redirect to
+//                        /dashboard from inside the page itself.
 //   /signin            — the sign-in page itself
 //   /privacy           — privacy policy, must be reachable to anonymous users
 //                        (Google OAuth review and end-user review require this)
@@ -27,7 +30,7 @@ export default withAuth;
 export const config = {
   matcher: [
     // Pages
-    "/",
+    "/dashboard/:path*",
     "/admin/:path*",
     "/billing/:path*",
     "/onboarding/:path*",

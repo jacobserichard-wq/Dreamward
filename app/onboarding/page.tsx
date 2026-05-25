@@ -45,7 +45,7 @@ export default function OnboardingPage() {
         }>("/api/client");
         if (cancelled) return;
         if (data?.onboardingCompleted === true) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
       } catch {
@@ -81,7 +81,7 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessName: businessName.trim(), industry }),
       });
-      router.push(data.plan === "pro" ? "/welcome-pro" : "/");
+      router.push(data.plan === "pro" ? "/welcome-pro" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't complete onboarding");
       setSaving(false);

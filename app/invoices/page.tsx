@@ -181,7 +181,7 @@ export default function InvoicesPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            backHref="/"
+            backHref="/dashboard"
             backLabel="FlowWork"
             title="Invoices"
             subtitle="Track wholesale invoices and chase overdue payments"
@@ -238,7 +238,7 @@ export default function InvoicesPage() {
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/"
+          backHref="/dashboard"
           backLabel="FlowWork"
           title="Invoices"
           subtitle="Track wholesale invoices and chase overdue payments"
