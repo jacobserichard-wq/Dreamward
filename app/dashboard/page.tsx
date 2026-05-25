@@ -10,6 +10,9 @@ import CsvReviewModal from "../components/CsvReviewModal";
 import ConfirmModal from "../components/ConfirmModal";
 import StatCard from "../components/StatCard";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
+import ChannelTable, {
+  type ChannelRow,
+} from "../components/ChannelTable";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
 
@@ -102,6 +105,21 @@ export default function Home() {
     largestOverdueBucket: AgingBucket | null;
     largestOverdueAmount: number;
   } | null>(null);
+
+  // Phase 9.1: channel profitability data + view state. Channels load
+  // independently of items/AR/events because the API does its own
+  // server-side aggregation. Null until first fetch returns.
+  const [channelData, setChannelData] = useState<{
+    channels: ChannelRow[];
+    overhead: number;
+    totalRevenue: number;
+    netProfit: number;
+  } | null>(null);
+  const [channelMode, setChannelMode] = useState<"attributable" | "allocated">(
+    "attributable"
+  );
+  const [collapsedChannels, setCollapsedChannels] = useState<string[]>([]);
+  const [collapsedChannelsLoaded, setCollapsedChannelsLoaded] = useState(false);
 
   // Load processed items from database
   const loadItems = useCallback(async () => {
@@ -232,6 +250,128 @@ export default function Home() {
       cancelled = true;
     };
   }, [clientInfo?.plan]);
+
+  // Phase 9.1: load the user's collapsed-channels preference + the
+  // channel-table data. Two separate fetches:
+  //  1. /api/settings → reads preferences.ux.dashboard.collapsed_channels
+  //     (default = collapse coming-soon channels for clean first-paint)
+  //  2. /api/profitability/channels?year=X&mode=Y → the aggregation
+  // Both are plan-gated (growth+pro+trial); skip for excluded plans.
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    let cancelled = false;
+    async function loadCollapsedPref() {
+      try {
+        const res = await fetch("/api/settings");
+        if (!res.ok) {
+          if (!cancelled) {
+            // Default: collapse the 3 coming-soon channels so the
+            // initial dashboard view isn't cluttered with rows the
+            // user can't act on yet.
+            setCollapsedChannels(["etsy", "square", "woocommerce"]);
+            setCollapsedChannelsLoaded(true);
+          }
+          return;
+        }
+        const data = (await res.json()) as {
+          settings?: { preferences?: Record<string, unknown> };
+        };
+        if (cancelled) return;
+        const ux =
+          data.settings?.preferences?.ux &&
+          typeof data.settings.preferences.ux === "object"
+            ? (data.settings.preferences.ux as Record<string, unknown>)
+            : {};
+        const dashPref =
+          ux.dashboard && typeof ux.dashboard === "object"
+            ? (ux.dashboard as Record<string, unknown>)
+            : {};
+        const collapsed = Array.isArray(dashPref.collapsed_channels)
+          ? (dashPref.collapsed_channels as string[]).filter(
+              (v) => typeof v === "string"
+            )
+          : ["etsy", "square", "woocommerce"];
+        setCollapsedChannels(collapsed);
+        setCollapsedChannelsLoaded(true);
+      } catch {
+        if (!cancelled) {
+          setCollapsedChannels(["etsy", "square", "woocommerce"]);
+          setCollapsedChannelsLoaded(true);
+        }
+      }
+    }
+    loadCollapsedPref();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan]);
+
+  // Channel data fetch — re-runs when the mode toggles (different
+  // query param). Year defaults to current; YTD picker in commit 6.
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    let cancelled = false;
+    async function loadChannels() {
+      try {
+        const res = await fetch(
+          `/api/profitability/channels?mode=${channelMode}`
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          channels: ChannelRow[];
+          overhead: number;
+          totalRevenue: number;
+          netProfit: number;
+        };
+        if (cancelled) return;
+        setChannelData({
+          channels: data.channels,
+          overhead: data.overhead,
+          totalRevenue: data.totalRevenue,
+          netProfit: data.netProfit,
+        });
+      } catch {
+        // Soft-fail — dashboard renders without the table.
+      }
+    }
+    loadChannels();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan, channelMode]);
+
+  // Phase 9.1: toggle a channel's collapse state. Optimistic update
+  // (local state flips immediately) + PATCH /api/settings in the
+  // background. If the PATCH fails, the local state stays — the user
+  // sees their action take effect; next reload re-reads the persisted
+  // state and reverts. Acceptable tradeoff for UX responsiveness.
+  const toggleChannelCollapse = useCallback(
+    (channelId: string) => {
+      setCollapsedChannels((prev) => {
+        const next = prev.includes(channelId)
+          ? prev.filter((id) => id !== channelId)
+          : [...prev, channelId];
+        // Fire-and-forget persistence
+        fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            preferences: {
+              ux: {
+                dashboard: { collapsed_channels: next },
+              },
+            },
+          }),
+        }).catch(() => {
+          // Non-fatal — local state already updated
+        });
+        return next;
+      });
+    },
+    []
+  );
 
   // ─── Fetch emails by label ─────────────────────────────────────────────────
 
@@ -1387,6 +1527,31 @@ export default function Home() {
                   })()
                 )}
               </div>
+            )}
+
+            {/* Phase 9.1: Channel Profitability table. Per Jacob's
+                "command center" framing, this is the primary decision-
+                support surface on the dashboard. Full table with all
+                canonical channels (even empty ones with add-CTAs).
+                Renders only when channel data has loaded — soft-hides
+                during initial fetch to avoid layout shift. */}
+            {channelData && collapsedChannelsLoaded && (
+              <ChannelTable
+                channels={channelData.channels}
+                overhead={channelData.overhead}
+                totalRevenue={channelData.totalRevenue}
+                netProfit={channelData.netProfit}
+                mode={channelMode}
+                onToggleMode={() =>
+                  setChannelMode((m) =>
+                    m === "attributable" ? "allocated" : "attributable"
+                  )
+                }
+                collapsedChannels={collapsedChannels}
+                onToggleCollapse={toggleChannelCollapse}
+                isPro={clientInfo?.plan === "pro"}
+                variant="dashboard"
+              />
             )}
 
             {/* Phase 4: Top Categories breakdown — closes roadmap item 6
