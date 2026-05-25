@@ -26,6 +26,7 @@ import {
   type ChannelTxnRow,
   type ChannelEventRow,
 } from "@/lib/profitability/channels";
+import { loadOperatingRateFromPrefs } from "@/lib/mileageRates";
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
   return plan === "growth" || plan === "pro" || plan === "trial";
@@ -151,7 +152,9 @@ export async function GET(req: NextRequest) {
     const customIncome: string[] = Array.isArray(prefIncome) ? prefIncome : [];
     const classify = buildKindClassifier(industry, customIncome, customExpense);
 
-    // ── IRS rate (with honesty flag, mirrors /api/profitability) ──
+    // ── IRS rate (for the rate metadata returned in the response;
+    //     not actually used in channel math anymore — channel math
+    //     uses the operating rate below) ──
     const irsRateRaw = appSettingResult.rows[0]?.value;
     const parsedRate = irsRateRaw == null ? NaN : Number(irsRateRaw);
     const hasConfiguredRate = Number.isFinite(parsedRate) && parsedRate > 0;
@@ -159,6 +162,13 @@ export async function GET(req: NextRequest) {
     const rateSource: "config" | "fallback" = hasConfiguredRate
       ? "config"
       : "fallback";
+
+    // ── Operating rate (gas ÷ MPG) — what we actually USE for
+    //     channel profitability math. The honest cash cost of
+    //     driving. Falls back to defaults (~$3.67/gal ÷ 30 mpg =
+    //     $0.12/mi) when the user hasn't set vehicle prefs. ──
+    const operating = loadOperatingRateFromPrefs(settings?.preferences);
+    const operatingMileageRate = operating.rate;
 
     // ── Convert raw rows into the helper's input shape ──────────
     const txns: ChannelTxnRow[] = txnsResult.rows
@@ -177,7 +187,10 @@ export async function GET(req: NextRequest) {
 
     const events: ChannelEventRow[] = eventsResult.rows.map((e) => {
       const totalMiles = e.total_miles == null ? 0 : Number(e.total_miles);
-      const mileageCost = totalMiles * irsMileageRate;
+      // Operating rate, not IRS rate — this is the cash cost driving
+      // the Markets channel net profit. IRS rate stays on /reports +
+      // /api/reports/annual for Schedule C deduction math.
+      const mileageCost = totalMiles * operatingMileageRate;
       return {
         id: e.id,
         revenue: e.revenue == null ? 0 : Number(e.revenue),
@@ -197,8 +210,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       year,
       mode,
+      // IRS rate fields kept on the response for parity with
+      // /api/profitability + /reports; the channel math itself
+      // uses operating rate below.
       rateSource,
       irsMileageRate,
+      // Operating rate metadata — what channel mileage was actually
+      // computed at. UI can label honestly ("$0.12/mi gas-only" vs
+      // "$0.70/mi IRS standard"). source='config' if user set BOTH
+      // gas + MPG in /settings; 'default' if either falls back.
+      operatingRate: operating.rate,
+      operatingRateSource: operating.source,
+      gasPricePerGallon: operating.gasPrice,
+      mpg: operating.mpg,
       ...result,
     });
   } catch (err) {

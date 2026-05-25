@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { getCategoriesForIndustry, type Industry } from "@/lib/categories";
+import { loadOperatingRateFromPrefs } from "@/lib/mileageRates";
 
 // Phase 5 commit 5: /api/profitability. Server-side P&L computation per
 // the design spec §1 model:
@@ -175,6 +176,13 @@ export async function GET() {
       ? "config"
       : "fallback";
 
+    // Operating rate (gas ÷ MPG) — what we use for profitability math
+    // going forward. IRS rate stays in the response so the per-event
+    // detail page can show BOTH numbers side-by-side (operating $ for
+    // cash impact + IRS $ for the Schedule C deduction value).
+    const operating = loadOperatingRateFromPrefs(settings?.preferences);
+    const operatingMileageRate = operating.rate;
+
     interface PerEventAccumulator {
       manualRevenue: number;
       linkedIncome: number;
@@ -216,7 +224,13 @@ export async function GET() {
     const perEvent = eventsResult.rows.map((e) => {
       const acc = accumulators.get(e.id)!;
       const totalMiles = e.total_miles == null ? null : Number(e.total_miles);
+      // Operating rate drives the per-event profit number — the honest
+      // cash cost of driving (gas ÷ MPG). irsMileageCost is exposed
+      // separately for surfaces that need the Schedule C deduction
+      // value (per-event detail page shows both side-by-side).
       const mileageCost =
+        totalMiles == null ? 0 : totalMiles * operatingMileageRate;
+      const irsMileageCost =
         totalMiles == null ? 0 : totalMiles * irsMileageRate;
       const revenue = acc.manualRevenue + acc.linkedIncome;
       const expenses = acc.linkedExpense + acc.manualExpense;
@@ -241,7 +255,11 @@ export async function GET() {
         },
         boothFee,
         totalMiles,
+        // Mileage costs at BOTH rates. mileageCost is the operating-
+        // rate value used in the profit math; irsMileageCost is the
+        // Schedule C deduction value surfaced on the event detail page.
         mileageCost,
+        irsMileageCost,
         profit,
         unknownAmount: acc.unknownAmount,
       };
@@ -307,6 +325,13 @@ export async function GET() {
       worstMarkets,
       irsMileageRate,
       rateSource,
+      // Operating-rate metadata for UIs that want to label honestly
+      // (per-event detail page, settings → vehicle preview, etc.).
+      // operatingRateSource='config' iff user set BOTH gas + MPG.
+      operatingRate: operating.rate,
+      operatingRateSource: operating.source,
+      gasPricePerGallon: operating.gasPrice,
+      mpg: operating.mpg,
     });
   } catch (error) {
     console.error("Profitability GET error:", error);
