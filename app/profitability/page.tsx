@@ -392,13 +392,33 @@ export default function ProfitabilityPage() {
                 )}`}
                 subtitle={`incl. $${formatMoneyShort(portfolio.totalBoothFees)} booth + $${formatMoneyShort(portfolio.totalMileageCost)} mileage`}
               />
+              {/* Per Jacob: replaced Total Miles tile with Profit
+                  Margin %. Mileage is a tax-prep input, not a
+                  decision-support metric, and was already counted
+                  in Total Expenses above. Profit Margin answers a
+                  question every business owner intuitively asks
+                  ("how efficient am I?") in the same shape as the
+                  other tiles ($ → %). Mileage cost still surfaces
+                  in the Total Expenses subtitle + per-event tables
+                  below + the /reports annual summary. */}
               <KpiTile
-                label="Total miles"
-                value={portfolio.totalMiles.toLocaleString("en-US", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 1,
-                })}
-                subtitle={`at $${irsMileageRate.toFixed(2)}/mi`}
+                label="Profit margin"
+                value={
+                  portfolio.totalRevenue > 0
+                    ? `${(
+                        (portfolio.netProfit / portfolio.totalRevenue) *
+                        100
+                      ).toFixed(1)}%`
+                    : "—"
+                }
+                valueClass={`text-2xl font-bold ${profitColor}`}
+                subtitle={
+                  portfolio.totalRevenue > 0
+                    ? portfolio.netProfit >= 0
+                      ? "of every revenue dollar kept"
+                      : "of every revenue dollar lost"
+                    : "no revenue yet"
+                }
               />
             </div>
 
@@ -410,7 +430,12 @@ export default function ProfitabilityPage() {
             )}
 
             {/* Three monthly trend charts. Identical shape so they pair
-                visually; small fixed height so they fit on one screen. */}
+                visually; small fixed height so they fit on one screen.
+                Per Jacob: hide entire row when there's only 0-1 data
+                points — a single dot per chart looks broken + adds no
+                signal. Reappears as soon as the user has events
+                spanning 2+ months. */}
+            {monthlyTrend.length >= 2 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               <MonthlyTrendCard
                 title="Revenue"
@@ -428,6 +453,7 @@ export default function ProfitabilityPage() {
                 data={monthlyTrend.map((m) => ({ month: m.month, value: m.net }))}
               />
             </div>
+            )}
 
             {/* Best/worst markets — ranked tables. worstMarkets is empty
                 when eventCount <= 5 (API suppresses the overlap with
