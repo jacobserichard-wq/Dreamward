@@ -1,0 +1,213 @@
+// app/api/profitability/channels/route.ts
+//
+// Phase 9.1 commit 2 of 7. GET endpoint that returns per-channel
+// profitability for a given time range. Drives the dashboard
+// ChannelTable + the /profitability "By Channel" tab.
+//
+// Mirrors the existing /api/profitability fetch pattern — same
+// classifier rules, same IRS rate honesty (rateSource flag), same
+// plan gating. Difference: this endpoint groups data by CHANNEL
+// (revenue source) instead of by EVENT, and accepts a year query
+// param to scope the time window.
+//
+// Query params:
+//   ?year=2026 (default: current UTC year)
+//   ?mode=attributable | allocated (default: attributable)
+//
+// Response shape: see lib/profitability/channels.ts ChannelAggregateResult.
+
+import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/db";
+import { getSessionClient } from "@/lib/getClient";
+import type { Industry } from "@/lib/categories";
+import {
+  buildKindClassifier,
+  computeChannels,
+  type ChannelTxnRow,
+  type ChannelEventRow,
+} from "@/lib/profitability/channels";
+
+function isPlanAllowed(plan: string | null | undefined): boolean {
+  return plan === "growth" || plan === "pro" || plan === "trial";
+}
+
+interface EventRow {
+  id: number;
+  revenue: string | null;
+  booth_fee: string;
+  total_miles: string | null;
+}
+
+interface TxnRow {
+  amount: string;
+  category: string | null;
+  source: string | null;
+  event_id: number | null;
+}
+
+interface SettingsRow {
+  custom_categories: string[] | null;
+  preferences: {
+    custom_income_categories?: string[];
+  } | null;
+}
+
+interface AppSettingRow {
+  value: string;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+    if (!isPlanAllowed(client.plan)) {
+      return NextResponse.json(
+        { error: "Channel profitability is a Growth or Pro feature" },
+        { status: 403 }
+      );
+    }
+
+    // ── Parse query params ──────────────────────────────────────
+    const url = req.nextUrl.searchParams;
+    const now = new Date();
+    const yearParam = url.get("year");
+    const year = yearParam ? Number(yearParam) : now.getUTCFullYear();
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      return NextResponse.json(
+        { error: "Invalid year param" },
+        { status: 400 }
+      );
+    }
+    const modeParam = url.get("mode");
+    const mode: "attributable" | "allocated" =
+      modeParam === "allocated" ? "allocated" : "attributable";
+
+    // Year boundaries — inclusive Jan 1 → Dec 31 in UTC. Matches the
+    // pg DATE-column type-parser override; comparing YYYY-MM-DD
+    // strings is correct.
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+
+    // ── Parallel fetch (same shape as /api/profitability) ───────
+    const [eventsResult, txnsResult, settingsResult, appSettingResult] =
+      await Promise.all([
+        pool.query<EventRow>(
+          // Events whose date range overlaps the year window. Use
+          // start_date for the range check (matches what /api/events
+          // does). total_miles uses the §8.2 conditional from
+          // /api/profitability so multi-day events with
+          // returns_home_nightly multiply the round_trip_miles by
+          // day count.
+          `SELECT id, revenue, booth_fee,
+                  CASE
+                    WHEN round_trip_miles IS NULL THEN NULL
+                    WHEN returns_home_nightly THEN
+                      round_trip_miles * ((end_date - start_date) + 1)
+                    ELSE round_trip_miles
+                  END AS total_miles
+             FROM events
+            WHERE client_id = $1
+              AND start_date >= $2
+              AND start_date <= $3`,
+          [client.id, yearStart, yearEnd]
+        ),
+        pool.query<TxnRow>(
+          // ALL processed_items in the year (NOT just event-linked).
+          // due_date is the canonical "when did this hit" column
+          // (matches /api/reports/annual). Some legacy rows may have
+          // null due_date — exclude them from the rollup rather than
+          // guess (would skew which year they land in).
+          `SELECT amount, category, source, event_id
+             FROM processed_items
+            WHERE client_id = $1
+              AND due_date IS NOT NULL
+              AND due_date >= $2
+              AND due_date <= $3`,
+          [client.id, yearStart, yearEnd]
+        ),
+        pool.query<SettingsRow>(
+          `SELECT custom_categories, preferences
+             FROM client_settings
+            WHERE client_id = $1`,
+          [client.id]
+        ),
+        pool.query<AppSettingRow>(
+          `SELECT value FROM app_settings WHERE key = 'irs_mileage_rate'`
+        ),
+      ]);
+
+    // ── Build classifier (same rules as /api/profitability) ─────
+    const industry = (client.industry ?? "other") as Industry;
+    const settings = settingsResult.rows[0] ?? null;
+    const customExpense: string[] = Array.isArray(settings?.custom_categories)
+      ? (settings!.custom_categories as string[])
+      : [];
+    const prefIncome = settings?.preferences?.custom_income_categories;
+    const customIncome: string[] = Array.isArray(prefIncome) ? prefIncome : [];
+    const classify = buildKindClassifier(industry, customIncome, customExpense);
+
+    // ── IRS rate (with honesty flag, mirrors /api/profitability) ──
+    const irsRateRaw = appSettingResult.rows[0]?.value;
+    const parsedRate = irsRateRaw == null ? NaN : Number(irsRateRaw);
+    const hasConfiguredRate = Number.isFinite(parsedRate) && parsedRate > 0;
+    const irsMileageRate = hasConfiguredRate ? parsedRate : 0.7;
+    const rateSource: "config" | "fallback" = hasConfiguredRate
+      ? "config"
+      : "fallback";
+
+    // ── Convert raw rows into the helper's input shape ──────────
+    const txns: ChannelTxnRow[] = txnsResult.rows
+      .map((r) => {
+        const amount = Number(r.amount);
+        if (!Number.isFinite(amount)) return null;
+        return {
+          amount,
+          category: r.category,
+          source: r.source,
+          event_id: r.event_id,
+          kind: classify(r.category),
+        };
+      })
+      .filter((r): r is ChannelTxnRow => r !== null);
+
+    const events: ChannelEventRow[] = eventsResult.rows.map((e) => {
+      const totalMiles = e.total_miles == null ? 0 : Number(e.total_miles);
+      const mileageCost = totalMiles * irsMileageRate;
+      return {
+        id: e.id,
+        revenue: e.revenue == null ? 0 : Number(e.revenue),
+        booth_fee: Number(e.booth_fee),
+        mileage_cost: mileageCost,
+      };
+    });
+
+    // ── Aggregate via the pure helper ───────────────────────────
+    const result = computeChannels({
+      txns,
+      events,
+      mode,
+      industry,
+    });
+
+    return NextResponse.json({
+      year,
+      mode,
+      rateSource,
+      irsMileageRate,
+      ...result,
+    });
+  } catch (err) {
+    console.error("Channel profitability error:", err);
+    return NextResponse.json(
+      {
+        error: err instanceof Error ? err.message : "Aggregation failed",
+      },
+      { status: 500 }
+    );
+  }
+}

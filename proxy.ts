@@ -54,6 +54,7 @@ export const config = {
     "/api/items/:path*",
     "/api/onboarding/:path*",
     "/api/process/:path*",
+    "/api/profitability/:path*",
     "/api/sample-data/:path*",
     "/api/settings/:path*",
     "/api/shopify/backfill/:path*",
