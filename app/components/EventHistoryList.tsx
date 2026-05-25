@@ -71,41 +71,15 @@ export default function EventHistoryList({ events }: Props) {
     );
   }
 
-  // Phase 4: total business miles across all visible events. The roadmap
-  // calls this "the mileage log" — realized as a per-row column + this
-  // single rolled-up figure rather than a separate screen (design §8.4).
-  // Excludes events where totalMiles is null (event has no address or
-  // client has no home address yet).
-  const totalBusinessMiles = events.reduce(
-    (sum, e) => sum + (e.totalMiles ?? 0),
-    0
-  );
-  const eventsWithMiles = events.filter(
-    (e) => typeof e.totalMiles === "number" && e.totalMiles > 0
-  ).length;
+  // Phase 4: total business miles roll-up tile removed in Phase 9.2
+  // follow-up. Same reasoning as the /profitability Total Miles tile
+  // removal — mileage is a tax-prep input, not a list-page header
+  // metric. Per-event mileage is already shown on each row below.
+  // The dollar value of the deduction lives on /profitability +
+  // /reports where it belongs.
 
   return (
     <>
-      {totalBusinessMiles > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 py-4 px-5 mb-4 flex items-baseline justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider m-0 mb-1">
-              Total business miles
-            </p>
-            <p className="text-2xl font-bold text-slate-900 m-0">
-              {totalBusinessMiles.toLocaleString("en-US", {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}{" "}
-              mi
-            </p>
-          </div>
-          <p className="text-xs text-slate-400 m-0">
-            across {eventsWithMiles} {eventsWithMiles === 1 ? "event" : "events"}
-          </p>
-        </div>
-      )}
-
       <ul className="grid grid-cols-1 gap-3 list-none p-0 m-0">
         {events.map((event) => {
           const count = event.linkedCount ?? 0;
