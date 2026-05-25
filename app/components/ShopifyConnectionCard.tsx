@@ -74,6 +74,7 @@ export default function ShopifyConnectionCard() {
   // /api/shopify/backfill is in flight (whether triggered by the
   // poll or by the user via the upgrade flow).
   const [backfillBusy, setBackfillBusy] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   const loadState = useCallback(async () => {
     setError(null);
@@ -183,6 +184,31 @@ export default function ShopifyConnectionCard() {
       setConnecting(false);
     }
   }, [shopInput]);
+
+  // Phase 8c commit 4: trigger the $99 Stripe Checkout for unlimited
+  // backfill. Returns a checkoutUrl; full-page redirects the user.
+  // Stripe webhook (commit 8c.5) handles the post-payment marker +
+  // resumes the backfill past the 30k cap.
+  const handleUpgradeBackfill = useCallback(async () => {
+    setUpgrading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/shopify/upgrade-backfill", {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        checkoutUrl?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.checkoutUrl) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upgrade failed");
+      setUpgrading(false);
+    }
+  }, []);
 
   const handleConfirmDisconnect = useCallback(async () => {
     setDisconnecting(true);
@@ -325,11 +351,14 @@ export default function ShopifyConnectionCard() {
                   </p>
                   <button
                     type="button"
-                    disabled
-                    title="Upgrade UI lands in commit 8c.4"
-                    className="py-1.5 px-3 rounded bg-amber-600 text-white text-xs font-semibold cursor-not-allowed opacity-60 border-0"
+                    onClick={handleUpgradeBackfill}
+                    disabled={upgrading}
+                    className="py-1.5 px-3 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
                   >
-                    Buy unlimited backfill — $99 (coming next commit)
+                    {upgrading && <Spinner size={11} color="white" />}
+                    {upgrading
+                      ? "Redirecting to checkout…"
+                      : "Buy unlimited backfill — $99 one-time"}
                   </button>
                 </div>
               )}

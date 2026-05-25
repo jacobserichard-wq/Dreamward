@@ -60,6 +60,7 @@ export const config = {
     "/api/shopify/connection/:path*",
     "/api/shopify/disconnect/:path*",
     "/api/shopify/oauth/initiate/:path*",
+    "/api/shopify/upgrade-backfill/:path*",
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",
