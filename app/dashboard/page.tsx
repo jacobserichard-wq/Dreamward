@@ -1429,7 +1429,7 @@ export default function Home() {
                   : 0
               }
               netProfit={channelData?.netProfit ?? 0}
-              year={dashboardCurrentYear}
+              year={channelYear}
               loading={!channelData || !collapsedChannelsLoaded}
             />
 
@@ -1448,7 +1448,36 @@ export default function Home() {
                 "See full breakdown →" link on the top-right routes
                 to /profitability for the full ChannelTable detail
                 view (which keeps the year picker + mode toggle). */}
-            <div className="flex items-center justify-end mb-3">
+            {/* Period picker + drill-down link row. The picker
+                drives BOTH the SalesBanner numbers AND the
+                ChannelStack data — they share the same channelData
+                fetch (re-runs when channelYear changes). */}
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="dashboard-year"
+                  className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                >
+                  Period
+                </label>
+                <select
+                  id="dashboard-year"
+                  value={channelYear}
+                  onChange={(e) => setChannelYear(Number(e.target.value))}
+                  className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                >
+                  {[
+                    dashboardCurrentYear,
+                    dashboardCurrentYear - 1,
+                    dashboardCurrentYear - 2,
+                    dashboardCurrentYear - 3,
+                  ].map((y) => (
+                    <option key={y} value={y}>
+                      {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <Link
                 href="/profitability"
                 className="text-xs text-blue-600 hover:underline"
