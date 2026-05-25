@@ -665,6 +665,17 @@ export default function Home() {
             >
               Setup
             </Link>
+            {/* Phase 8b: Integrations nav link. Pro-only (the page
+                itself shows an upgrade card for non-Pro), but rendered
+                for all plans so the option is discoverable + the
+                upgrade message becomes a conversion surface. */}
+            <Link
+              href="/integrations"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+              title="Connect Shopify and other platforms"
+            >
+              Integrations
+            </Link>
             <Link
               href="/settings"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
