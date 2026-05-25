@@ -50,6 +50,7 @@ export const config = {
     "/api/admin/:path*",
     "/api/billing/:path*",
     "/api/client/:path*",
+    "/api/expenses/:path*",
     "/api/gmail/:path*",
     "/api/items/:path*",
     "/api/onboarding/:path*",
