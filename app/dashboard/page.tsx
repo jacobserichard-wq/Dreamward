@@ -118,6 +118,12 @@ export default function Home() {
   const [channelMode, setChannelMode] = useState<"attributable" | "allocated">(
     "attributable"
   );
+  // Phase 9.1 commit 6: time-range picker. Default 'ytd' (current
+  // year) — matches the /reports + /profitability conventions. Full
+  // year selector lives on /profitability; the dashboard sticks to
+  // year-only since it's the high-level summary view.
+  const dashboardCurrentYear = new Date().getUTCFullYear();
+  const [channelYear, setChannelYear] = useState<number>(dashboardCurrentYear);
   const [collapsedChannels, setCollapsedChannels] = useState<string[]>([]);
   const [collapsedChannelsLoaded, setCollapsedChannelsLoaded] = useState(false);
 
@@ -316,7 +322,7 @@ export default function Home() {
     async function loadChannels() {
       try {
         const res = await fetch(
-          `/api/profitability/channels?mode=${channelMode}`
+          `/api/profitability/channels?year=${channelYear}&mode=${channelMode}`
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -340,7 +346,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [clientInfo?.plan, channelMode]);
+  }, [clientInfo?.plan, channelMode, channelYear]);
 
   // Phase 9.1: toggle a channel's collapse state. Optimistic update
   // (local state flips immediately) + PATCH /api/settings in the
@@ -1534,24 +1540,59 @@ export default function Home() {
                 support surface on the dashboard. Full table with all
                 canonical channels (even empty ones with add-CTAs).
                 Renders only when channel data has loaded — soft-hides
-                during initial fetch to avoid layout shift. */}
+                during initial fetch to avoid layout shift. Year
+                picker (commit 6) sits above the table; current +
+                3 prior, matching /reports + /profitability. */}
             {channelData && collapsedChannelsLoaded && (
-              <ChannelTable
-                channels={channelData.channels}
-                overhead={channelData.overhead}
-                totalRevenue={channelData.totalRevenue}
-                netProfit={channelData.netProfit}
-                mode={channelMode}
-                onToggleMode={() =>
-                  setChannelMode((m) =>
-                    m === "attributable" ? "allocated" : "attributable"
-                  )
-                }
-                collapsedChannels={collapsedChannels}
-                onToggleCollapse={toggleChannelCollapse}
-                isPro={clientInfo?.plan === "pro"}
-                variant="dashboard"
-              />
+              <div>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <label
+                    htmlFor="dashboard-channel-year"
+                    className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                  >
+                    Period
+                  </label>
+                  <select
+                    id="dashboard-channel-year"
+                    value={channelYear}
+                    onChange={(e) => setChannelYear(Number(e.target.value))}
+                    className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                  >
+                    {[
+                      dashboardCurrentYear,
+                      dashboardCurrentYear - 1,
+                      dashboardCurrentYear - 2,
+                      dashboardCurrentYear - 3,
+                    ].map((y) => (
+                      <option key={y} value={y}>
+                        {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
+                      </option>
+                    ))}
+                  </select>
+                  <Link
+                    href="/profitability"
+                    className="text-xs text-blue-600 hover:underline ml-auto"
+                  >
+                    See full breakdown {"\u{2192}"}
+                  </Link>
+                </div>
+                <ChannelTable
+                  channels={channelData.channels}
+                  overhead={channelData.overhead}
+                  totalRevenue={channelData.totalRevenue}
+                  netProfit={channelData.netProfit}
+                  mode={channelMode}
+                  onToggleMode={() =>
+                    setChannelMode((m) =>
+                      m === "attributable" ? "allocated" : "attributable"
+                    )
+                  }
+                  collapsedChannels={collapsedChannels}
+                  onToggleCollapse={toggleChannelCollapse}
+                  isPro={clientInfo?.plan === "pro"}
+                  variant="dashboard"
+                />
+              </div>
             )}
 
             {/* Phase 4: Top Categories breakdown — closes roadmap item 6

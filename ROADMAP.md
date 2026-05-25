@@ -1,8 +1,8 @@
 # FlowWork Product Roadmap
 
-**Small Business Edition** | Updated May 23, 2026
+**Small Business Edition** | Updated May 25, 2026
 
-**8 Phases** · **55+ Tasks** · **17 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 6.5 / 7 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 7a + 7b + 7c SHIPPED (annual summary + mileage + CSV + PDF + CPA handoff + Schedule C line mapping + quarterly estimates); Phase 6.5 SHIPPED (AR auto-detect from Gmail); UX First-Run polish SHIPPED (setup checklist + sample tint + tooltips + clickable status pills + 3-path empty state)**
+**9 Phases** · **60+ Tasks** · **18 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 6.5 / 7 / 8 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 8 SHIPPED (Shopify integration — OAuth + token encryption + connect/disconnect UI + backfill with $99 unlimited upgrade + webhooks + cron + landing page command-center pivot)** · **Phase 9.1 SHIPPED (Channel Profitability — canonical 9-channel dashboard surface + /profitability "By Channel" tab + per-user collapse persistence + overhead allocation toggle, repositions FlowWork from "bookkeeping software" to "decision-support command center")**
 
 ---
 
@@ -509,7 +509,11 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 ## Up Next
 
-**Phases 3 / 4 / 5 / 6 / 6.5 / 7a / 7b / 7c — SHIPPED** (sub-sessions 16 through 24, May 16–23). See per-phase sections above for shipped-summary paragraphs.
+**Phases 3 / 4 / 5 / 6 / 6.5 / 7a / 7b / 7c / 8 / 9.1 — SHIPPED** (sub-sessions 16 through 25, May 16–25). See per-phase sections above for shipped-summary paragraphs.
+
+**Phase 8 (sub-session 24) shipped**: Shopify integration end-to-end. Migration `0010` adds `shopify_connections` (encrypted access token via AES-256-GCM, webhook subscription IDs, backfill bookkeeping with $99 paid-upgrade marker) + `processed_items.source_ref_id` for cross-source dedup. `lib/crypto.ts` (pure AES-256-GCM helpers, env-var-keyed) + `lib/shopify.ts` (typed REST client, OAuth helpers, HMAC verification for both callback + webhooks, order/refund mappers). New routes: `/api/shopify/oauth/initiate` (CSRF state cookie) + `/api/shopify/oauth/callback` (8-step verify-exchange-encrypt-insert flow) + `/api/shopify/connection` GET + `/api/shopify/disconnect` POST + `/api/shopify/backfill` POST (chunked + resumable, 30k free cap) + `/api/shopify/upgrade-backfill` POST ($99 one-time Stripe Checkout) + `/api/shopify/webhook` POST (HMAC-verified, 4 topics: orders/create/updated/cancelled + refunds/create). Stripe webhook extended to handle the one-time payment event. `/integrations` page with `ShopifyConnectionCard` (live progress UI, upgrade prompt, "Live sync active" indicator), nav link from dashboard, Pro-only with non-Pro upgrade card. Landing page repositioned to "Mission control for your money" with 4-card features + "Where your money moves" channel grid + Coming Soon (Etsy/Square/WooCommerce/Stripe Connect).
+
+**Phase 9.1 (sub-session 25) shipped**: Channel Profitability — the first decision-support feature in the new "command center" framing. `lib/profitability/channels.ts` defines the canonical 9-channel registry (Shopify / Markets / Wholesale / Service / Gmail / Uploads + Etsy/Square/WooCommerce coming-soon) and a pure `computeChannels` helper that classifies processed_items via source-priority + category-map and rolls up revenue / direct expenses / unallocated overhead. `/api/profitability/channels` GET endpoint year-bounded with `attributable` / `allocated` mode toggle. `ChannelTable` component (dashboard + full variants) with horizontal revenue bars, per-row collapse (persists to `preferences.ux.dashboard.collapsed_channels`), Pro-upgrade routing for non-Pro users, Coming Soon pills, and empty-state add-CTAs that route to `/integrations` / `/events/new` / `/invoices/new` / `/help/gmail-setup` depending on channel. Dashboard integration with year picker + "See full breakdown →" link. `/profitability` page gets a "By Channel" tab alongside the existing "By Event" view. Hero/sub-copy reframed from "tax-time workflow" to "decision-support layer".
 
 **Phase 7 — DONE.** All four originally-planned tasks (annual summary, mileage, CSV/PDF export, Schedule C line mapping, quarterly estimates) are shipped, plus the Phase 7a addition of CPA email handoff.
 
