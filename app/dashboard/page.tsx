@@ -819,11 +819,27 @@ export default function Home() {
             >
               Events
             </Link>
+            {/* Phase 9.3: new Expenses page (money OUT — vendor bills,
+                subscriptions, supplies). Sits before AR in the
+                financial-flow grouping so the "what does my business
+                cost" surface comes before "what's owed to me". */}
+            <Link
+              href="/expenses"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+            >
+              Expenses
+            </Link>
+            {/* Phase 9.3 rename: "Invoices" → "AR" for clarity. The
+                /invoices page tracks Accounts Receivable (invoices YOU
+                sent to YOUR customers), not vendor bills you received.
+                The new "Expenses" link above handles the money-out
+                side that "Invoices" was confusingly suggesting. */}
             <Link
               href="/invoices"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+              title="Accounts Receivable — customer invoices awaiting payment"
             >
-              Invoices
+              AR
             </Link>
             {/* Phase 7a commit 9: Reports nav link. Pro-only — matches the
                 /reports route plan-gate. Sits between Invoices and Settings
