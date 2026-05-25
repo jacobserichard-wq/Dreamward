@@ -208,12 +208,21 @@ function ChannelCard({
               style={{ width: barWidth }}
             />
           </div>
-          {/* Numbers row */}
-          <div className="flex items-baseline justify-between gap-2 text-xs">
-            <div className="flex items-baseline gap-3">
+          {/* Numbers row — 3 metrics with equal visual weight per
+              Jacob's tweak. Revenue + Expenses styled the same;
+              Net stays on the right + color-coded for the at-a-
+              glance positive/negative read. */}
+          <div className="flex items-baseline justify-between gap-2 text-xs flex-wrap">
+            <div className="flex items-baseline gap-2">
               <span className="text-slate-500">Revenue</span>
               <span className="font-semibold text-slate-900 tabular-nums">
                 {fmtUsd(channel.revenue)}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-slate-500">Expenses</span>
+              <span className="font-semibold text-slate-900 tabular-nums">
+                {fmtUsd(channel.directExpenses)}
               </span>
             </div>
             <div className="flex items-baseline gap-2">
@@ -223,11 +232,6 @@ function ChannelCard({
               </span>
             </div>
           </div>
-          {channel.directExpenses > 0 && (
-            <div className="text-[11px] text-slate-400 mt-1">
-              minus {fmtUsd(channel.directExpenses)} in direct expenses
-            </div>
-          )}
         </>
       ) : (
         <>
