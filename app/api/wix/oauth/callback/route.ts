@@ -18,9 +18,11 @@
 //      = "already connected" message
 //   7. Redirect to /integrations?connected_wix=1&site=<name>
 //
-// ⚠️ TODOs flagged in lib/wix.ts — this route inherits those:
-//   - Authorize URL / callback param shape
-//   - Token endpoint response shape (instance_id field name)
+// ✅ Phase 10b: install URL + token-exchange shape verified vs
+// @wix/sdk source. The instance_id question is settled too —
+// it's NEVER on the token response; it's always on the callback
+// URL as `instanceId` query param. This route uses that param
+// directly + no longer falls back to a (non-existent) token field.
 
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
@@ -29,13 +31,6 @@ import { exchangeCodeForToken, fetchSiteDisplayName } from "@/lib/wix";
 import { encryptForDb } from "@/lib/crypto";
 
 const STATE_COOKIE_NAME = "wix_oauth_state";
-
-function callbackUrl(): string {
-  return (
-    process.env.WIX_OAUTH_CALLBACK_URL ||
-    "https://flowworks.it.com/api/wix/oauth/callback"
-  );
-}
 
 function redirectWithError(req: NextRequest, message: string): NextResponse {
   const url = new URL("/integrations", req.url);
@@ -80,10 +75,7 @@ export async function GET(req: NextRequest) {
 
   let tokenResult: Awaited<ReturnType<typeof exchangeCodeForToken>>;
   try {
-    tokenResult = await exchangeCodeForToken({
-      code,
-      redirectUri: callbackUrl(),
-    });
+    tokenResult = await exchangeCodeForToken({ code });
   } catch (err) {
     console.error("Wix token exchange failed:", err);
     return redirectWithError(
@@ -92,10 +84,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ⚠️ TODO: verify instance_id is on the token response (vs in a
-  // separate query param). Falling back to the URL param if not.
-  const instanceId =
-    tokenResult.instance_id || params.get("instanceId") || null;
+  // instanceId always comes from the callback URL — verified vs
+  // @wix/sdk source (handleOAuthCallback reads it via
+  // `params.get('instanceId')`). Wix never returns it in the token
+  // exchange response body.
+  const instanceId = params.get("instanceId");
   if (!instanceId) {
     return redirectWithError(
       req,

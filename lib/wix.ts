@@ -4,22 +4,33 @@
 // helpers. Pure — no DB I/O. Route handlers (app/api/wix/oauth/*)
 // own DB writes; this module makes the HTTP calls + OAuth handshake.
 //
-// ⚠️ TODO during smoke testing — verify these against actual Wix docs:
-//   - Authorize URL exact path/params (my best read of Wix Dev Center
-//     docs is https://www.wix.com/oauth/authorize; may differ for
-//     headless vs platform apps)
-//   - Token exchange endpoint shape (some Wix docs reference
-//     /oauth/access, others /oauth/token; refresh_token rotation
-//     semantics)
+// ✅ RESOLVED during Phase 10b smoke (verified against @wix/sdk
+//    AppStrategy source — package/build/auth/AppStrategy.js):
+//   - Install URL: https://www.wix.com/installer/install
+//     (NOT /oauth/authorize). Wix's app install flow is its own
+//     pattern, not vanilla OAuth 2.0.
+//   - Install params: appId + redirectUrl + state (+ optional token
+//     for in-app entry points). NOT client_id / redirect_uri /
+//     response_type / scope. Scopes are pre-configured in the Wix
+//     Dev Center Permissions panel, not negotiated at install.
+//   - Token exchange URL: https://www.wixapis.com/oauth/access ✓
+//   - Token exchange body: code + client_id + client_secret +
+//     grant_type. NO redirect_uri in the body (unlike vanilla OAuth).
+//   - instance_id is NOT in the token response — it's on the
+//     callback URL as `instanceId` query param. Always.
+//
+// ⚠️ Still TODO during 10c–10d:
+//   - Stores API base path — currently assuming /stores/v2 but Wix
+//     Dev Center App Settings → "Wix Stores Catalog V1 & V3
+//     compatibility: App is compatible" suggests v3 is the modern
+//     default. Verify when 10c (backfill) ships.
 //   - Webhook verification: Wix uses JWT-signed payloads (HS256 with
 //     app secret) — DIFFERENT from Shopify's HMAC-of-body pattern.
 //     Implemented as a TODO stub until I see a real Wix webhook payload.
-//   - Stores API base path — currently assuming /stores/v2 but Wix
-//     has been migrating to /stores/v3 in 2025-2026.
 //
 // What's NOT a TODO (well-understood):
-//   - General OAuth 2.0 flow shape (authorize → consent → code → exchange)
-//   - Bearer token auth on API calls
+//   - Bearer token auth on API calls (Wix uses raw access token in
+//     Authorization header, no "Bearer " prefix — confirmed in SDK)
 //   - Token refresh on 401 / pre-expiry check
 //   - Pagination cursor pattern (most modern APIs use cursor pagination)
 
@@ -45,54 +56,68 @@ function loadEnv(): {
 // ---------------------------------------------------------------------
 
 /**
- * Build the URL we redirect the merchant to for the OAuth consent
- * screen. State is a CSRF nonce stored in a short-lived cookie that
- * the callback handler verifies on return.
+ * Build the URL we redirect the merchant to for the Wix app install
+ * consent screen. State is a CSRF nonce stored in a short-lived
+ * cookie that the callback handler verifies on return.
  *
- * ⚠️ TODO: verify URL pattern against Wix Dev Center docs. My best
- * read is the standard OAuth 2.0 authorize endpoint, but Wix's
- * "App Installation" flow (vs "Headless OAuth") may route differently.
+ * Verified against @wix/sdk AppStrategy.getInstallUrl source
+ * (1.21.12, package/build/auth/AppStrategy.js). The shape is:
+ *
+ *   https://www.wix.com/installer/install
+ *     ?redirectUrl=<URL-encoded callback URL>
+ *     &appId=<our app ID>
+ *     &state=<CSRF nonce>
+ *
+ * Note the divergence from vanilla OAuth 2.0:
+ *   - URL is /installer/install, not /oauth/authorize
+ *   - Param name is `appId`, not `client_id`
+ *   - Param name is `redirectUrl`, not `redirect_uri`
+ *   - No `response_type`, no `scope` — scopes are pre-configured
+ *     on the app in Wix Dev Center (Develop → Permissions), not
+ *     requested at install time. Adding/removing permissions there
+ *     requires a new app version + re-auth from existing merchants.
  */
 export function buildAuthorizeUrl(opts: {
   state: string;
   redirectUri: string;
-  scopes: string[];
 }): string {
   const { clientId } = loadEnv();
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "code",
-    redirect_uri: opts.redirectUri,
-    scope: opts.scopes.join(" "),
-    state: opts.state,
-  });
-  return `https://www.wix.com/oauth/authorize?${params.toString()}`;
+  const params = new URLSearchParams();
+  params.set("redirectUrl", opts.redirectUri);
+  params.set("appId", clientId);
+  params.set("state", opts.state);
+  return `https://www.wix.com/installer/install?${params.toString()}`;
 }
 
 /**
  * Token response shape from Wix's token endpoint. Both access + refresh
- * tokens come back together on initial exchange + on refresh (refresh
- * token may or may not rotate per Wix policy).
+ * tokens come back together on initial exchange + on refresh.
+ *
+ * Verified against @wix/sdk AppStrategy source — the response body is
+ * just access_token + refresh_token (+ presumably expires_in, though
+ * the SDK doesn't read it directly on the install path). NOTE: there
+ * is NO instance_id in the response. instanceId comes from the
+ * callback URL's query param — always — and the caller is responsible
+ * for extracting it from there.
  */
 export interface WixTokenResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;        // seconds until access_token expires
-  instance_id?: string;       // Wix App Instance UUID (returned on initial exchange)
-  scope?: string;             // space-separated list of granted scopes
+  scope?: string;             // space-separated list of granted scopes (if Wix returns one)
 }
 
 /**
  * Exchange the OAuth `code` we got back at the callback for an
  * access_token + refresh_token pair.
  *
- * ⚠️ TODO: verify endpoint URL + request body shape against Wix docs.
- * Currently using /oauth/access (the Wix "Headless OAuth" endpoint
- * per my memory). Older Wix apps used /oauth/token.
+ * Verified against @wix/sdk AppStrategy.handleOAuthCallback source.
+ * Body fields: code + client_id + client_secret + grant_type.
+ * Importantly: NO redirect_uri in the body — Wix's exchange endpoint
+ * doesn't accept or require it, unlike vanilla OAuth 2.0.
  */
 export async function exchangeCodeForToken(opts: {
   code: string;
-  redirectUri: string;
 }): Promise<WixTokenResponse> {
   const { clientId, clientSecret } = loadEnv();
   const res = await fetch("https://www.wixapis.com/oauth/access", {
@@ -103,7 +128,6 @@ export async function exchangeCodeForToken(opts: {
       client_id: clientId,
       client_secret: clientSecret,
       code: opts.code,
-      redirect_uri: opts.redirectUri,
     }),
   });
   if (!res.ok) {
