@@ -1,39 +1,37 @@
 // app/components/WixConnectionCard.tsx
 //
-// Phase 10b commit 2. Wix counterpart to ShopifyConnectionCard.
-// Same loading / connected / disconnected state machine; differences
-// noted below.
+// Phase 10 Client Credentials rewrite. The Wix connection card on
+// /integrations. Three-state machine: loading / disconnected /
+// connected.
 //
-// Differences vs Shopify:
-//   - No shop-domain input. The Wix consent screen lets the merchant
-//     pick which Wix site they're installing on, so /api/wix/oauth/
-//     initiate takes no body. Connect = single button click.
-//   - Renders siteDisplayName (best-effort) instead of shopDomain.
-//     siteDisplayName can be null if the Sites API call failed at
-//     connect time — falls back to a truncated instance UUID.
-//   - Backfill UI omitted (Phase 10c). Wix doesn't have Shopify's
-//     30k cap / paid extension concept either, so when the backfill
-//     ships in 10c the progress UI will be simpler than Shopify's.
-//   - accessTokenExpiresAt is surfaced as a "needs reconnect" warning
-//     when the cached expiry is past + the last refresh failed. Wix
-//     access tokens are short-lived (~5 min) — refresh happens on
-//     every API call in lib/wix.ts, so a past expiry means the
-//     refresh chain is broken (rare; only when the merchant
-//     uninstalls the app on their Wix site).
+// ─────────────────────────────────────────────────────────────────
+// Why the Connect flow looks unlike Shopify (or any other OAuth):
+// ─────────────────────────────────────────────────────────────────
+// Wix's modern install pattern (Client Credentials, post-2025
+// platform changes) means there is no "we redirect the user to a
+// vendor consent screen" flow we control. Installation happens
+// on Wix's side — merchant clicks an install link, Wix shows the
+// consent screen with our pre-configured permissions, merchant
+// approves, and Wix then sends them BACK to FlowWork via the
+// post-install redirect endpoint (/api/wix/installed/redirect)
+// which does the actual binding of client_id ↔ instance_id.
 //
-// Connect flow:
-//   1. User clicks Connect
-//   2. POST /api/wix/oauth/initiate → { authorizeUrl }
-//   3. window.location = authorizeUrl (full-page redirect to Wix)
-//   4. Wix redirects back to /api/wix/oauth/callback with code + state
-//   5. Callback persists encrypted tokens, redirects to
-//      /integrations?connected_wix=1&site=<name>
-//   6. /integrations page surfaces a success toast (commit 3)
+// So this card's Connect UX is just "click here to start the
+// install flow on Wix" — opens the install URL in a new tab so
+// the merchant doesn't lose their FlowWork session. While the
+// tab is open, we poll /api/wix/connection every few seconds so
+// when the merchant lands back here we re-render as Connected
+// without requiring a manual page refresh.
 //
-// Disconnect flow:
-//   1. User clicks Disconnect → ConfirmModal opens
-//   2. POST /api/wix/disconnect → 200
-//   3. Component re-fetches connection state → renders disconnected card
+// Disconnected state polling:
+//   Cadence 5s, only while disconnected + the card is mounted.
+//   Stops as soon as state flips to connected. Cheap call against
+//   our own backend; no Wix-side rate-limit exposure.
+//
+// Connection state shape: matches the response of GET
+// /api/wix/connection after the Phase 10 commit-6 refactor —
+// no token expiry, no scopes-based warnings, just identity +
+// install timestamp + sync state.
 
 "use client";
 
@@ -41,24 +39,43 @@ import { useCallback, useEffect, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
 
+// While disconnected, re-fetch connection state every 5s to catch
+// the merchant's return from the install flow without requiring a
+// page refresh. Cheap (one DB query against our own backend).
+const DISCONNECTED_POLL_INTERVAL_MS = 5_000;
+
+// Install URL. Configured per-deployment via NEXT_PUBLIC_WIX_INSTALL_URL
+// since the share link / App Market listing URL is Wix-side state
+// that changes between dev/prod and over time. The fallback below
+// is Jacob's current "Share Install Link" from Wix Dev Center —
+// intentionally flagged in console.warn so misconfiguration is
+// visible (per the no-silent-fallbacks repo convention).
+function getInstallUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_WIX_INSTALL_URL;
+  if (fromEnv) return fromEnv;
+  if (typeof window !== "undefined") {
+    console.warn(
+      "NEXT_PUBLIC_WIX_INSTALL_URL not set — falling back to the " +
+        "Phase 10 dev-time share install link. Set the env var in " +
+        "Vercel for prod."
+    );
+  }
+  return "https://wix.to/MxdvZVA";
+}
+
 interface ConnectionState {
   connected: boolean;
   instanceId?: string;
   siteDisplayName?: string | null;
   scopes?: string[];
   connectedAt?: string;
+  installedAt?: string;
   lastSyncAt?: string | null;
   lastSyncStatus?: string | null;
   lastSyncError?: string | null;
-  /** Number of registered Wix webhook subscriptions. Non-zero means
-   *  real-time sync is active; zero means degraded mode (data still
-   *  flows via daily cron once Phase 10e ships). For 10a/10b this is
-   *  always 0 — webhook registration lands in 10d. */
+  /** Number of registered Wix webhook subscriptions. Always 0 for
+   *  Phase 10b — subscription wiring lands in 10d. */
   webhookCount?: number;
-  /** ISO string for the cached access_token expiry. Past expiry
-   *  means the refresh chain broke (merchant uninstalled app, Wix
-   *  revoked, etc.) — render the reconnect warning. */
-  accessTokenExpiresAt?: string | null;
   backfill?: {
     startedAt: string | null;
     completedAt: string | null;
@@ -72,7 +89,6 @@ export default function WixConnectionCard() {
   const [state, setState] = useState<ConnectionState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [connecting, setConnecting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -100,26 +116,24 @@ export default function WixConnectionCard() {
     loadState();
   }, [loadState]);
 
-  const handleConnect = useCallback(async () => {
-    setConnecting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/wix/oauth/initiate", { method: "POST" });
-      const data = (await res.json().catch(() => ({}))) as {
-        authorizeUrl?: string;
-        error?: string;
-      };
-      if (!res.ok || !data.authorizeUrl) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      // Full-page redirect to Wix consent. The state cookie was set by
-      // the initiate route; the callback will land back on /integrations
-      // and re-trigger this card's loadState.
-      window.location.href = data.authorizeUrl;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Connect failed");
-      setConnecting(false);
-    }
+  // ── Disconnected-state polling ────────────────────────────────
+  // While disconnected, poll every 5s so the merchant returning
+  // from the install flow (which happens in a different tab) sees
+  // the card flip to Connected without needing to refresh. Stops
+  // as soon as state.connected becomes true.
+  useEffect(() => {
+    if (loading) return;
+    if (state?.connected) return;
+    const id = window.setInterval(loadState, DISCONNECTED_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [loading, state?.connected, loadState]);
+
+  const handleConnect = useCallback(() => {
+    // Open the Wix install flow in a new tab. The merchant picks
+    // their site + approves permissions on Wix, then Wix redirects
+    // their browser to /api/wix/installed/redirect which does the
+    // binding. This card's polling loop catches the state flip.
+    window.open(getInstallUrl(), "_blank", "noopener,noreferrer");
   }, []);
 
   const handleConfirmDisconnect = useCallback(async () => {
@@ -140,19 +154,14 @@ export default function WixConnectionCard() {
   }, [loadState]);
 
   // Best-effort display label for the connected site. Wix's
-  // siteDisplayName comes from a separate Sites API call at connect
-  // time and can be null. Fall back to a truncated instance UUID
-  // (`Site abc12345…`) so the user has *something* to identify by.
+  // siteDisplayName comes from a separate Sites API call during
+  // the install bind step and can be null if Wix's API failed
+  // (rare). Fall back to a truncated instance UUID so the user
+  // still has *something* to identify by.
   const displayLabel = (() => {
     if (state?.siteDisplayName) return state.siteDisplayName;
     if (state?.instanceId) return `Site ${state.instanceId.slice(0, 8)}…`;
     return "Connected site";
-  })();
-
-  // Reconnect warning: token expiry in the past = refresh chain broken.
-  const tokenExpired = (() => {
-    if (!state?.connected || !state.accessTokenExpiresAt) return false;
-    return new Date(state.accessTokenExpiresAt).getTime() < Date.now();
   })();
 
   if (loading) {
@@ -202,11 +211,11 @@ export default function WixConnectionCard() {
           <div className="space-y-3">
             <div className="text-sm text-slate-700">
               <strong>{displayLabel}</strong>
-              {state.connectedAt && (
+              {state.installedAt && (
                 <span className="text-slate-500">
                   {" "}
-                  · connected{" "}
-                  {new Date(state.connectedAt).toLocaleDateString("en-US", {
+                  · installed{" "}
+                  {new Date(state.installedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
@@ -214,22 +223,6 @@ export default function WixConnectionCard() {
                 </span>
               )}
             </div>
-
-            {/* Reconnect warning if the cached token expired and refresh
-                chain is broken. Rare — happens if the merchant
-                uninstalls the app from inside Wix. */}
-            {tokenExpired && (
-              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
-                <p className="font-semibold text-amber-900 m-0 mb-1">
-                  {"\u{26A0}\u{FE0F}"} Connection needs refresh
-                </p>
-                <p className="text-amber-800 m-0 leading-relaxed">
-                  The connection to Wix expired. This usually means the
-                  app was uninstalled on your Wix site. Disconnect and
-                  reconnect to restore syncing.
-                </p>
-              </div>
-            )}
 
             {/* Sync status — last_sync_at + live-sync indicator (10d) */}
             <div className="flex items-center gap-3 flex-wrap text-xs">
@@ -273,8 +266,7 @@ export default function WixConnectionCard() {
 
             {/* Backfill progress — Phase 10c will wire this up. Until
                 then we render a minimal completed-or-pending hint based
-                on whatever the connection endpoint returns (defaults
-                to 0 orders, null timestamps for fresh connects). */}
+                on whatever the connection endpoint returns. */}
             {state.backfill?.startedAt && !state.backfill?.completedAt && (
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
                 <div className="flex items-center justify-between gap-2">
@@ -316,25 +308,36 @@ export default function WixConnectionCard() {
           </div>
         )}
 
-        {/* Disconnected state — single Connect button. Unlike Shopify,
-            no shop-name input is needed; the Wix consent screen lets
-            the merchant pick which site to install on. */}
+        {/* Disconnected state — install-on-Wix CTA + brief
+            instructions. Unlike Shopify (where we control the OAuth
+            redirect), Wix runs the install flow on their side. We
+            send the merchant there in a new tab and poll for the
+            return. */}
         {!state?.connected && (
           <div className="space-y-3 pt-2 border-t border-slate-100">
-            <div className="flex gap-2 flex-wrap items-center">
-              <button
-                type="button"
-                onClick={handleConnect}
-                disabled={connecting}
-                className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
-              >
-                {connecting && <Spinner size={12} color="white" />}
-                {connecting ? "Redirecting…" : "Connect Wix site"}
-              </button>
-              <span className="text-xs text-slate-500">
-                You&apos;ll pick which Wix site to connect on Wix&apos;s
-                consent screen.
-              </span>
+            <div>
+              <p className="text-xs text-slate-600 mb-2.5 leading-relaxed">
+                Click below to install FlowWork on your Wix site. You&apos;ll
+                pick the site, approve permissions, and then Wix will send
+                you back here automatically.
+              </p>
+              <div className="flex gap-2 flex-wrap items-center">
+                <button
+                  type="button"
+                  onClick={handleConnect}
+                  className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-2"
+                >
+                  Install on your Wix site →
+                </button>
+                <span className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  Watching for connection…
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                The install opens in a new tab. Keep this tab open — it
+                refreshes automatically when the connection completes.
+              </p>
             </div>
           </div>
         )}
