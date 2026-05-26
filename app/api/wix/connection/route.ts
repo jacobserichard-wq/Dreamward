@@ -1,18 +1,18 @@
 // app/api/wix/connection/route.ts
 //
-// Phase 10b. GET endpoint returning the current Wix connection
-// state for the signed-in client. Drives the /integrations page's
-// WixConnectionCard.
+// Phase 10 Client Credentials rewrite. GET endpoint returning the
+// current Wix connection state for the signed-in client. Drives
+// the /integrations page's WixConnectionCard.
 //
 // Returns:
 //   { connected: false } when no connection exists
-//   { connected: true, instanceId, siteDisplayName, ... } otherwise
+//   { connected: true, instanceId, siteDisplayName, installedAt, ... }
 //
-// Pro-gated (matches every other /api/wix/* route + the Shopify
-// pattern from Phase 8b).
+// Pro-gated (matches every other /api/wix/* route).
 //
-// Explicit column list — encrypted token blobs NEVER leave the
-// server. Surfacing them would defeat the AES-256-GCM encryption.
+// No token columns are surfaced or even SELECTed — under the Client
+// Credentials model, FlowWork doesn't store tokens at all (tokens
+// are minted per-request via lib/wix.mintAccessToken).
 
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
@@ -23,6 +23,7 @@ interface WixConnectionRow {
   site_display_name: string | null;
   scopes: string[];
   connected_at: string;
+  installed_at: string;
   last_sync_at: string | null;
   last_sync_status: string | null;
   last_sync_error: string | null;
@@ -31,7 +32,6 @@ interface WixConnectionRow {
   backfill_completed_at: string | null;
   backfill_total_orders: number | null;
   backfill_orders_imported: number;
-  access_token_expires_at: string | null;
 }
 
 export async function GET() {
@@ -58,6 +58,7 @@ export async function GET() {
               site_display_name,
               scopes,
               connected_at,
+              installed_at,
               last_sync_at,
               last_sync_status,
               last_sync_error,
@@ -65,8 +66,7 @@ export async function GET() {
               backfill_started_at,
               backfill_completed_at,
               backfill_total_orders,
-              backfill_orders_imported,
-              access_token_expires_at
+              backfill_orders_imported
          FROM wix_connections
         WHERE client_id = $1`,
       [client.id]
@@ -83,14 +83,11 @@ export async function GET() {
       siteDisplayName: row.site_display_name,
       scopes: row.scopes,
       connectedAt: row.connected_at,
+      installedAt: row.installed_at,
       lastSyncAt: row.last_sync_at,
       lastSyncStatus: row.last_sync_status,
       lastSyncError: row.last_sync_error,
       webhookCount: row.webhook_subscription_ids.length,
-      // Surface token expiry so the UI can show "needs reconnect"
-      // when the refresh token chain breaks (rare; happens if Wix
-      // revokes the app on the merchant's site).
-      accessTokenExpiresAt: row.access_token_expires_at,
       backfill: {
         startedAt: row.backfill_started_at,
         completedAt: row.backfill_completed_at,

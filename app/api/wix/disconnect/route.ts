@@ -1,49 +1,39 @@
 // app/api/wix/disconnect/route.ts
 //
-// Phase 10b. Companion to GET /api/wix/connection. Mirrors the Shopify
-// disconnect endpoint from Phase 8b — same flow, different provider.
+// Phase 10 Client Credentials rewrite. POST endpoint that disconnects
+// the client's Wix site.
 //
-// POST endpoint that disconnects the client's Wix site:
-//   1. Loads the connection row (404 if none)
-//   2. Decrypts the access token (needed to authenticate Wix-side
-//      webhook deletion)
-//   3. Iterates webhook_subscription_ids — DELETEs each subscription
-//      via Wix's API so they stop being delivered. Best-effort:
-//      logs failures but doesn't block the disconnect (a Wix webhook
-//      delivered after disconnect is harmless — the receiver would
-//      404 on its own client_id lookup).
-//   4. DELETEs the wix_connections row
+// Massively simplified vs the OAuth-2.0-redirect version:
+//   - No tokens are stored to decrypt + revoke (Client Credentials
+//     mints fresh tokens per-request; nothing persistent on our end).
+//   - Webhook subscriptions are app-level (not per-instance) in the
+//     Client Credentials model; Wix manages them. We have nothing
+//     per-merchant to clean up Wix-side at disconnect time. (Future
+//     work in 10d: subscribe to additional event categories for
+//     real-time sync; same app-level subscription, no per-merchant
+//     teardown needed at disconnect.)
 //
-// IMPORTANT: this DOES NOT delete the historical processed_items rows
-// ingested from Wix. Mirroring locked Shopify decision 4.8 — disconnect
-// stops new ingestion + preserves historical data for tax reporting.
-// The separate "delete connected data" destructive op will land in
-// sub-phase 10e alongside the cron + purge route.
+// Flow:
+//   1. Auth + Pro gate.
+//   2. clearCachedToken(instanceId) — invalidate the in-process
+//      token cache so a future re-connect doesn't serve a stale
+//      cached entry from before the row was deleted.
+//   3. DELETE the wix_connections row.
 //
-// For Phase 10a/10b: webhook_subscription_ids is always an empty array
-// (webhook registration lands in 10d), so the deletion loop is a no-op
-// until then. Code is wired now so the iterator just works once 10d
-// populates the array.
-//
-// ⚠️ TODO during 10d implementation — verify the Wix webhook DELETE
-// endpoint path. Currently assuming `/webhooks/v1/webhooks/{id}` per
-// the Wix Headless API pattern, but this needs confirmation when we
-// build the subscription registration in 10d.
+// IMPORTANT: this DOES NOT delete the historical processed_items
+// rows ingested from Wix. Mirroring Shopify decision 4.8 —
+// disconnect stops new ingestion + preserves historical data for
+// tax reporting. The separate "delete connected data" destructive
+// op will land in sub-phase 10e alongside the cron + purge route.
 
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { decryptFromDb } from "@/lib/crypto";
+import { clearCachedToken } from "@/lib/wix";
 
 interface WixConnectionRow {
   instance_id: string;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
-  webhook_subscription_ids: string[];
 }
-
-const WIX_API_BASE = "https://www.wixapis.com";
 
 export async function POST() {
   try {
@@ -61,14 +51,11 @@ export async function POST() {
       );
     }
 
-    // Load the connection (single tenant — UNIQUE(client_id) means
-    // at most one row).
+    // Load the connection row (single tenant — UNIQUE(client_id)
+    // means at most one row). We only need instance_id so we can
+    // clear the cache; everything else gets deleted unconditionally.
     const found = await pool.query<WixConnectionRow>(
-      `SELECT instance_id,
-              access_token_ciphertext,
-              access_token_iv,
-              access_token_auth_tag,
-              webhook_subscription_ids
+      `SELECT instance_id
          FROM wix_connections
         WHERE client_id = $1`,
       [client.id]
@@ -79,45 +66,11 @@ export async function POST() {
         { status: 404 }
       );
     }
-    const conn = found.rows[0];
 
-    // Best-effort Wix-side webhook cleanup. Decrypt the token, call
-    // DELETE for each webhook ID. Failures get logged but never block
-    // the local disconnect.
-    if (conn.webhook_subscription_ids.length > 0) {
-      try {
-        const accessToken = decryptFromDb({
-          ciphertext: conn.access_token_ciphertext,
-          iv: conn.access_token_iv,
-          authTag: conn.access_token_auth_tag,
-        });
-        for (const webhookId of conn.webhook_subscription_ids) {
-          try {
-            // ⚠️ TODO 10d: verify endpoint path. See file header.
-            await fetch(
-              `${WIX_API_BASE}/webhooks/v1/webhooks/${webhookId}`,
-              {
-                method: "DELETE",
-                headers: {
-                  Authorization: accessToken,
-                  Accept: "application/json",
-                },
-              }
-            );
-          } catch (err) {
-            console.warn(
-              `Wix webhook ${webhookId} delete failed (best-effort):`,
-              err
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          "Decrypting token for webhook cleanup failed — proceeding with disconnect anyway:",
-          err
-        );
-      }
-    }
+    // Invalidate cached token so a future re-connect (which may
+    // happen seconds later) doesn't serve a stale entry. Safe
+    // no-op when nothing's cached.
+    clearCachedToken(found.rows[0].instance_id);
 
     // Delete the connection row. Historical processed_items
     // (source='wix') are intentionally preserved — see header
