@@ -250,6 +250,44 @@ export default function ExpensesPage() {
     setFormOpen(true);
   }, []);
 
+  // ── Phase 9.3.2: in-line category create handler ──────────────
+  // Called from ExpenseForm when user picks "+ Create new category..."
+  // and submits a new name. Appends to client_settings.custom_categories
+  // via PATCH /api/settings, then re-fetches to refresh the dropdown.
+  // Throws on error so the form's inline error UI surfaces it.
+  const handleCreateCategory = useCallback(
+    async (name: string) => {
+      // GET current preferences first so we PATCH a complete object
+      // (avoids clobbering custom_income_categories / ux / etc.)
+      const settingsRes = await fetch("/api/settings");
+      if (!settingsRes.ok) {
+        throw new Error("Couldn't load current settings");
+      }
+      const sdata = (await settingsRes.json()) as {
+        settings?: { custom_categories?: string[] };
+      };
+      const current = Array.isArray(sdata.settings?.custom_categories)
+        ? sdata.settings!.custom_categories!
+        : [];
+      const next = current.includes(name) ? current : [...current, name];
+
+      const patchRes = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customCategories: next }),
+      });
+      if (!patchRes.ok) {
+        const body = await patchRes.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${patchRes.status}`);
+      }
+
+      // Refresh the categories list so the form re-renders with the
+      // new name + auto-selects it (the form's logic does the select).
+      await loadClientPlusEvents();
+    },
+    [loadClientPlusEvents]
+  );
+
   // ── Delete handler (called from ConfirmModal) ─────────────────
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDelete) return;
@@ -442,6 +480,7 @@ export default function ExpensesPage() {
         events={events}
         editing={editing}
         onSave={handleSaveExpense}
+        onCreateCategory={handleCreateCategory}
         onClose={() => {
           setFormOpen(false);
           setEditing(null);

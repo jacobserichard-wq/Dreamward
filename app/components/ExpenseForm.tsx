@@ -80,6 +80,15 @@ export interface ExpenseFormProps {
   } | null;
   onSave: (data: ExpenseFormSubmit) => Promise<void>;
   onClose: () => void;
+  /** Phase 9.3.2: in-line "create a new category" path. When
+   *  provided, the category dropdown gets a "+ Create new
+   *  category..." option that swaps to an inline input on click.
+   *  Callback should PATCH /api/settings to add the new name to
+   *  client_settings.custom_categories + refresh the parent's
+   *  categories list. Resolves to the name string so the form can
+   *  auto-select it once the parent re-renders with the new prop.
+   *  If omitted, the create-new option doesn't render (back-compat). */
+  onCreateCategory?: (name: string) => Promise<void>;
 }
 
 /** Filter the canonical channel list down to the ones a user
@@ -107,6 +116,7 @@ export default function ExpenseForm({
   editing = null,
   onSave,
   onClose,
+  onCreateCategory,
 }: ExpenseFormProps) {
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("");
@@ -119,6 +129,13 @@ export default function ExpenseForm({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase 9.3.2: in-line "create new category" state. creatingCategory
+  // toggles to the input mode; newCategoryName holds the typed name;
+  // creatingBusy disables the Save button while the PATCH is in flight.
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingBusy, setCreatingBusy] = useState(false);
 
   // Reset state when modal re-opens. Two paths:
   // - editing=null → fresh "Add expense" form (empty fields,
@@ -144,7 +161,39 @@ export default function ExpenseForm({
       setNotes("");
     }
     setError(null);
+    setCreatingCategory(false);
+    setNewCategoryName("");
   }, [open, editing, defaultChannel, defaultEventId]);
+
+  // Phase 9.3.2: handle the "+ Create new category..." submit.
+  // Parent's onCreateCategory persists via PATCH /api/settings,
+  // then refreshes the categories prop. Once the new name appears
+  // in the categories list (next re-render), we auto-select it.
+  const handleCreateCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      setError("Category name can't be empty.");
+      return;
+    }
+    if (categories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      setError("That category already exists.");
+      return;
+    }
+    if (!onCreateCategory) return;
+    setCreatingBusy(true);
+    setError(null);
+    try {
+      await onCreateCategory(trimmed);
+      // Parent re-renders with the new name in `categories`; select it.
+      setCategory(trimmed);
+      setCreatingCategory(false);
+      setNewCategoryName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save category");
+    } finally {
+      setCreatingBusy(false);
+    }
+  };
 
   // Esc to close (when not saving)
   useEffect(() => {
@@ -289,25 +338,89 @@ export default function ExpenseForm({
             />
           </Field>
 
-          {/* Category */}
+          {/* Category — Phase 9.3.2: dropdown gains a "+ Create new
+              category..." option when onCreateCategory is wired. Picking
+              it swaps the dropdown for an inline input + Save / Cancel
+              buttons. New category persists to client_settings.custom_
+              categories via PATCH /api/settings + auto-selects on success. */}
           <Field label="Category" htmlFor="expense-category">
-            <select
-              id="expense-category"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                setError(null);
-              }}
-              disabled={saving}
-              className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
-            >
-              <option value="">— pick a category —</option>
-              {categories.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            {creatingCategory ? (
+              <div className="flex gap-2">
+                <input
+                  id="expense-new-category"
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => {
+                    setNewCategoryName(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleCreateCategory();
+                    } else if (e.key === "Escape") {
+                      setCreatingCategory(false);
+                      setNewCategoryName("");
+                      setError(null);
+                    }
+                  }}
+                  placeholder="e.g., Booth Supplies"
+                  autoFocus
+                  disabled={creatingBusy}
+                  className="flex-1 py-2 px-3 text-sm border border-blue-300 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateCategory()}
+                  disabled={creatingBusy || !newCategoryName.trim()}
+                  className="py-2 px-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold cursor-pointer border-0 disabled:opacity-60 inline-flex items-center gap-1.5"
+                >
+                  {creatingBusy && <Spinner size={11} color="white" />}
+                  {creatingBusy ? "Adding..." : "Add"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingCategory(false);
+                    setNewCategoryName("");
+                    setError(null);
+                  }}
+                  disabled={creatingBusy}
+                  className="py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium cursor-pointer hover:bg-slate-50 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <select
+                id="expense-category"
+                value={category}
+                onChange={(e) => {
+                  if (e.target.value === "__create__") {
+                    setCreatingCategory(true);
+                    setNewCategoryName("");
+                    setError(null);
+                    return;
+                  }
+                  setCategory(e.target.value);
+                  setError(null);
+                }}
+                disabled={saving}
+                className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+              >
+                <option value="">— pick a category —</option>
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+                {onCreateCategory && (
+                  <option value="__create__">
+                    {"\u{2795}"} Create new category...
+                  </option>
+                )}
+              </select>
+            )}
           </Field>
 
           {/* Channel */}
