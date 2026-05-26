@@ -1,255 +1,231 @@
 // lib/wix.ts
 //
-// Phase 10a commit 2 of ~5. Typed Wix Stores API client + OAuth
-// helpers. Pure — no DB I/O. Route handlers (app/api/wix/oauth/*)
-// own DB writes; this module makes the HTTP calls + OAuth handshake.
+// Phase 10 architecture pivot. Typed Wix Stores API client + token
+// minting + webhook verification. Pure — no DB I/O. Route handlers
+// (app/api/wix/*) own DB writes; this module owns the protocol.
 //
-// ✅ RESOLVED during Phase 10b smoke (verified against @wix/sdk
-//    AppStrategy source — package/build/auth/AppStrategy.js):
-//   - Install URL: https://www.wix.com/installer/install
-//     (NOT /oauth/authorize). Wix's app install flow is its own
-//     pattern, not vanilla OAuth 2.0.
-//   - Install params: appId + redirectUrl + state (+ optional token
-//     for in-app entry points). NOT client_id / redirect_uri /
-//     response_type / scope. Scopes are pre-configured in the Wix
-//     Dev Center Permissions panel, not negotiated at install.
-//   - Token exchange URL: https://www.wixapis.com/oauth/access ✓
-//   - Token exchange body: code + client_id + client_secret +
-//     grant_type. NO redirect_uri in the body (unlike vanilla OAuth).
-//   - instance_id is NOT in the token response — it's on the
-//     callback URL as `instanceId` query param. Always.
+// ─────────────────────────────────────────────────────────────────
+// Why this looks different than every other OAuth integration in
+// the codebase (Shopify, etc.):
+// ─────────────────────────────────────────────────────────────────
+// Wix's "Custom Authentication" — the OAuth 2.0 redirect flow with
+// authorize URLs, code exchange, encrypted refresh-token storage,
+// and refresh-before-use logic — is DEPRECATED and no longer
+// available for new apps as of Wix's 2025 policy update.
 //
-// ⚠️ Still TODO during 10c–10d:
+// The supported pattern for new apps is **Client Credentials**:
+//
+//   POST https://www.wixapis.com/oauth2/token
+//   {
+//     "grant_type":    "client_credentials",
+//     "client_id":     <WIX_CLIENT_ID>,
+//     "client_secret": <WIX_CLIENT_SECRET>,
+//     "instance_id":   <site-specific Wix App Instance UUID>
+//   }
+//   → { access_token, expires_in }  (short-lived; ~5 min)
+//
+// We store NO tokens. We store only the per-site instance_id (binding
+// FlowWork's client_id ↔ Wix's instance_id) in wix_connections + mint
+// fresh tokens on demand. An in-process cache trims minting to roughly
+// once per ~5 min per site.
+//
+// The instance_id arrives from Wix via:
+//   1. POST /api/wix/installed  — JWT-signed app-installed webhook
+//                                 (machine-to-machine; uses jose
+//                                 to verify against WIX_WEBHOOK_PUBLIC_KEY)
+//   2. GET /api/wix/installed/redirect — browser-redirected merchant
+//                                        with instanceId in URL params
+//                                        (uses NextAuth session to
+//                                        bind to a FlowWork client)
+//
+// See session-notes/phase-10-wix-architecture-pivot.md for the full
+// architecture decision record + commit-by-commit refactor plan.
+//
+// ─────────────────────────────────────────────────────────────────
+// Still TODO during 10c–10e:
 //   - Stores API base path — currently assuming /stores/v2 but Wix
 //     Dev Center App Settings → "Wix Stores Catalog V1 & V3
 //     compatibility: App is compatible" suggests v3 is the modern
 //     default. Verify when 10c (backfill) ships.
-//   - Webhook verification: Wix uses JWT-signed payloads (HS256 with
-//     app secret) — DIFFERENT from Shopify's HMAC-of-body pattern.
-//     Implemented as a TODO stub until I see a real Wix webhook payload.
-//
-// What's NOT a TODO (well-understood):
-//   - Bearer token auth on API calls (Wix uses raw access token in
-//     Authorization header, no "Bearer " prefix — confirmed in SDK)
-//   - Token refresh on 401 / pre-expiry check
-//   - Pagination cursor pattern (most modern APIs use cursor pagination)
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { jwtVerify, importSPKI } from "jose";
 
 // ---------------------------------------------------------------------
 // Env-var loading (lazy + validating)
 // ---------------------------------------------------------------------
 
-function loadEnv(): {
-  clientId: string;
-  clientSecret: string;
-} {
-  const clientId = process.env.WIX_CLIENT_ID;
-  const clientSecret = process.env.WIX_CLIENT_SECRET;
-  if (!clientId) throw new Error("WIX_CLIENT_ID env var is not set");
-  if (!clientSecret) throw new Error("WIX_CLIENT_SECRET env var is not set");
-  return { clientId, clientSecret };
+function loadAppCreds(): { appId: string; appSecret: string } {
+  const appId = process.env.WIX_CLIENT_ID;
+  const appSecret = process.env.WIX_CLIENT_SECRET;
+  if (!appId) throw new Error("WIX_CLIENT_ID env var is not set");
+  if (!appSecret) throw new Error("WIX_CLIENT_SECRET env var is not set");
+  return { appId, appSecret };
+}
+
+function loadWebhookPublicKey(): string {
+  const raw = process.env.WIX_WEBHOOK_PUBLIC_KEY;
+  if (!raw) throw new Error("WIX_WEBHOOK_PUBLIC_KEY env var is not set");
+  // Wix Dev Center provides the key in PEM (multi-line, with BEGIN/END
+  // markers + newlines) or as a base64-encoded single line. Mirror
+  // @wix/sdk's parsePublicKeyIfEncoded helper: if it looks like PEM,
+  // pass through; otherwise base64-decode to PEM.
+  if (raw.includes("\n") || raw.includes("\r")) return raw.trim();
+  return Buffer.from(raw, "base64").toString("utf-8");
 }
 
 // ---------------------------------------------------------------------
-// OAuth — authorize URL + code exchange + refresh
+// Token minting (Client Credentials + in-process cache)
 // ---------------------------------------------------------------------
 
-/**
- * Build the URL we redirect the merchant to for the Wix app install
- * consent screen. State is a CSRF nonce stored in a short-lived
- * cookie that the callback handler verifies on return.
- *
- * Verified against @wix/sdk AppStrategy.getInstallUrl source
- * (1.21.12, package/build/auth/AppStrategy.js). The shape is:
- *
- *   https://www.wix.com/installer/install
- *     ?redirectUrl=<URL-encoded callback URL>
- *     &appId=<our app ID>
- *     &state=<CSRF nonce>
- *
- * Note the divergence from vanilla OAuth 2.0:
- *   - URL is /installer/install, not /oauth/authorize
- *   - Param name is `appId`, not `client_id`
- *   - Param name is `redirectUrl`, not `redirect_uri`
- *   - No `response_type`, no `scope` — scopes are pre-configured
- *     on the app in Wix Dev Center (Develop → Permissions), not
- *     requested at install time. Adding/removing permissions there
- *     requires a new app version + re-auth from existing merchants.
- */
-export function buildAuthorizeUrl(opts: {
-  state: string;
-  redirectUri: string;
-}): string {
-  const { clientId } = loadEnv();
-  const params = new URLSearchParams();
-  params.set("redirectUrl", opts.redirectUri);
-  params.set("appId", clientId);
-  params.set("state", opts.state);
-  return `https://www.wix.com/installer/install?${params.toString()}`;
+/** Cached token entry. expiresAt is wall-clock ms; we trim by 60s
+ *  to avoid serving a token that expires mid-flight. */
+interface CachedToken {
+  accessToken: string;
+  expiresAt: number; // epoch ms
 }
+const tokenCache = new Map<string, CachedToken>();
+const TOKEN_SAFETY_MARGIN_MS = 60_000;
 
 /**
- * Token response shape from Wix's token endpoint. Both access + refresh
- * tokens come back together on initial exchange + on refresh.
+ * Mint a short-lived Wix access token for a specific app instance
+ * (i.e., a specific merchant's Wix site) using Client Credentials.
  *
- * Verified against @wix/sdk AppStrategy source — the response body is
- * just access_token + refresh_token (+ presumably expires_in, though
- * the SDK doesn't read it directly on the install path). NOTE: there
- * is NO instance_id in the response. instanceId comes from the
- * callback URL's query param — always — and the caller is responsible
- * for extracting it from there.
+ * Hot path is cached: a single mint per instance_id covers ~5 min
+ * of API calls. Cache is per-process — Vercel cold starts re-mint,
+ * which is fine (single HTTP call, no rate limits we've observed).
+ *
+ * Throws on HTTP error so callers can surface to the user instead
+ * of returning a stale or nullish token.
  */
-export interface WixTokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;        // seconds until access_token expires
-  scope?: string;             // space-separated list of granted scopes (if Wix returns one)
-}
+export async function mintAccessToken(opts: {
+  instanceId: string;
+}): Promise<{ accessToken: string; expiresAt: Date }> {
+  const cached = tokenCache.get(opts.instanceId);
+  if (cached && cached.expiresAt - TOKEN_SAFETY_MARGIN_MS > Date.now()) {
+    return {
+      accessToken: cached.accessToken,
+      expiresAt: new Date(cached.expiresAt),
+    };
+  }
 
-/**
- * Exchange the OAuth `code` we got back at the callback for an
- * access_token + refresh_token pair.
- *
- * Verified against @wix/sdk AppStrategy.handleOAuthCallback source.
- * Body fields: code + client_id + client_secret + grant_type.
- * Importantly: NO redirect_uri in the body — Wix's exchange endpoint
- * doesn't accept or require it, unlike vanilla OAuth 2.0.
- */
-export async function exchangeCodeForToken(opts: {
-  code: string;
-}): Promise<WixTokenResponse> {
-  const { clientId, clientSecret } = loadEnv();
-  const res = await fetch("https://www.wixapis.com/oauth/access", {
+  const { appId, appSecret } = loadAppCreds();
+  const res = await fetch("https://www.wixapis.com/oauth2/token", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
     body: JSON.stringify({
-      grant_type: "authorization_code",
-      client_id: clientId,
-      client_secret: clientSecret,
-      code: opts.code,
+      grant_type: "client_credentials",
+      client_id: appId,
+      client_secret: appSecret,
+      instance_id: opts.instanceId,
     }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(
-      `Wix token exchange failed: HTTP ${res.status} ${body.slice(0, 200)}`
+      `Wix token mint failed: HTTP ${res.status} ${body.slice(0, 200)}`
     );
   }
-  const data = (await res.json()) as WixTokenResponse;
-  if (!data.access_token || !data.refresh_token) {
-    throw new Error("Wix token exchange returned no tokens");
+  const data = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+  };
+  if (!data.access_token || typeof data.expires_in !== "number") {
+    throw new Error("Wix token mint returned an unexpected payload shape");
   }
-  return data;
-}
 
-/**
- * Use the refresh_token to mint a new access_token. Called by the API
- * client when the cached access_token is near or past expiry.
- *
- * ⚠️ TODO: verify whether Wix rotates refresh tokens (returns a new
- * refresh_token in the response) or keeps the same one. If rotated,
- * caller must update the stored refresh_token too.
- */
-export async function refreshAccessToken(
-  refreshToken: string
-): Promise<WixTokenResponse> {
-  const { clientId, clientSecret } = loadEnv();
-  const res = await fetch("https://www.wixapis.com/oauth/access", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      grant_type: "refresh_token",
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    }),
+  const expiresAtMs = Date.now() + data.expires_in * 1000;
+  tokenCache.set(opts.instanceId, {
+    accessToken: data.access_token,
+    expiresAt: expiresAtMs,
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Wix token refresh failed: HTTP ${res.status} ${body.slice(0, 200)}`
-    );
-  }
-  return (await res.json()) as WixTokenResponse;
-}
-
-// ---------------------------------------------------------------------
-// HMAC verification for OAuth callback (CSRF protection)
-// ---------------------------------------------------------------------
-
-/**
- * Verify the HMAC Wix signs on OAuth callback redirects (if applicable).
- *
- * ⚠️ TODO: Unlike Shopify, Wix may not sign OAuth callback URLs the
- * same way. Standard OAuth 2.0 only requires state-param CSRF
- * protection (which we do separately via cookie). This function is
- * a placeholder for future webhook verification (see below).
- *
- * For now, the CSRF state-cookie check in the callback route is the
- * primary protection.
- */
-export function verifyOAuthCallbackHmac(): boolean {
-  // Wix OAuth callbacks don't include an hmac param (standard OAuth 2.0
-  // relies on state-param + HTTPS for integrity). Return true so the
-  // callback route can use a single check pattern across providers.
-  return true;
+  return {
+    accessToken: data.access_token,
+    expiresAt: new Date(expiresAtMs),
+  };
 }
 
 /**
- * Verify the signature Wix attaches to webhook POSTs.
- *
- * ⚠️ TODO: Wix uses JWT-signed payloads (HS256 with app secret in some
- * docs, public-key verification in others). DIFFERENT from Shopify's
- * HMAC-of-body pattern. Implementation requires:
- *   1. Parse the Authorization header (likely Bearer <JWT>)
- *   2. Verify JWT signature using app secret or public key
- *   3. Compare JWT payload to request body (replay protection)
- *
- * Stubbed until 10d (webhook receiver). Shopify's verifyWebhookHmac
- * is in lib/shopify.ts as reference but the algorithm differs.
+ * Drop a cached token (e.g., on disconnect) so a future re-connect
+ * doesn't serve the stale entry. Safe no-op when nothing's cached.
  */
-export function verifyWebhookSignature(
-  _rawBody: string | Buffer,
-  _authHeader: string | null
-): boolean {
-  // TODO Phase 10d: implement Wix JWT verification.
-  // Returning false in production until implemented — webhooks will
-  // 401 (safer than silently accepting unverified payloads).
-  return false;
+export function clearCachedToken(instanceId: string): void {
+  tokenCache.delete(instanceId);
 }
 
-// HMAC helper for future use (in case Wix introduces an HMAC pattern;
-// or for cross-validating webhook signatures during 10d implementation).
-export function computeHmacSha256(rawBody: string | Buffer, secret: string): string {
-  return createHmac("sha256", secret).update(rawBody).digest("hex");
-}
+// ---------------------------------------------------------------------
+// Webhook verification (RS256-signed JWT, per Wix's pattern)
+// ---------------------------------------------------------------------
 
-export function timingSafeStringCompare(a: string, b: string): boolean {
+/**
+ * Verify an RS256-signed JWT from a Wix webhook delivery.
+ *
+ * Wix wraps the webhook payload in a JWT (typical for their app
+ * platform webhooks — see @wix/sdk AppStrategy.decodeJWT). The JWT
+ * has `data` field (string-encoded JSON payload) and standard
+ * claims (iss=wix.com, aud=<app_id>).
+ *
+ * Returns the parsed `data` payload (already JSON-parsed) on
+ * successful verification. Returns null on any failure — caller
+ * should 401 / 400 the request rather than risk processing an
+ * unverified payload.
+ */
+export async function verifyAppInstalledWebhook(opts: {
+  jwt: string;
+}): Promise<Record<string, unknown> | null> {
   try {
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    const { appId } = loadAppCreds();
+    const publicKeyPem = loadWebhookPublicKey();
+    const publicKey = await importSPKI(publicKeyPem, "RS256");
+    const verified = await jwtVerify(opts.jwt, publicKey, {
+      issuer: "wix.com",
+      audience: appId,
+    });
+    // Wix wraps the actual webhook payload inside a `data` field that
+    // is itself a JSON-encoded string. Parse it before returning.
+    const rawData = (verified.payload as { data?: unknown }).data;
+    if (typeof rawData === "string") {
+      try {
+        return JSON.parse(rawData) as Record<string, unknown>;
+      } catch {
+        // data is not parseable JSON — return as-is in a wrapper so
+        // caller can decide how to handle.
+        return { rawData };
+      }
+    }
+    // Some Wix webhooks may put structured data directly; pass through.
+    if (rawData && typeof rawData === "object") {
+      return rawData as Record<string, unknown>;
+    }
+    return verified.payload as Record<string, unknown>;
   } catch {
-    return false;
+    // Signature failure, expired JWT, wrong audience/issuer — all
+    // surface as "verification failed". Caller decides response code.
+    return null;
   }
 }
 
 // ---------------------------------------------------------------------
-// API client (used by sub-phases 10c + 10d)
+// API client
 // ---------------------------------------------------------------------
 
 const WIX_API_BASE = "https://www.wixapis.com";
 
 /**
- * Bare REST GET against Wix's API. Bearer-token auth via
- * Authorization header. Path is appended to WIX_API_BASE.
+ * Bare REST GET against Wix's API. Auth via Authorization header
+ * (raw access token; no "Bearer " prefix — verified against
+ * @wix/sdk AppStrategy.getAuthHeaders). Path is appended to
+ * WIX_API_BASE.
  *
- * ⚠️ TODO: confirm /stores/v2 vs /stores/v3 — Wix has been migrating
- * to v3 for orders in 2025-2026.
+ * Callers should obtain accessToken via mintAccessToken() first.
+ *
+ * ⚠️ TODO: confirm /stores/v2 vs /stores/v3 path during Phase 10c.
  */
 export async function wixGet<T = unknown>(opts: {
   accessToken: string;
-  path: string;          // e.g. "/stores/v2/orders/query"
+  path: string; // e.g. "/stores/v3/orders/query"
 }): Promise<T> {
   const url = `${WIX_API_BASE}${opts.path}`;
   const res = await fetch(url, {
@@ -260,14 +236,14 @@ export async function wixGet<T = unknown>(opts: {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Wix GET ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
+    throw new Error(
+      `Wix GET ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`
+    );
   }
   return (await res.json()) as T;
 }
 
-/**
- * Bare REST POST. Used for webhook subscription registration in 10d.
- */
+/** Bare REST POST. Same auth + base-URL conventions as wixGet. */
 export async function wixPost<T = unknown>(opts: {
   accessToken: string;
   path: string;
@@ -285,7 +261,9 @@ export async function wixPost<T = unknown>(opts: {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Wix POST ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
+    throw new Error(
+      `Wix POST ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`
+    );
   }
   return (await res.json()) as T;
 }
@@ -299,18 +277,18 @@ export async function wixPost<T = unknown>(opts: {
  *  Stores API v2/v3 docs during 10c implementation. */
 export interface WixOrder {
   id: string;
-  number: number;                  // human-friendly order number
-  dateCreated: string;             // ISO timestamp
+  number: number; // human-friendly order number
+  dateCreated: string; // ISO timestamp
   totals: {
-    total: string;                 // decimal-as-string
+    total: string; // decimal-as-string
     subtotal: string;
     tax: string;
     shipping: string;
     discount: string;
   };
-  currency: string;                // ISO 4217
-  paymentStatus: string;           // 'PAID' | 'PENDING' | 'REFUNDED' | etc.
-  fulfillmentStatus: string;       // 'FULFILLED' | 'NOT_FULFILLED' | etc.
+  currency: string; // ISO 4217
+  paymentStatus: string; // 'PAID' | 'PENDING' | 'REFUNDED' | etc.
+  fulfillmentStatus: string; // 'FULFILLED' | 'NOT_FULFILLED' | etc.
   buyerInfo: {
     email: string | null;
     firstName: string | null;
@@ -330,10 +308,11 @@ export interface WixOrder {
 
 /**
  * Fetch the connected Wix site's display name for the UI. The
- * instance_id we get from OAuth isn't user-friendly; this hits Wix's
- * Sites API to get "Acme Shop" or whatever the merchant named it.
+ * instance_id we get from install isn't user-friendly; this hits
+ * Wix's Sites API to get "Acme Shop" or whatever the merchant
+ * named it.
  *
- * ⚠️ TODO: verify endpoint path + response shape.
+ * ⚠️ TODO: verify endpoint path + response shape during 10c.
  */
 export async function fetchSiteDisplayName(opts: {
   accessToken: string;
