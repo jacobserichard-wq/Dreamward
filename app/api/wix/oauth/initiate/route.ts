@@ -51,14 +51,28 @@ export async function POST() {
     const state = randomBytes(32).toString("hex");
 
     // ── Build authorize URL ────────────────────────────────────
-    // ⚠️ TODO: Wix scopes need verification. My best guess is "STORES.READ"
-    // for read-only orders + "STORES.READ_ORDERS" for the orders endpoint
-    // specifically. Verify against Wix Dev Center scope picker during
-    // smoke testing.
+    // Verified against Wix Dev Center scope picker during sub-session
+    // 25 setup. The scope identifier format is
+    // `SCOPE.DC-<CATEGORY>.<ACTION>-<NOUN>` — case-sensitive, dots
+    // between segments, hyphens within segments, all uppercase.
+    //
+    // Currently requesting:
+    //   - SCOPE.DC-STORES.READ-ORDERS — order data including buyer
+    //     info + line items + totals (Wix Stores only — not
+    //     Restaurants / Paid Plans, which have separate scopes)
+    //   - SCOPE.DC-SITES.READ-URLS — site URL for the connection
+    //     card (e.g., "my-shop.wixsite.com"). Narrower than I'd hoped
+    //     (Wix doesn't expose site display name via a public scope as
+    //     far as I can find) but better than showing the raw instance
+    //     UUID on the UI.
+    //
+    // Both scopes match what's configured on the app in Wix Dev
+    // Center — if you add/remove permissions there, mirror here +
+    // require re-auth from existing customers.
     const authorizeUrl = buildAuthorizeUrl({
       state,
       redirectUri: callbackUrl(),
-      scopes: ["STORES.READ_ORDERS"],
+      scopes: ["SCOPE.DC-STORES.READ-ORDERS", "SCOPE.DC-SITES.READ-URLS"],
     });
 
     // ── Set the state cookie + return ──────────────────────────
