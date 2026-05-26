@@ -27,6 +27,12 @@
 //                                 Shopify HMAC. Phase 8a sub-session 24.
 //   /api/shopify/webhook — invoked by Shopify with X-Shopify-Hmac-SHA256
 //                          header; route verifies the signature. Phase 8d.
+//   /api/wix/oauth/callback — Wix redirects merchants here after they
+//                             grant the app permissions. Same pattern
+//                             as Shopify callback: public route + CSRF
+//                             state cookie + server-side session check.
+//                             Phase 10a sub-session 25.
+//   /api/wix/webhook — future Phase 10d, JWT-signed payloads from Wix.
 //
 // If you add a new route that needs to be public, leave it OUT of the matcher.
 // If you add a new route that needs auth, add it explicitly below.
@@ -67,5 +73,6 @@ export const config = {
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",
+    "/api/wix/oauth/initiate/:path*",
   ],
 };
