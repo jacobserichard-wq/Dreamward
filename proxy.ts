@@ -82,5 +82,6 @@ export const config = {
     "/api/upload/:path*",
     "/api/wix/connection/:path*",
     "/api/wix/disconnect/:path*",
+    "/api/wix/installed/redirect/:path*",
   ],
 };
