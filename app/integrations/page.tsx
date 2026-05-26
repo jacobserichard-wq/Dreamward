@@ -3,21 +3,23 @@
 // Phase 8b commit 3 of 3 (commit 9 of Phase 8 overall).
 //
 // /integrations — the user-facing hub for connecting external
-// platforms. v1 lists Shopify (live) + placeholder cards for
+// platforms. v1 lists Shopify + Wix (live) + placeholder cards for
 // upcoming platforms (Etsy, Square, WooCommerce) so users see the
 // roadmap.
 //
-// Pro-gated (matches every other /api/shopify/* route + the
-// /reports page pattern). Non-Pro users see an amber upgrade
+// Pro-gated (matches every other /api/shopify/* + /api/wix/* route
+// + the /reports page pattern). Non-Pro users see an amber upgrade
 // card with a "View plans" CTA.
 //
 // URL params surfaced as banners:
-//   ?connected=1&shop=...  → green "Connected to my-store.myshopify.com" toast
-//   ?error=<msg>           → red error banner
-//   ?upgrade=success       → emerald "Extended backfill unlocked" toast
-//                            (sub-phase 8c will trigger this from the Stripe
-//                             webhook handler; safe to render now since the
-//                             check is just "is the param present")
+//   ?connected=1&shop=...    → green "Connected to my-store.myshopify.com" toast
+//   ?connected_wix=1&site=... → green "Connected to <site display name>!" toast
+//                               (Phase 10a callback emits these on success)
+//   ?error=<msg>             → red error banner
+//   ?upgrade=success         → emerald "Extended backfill unlocked" toast
+//                              (sub-phase 8c triggers this from the Stripe
+//                              webhook handler; safe to render now since the
+//                              check is just "is the param present")
 
 "use client";
 
@@ -27,6 +29,7 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
+import WixConnectionCard from "../components/WixConnectionCard";
 
 interface ClientInfo {
   plan: string;
@@ -71,18 +74,27 @@ function IntegrationsPageInner() {
   useEffect(() => {
     const connected = params.get("connected");
     const shop = params.get("shop");
+    const connectedWix = params.get("connected_wix");
+    const site = params.get("site");
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
 
     if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
+    } else if (connectedWix === "1") {
+      // siteDisplayName is best-effort — Wix's Sites API call can fail
+      // and we still want to show success. Fall back to a generic
+      // message when site=... wasn't on the redirect URL.
+      setSuccessMsg(
+        site ? `Connected to ${site}!` : "Wix site connected!"
+      );
     } else if (upgrade === "success") {
       setSuccessMsg("Extended backfill unlocked — pulling the rest of your order history now.");
     } else if (errParam) {
       setError(errParam);
     }
 
-    if (connected || errParam || upgrade) {
+    if (connected || connectedWix || errParam || upgrade) {
       // Strip the params so reload doesn't replay the toast.
       router.replace("/integrations");
     }
@@ -139,9 +151,9 @@ function IntegrationsPageInner() {
               {"\u{1F512}"} Integrations are a Pro feature
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
-              Upgrade to Pro ($89/mo) to connect Shopify and pull orders
-              + revenue automatically into FlowWork. Coming soon: Etsy,
-              Square, WooCommerce.
+              Upgrade to Pro ($89/mo) to connect Shopify or Wix and
+              pull orders + revenue automatically into FlowWork.
+              Coming soon: Etsy, Square, WooCommerce.
             </p>
             <Link
               href="/billing"
@@ -187,7 +199,10 @@ function IntegrationsPageInner() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">
             Available now
           </h2>
-          <ShopifyConnectionCard />
+          <div className="space-y-3">
+            <ShopifyConnectionCard />
+            <WixConnectionCard />
+          </div>
         </div>
 
         {/* Coming soon — placeholder cards. Each is a static card with
