@@ -1,57 +1,75 @@
 // app/api/wix/installed/route.ts
 //
-// Phase 10 architecture pivot commit 4. Wix webhook receiver for
-// the "app installed" event. PUBLIC route (no NextAuth session —
-// Wix POSTs machine-to-machine), JWT-signature-verified via
-// lib/wix.verifyAppInstalledWebhook.
+// Phase 10 email-matching binding (replaces the JWT-only-stub from
+// the previous architecture pivot). Wix webhook receiver for the
+// app-installed event. PUBLIC route — Wix POSTs machine-to-machine,
+// no NextAuth session.
 //
 // ─────────────────────────────────────────────────────────────────
-// Role in the install flow:
+// Why we're not redirect-binding anymore:
 // ─────────────────────────────────────────────────────────────────
-// This webhook is the **resilience / observability layer**, NOT
-// the primary path for binding a Wix instance_id to a FlowWork
-// client_id. The primary path is /api/wix/installed/redirect
-// (shipped in commit 5), which has the merchant's NextAuth
-// session available + can do the binding directly.
+// The previous design assumed Wix would redirect the merchant's
+// browser back to /api/wix/installed/redirect with the instanceId
+// after install completed. Empirical install test on prod proved
+// Wix Studio Custom Apps don't expose a configurable post-install
+// redirect URL — Wix sends merchants to its own manage-apps page.
+// See session-notes/phase-10-wix-email-matching.md § 1.
 //
-// Concretely, this route's responsibilities are:
-//   1. Verify Wix's JWT signature so we know the install event is
-//      genuinely from Wix (RS256 vs WIX_WEBHOOK_PUBLIC_KEY).
-//   2. Log the event for ops visibility.
-//   3. If we already have a wix_connections row for the announced
-//      instance_id (i.e., the redirect handler bound it), the
-//      webhook is essentially redundant — log + 200.
-//   4. If we DON'T have a row (rare — merchant closed the tab
-//      before the redirect, or installed via Wix App Market path
-//      that we don't support yet), we have no way to bind to a
-//      client_id from the webhook alone. Log "unbound install"
-//      + 200. Future Phase 10d work may add a state-token or
-//      App-Market-flow path that handles this case.
+// This webhook is now the PRIMARY binding path:
+//   1. Wix POSTs the install event here with the new instance_id
+//   2. We mint a Client Credentials token for that instance
+//   3. Call Wix's site-properties API to retrieve the site's
+//      business email (our scope already grants this access —
+//      "Read site, business, and email details")
+//   4. Lookup clients table by email
+//   5. If exactly 1 match → INSERT wix_connections binding
+//      If 0 matches → log "unbound", merchant can re-attempt later
+//      If >1 matches → log "ambiguous", don't auto-bind
 //
-// Always returns 200 on a verified payload — Wix re-delivers
-// failed webhooks, and we don't want a retry storm over events
-// we intentionally don't act on.
+// ─────────────────────────────────────────────────────────────────
+// JWT verification status:
+// ─────────────────────────────────────────────────────────────────
+// We *unpack* the JWT (jose.decodeJwt — no signature check) and do
+// a soft `iss === 'wix.com'` claim check. We do NOT verify the RS256
+// signature because the public key isn't surfaced in Wix Studio
+// Custom Apps' Dev Center UI. Risk analysis: an attacker would need
+// to ALREADY control a FlowWork user's email to gain anything from
+// a forged install webhook (we only bind to existing clients matched
+// by email). Real attack surface is small. JWT signature verification
+// is a TODO for when we find the public key — lib/wix.ts already
+// has verifyAppInstalledWebhook ready to drop in.
 //
-// Returns 401 on failed JWT verification (caller is unauthenticated
-// or impersonating Wix). Returns 400 on a malformed request body.
+// Always returns 200 on a well-formed request — Wix re-delivers
+// failed webhooks aggressively, and we don't want retry storms.
+// Only returns 400 on malformed input.
 //
 // NOT in proxy.ts matcher — must remain public for Wix to reach.
 
 import { NextRequest, NextResponse } from "next/server";
+import { decodeJwt } from "jose";
 import pool from "@/lib/db";
-import { verifyAppInstalledWebhook } from "@/lib/wix";
+import { mintAccessToken, wixGet } from "@/lib/wix";
 
-interface WixConnectionLookupRow {
+// Wix's site-properties API response shape — only the fields we
+// need. Wix returns more; we ignore the rest. Multiple email-bearing
+// fields exist (top-level + nested) — we try them in order.
+interface WixSiteProperties {
+  email?: string | null;
+  contact?: { email?: string | null } | null;
+  businessContactData?: { email?: string | null } | null;
+  // Display name as fallback if not yet stored — convenient to
+  // hydrate at bind time so the connection card doesn't have to
+  // do a separate API call.
+  businessName?: string | null;
+}
+
+interface ClientLookupRow {
   id: number;
-  client_id: number;
+  email: string;
 }
 
 export async function POST(req: NextRequest) {
-  // Wix delivers the webhook as the raw JWT in the request body
-  // (plain text, not JSON-wrapped — verified against @wix/sdk
-  // delivery conventions). Some Wix integrations also wrap in
-  // { jwt: "..." } JSON; try the plain-text path first and fall
-  // back if it doesn't look like a JWT.
+  // ── 1. Read body + extract JWT ──────────────────────────────
   let jwt: string;
   try {
     const raw = await req.text();
@@ -61,25 +79,24 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // JWT shape sanity check: three base64url-encoded segments
-    // separated by "." (header.payload.signature).
+    // JWT shape sanity check: 3 base64url segments separated by "."
     if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw.trim())) {
       jwt = raw.trim();
     } else {
-      // Try JSON-wrapped: { jwt: "..." }
+      // Some Wix delivery flavors wrap as { jwt: "..." } JSON
       try {
         const parsed = JSON.parse(raw) as { jwt?: string };
         if (typeof parsed.jwt === "string") {
           jwt = parsed.jwt;
         } else {
           return NextResponse.json(
-            { error: "Request body is neither a JWT nor a { jwt: string } envelope" },
+            { error: "Body is neither a JWT nor a { jwt } envelope" },
             { status: 400 }
           );
         }
       } catch {
         return NextResponse.json(
-          { error: "Request body is not a valid JWT" },
+          { error: "Body is not a valid JWT" },
           { status: 400 }
         );
       }
@@ -92,75 +109,178 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const payload = await verifyAppInstalledWebhook({ jwt });
-  if (!payload) {
-    console.warn("Wix webhook: JWT verification failed");
+  // ── 2. Decode JWT (no signature verify — see file header) ───
+  let payload: Record<string, unknown>;
+  try {
+    payload = decodeJwt(jwt) as Record<string, unknown>;
+  } catch (err) {
+    console.warn("Wix webhook: malformed JWT, couldn't decode:", err);
     return NextResponse.json(
-      { error: "Webhook signature verification failed" },
-      { status: 401 }
+      { error: "Couldn't decode JWT payload" },
+      { status: 400 }
     );
   }
 
-  // ── Extract instance_id from the verified payload ──────────────
-  // Wix's app-platform webhook payloads typically have:
-  //   { eventType: 'INSTALLED' | 'UNINSTALLED' | ..., instanceId,
-  //     siteUrl?, timestamp? }
-  // But the exact shape varies by event category — guard against
-  // a missing instanceId and log enough context for diagnosis.
-  const instanceId =
-    typeof payload.instanceId === "string"
-      ? payload.instanceId
-      : typeof (payload as { instance_id?: unknown }).instance_id === "string"
-        ? ((payload as { instance_id: string }).instance_id)
-        : null;
+  // Soft check: issuer should be wix.com. Catches casual non-Wix
+  // POSTs to this public endpoint. Not a real signature verification.
+  if (payload.iss !== "wix.com") {
+    console.warn(
+      `Wix webhook: rejecting payload with iss=${String(payload.iss)} ` +
+        `(expected 'wix.com')`
+    );
+    return NextResponse.json({ acknowledged: true, action: "rejected" });
+  }
 
+  // ── 3. Extract instanceId from envelope ─────────────────────
+  // Wix wraps event payloads as { eventType, instanceId, data, identity }
+  // at the top level of the JWT-decoded claims. instanceId here is the
+  // site-app instance, exactly what we want.
+  const instanceId =
+    typeof payload.instanceId === "string" ? payload.instanceId : null;
   const eventType =
-    typeof payload.eventType === "string"
-      ? payload.eventType
-      : typeof (payload as { event_type?: unknown }).event_type === "string"
-        ? ((payload as { event_type: string }).event_type)
-        : "(unknown)";
+    typeof payload.eventType === "string" ? payload.eventType : "(unknown)";
 
   if (!instanceId) {
     console.warn(
-      "Wix webhook: verified payload missing instanceId — payload keys:",
+      "Wix webhook: payload missing instanceId — keys:",
       Object.keys(payload)
     );
-    // Still 200 — we verified the signature, we just don't know what
-    // to do with the payload. Don't make Wix retry.
     return NextResponse.json({ acknowledged: true, action: "ignored" });
   }
 
-  // ── Cross-reference with wix_connections ───────────────────────
+  // ── 4. Short-circuit if already bound ───────────────────────
+  // Webhooks can re-deliver (Wix retries failures, and we may
+  // intentionally receive multiple events for the same instance over
+  // its lifetime). If a row already exists, no work to do.
   try {
-    const found = await pool.query<WixConnectionLookupRow>(
+    const existing = await pool.query<{ id: number; client_id: number }>(
       `SELECT id, client_id
          FROM wix_connections
         WHERE instance_id = $1`,
       [instanceId]
     );
-
-    if (found.rows.length > 0) {
+    if (existing.rows.length > 0) {
       console.log(
         `Wix webhook: event=${eventType} instance=${instanceId} ` +
-          `bound to client_id=${found.rows[0].client_id} (already in DB)`
+          `already bound to client_id=${existing.rows[0].client_id} — no action`
       );
-    } else {
-      // Merchant either closed the install tab before the redirect
-      // handler bound the row, OR installed via a path we don't
-      // support yet (Wix App Market). Can't bind without a FlowWork
-      // session — log and move on. Future work: state-token path.
-      console.warn(
-        `Wix webhook: event=${eventType} instance=${instanceId} ` +
-          `received for unbound instance — will be bound when merchant ` +
-          `signs into FlowWork and hits /api/wix/installed/redirect`
-      );
+      return NextResponse.json({ acknowledged: true, action: "already_bound" });
     }
-    return NextResponse.json({ acknowledged: true });
   } catch (err) {
-    console.error("Wix webhook: DB lookup failed:", err);
-    // 200 anyway — the signature was valid, the DB issue is on our
-    // side. Wix shouldn't retry over a transient DB blip.
+    console.error("Wix webhook: existence check failed:", err);
+    return NextResponse.json({ acknowledged: true, dbError: true });
+  }
+
+  // ── 5. Mint Client Credentials token + fetch site properties ─
+  let siteEmail: string | null = null;
+  let siteName: string | null = null;
+  try {
+    const { accessToken } = await mintAccessToken({ instanceId });
+    const props = await wixGet<WixSiteProperties>({
+      accessToken,
+      path: "/site-properties/v4/properties",
+    });
+    // Try multiple field paths — Wix's SDK typings show both top-level
+    // and nested email locations; the actual REST response shape isn't
+    // fully documented externally, so be defensive.
+    siteEmail =
+      props.email ||
+      props.contact?.email ||
+      props.businessContactData?.email ||
+      null;
+    siteName = props.businessName ?? null;
+  } catch (err) {
+    console.error(
+      `Wix webhook: failed to fetch site-properties for ` +
+        `instance=${instanceId}:`,
+      err
+    );
+    return NextResponse.json({
+      acknowledged: true,
+      action: "fetch_failed",
+    });
+  }
+
+  if (!siteEmail) {
+    console.warn(
+      `Wix webhook: site-properties for instance=${instanceId} ` +
+        `returned no email — can't auto-bind. Merchant can manually ` +
+        `link via fallback UI (TODO).`
+    );
+    return NextResponse.json({ acknowledged: true, action: "no_email" });
+  }
+
+  // ── 6. Match against clients table ──────────────────────────
+  const normalized = siteEmail.trim().toLowerCase();
+  let matches: ClientLookupRow[];
+  try {
+    const res = await pool.query<ClientLookupRow>(
+      `SELECT id, email
+         FROM clients
+        WHERE LOWER(email) = $1`,
+      [normalized]
+    );
+    matches = res.rows;
+  } catch (err) {
+    console.error("Wix webhook: client lookup failed:", err);
+    return NextResponse.json({ acknowledged: true, dbError: true });
+  }
+
+  if (matches.length === 0) {
+    // No FlowWork account with this email yet. The merchant may sign
+    // up later — at that point we'd need a "look for pending unbound
+    // installs for my email" job (not built yet). For now, log + 200.
+    console.warn(
+      `Wix webhook: unbound install for instance=${instanceId} ` +
+        `email=${normalized} — no FlowWork account matches`
+    );
+    return NextResponse.json({ acknowledged: true, action: "unbound_no_match" });
+  }
+
+  if (matches.length > 1) {
+    // Shouldn't happen — UNIQUE(email) is enforced on clients — but
+    // be defensive. If it does happen, don't pick arbitrarily.
+    console.warn(
+      `Wix webhook: ambiguous match for instance=${instanceId} ` +
+        `email=${normalized} → ${matches.length} clients. Refusing to bind.`
+    );
+    return NextResponse.json({ acknowledged: true, action: "ambiguous" });
+  }
+
+  // ── 7. Bind ─────────────────────────────────────────────────
+  const clientId = matches[0].id;
+  try {
+    await pool.query(
+      `INSERT INTO wix_connections (
+         client_id,
+         instance_id,
+         site_display_name,
+         installed_at,
+         scopes
+       ) VALUES ($1, $2, $3, NOW(), $4)
+       ON CONFLICT (client_id) DO UPDATE
+         SET instance_id       = EXCLUDED.instance_id,
+             site_display_name = EXCLUDED.site_display_name,
+             installed_at      = NOW()`,
+      [clientId, instanceId, siteName, []]
+    );
+    console.log(
+      `Wix webhook: bound instance=${instanceId} → client_id=${clientId} ` +
+        `via email=${normalized}`
+    );
+    return NextResponse.json({ acknowledged: true, action: "bound", clientId });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // UNIQUE(instance_id) constraint can fire if a race created the
+    // row between our existence-check (step 4) and this insert.
+    if (msg.includes("wix_connections_instance_id_key") || msg.includes("instance_id")) {
+      console.warn(
+        `Wix webhook: race on instance=${instanceId} insert ` +
+          `(another binding committed first) — ignoring`
+      );
+      return NextResponse.json({ acknowledged: true, action: "race_lost" });
+    }
+    console.error("Wix webhook: bind INSERT failed:", err);
     return NextResponse.json({ acknowledged: true, dbError: true });
   }
 }
