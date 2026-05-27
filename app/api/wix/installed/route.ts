@@ -27,28 +27,27 @@
 //      If >1 matches → log "ambiguous", don't auto-bind
 //
 // ─────────────────────────────────────────────────────────────────
-// JWT verification status:
+// JWT verification:
 // ─────────────────────────────────────────────────────────────────
-// We *unpack* the JWT (jose.decodeJwt — no signature check) and do
-// a soft `iss === 'wix.com'` claim check. We do NOT verify the RS256
-// signature because the public key isn't surfaced in Wix Studio
-// Custom Apps' Dev Center UI. Risk analysis: an attacker would need
-// to ALREADY control a FlowWork user's email to gain anything from
-// a forged install webhook (we only bind to existing clients matched
-// by email). Real attack surface is small. JWT signature verification
-// is a TODO for when we find the public key — lib/wix.ts already
-// has verifyAppInstalledWebhook ready to drop in.
+// Full RS256 signature verification against WIX_WEBHOOK_PUBLIC_KEY
+// (the public key Wix Dev Center exposes from the Webhooks page →
+// "Get Public Key" button — only visible after at least one webhook
+// is registered, which is why we initially shipped with a soft
+// iss-only check). lib/wix.verifyAppInstalledWebhook handles the
+// jose.jwtVerify call + issuer + audience checks + envelope shape
+// normalization.
 //
-// Always returns 200 on a well-formed request — Wix re-delivers
-// failed webhooks aggressively, and we don't want retry storms.
-// Only returns 400 on malformed input.
+// Always returns 200 on a well-formed verified request — Wix
+// re-delivers failed webhooks aggressively, and we don't want retry
+// storms over events we intentionally don't act on. Returns 401 on
+// signature failure / wrong iss / wrong aud / expired JWT. Returns
+// 400 on malformed input.
 //
 // NOT in proxy.ts matcher — must remain public for Wix to reach.
 
 import { NextRequest, NextResponse } from "next/server";
-import { decodeJwt } from "jose";
 import pool from "@/lib/db";
-import { mintAccessToken, wixGet } from "@/lib/wix";
+import { mintAccessToken, verifyAppInstalledWebhook, wixGet } from "@/lib/wix";
 
 // Wix's site-properties API response shape — only the fields we
 // need. Wix returns more; we ignore the rest. Multiple email-bearing
@@ -109,26 +108,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 2. Decode JWT (no signature verify — see file header) ───
-  let payload: Record<string, unknown>;
-  try {
-    payload = decodeJwt(jwt) as Record<string, unknown>;
-  } catch (err) {
-    console.warn("Wix webhook: malformed JWT, couldn't decode:", err);
+  // ── 2. Verify JWT signature (RS256 vs WIX_WEBHOOK_PUBLIC_KEY) ─
+  // verifyAppInstalledWebhook returns null on any failure:
+  // bad signature, expired, wrong issuer (must be wix.com), wrong
+  // audience (must be our app id). Returns the verified envelope
+  // (with data parsed in place) on success.
+  const payload = await verifyAppInstalledWebhook({ jwt });
+  if (!payload) {
+    console.warn("Wix webhook: JWT verification failed (signature/iss/aud/exp)");
     return NextResponse.json(
-      { error: "Couldn't decode JWT payload" },
-      { status: 400 }
+      { error: "Webhook signature verification failed" },
+      { status: 401 }
     );
-  }
-
-  // Soft check: issuer should be wix.com. Catches casual non-Wix
-  // POSTs to this public endpoint. Not a real signature verification.
-  if (payload.iss !== "wix.com") {
-    console.warn(
-      `Wix webhook: rejecting payload with iss=${String(payload.iss)} ` +
-        `(expected 'wix.com')`
-    );
-    return NextResponse.json({ acknowledged: true, action: "rejected" });
   }
 
   // ── 3. Extract instanceId from envelope ─────────────────────

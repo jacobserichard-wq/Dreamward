@@ -162,15 +162,21 @@ export function clearCachedToken(instanceId: string): void {
 /**
  * Verify an RS256-signed JWT from a Wix webhook delivery.
  *
- * Wix wraps the webhook payload in a JWT (typical for their app
- * platform webhooks — see @wix/sdk AppStrategy.decodeJWT). The JWT
- * has `data` field (string-encoded JSON payload) and standard
- * claims (iss=wix.com, aud=<app_id>).
+ * Wix wraps webhook payloads in a JWT with these top-level claims:
+ *   { iss: 'wix.com', aud: <app_id>, exp, iat,
+ *     eventType: 'wix.app_market.v1.app_installed' (or similar),
+ *     instanceId: <UUID — the site-app instance the event is for>,
+ *     identity: { type: 'WIX_USER' | 'APP' | ..., id: <UUID> },
+ *     data: <JSON-encoded string with event-specific payload> }
  *
- * Returns the parsed `data` payload (already JSON-parsed) on
- * successful verification. Returns null on any failure — caller
- * should 401 / 400 the request rather than risk processing an
- * unverified payload.
+ * The previous version of this function returned only the parsed
+ * `data` field — which loses the critical `instanceId` (top-level,
+ * NOT inside data). Now returns the full verified envelope, with
+ * `data` parsed in place when it's a JSON string. Caller can pull
+ * whatever fields it needs.
+ *
+ * Returns null on any verification failure (bad signature, expired,
+ * wrong iss/aud) — caller should 401 the request.
  */
 export async function verifyAppInstalledWebhook(opts: {
   jwt: string;
@@ -183,23 +189,18 @@ export async function verifyAppInstalledWebhook(opts: {
       issuer: "wix.com",
       audience: appId,
     });
-    // Wix wraps the actual webhook payload inside a `data` field that
-    // is itself a JSON-encoded string. Parse it before returning.
-    const rawData = (verified.payload as { data?: unknown }).data;
+    // Clone the envelope and parse `data` in place if it's a string —
+    // gives the caller a single object to work with.
+    const envelope = { ...verified.payload } as Record<string, unknown>;
+    const rawData = envelope.data;
     if (typeof rawData === "string") {
       try {
-        return JSON.parse(rawData) as Record<string, unknown>;
+        envelope.data = JSON.parse(rawData);
       } catch {
-        // data is not parseable JSON — return as-is in a wrapper so
-        // caller can decide how to handle.
-        return { rawData };
+        // Leave as raw string when not parseable — caller decides.
       }
     }
-    // Some Wix webhooks may put structured data directly; pass through.
-    if (rawData && typeof rawData === "object") {
-      return rawData as Record<string, unknown>;
-    }
-    return verified.payload as Record<string, unknown>;
+    return envelope;
   } catch {
     // Signature failure, expired JWT, wrong audience/issuer — all
     // surface as "verification failed". Caller decides response code.
