@@ -29,15 +29,16 @@
 //                          header; route verifies the signature. Phase 8d.
 //   /api/wix/installed — Wix POSTs the app-installed webhook here
 //                        after a merchant installs FlowWork on their
-//                        Wix site. JWT-signed; route verifies the
-//                        signature using WIX_WEBHOOK_PUBLIC_KEY.
-//                        Phase 10 Client Credentials rewrite.
-//   /api/wix/installed/redirect — Wix redirects merchants' browsers
-//                                 here after install completes. This
-//                                 ONE is authenticated (it's in the
-//                                 matcher below) — needs the merchant's
-//                                 FlowWork NextAuth session to bind
-//                                 client_id → instance_id.
+//                        Wix site. JWT-signed (signature verification
+//                        is TODO — Wix's public key isn't exposed in
+//                        Custom Apps' Dev Center UI). Route does a
+//                        soft iss='wix.com' claim check + email
+//                        matching against the clients table to bind
+//                        instance_id → client_id. This is the PRIMARY
+//                        binding path for Phase 10 since Custom Apps
+//                        don't support post-install redirect URL
+//                        configuration. See session-notes/
+//                        phase-10-wix-email-matching.md.
 //   /api/wix/webhook — future Phase 10d, additional Wix webhooks for
 //                      real-time order sync.
 //
@@ -82,6 +83,5 @@ export const config = {
     "/api/upload/:path*",
     "/api/wix/connection/:path*",
     "/api/wix/disconnect/:path*",
-    "/api/wix/installed/redirect/:path*",
   ],
 };
