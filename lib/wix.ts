@@ -201,9 +201,21 @@ export async function verifyAppInstalledWebhook(opts: {
       }
     }
     return envelope;
-  } catch {
-    // Signature failure, expired JWT, wrong audience/issuer — all
-    // surface as "verification failed". Caller decides response code.
+  } catch (err) {
+    // Surface enough info to diagnose which check failed without
+    // leaking the JWT itself. jose throws typed errors:
+    //   JWSSignatureVerificationFailed — bad signature
+    //   JWTClaimValidationFailed — wrong iss/aud/exp/nbf
+    //   JWTInvalid / JWTExpired — malformed / expired
+    //   JOSEAlgNotAllowed — alg mismatch
+    // The .code property + name combination is the diagnostic.
+    const name = err instanceof Error ? err.name : "Unknown";
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string })?.code ?? "(no code)";
+    console.warn(
+      `Wix webhook verify failed — name=${name} code=${code} ` +
+        `message=${message}`
+    );
     return null;
   }
 }
