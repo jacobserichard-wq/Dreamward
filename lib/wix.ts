@@ -182,13 +182,16 @@ export async function verifyAppInstalledWebhook(opts: {
   jwt: string;
 }): Promise<Record<string, unknown> | null> {
   try {
-    const { appId } = loadAppCreds();
     const publicKeyPem = loadWebhookPublicKey();
     const publicKey = await importSPKI(publicKeyPem, "RS256");
-    const verified = await jwtVerify(opts.jwt, publicKey, {
-      issuer: "wix.com",
-      audience: appId,
-    });
+    // No issuer/audience options: empirical testing (sub-session 25,
+    // 2026-05-26) showed Wix's webhook JWTs don't include `iss` or
+    // `aud` claims at all, despite their docs implying iss='wix.com'.
+    // jose rejects any JWT missing a required claim, so passing those
+    // options as required would always fail. Signature verification
+    // against Wix's RSA public key is the real security boundary —
+    // anything that validates is genuinely from Wix.
+    const verified = await jwtVerify(opts.jwt, publicKey);
     // Clone the envelope and parse `data` in place if it's a string —
     // gives the caller a single object to work with.
     const envelope = { ...verified.payload } as Record<string, unknown>;
