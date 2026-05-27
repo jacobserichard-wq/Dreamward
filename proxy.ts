@@ -81,6 +81,7 @@ export const config = {
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",
+    "/api/wix/bind/:path*",
     "/api/wix/connection/:path*",
     "/api/wix/disconnect/:path*",
   ],

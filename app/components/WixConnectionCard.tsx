@@ -92,6 +92,13 @@ export default function WixConnectionCard() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  // Manual-bind state. Wix's App Installed webhook doesn't fire for
+  // share-install-link installs (only for App Market installs we
+  // haven't shipped yet), so this is the path most merchants will
+  // use until/unless we go through App Market submission.
+  const [manualInstanceId, setManualInstanceId] = useState("");
+  const [binding, setBinding] = useState(false);
+
   const loadState = useCallback(async () => {
     setError(null);
     try {
@@ -135,6 +142,36 @@ export default function WixConnectionCard() {
     // binding. This card's polling loop catches the state flip.
     window.open(getInstallUrl(), "_blank", "noopener,noreferrer");
   }, []);
+
+  const handleManualBind = useCallback(async () => {
+    const trimmed = manualInstanceId.trim();
+    if (!trimmed) {
+      setError("Paste your Wix instance ID first.");
+      return;
+    }
+    setBinding(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wix/bind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instanceId: trimmed }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        bound?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.bound) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setManualInstanceId("");
+      await loadState(); // refresh — should flip to connected
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't connect");
+    } finally {
+      setBinding(false);
+    }
+  }, [manualInstanceId, loadState]);
 
   const handleConfirmDisconnect = useCallback(async () => {
     setDisconnecting(true);
@@ -338,6 +375,66 @@ export default function WixConnectionCard() {
                 The install opens in a new tab. Keep this tab open — it
                 refreshes automatically when the connection completes.
               </p>
+            </div>
+
+            {/* Manual-bind fallback. Wix's auto-detect doesn't fire
+                for installs done via Share Install Link (only App
+                Market installs), so most merchants will land here
+                until we go through App Market submission. */}
+            <div className="pt-3 border-t border-dashed border-slate-200">
+              <details className="group">
+                <summary className="text-xs font-medium text-slate-700 cursor-pointer hover:text-slate-900 select-none list-none">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-slate-400 group-open:rotate-90 transition-transform inline-block">
+                      ▸
+                    </span>
+                    Already installed? Connect manually
+                  </span>
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    If you already installed FlowWork on a Wix site and the
+                    automatic connection didn&apos;t happen, paste your{" "}
+                    <strong>Wix App Instance ID</strong> below. Find it in
+                    your Wix dashboard:{" "}
+                    <a
+                      href="https://manage.wix.com/account/sites"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Wix Sites
+                    </a>{" "}
+                    → click your site → <em>Manage Apps</em> → click
+                    FlowWork → the UUID in the URL or app details.
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      value={manualInstanceId}
+                      onChange={(e) => {
+                        setManualInstanceId(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder="12345678-1234-1234-1234-123456789012"
+                      className="flex-1 min-w-[280px] py-2 px-3 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      disabled={binding}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleManualBind();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleManualBind}
+                      disabled={binding || !manualInstanceId.trim()}
+                      className="py-2 px-4 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
+                    >
+                      {binding && <Spinner size={11} color="white" />}
+                      {binding ? "Connecting…" : "Connect"}
+                    </button>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         )}
