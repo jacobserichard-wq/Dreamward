@@ -96,6 +96,14 @@ export default function WixConnectionCard() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  // Phase 10e: "Delete all Wix data" destructive action. Separate
+  // from disconnect — disconnect stops new syncs but preserves
+  // historical reports; purge hard-deletes everything imported from
+  // Wix. Stronger ConfirmModal warning.
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeMsg, setPurgeMsg] = useState<string | null>(null);
+
   // Manual-bind state. Wix's App Installed webhook doesn't fire for
   // share-install-link installs (only for App Market installs we
   // haven't shipped yet), so this is the path most merchants will
@@ -247,6 +255,37 @@ export default function WixConnectionCard() {
       setDisconnecting(false);
     }
   }, [loadState]);
+
+  // Phase 10e: hard-delete all processed_items with source='wix'.
+  // Separate from disconnect (which preserves historical data).
+  // Doesn't affect the wix_connections row — the merchant can keep
+  // the connection live and still wipe historical data if e.g.
+  // they're starting fresh after a test-data import.
+  const handleConfirmPurge = useCallback(async () => {
+    setPurging(true);
+    setPurgeMsg(null);
+    try {
+      const res = await fetch("/api/wix/purge-data", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        deleted?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const count = data.deleted ?? 0;
+      setPurgeMsg(
+        count > 0
+          ? `Deleted ${count.toLocaleString()} Wix order${count === 1 ? "" : "s"} from your reports.`
+          : "No Wix orders to delete."
+      );
+      setConfirmPurge(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete data");
+    } finally {
+      setPurging(false);
+    }
+  }, []);
 
   // Best-effort display label for the connected site. Wix's
   // siteDisplayName comes from a separate Sites API call during
@@ -402,6 +441,21 @@ export default function WixConnectionCard() {
                 </div>
               )}
 
+            {purgeMsg && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-lg text-xs flex justify-between items-center gap-3 flex-wrap">
+                <span className="font-medium">
+                  {"\u{2705}"} {purgeMsg}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPurgeMsg(null)}
+                  className="text-emerald-700 hover:underline cursor-pointer text-xs bg-transparent border-0"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button
                 type="button"
@@ -410,9 +464,16 @@ export default function WixConnectionCard() {
               >
                 Disconnect
               </button>
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(true)}
+                className="py-1.5 px-3 rounded border border-red-200 bg-white text-xs font-medium text-red-700 hover:bg-red-50 cursor-pointer"
+              >
+                Delete all Wix data
+              </button>
               <span className="text-xs text-slate-400">
-                Disconnecting stops new syncs. Historical orders stay in your
-                reports.
+                Disconnect stops new syncs. Delete removes imported orders
+                from your reports too.
               </span>
             </div>
           </div>
@@ -522,6 +583,17 @@ export default function WixConnectionCard() {
         busy={disconnecting}
         onConfirm={handleConfirmDisconnect}
         onCancel={() => setConfirmDisconnect(false)}
+      />
+
+      <ConfirmModal
+        open={confirmPurge}
+        title="Delete all Wix data?"
+        message="This permanently removes every order imported from Wix from your FlowWork reports. This cannot be undone. Your Wix connection stays active — disconnect separately if you want to stop syncing too."
+        confirmLabel="Delete all Wix data"
+        danger
+        busy={purging}
+        onConfirm={handleConfirmPurge}
+        onCancel={() => setConfirmPurge(false)}
       />
     </>
   );
