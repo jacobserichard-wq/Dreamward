@@ -29,6 +29,7 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
+import SquareConnectionCard from "../components/SquareConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
 
 interface ClientInfo {
@@ -76,6 +77,8 @@ function IntegrationsPageInner() {
     const shop = params.get("shop");
     const connectedWix = params.get("connected_wix");
     const site = params.get("site");
+    const connectedSquare = params.get("connected_square");
+    const merchant = params.get("merchant");
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
     // Auto-bind handoff from the Wix Dashboard Extension bridge page
@@ -88,6 +91,10 @@ function IntegrationsPageInner() {
 
     if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
+    } else if (connectedSquare === "1") {
+      setSuccessMsg(
+        merchant ? `Connected to ${merchant}!` : "Square account connected!"
+      );
     } else if (connectedWix === "1") {
       // siteDisplayName is best-effort — Wix's Sites API call can fail
       // and we still want to show success. Fall back to a generic
@@ -137,6 +144,7 @@ function IntegrationsPageInner() {
 
     if (
       connected ||
+      connectedSquare ||
       connectedWix ||
       errParam ||
       upgrade ||
@@ -198,9 +206,9 @@ function IntegrationsPageInner() {
               {"\u{1F512}"} Integrations are a Pro feature
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
-              Upgrade to Pro ($89/mo) to connect Shopify or Wix and
-              pull orders + revenue automatically into FlowWork.
-              Coming soon: Etsy, Square, WooCommerce.
+              Upgrade to Pro ($89/mo) to connect Shopify, Wix, or
+              Square and pull orders + revenue automatically into
+              FlowWork. Coming soon: Etsy, WooCommerce, Stripe Connect.
             </p>
             <Link
               href="/billing"
@@ -249,6 +257,7 @@ function IntegrationsPageInner() {
           <div className="space-y-3">
             <ShopifyConnectionCard />
             <WixConnectionCard />
+            <SquareConnectionCard />
           </div>
         </div>
 
@@ -264,11 +273,6 @@ function IntegrationsPageInner() {
               icon={"\u{1F3F7}\u{FE0F}"}
               name="Etsy"
               subtitle="Sync orders + listing fees + shop payments"
-            />
-            <ComingSoonCard
-              icon={"\u{1F4B3}"}
-              name="Square"
-              subtitle="In-person POS + online commerce + payouts"
             />
             <ComingSoonCard
               icon={"\u{1F6D2}"}
