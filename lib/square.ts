@@ -88,16 +88,33 @@ function loadWebhookSignatureKey(): string {
 // ---------------------------------------------------------------------
 
 /**
- * Default OAuth scopes for the bookkeeping use case:
- *   - PAYMENTS_READ — list/get payment objects (revenue data)
- *   - MERCHANT_PROFILE_READ — get business name for the UI
+ * Default OAuth scopes for the bookkeeping use case + the upcoming
+ * Phase 12 COGS system.
  *
- * Both are required. ORDERS_READ + CUSTOMERS_READ are useful future
- * additions but not blocking for v1 (Payment objects have enough
- * info on their own for revenue rollups).
+ * Phase 11 needs:
+ *   - PAYMENTS_READ — list/get payment objects (revenue rollups)
+ *   - MERCHANT_PROFILE_READ — business name for the UI
+ *
+ * Phase 12 (COGS) needs the next two ahead of time so merchants
+ * who connect today don't have to re-consent when COGS ships:
+ *   - ORDERS_READ — line items per payment (which SKUs were sold +
+ *     quantities + per-line prices). Payments alone don't carry
+ *     line-item data; Orders do.
+ *   - ITEMS_READ — Square's catalog including the `cost` field
+ *     merchants can set per item variation. Lets us auto-suggest
+ *     SKU→cost matches when the merchant builds their FlowWork
+ *     SKU catalog.
+ *
+ * See session-notes/phase-12-cogs-design.md for the full COGS plan.
+ *
+ * Trade-off: adding more scopes here means the consent screen shows
+ * more permissions, which CAN reduce conversion. We accept that to
+ * avoid the bigger friction of re-consent flow once COGS ships.
  */
 export const SQUARE_DEFAULT_SCOPES = [
   "PAYMENTS_READ",
+  "ORDERS_READ",
+  "ITEMS_READ",
   "MERCHANT_PROFILE_READ",
 ] as const;
 
