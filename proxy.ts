@@ -86,5 +86,6 @@ export const config = {
     "/api/wix/bind/:path*",
     "/api/wix/connection/:path*",
     "/api/wix/disconnect/:path*",
+    "/api/wix/purge-data/:path*",
   ],
 };
