@@ -414,6 +414,109 @@ export async function fetchOrdersPage(opts: {
   };
 }
 
+/**
+ * Shape we INSERT into processed_items for one Wix order. Mirrors
+ * the MappedOrderRow pattern from lib/shopify, with `channel`
+ * explicitly tagged (Shopify shipped before the channel column
+ * existed in Phase 9.3; new integrations like Wix set it directly).
+ */
+export interface MappedWixOrderRow {
+  vendor: string;
+  invoice_number: string;
+  amount: number;
+  due_date: string;          // YYYY-MM-DD (pg DATE)
+  status: string;            // 'paid' | 'pending' | 'cancelled'
+  category: string;          // hardcoded "Online Sales"
+  source: "wix";
+  source_ref_id: string;     // Wix order ID (UUID-string)
+  channel: "wix";            // explicit channel tag for rollups
+  confidence: number;        // 100 — direct API, no AI extraction
+  summary: string;
+  extracted_data: Record<string, unknown>;
+}
+
+/**
+ * Map a Wix eCommerce order into the processed_items row shape.
+ * Mirrors lib/shopify.mapOrderToProcessedItem with Wix-specific
+ * field paths (priceSummary.total.amount, buyerInfo.email,
+ * billingInfo.contactDetails.{firstName,lastName}, etc.).
+ *
+ * Defensive against missing fields — Wix's API is loose about what
+ * it returns based on order state, so we fall back gracefully.
+ */
+export function mapWixOrderToProcessedItem(
+  order: WixOrder
+): MappedWixOrderRow {
+  // Customer name preference: first+last, then email, then "Unknown"
+  const first = order.billingInfo?.contactDetails?.firstName?.trim() || "";
+  const last = order.billingInfo?.contactDetails?.lastName?.trim() || "";
+  const fullName = [first, last].filter(Boolean).join(" ").trim();
+  const customerName =
+    fullName || order.buyerInfo?.email || "Unknown customer";
+
+  // Date: use createdDate (ISO timestamp). Slice to YYYY-MM-DD for
+  // the pg DATE column.
+  const isoDate = order.createdDate || new Date().toISOString();
+  const dueDate = isoDate.slice(0, 10);
+
+  // Status mapping — Wix's paymentStatus enum:
+  //   PAID, NOT_PAID, PARTIALLY_PAID, REFUNDED, PARTIALLY_REFUNDED,
+  //   PENDING, CANCELLED (per Wix eCommerce docs)
+  let status: string;
+  const ps = order.paymentStatus?.toUpperCase() ?? "";
+  if (ps === "CANCELLED") {
+    status = "cancelled";
+  } else if (ps === "PAID" || ps === "REFUNDED" || ps === "PARTIALLY_REFUNDED") {
+    // Refunds preserve the original sale row; refund itself is a
+    // separate Phase 10d webhook event (if we wire it up).
+    status = "paid";
+  } else {
+    status = "pending";
+  }
+
+  // Amounts — Wix returns strings like "99.99"
+  const totalAmount = Number(order.priceSummary?.total?.amount ?? "0") || 0;
+  const currency = order.priceSummary?.total?.currency || order.currency || "USD";
+  const lineItemCount = order.lineItems?.length ?? 0;
+
+  // Invoice number — Wix's order.number is human-friendly (10001, etc.)
+  const invoiceNumber = order.number
+    ? `#${String(order.number)}`
+    : `#${order.id.slice(0, 8)}`;
+
+  return {
+    vendor: customerName,
+    invoice_number: invoiceNumber,
+    amount: totalAmount,
+    due_date: dueDate,
+    status,
+    category: "Online Sales",
+    source: "wix",
+    source_ref_id: order.id,
+    channel: "wix",
+    confidence: 100,
+    summary: `Wix order ${invoiceNumber} — ${lineItemCount} item${lineItemCount === 1 ? "" : "s"}, ${currency} ${totalAmount.toFixed(2)}`,
+    extracted_data: {
+      wix_order_id: order.id,
+      order_number: order.number,
+      currency,
+      payment_status: order.paymentStatus,
+      fulfillment_status: order.fulfillmentStatus,
+      buyer_email: order.buyerInfo?.email ?? null,
+      subtotal: order.priceSummary?.subtotal?.amount ?? null,
+      tax: order.priceSummary?.tax?.amount ?? null,
+      shipping: order.priceSummary?.shipping?.amount ?? null,
+      discount: order.priceSummary?.discount?.amount ?? null,
+      line_items: (order.lineItems ?? []).map((li) => ({
+        id: li.id,
+        name: li.productName?.original,
+        quantity: li.quantity,
+        price: li.price?.amount,
+      })),
+    },
+  };
+}
+
 // ---------------------------------------------------------------------
 // Site display name (for the connection card)
 // ---------------------------------------------------------------------

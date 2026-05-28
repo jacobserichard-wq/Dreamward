@@ -1,0 +1,245 @@
+// app/api/wix/backfill/route.ts
+//
+// Phase 10c (Wix backfill). POST endpoint that pulls historical
+// Wix orders into processed_items. Mirrors Shopify Phase 8c's
+// chunked + resumable design — runs inside a 50s time budget,
+// frontend polls and re-POSTs until done=true.
+//
+// Differences from Shopify backfill:
+//   - Cursor pagination (Wix eCommerce v3) instead of since_id
+//     numeric cursor → persisted in wix_connections.backfill_cursor
+//     (migration 0015) since Wix order IDs are UUIDs (non-monotonic
+//     so MAX(source_ref_id) doesn't work as a resume key).
+//   - Client Credentials token (minted per-request from
+//     lib/wix.mintAccessToken) instead of stored encrypted access
+//     token. The cache inside mintAccessToken keeps this cheap.
+//   - No free cap / paid extension. Wix stores are smaller on
+//     average than Shopify; we'll add a cap later if usage demands.
+//
+// Idempotency: the unique index on processed_items(client_id,
+// source, source_ref_id) means re-runs safely skip already-inserted
+// orders via ON CONFLICT DO NOTHING.
+//
+// Frontend (WixConnectionCard, next commit) polls every 5 seconds
+// while backfill is in-progress; re-POSTs whenever done=false comes
+// back, until done=true.
+
+import { NextResponse } from "next/server";
+import pool from "@/lib/db";
+import { getSessionClient } from "@/lib/getClient";
+import {
+  fetchOrdersPage,
+  mapWixOrderToProcessedItem,
+  mintAccessToken,
+} from "@/lib/wix";
+
+// Vercel Pro = 60s hard limit; leaving 10s headroom for final
+// UPDATE + response serialization. Same as Shopify backfill.
+const TIME_BUDGET_MS = 50_000;
+
+interface ConnectionRow {
+  id: number;
+  instance_id: string;
+  backfill_orders_imported: number;
+  backfill_cursor: string | null;
+  backfill_completed_at: string | null;
+}
+
+export async function POST() {
+  const startMs = Date.now();
+  try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+    if (client.plan !== "pro") {
+      return NextResponse.json(
+        { error: "Wix integration is a Pro feature." },
+        { status: 403 }
+      );
+    }
+
+    // ── Load connection state ──────────────────────────────────
+    const found = await pool.query<ConnectionRow>(
+      `SELECT id,
+              instance_id,
+              backfill_orders_imported,
+              backfill_cursor,
+              backfill_completed_at
+         FROM wix_connections
+        WHERE client_id = $1`,
+      [client.id]
+    );
+    if (found.rows.length === 0) {
+      return NextResponse.json(
+        { error: "No Wix connection. Connect a site first." },
+        { status: 404 }
+      );
+    }
+    const conn = found.rows[0];
+
+    // Already done — return done=true without re-fetching anything.
+    if (conn.backfill_completed_at) {
+      return NextResponse.json({
+        done: true,
+        ordersImported: 0,
+        totalImported: conn.backfill_orders_imported,
+      });
+    }
+
+    // ── Mint token + mark backfill as started (idempotent) ─────
+    const { accessToken } = await mintAccessToken({
+      instanceId: conn.instance_id,
+    });
+
+    await pool.query(
+      `UPDATE wix_connections
+          SET backfill_started_at = COALESCE(backfill_started_at, NOW()),
+              last_sync_status = 'in_progress',
+              updated_at = NOW()
+        WHERE id = $1`,
+      [conn.id]
+    );
+
+    let cursor: string | null = conn.backfill_cursor;
+    let totalImported = conn.backfill_orders_imported;
+    let ordersThisRun = 0;
+    let done = false;
+
+    // ── Main loop ──────────────────────────────────────────────
+    while (true) {
+      // Time budget check
+      if (Date.now() - startMs > TIME_BUDGET_MS) {
+        // Out of time — next POST will resume from where we left off
+        break;
+      }
+
+      // Fetch a page
+      let page: Awaited<ReturnType<typeof fetchOrdersPage>>;
+      try {
+        page = await fetchOrdersPage({
+          accessToken,
+          cursor,
+          limit: 100, // Wix max
+        });
+      } catch (err) {
+        // Wix API error — record + stop. Frontend retries via the
+        // next POST (which will re-mint the token).
+        await pool.query(
+          `UPDATE wix_connections
+              SET last_sync_status = 'failed',
+                  last_sync_error = $1,
+                  updated_at = NOW()
+            WHERE id = $2`,
+          [
+            err instanceof Error ? err.message.slice(0, 500) : "unknown",
+            conn.id,
+          ]
+        );
+        throw err;
+      }
+
+      if (page.orders.length === 0) {
+        // End of history. Mark backfill complete.
+        done = true;
+        break;
+      }
+
+      // ── Bulk INSERT with ON CONFLICT DO NOTHING ──────────────
+      // 13 fields per row (12 from MappedWixOrderRow + client_id).
+      // Build a single multi-row INSERT for the whole page.
+      const rows = page.orders.map(mapWixOrderToProcessedItem);
+      const fieldsPerRow = 13;
+      const values: unknown[] = [];
+      const placeholders = rows
+        .map((r) => {
+          const base = values.length;
+          values.push(
+            r.vendor,
+            r.invoice_number,
+            r.amount,
+            r.due_date,
+            r.status,
+            r.category,
+            r.source,
+            r.source_ref_id,
+            r.channel,
+            r.confidence,
+            r.summary,
+            JSON.stringify(r.extracted_data),
+            client.id
+          );
+          return (
+            "(" +
+            Array.from(
+              { length: fieldsPerRow },
+              (_, j) => `$${base + j + 1}`
+            ).join(",") +
+            ")"
+          );
+        })
+        .join(",");
+
+      await pool.query(
+        `INSERT INTO processed_items (
+           vendor, invoice_number, amount, due_date, status,
+           category, source, source_ref_id, channel, confidence,
+           summary, extracted_data, client_id
+         ) VALUES ${placeholders}
+         ON CONFLICT (client_id, source, source_ref_id) DO NOTHING`,
+        values
+      );
+
+      totalImported += rows.length;
+      ordersThisRun += rows.length;
+      cursor = page.nextCursor;
+
+      // Update progress + cursor in one round-trip so the frontend
+      // poll sees movement + a refresh resumes from this cursor.
+      await pool.query(
+        `UPDATE wix_connections
+            SET backfill_orders_imported = $1,
+                backfill_cursor = $2,
+                last_sync_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $3`,
+        [totalImported, cursor, conn.id]
+      );
+
+      if (cursor === null) {
+        // Wix says no more pages — done with history.
+        done = true;
+        break;
+      }
+    }
+
+    // ── Final state update ─────────────────────────────────────
+    if (done) {
+      await pool.query(
+        `UPDATE wix_connections
+            SET backfill_completed_at = NOW(),
+                backfill_cursor = NULL,
+                last_sync_status = 'success',
+                last_sync_error = NULL,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [conn.id]
+      );
+    }
+
+    return NextResponse.json({
+      done,
+      ordersImported: ordersThisRun,
+      totalImported,
+    });
+  } catch (err) {
+    console.error("Wix backfill error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Backfill failed" },
+      { status: 500 }
+    );
+  }
+}
