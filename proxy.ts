@@ -39,8 +39,9 @@
 //                        don't support post-install redirect URL
 //                        configuration. See session-notes/
 //                        phase-10-wix-email-matching.md.
-//   /api/wix/webhook — future Phase 10d, additional Wix webhooks for
-//                      real-time order sync.
+//   /api/wix/webhook — Wix POSTs order events here (Order Created,
+//                      Order Paid, Order Updated, Order Cancelled).
+//                      JWT-signed; verified server-side. Phase 10d.
 //
 // If you add a new route that needs to be public, leave it OUT of the matcher.
 // If you add a new route that needs auth, add it explicitly below.
