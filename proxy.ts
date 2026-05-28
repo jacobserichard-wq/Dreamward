@@ -27,6 +27,12 @@
 //                                 Shopify HMAC. Phase 8a sub-session 24.
 //   /api/shopify/webhook — invoked by Shopify with X-Shopify-Hmac-SHA256
 //                          header; route verifies the signature. Phase 8d.
+//   /api/square/oauth/callback — Square redirects merchants here after
+//                                they grant OAuth consent. Standard
+//                                OAuth 2.0 with state-cookie CSRF;
+//                                no HMAC signing. Phase 11a.
+//   /api/square/webhook — Phase 11d, Square POSTs payment events with
+//                         X-Square-HmacSHA256-Signature header.
 //   /api/wix/installed — Wix POSTs the app-installed webhook here
 //                        after a merchant installs FlowWork on their
 //                        Wix site. JWT-signed (signature verification
@@ -79,6 +85,7 @@ export const config = {
     "/api/shopify/disconnect/:path*",
     "/api/shopify/oauth/initiate/:path*",
     "/api/shopify/upgrade-backfill/:path*",
+    "/api/square/oauth/initiate/:path*",
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",
