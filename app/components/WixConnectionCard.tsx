@@ -35,7 +35,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
 
@@ -43,6 +43,10 @@ import Spinner from "./Spinner";
 // the merchant's return from the install flow without requiring a
 // page refresh. Cheap (one DB query against our own backend).
 const DISCONNECTED_POLL_INTERVAL_MS = 5_000;
+
+// Phase 10c: while a backfill is in-progress, re-trigger the next
+// chunk + refresh state every 5s. Mirrors ShopifyConnectionCard.
+const BACKFILL_POLL_INTERVAL_MS = 5_000;
 
 // Install URL. Configured per-deployment via NEXT_PUBLIC_WIX_INSTALL_URL
 // since the share link / App Market listing URL is Wix-side state
@@ -134,6 +138,60 @@ export default function WixConnectionCard() {
     const id = window.setInterval(loadState, DISCONNECTED_POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [loading, state?.connected, loadState]);
+
+  // ── Phase 10c: backfill polling + chunk re-trigger ────────────
+  //
+  // While the backfill is in-progress (started but not completed),
+  // poll /api/wix/connection every 5s to surface progress, and
+  // re-POST /api/wix/backfill whenever the previous chunk's run
+  // finished but the backfill isn't complete. The route is designed
+  // to be re-called safely (resumes from backfill_cursor in DB).
+  //
+  // backfillBusyRef guards against overlapping POSTs — if a chunk
+  // takes longer than the poll interval, the next poll skips its
+  // POST and just refreshes state.
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const backfillBusyRef = useRef(false);
+  useEffect(() => {
+    if (!state?.connected) return;
+    const bf = state.backfill;
+    if (!bf) return;
+    // Already done — no polling needed.
+    if (bf.completedAt) return;
+
+    const tick = async () => {
+      // Re-trigger a chunk if not currently in flight. The bind
+      // endpoint sets backfill_started_at to NOW() on first call;
+      // re-POST is also how we kick off the FIRST chunk right after
+      // bind (vs waiting up to 5s for a polling tick).
+      if (!backfillBusyRef.current) {
+        backfillBusyRef.current = true;
+        setBackfillBusy(true);
+        try {
+          await fetch("/api/wix/backfill", { method: "POST" });
+        } catch {
+          // ignore — next tick retries
+        } finally {
+          backfillBusyRef.current = false;
+          setBackfillBusy(false);
+        }
+      }
+      // Refresh state so UI reflects progress (whether the chunk
+      // we just triggered finished or an earlier in-flight one did)
+      await loadState();
+    };
+
+    // Fire one immediately so connecting → land on /integrations
+    // doesn't wait 5s before showing progress; then interval after.
+    void tick();
+    const id = window.setInterval(tick, BACKFILL_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [
+    state?.connected,
+    state?.backfill?.completedAt,
+    state?.backfill?.startedAt,
+    loadState,
+  ]);
 
   const handleConnect = useCallback(() => {
     // Open the Wix install flow in a new tab. The merchant picks
@@ -306,15 +364,30 @@ export default function WixConnectionCard() {
                 on whatever the connection endpoint returns. */}
             {state.backfill?.startedAt && !state.backfill?.completedAt && (
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className="text-blue-900 font-medium inline-flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                     Importing orders from Wix…
                   </span>
                   <span className="text-blue-700 tabular-nums">
                     {state.backfill.ordersImported.toLocaleString()} imported
+                    {backfillBusy && (
+                      <span className="ml-1.5 text-blue-500">•</span>
+                    )}
                   </span>
                 </div>
+                {/* Indeterminate progress bar — Wix doesn't expose
+                    a total count via /orders/search, and our query
+                    pages until cursor=null, so we can't show a
+                    percentage. Animated stripe communicates "live"
+                    progress. */}
+                <div className="w-full h-1 bg-blue-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 animate-pulse w-1/3" />
+                </div>
+                <p className="text-blue-700/80 mt-1.5 m-0">
+                  Safe to leave this page — backfill continues in the
+                  background.
+                </p>
               </div>
             )}
             {state.backfill?.completedAt &&
