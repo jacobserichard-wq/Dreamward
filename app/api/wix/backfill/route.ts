@@ -183,13 +183,23 @@ export async function POST() {
         })
         .join(",");
 
+      // ON CONFLICT must include the partial index's WHERE predicate
+      // (source_ref_id IS NOT NULL) to match. Otherwise PostgreSQL
+      // throws "no unique or exclusion constraint matching the
+      // ON CONFLICT specification". The unique index spec lives in
+      // migration 0010_add_shopify_connections.sql:
+      //   CREATE UNIQUE INDEX idx_processed_items_source_ref
+      //     ON processed_items (client_id, source, source_ref_id)
+      //     WHERE source_ref_id IS NOT NULL;
       await pool.query(
         `INSERT INTO processed_items (
            vendor, invoice_number, amount, due_date, status,
            category, source, source_ref_id, channel, confidence,
            summary, extracted_data, client_id
          ) VALUES ${placeholders}
-         ON CONFLICT (client_id, source, source_ref_id) DO NOTHING`,
+         ON CONFLICT (client_id, source, source_ref_id)
+           WHERE source_ref_id IS NOT NULL
+         DO NOTHING`,
         values
       );
 
