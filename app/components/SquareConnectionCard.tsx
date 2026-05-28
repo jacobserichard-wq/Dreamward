@@ -20,9 +20,13 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+
+// Phase 11c: while a backfill is in-progress, re-trigger the next
+// chunk + refresh state every 5s. Mirrors WixConnectionCard.
+const BACKFILL_POLL_INTERVAL_MS = 5_000;
 
 interface ConnectionState {
   connected: boolean;
@@ -78,6 +82,46 @@ export default function SquareConnectionCard() {
   useEffect(() => {
     loadState();
   }, [loadState]);
+
+  // ── Phase 11c: backfill polling + chunk re-trigger ────────────
+  // Mirrors WixConnectionCard. While the backfill is in-progress
+  // (started but not completed), poll /api/square/connection every
+  // 5s to surface progress, and re-POST /api/square/backfill
+  // whenever the previous chunk's run finished. The route is
+  // designed to be re-called safely (resumes from backfill_cursor).
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const backfillBusyRef = useRef(false);
+  useEffect(() => {
+    if (!state?.connected) return;
+    const bf = state.backfill;
+    if (!bf) return;
+    if (bf.completedAt) return;
+
+    const tick = async () => {
+      if (!backfillBusyRef.current) {
+        backfillBusyRef.current = true;
+        setBackfillBusy(true);
+        try {
+          await fetch("/api/square/backfill", { method: "POST" });
+        } catch {
+          // ignore — next tick retries
+        } finally {
+          backfillBusyRef.current = false;
+          setBackfillBusy(false);
+        }
+      }
+      await loadState();
+    };
+
+    void tick();
+    const id = window.setInterval(tick, BACKFILL_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [
+    state?.connected,
+    state?.backfill?.completedAt,
+    state?.backfill?.startedAt,
+    loadState,
+  ]);
 
   const handleConnect = useCallback(async () => {
     setConnecting(true);
@@ -269,18 +313,28 @@ export default function SquareConnectionCard() {
               )}
             </div>
 
-            {/* Backfill UI (Phase 11c wires this up) */}
+            {/* Backfill UI — driven by the polling effect above */}
             {state.backfill?.startedAt && !state.backfill?.completedAt && (
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className="text-blue-900 font-medium inline-flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                     Importing payments from Square…
                   </span>
                   <span className="text-blue-700 tabular-nums">
                     {state.backfill.paymentsImported.toLocaleString()} imported
+                    {backfillBusy && (
+                      <span className="ml-1.5 text-blue-500">•</span>
+                    )}
                   </span>
                 </div>
+                <div className="w-full h-1 bg-blue-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 animate-pulse w-1/3" />
+                </div>
+                <p className="text-blue-700/80 mt-1.5 m-0">
+                  Safe to leave this page — backfill continues in the
+                  background.
+                </p>
               </div>
             )}
             {state.backfill?.completedAt &&
