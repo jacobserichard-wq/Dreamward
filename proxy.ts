@@ -85,6 +85,8 @@ export const config = {
     "/api/shopify/disconnect/:path*",
     "/api/shopify/oauth/initiate/:path*",
     "/api/shopify/upgrade-backfill/:path*",
+    "/api/square/connection/:path*",
+    "/api/square/disconnect/:path*",
     "/api/square/oauth/initiate/:path*",
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
