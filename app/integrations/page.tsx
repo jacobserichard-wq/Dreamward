@@ -78,6 +78,13 @@ function IntegrationsPageInner() {
     const site = params.get("site");
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
+    // Auto-bind handoff from the Wix Dashboard Extension bridge page
+    // (/wix-bridge). When a merchant clicks "Open FlowWork" in the
+    // Wix-embedded iframe, they land here with this param + their
+    // FlowWork session. We POST to /api/wix/bind to finish the
+    // connection, then show success/failure via the existing
+    // banner plumbing.
+    const wixBindInstance = params.get("wix_bind_instance");
 
     if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
@@ -92,10 +99,50 @@ function IntegrationsPageInner() {
       setSuccessMsg("Extended backfill unlocked — pulling the rest of your order history now.");
     } else if (errParam) {
       setError(errParam);
+    } else if (wixBindInstance) {
+      // Auto-bind path — fire-and-forget POST, surface result in
+      // banners. Strip the param even if the call is still in flight
+      // so a reload doesn't re-attempt.
+      void (async () => {
+        try {
+          const res = await fetch("/api/wix/bind", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ instanceId: wixBindInstance }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            bound?: boolean;
+            siteDisplayName?: string | null;
+            alreadyBound?: boolean;
+            error?: string;
+          };
+          if (!res.ok || !data.bound) {
+            setError(data.error || `Couldn't connect Wix (HTTP ${res.status})`);
+            return;
+          }
+          if (data.alreadyBound) {
+            setSuccessMsg("Wix site already connected.");
+          } else {
+            setSuccessMsg(
+              data.siteDisplayName
+                ? `Connected to ${data.siteDisplayName}!`
+                : "Wix site connected!"
+            );
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't connect Wix");
+        }
+      })();
     }
 
-    if (connected || connectedWix || errParam || upgrade) {
-      // Strip the params so reload doesn't replay the toast.
+    if (
+      connected ||
+      connectedWix ||
+      errParam ||
+      upgrade ||
+      wixBindInstance
+    ) {
+      // Strip the params so reload doesn't replay the toast / re-bind.
       router.replace("/integrations");
     }
   }, [params, router]);
