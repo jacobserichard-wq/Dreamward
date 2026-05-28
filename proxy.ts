@@ -89,6 +89,7 @@ export const config = {
     "/api/square/connection/:path*",
     "/api/square/disconnect/:path*",
     "/api/square/oauth/initiate/:path*",
+    "/api/square/purge-data/:path*",
     "/api/stripe/checkout/:path*",
     "/api/stripe/portal/:path*",
     "/api/upload/:path*",

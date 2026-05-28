@@ -59,6 +59,11 @@ export default function SquareConnectionCard() {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  // Phase 11e: "Delete all Square data" destructive action.
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeMsg, setPurgeMsg] = useState<string | null>(null);
+
   const loadState = useCallback(async () => {
     setError(null);
     try {
@@ -164,6 +169,32 @@ export default function SquareConnectionCard() {
       setDisconnecting(false);
     }
   }, [loadState]);
+
+  const handleConfirmPurge = useCallback(async () => {
+    setPurging(true);
+    setPurgeMsg(null);
+    try {
+      const res = await fetch("/api/square/purge-data", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        deleted?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const count = data.deleted ?? 0;
+      setPurgeMsg(
+        count > 0
+          ? `Deleted ${count.toLocaleString()} Square payment${count === 1 ? "" : "s"} from your reports.`
+          : "No Square payments to delete."
+      );
+      setConfirmPurge(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete data");
+    } finally {
+      setPurging(false);
+    }
+  }, []);
 
   // Display label: business name from Square if available, fallback
   // to truncated merchant ID.
@@ -350,6 +381,21 @@ export default function SquareConnectionCard() {
                 </div>
               )}
 
+            {purgeMsg && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-lg text-xs flex justify-between items-center gap-3 flex-wrap">
+                <span className="font-medium">
+                  {"\u{2705}"} {purgeMsg}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPurgeMsg(null)}
+                  className="text-emerald-700 hover:underline cursor-pointer text-xs bg-transparent border-0"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button
                 type="button"
@@ -358,9 +404,16 @@ export default function SquareConnectionCard() {
               >
                 Disconnect
               </button>
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(true)}
+                className="py-1.5 px-3 rounded border border-red-200 bg-white text-xs font-medium text-red-700 hover:bg-red-50 cursor-pointer"
+              >
+                Delete all Square data
+              </button>
               <span className="text-xs text-slate-400">
-                Disconnecting stops new syncs. Historical payments stay
-                in your reports.
+                Disconnect stops new syncs. Delete removes imported
+                payments from your reports too.
               </span>
             </div>
           </div>
@@ -399,6 +452,17 @@ export default function SquareConnectionCard() {
         busy={disconnecting}
         onConfirm={handleConfirmDisconnect}
         onCancel={() => setConfirmDisconnect(false)}
+      />
+
+      <ConfirmModal
+        open={confirmPurge}
+        title="Delete all Square data?"
+        message="This permanently removes every payment imported from Square from your FlowWork reports. This cannot be undone. Your Square connection stays active — disconnect separately if you want to stop syncing too."
+        confirmLabel="Delete all Square data"
+        danger
+        busy={purging}
+        onConfirm={handleConfirmPurge}
+        onCancel={() => setConfirmPurge(false)}
       />
     </>
   );

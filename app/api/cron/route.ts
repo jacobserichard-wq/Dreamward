@@ -12,6 +12,12 @@ import {
   mapWixOrderToProcessedItem,
   mintAccessToken,
 } from "@/lib/wix";
+import {
+  fetchPaymentsPage,
+  mapPaymentToProcessedItem,
+  refreshAccessToken as squareRefreshAccessToken,
+} from "@/lib/square";
+import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 const PRO_CALL_REMINDER_DELAY_DAYS = 3;
@@ -21,6 +27,10 @@ const PRO_CALL_REMINDER_DELAY_DAYS = 3;
 // orders created during the cron itself running. Idempotent upserts
 // make the overlap safe.
 const WIX_RECONCILE_LOOKBACK_HOURS = 25;
+
+// Phase 11e: same lookback semantics for Square.
+const SQUARE_RECONCILE_LOOKBACK_HOURS = 25;
+const SQUARE_TOKEN_REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -302,6 +312,188 @@ export async function GET(req: NextRequest) {
       console.error("[cron] Wix reconcile pass aggregate failure:", err);
     }
 
+    // Phase 11e: Square reconciliation pass — mirrors the Wix block
+    // above. Same purpose: catch payments that webhooks missed.
+    // Differences:
+    //   - Token decryption + pre-emptive refresh (Square tokens
+    //     expire; we re-encrypt rotated refresh tokens back)
+    //   - Filter on begin_time= via Square's Payments API param
+    //     (Square supports this natively, unlike Wix where we
+    //     filtered client-side)
+    let squareConnectionsScanned = 0;
+    let squarePaymentsUpserted = 0;
+    let squareReconcileErrors = 0;
+    try {
+      const cutoffMs =
+        Date.now() - SQUARE_RECONCILE_LOOKBACK_HOURS * 3600_000;
+      const cutoffIso = new Date(cutoffMs).toISOString();
+
+      const squareConnsResult = await pool.query<{
+        id: number;
+        client_id: number;
+        access_token_ciphertext: Buffer;
+        access_token_iv: Buffer;
+        access_token_auth_tag: Buffer;
+        access_token_expires_at: string;
+        refresh_token_ciphertext: Buffer;
+        refresh_token_iv: Buffer;
+        refresh_token_auth_tag: Buffer;
+      }>(
+        `SELECT id, client_id,
+                access_token_ciphertext, access_token_iv, access_token_auth_tag,
+                access_token_expires_at,
+                refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag
+           FROM square_connections
+          WHERE backfill_completed_at IS NOT NULL`
+      );
+
+      for (const conn of squareConnsResult.rows) {
+        squareConnectionsScanned++;
+        try {
+          // Decrypt + maybe refresh.
+          let accessToken = decryptFromDb({
+            ciphertext: conn.access_token_ciphertext,
+            iv: conn.access_token_iv,
+            authTag: conn.access_token_auth_tag,
+          });
+          const refreshToken = decryptFromDb({
+            ciphertext: conn.refresh_token_ciphertext,
+            iv: conn.refresh_token_iv,
+            authTag: conn.refresh_token_auth_tag,
+          });
+          const expiresAtMs = new Date(conn.access_token_expires_at).getTime();
+          if (
+            expiresAtMs - Date.now() <
+            SQUARE_TOKEN_REFRESH_THRESHOLD_MS
+          ) {
+            const refreshed = await squareRefreshAccessToken({ refreshToken });
+            accessToken = refreshed.access_token;
+            const newAccessBlob = encryptForDb(refreshed.access_token);
+            const newRefreshBlob = encryptForDb(refreshed.refresh_token);
+            await pool.query(
+              `UPDATE square_connections
+                  SET access_token_ciphertext = $1,
+                      access_token_iv = $2,
+                      access_token_auth_tag = $3,
+                      access_token_expires_at = $4,
+                      refresh_token_ciphertext = $5,
+                      refresh_token_iv = $6,
+                      refresh_token_auth_tag = $7,
+                      updated_at = NOW()
+                WHERE id = $8`,
+              [
+                newAccessBlob.ciphertext,
+                newAccessBlob.iv,
+                newAccessBlob.authTag,
+                refreshed.expires_at,
+                newRefreshBlob.ciphertext,
+                newRefreshBlob.iv,
+                newRefreshBlob.authTag,
+                conn.id,
+              ]
+            );
+          }
+
+          // Fetch the last 25h of payments. Square supports
+          // begin_time= as a native filter so we don't need
+          // client-side filtering like Wix.
+          const page = await fetchPaymentsPage({
+            accessToken,
+            limit: 100,
+            sortOrder: "DESC", // newest first for incremental
+            beginTime: cutoffIso,
+          });
+
+          if (page.payments.length === 0) continue;
+
+          const rows = page.payments.map(mapPaymentToProcessedItem);
+          const fieldsPerRow = 13;
+          const values: unknown[] = [];
+          const placeholders = rows
+            .map((r) => {
+              const base = values.length;
+              values.push(
+                r.vendor,
+                r.invoice_number,
+                r.amount,
+                r.due_date,
+                r.status,
+                r.category,
+                r.source,
+                r.source_ref_id,
+                r.channel,
+                r.confidence,
+                r.summary,
+                JSON.stringify(r.extracted_data),
+                conn.client_id
+              );
+              return (
+                "(" +
+                Array.from(
+                  { length: fieldsPerRow },
+                  (_, j) => `$${base + j + 1}`
+                ).join(",") +
+                ")"
+              );
+            })
+            .join(",");
+
+          await pool.query(
+            `INSERT INTO processed_items (
+               vendor, invoice_number, amount, due_date, status,
+               category, source, source_ref_id, channel, confidence,
+               summary, extracted_data, client_id
+             ) VALUES ${placeholders}
+             ON CONFLICT (client_id, source, source_ref_id)
+               WHERE source_ref_id IS NOT NULL
+             DO NOTHING`,
+            values
+          );
+
+          await pool.query(
+            `UPDATE square_connections
+                SET last_sync_at = NOW(),
+                    last_sync_status = 'success',
+                    last_sync_error = NULL,
+                    updated_at = NOW()
+              WHERE id = $1`,
+            [conn.id]
+          );
+
+          squarePaymentsUpserted += rows.length;
+        } catch (err) {
+          squareReconcileErrors++;
+          console.error(
+            `[cron] Square reconcile failed for connection ${conn.id} ` +
+              `(client_id=${conn.client_id}):`,
+            err
+          );
+          try {
+            await pool.query(
+              `UPDATE square_connections
+                  SET last_sync_status = 'failed',
+                      last_sync_error = $1,
+                      updated_at = NOW()
+                WHERE id = $2`,
+              [
+                err instanceof Error ? err.message.slice(0, 500) : "unknown",
+                conn.id,
+              ]
+            );
+          } catch {
+            // ignore — secondary failure
+          }
+        }
+      }
+
+      console.log(
+        `[cron] Square reconcile: ${squarePaymentsUpserted} payments upserted ` +
+          `across ${squareConnectionsScanned} connections, ${squareReconcileErrors} errors`
+      );
+    } catch (err) {
+      console.error("[cron] Square reconcile pass aggregate failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -314,6 +506,9 @@ export async function GET(req: NextRequest) {
       wixConnectionsScanned,
       wixOrdersUpserted,
       wixReconcileErrors,
+      squareConnectionsScanned,
+      squarePaymentsUpserted,
+      squareReconcileErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);
