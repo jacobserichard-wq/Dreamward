@@ -177,49 +177,23 @@ function WixBridgeInner() {
   }
 
   if (!instanceId) {
-    // Diagnostic: dump the raw URL + all query params so we can
-    // see what Wix actually sent. Will iterate on the parser
-    // based on what shows up here.
-    const allParams: Record<string, string> = {};
-    params.forEach((value, key) => {
-      // Truncate huge values (JWTs) for display
-      allParams[key] = value.length > 80 ? value.slice(0, 80) + "…" : value;
-    });
     return (
       <PageFrame>
         <h1 className="text-base font-bold text-slate-900 m-0 mb-2">
           {"\u{26A0}\u{FE0F}"} Couldn&apos;t read the install info
         </h1>
         <p className="text-sm text-slate-700 m-0 mb-3 leading-relaxed">
-          We got a token from Wix but couldn&apos;t extract the
-          instance ID. Debug info below — share with{" "}
+          We got an instance token from Wix, but couldn&apos;t decode it.
+          This might be a temporary issue. Try refreshing this page, or
+          contact{" "}
           <a
             href="mailto:hello@flowworks.it.com"
             className="text-blue-600 hover:underline"
           >
             hello@flowworks.it.com
-          </a>
-          .
+          </a>{" "}
+          if it keeps happening.
         </p>
-        <details className="text-xs mt-3">
-          <summary className="cursor-pointer text-slate-500">
-            Debug info
-          </summary>
-          <pre className="bg-slate-100 rounded p-2 overflow-x-auto mt-2 text-[10px]">
-            {JSON.stringify(
-              {
-                rawInstanceLength: rawInstance.length,
-                rawInstancePreview: rawInstance.slice(0, 80),
-                hasDotsSplitCount: rawInstance.split(".").length,
-                decodedPayloadKeys: decoded ? Object.keys(decoded) : null,
-                decodedPayload: decoded,
-                allQueryParams: allParams,
-              },
-              null,
-              2
-            )}
-          </pre>
-        </details>
       </PageFrame>
     );
   }
