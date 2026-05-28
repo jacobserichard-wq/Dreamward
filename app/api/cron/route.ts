@@ -7,9 +7,20 @@ import {
 } from "@/lib/email";
 import { reclassifyClientItems } from "@/lib/reclassify";
 import { type Industry } from "@/lib/categories";
+import {
+  fetchOrdersPage,
+  mapWixOrderToProcessedItem,
+  mintAccessToken,
+} from "@/lib/wix";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 const PRO_CALL_REMINDER_DELAY_DAYS = 3;
+
+// Phase 10e: how far back the Wix reconciliation pass looks. 25 hours
+// gives a 1-hour overlap with the previous run so we don't miss
+// orders created during the cron itself running. Idempotent upserts
+// make the overlap safe.
+const WIX_RECONCILE_LOOKBACK_HOURS = 25;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -146,6 +157,151 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Phase 10e: Wix reconciliation pass — catches any orders that
+    // webhooks missed (delivery failures, brief outage, merchant
+    // installed app mid-day before subscribing, etc.). Fetches
+    // recent orders per connection + upserts into processed_items.
+    //
+    // Per-merchant errors are caught so one bad connection doesn't
+    // break the others. The ON CONFLICT DO NOTHING in the upsert
+    // makes this fully idempotent with what webhooks already
+    // delivered.
+    //
+    // Resource use: O(num_wix_connections × ~100 orders/last 25h).
+    // For a single Wix store with <100 orders/day this is 1 API call.
+    // Pagination only kicks in for very high-volume merchants, who
+    // we'd probably want a different sync strategy for anyway.
+    let wixConnectionsScanned = 0;
+    let wixOrdersUpserted = 0;
+    let wixReconcileErrors = 0;
+    try {
+      const cutoffMs = Date.now() - WIX_RECONCILE_LOOKBACK_HOURS * 3600_000;
+      const cutoffIso = new Date(cutoffMs).toISOString();
+
+      const wixConnsResult = await pool.query<{
+        id: number;
+        client_id: number;
+        instance_id: string;
+      }>(
+        `SELECT id, client_id, instance_id
+           FROM wix_connections
+          WHERE backfill_completed_at IS NOT NULL`
+      );
+
+      for (const conn of wixConnsResult.rows) {
+        wixConnectionsScanned++;
+        try {
+          const { accessToken } = await mintAccessToken({
+            instanceId: conn.instance_id,
+          });
+
+          // Single-page fetch is enough for the lookback window in
+          // most cases. If a merchant has >100 orders in 25h we'd
+          // need pagination — that's a future enhancement.
+          const page = await fetchOrdersPage({
+            accessToken,
+            limit: 100,
+          });
+
+          // Filter client-side to the lookback window (Wix's
+          // orders/search filter API is complex enough that
+          // we'd rather take the small over-fetch + filter).
+          const recent = page.orders.filter((o) => {
+            if (!o.createdDate) return false;
+            return o.createdDate >= cutoffIso;
+          });
+
+          if (recent.length === 0) continue;
+
+          const rows = recent.map(mapWixOrderToProcessedItem);
+          const fieldsPerRow = 13;
+          const values: unknown[] = [];
+          const placeholders = rows
+            .map((r) => {
+              const base = values.length;
+              values.push(
+                r.vendor,
+                r.invoice_number,
+                r.amount,
+                r.due_date,
+                r.status,
+                r.category,
+                r.source,
+                r.source_ref_id,
+                r.channel,
+                r.confidence,
+                r.summary,
+                JSON.stringify(r.extracted_data),
+                conn.client_id
+              );
+              return (
+                "(" +
+                Array.from(
+                  { length: fieldsPerRow },
+                  (_, j) => `$${base + j + 1}`
+                ).join(",") +
+                ")"
+              );
+            })
+            .join(",");
+
+          await pool.query(
+            `INSERT INTO processed_items (
+               vendor, invoice_number, amount, due_date, status,
+               category, source, source_ref_id, channel, confidence,
+               summary, extracted_data, client_id
+             ) VALUES ${placeholders}
+             ON CONFLICT (client_id, source, source_ref_id)
+               WHERE source_ref_id IS NOT NULL
+             DO NOTHING`,
+            values
+          );
+
+          await pool.query(
+            `UPDATE wix_connections
+                SET last_sync_at = NOW(),
+                    last_sync_status = 'success',
+                    last_sync_error = NULL,
+                    updated_at = NOW()
+              WHERE id = $1`,
+            [conn.id]
+          );
+
+          wixOrdersUpserted += rows.length;
+        } catch (err) {
+          wixReconcileErrors++;
+          console.error(
+            `[cron] Wix reconcile failed for connection ${conn.id} ` +
+              `(client_id=${conn.client_id}, instance=${conn.instance_id}):`,
+            err
+          );
+          // Record on the row so the card can surface staleness.
+          try {
+            await pool.query(
+              `UPDATE wix_connections
+                  SET last_sync_status = 'failed',
+                      last_sync_error = $1,
+                      updated_at = NOW()
+                WHERE id = $2`,
+              [
+                err instanceof Error ? err.message.slice(0, 500) : "unknown",
+                conn.id,
+              ]
+            );
+          } catch {
+            // ignore — secondary failure
+          }
+        }
+      }
+
+      console.log(
+        `[cron] Wix reconcile: ${wixOrdersUpserted} orders upserted ` +
+          `across ${wixConnectionsScanned} connections, ${wixReconcileErrors} errors`
+      );
+    } catch (err) {
+      console.error("[cron] Wix reconcile pass aggregate failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -155,6 +311,9 @@ export async function GET(req: NextRequest) {
       reclassifyClientsProcessed,
       reclassifyItemsTotal,
       reclassifyErrors,
+      wixConnectionsScanned,
+      wixOrdersUpserted,
+      wixReconcileErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);
