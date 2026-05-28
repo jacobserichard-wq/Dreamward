@@ -69,17 +69,34 @@ interface DecodedInstance {
 }
 
 /**
- * Decode the payload of a JWT without verifying the signature.
- * Signature verification happens server-side when /api/wix/bind
+ * Decode the payload of a Wix instance token without verifying the
+ * signature. Verification happens server-side when /api/wix/bind
  * mints a Client Credentials token against Wix's API (which fails
  * for any invalid instanceId — that's our real validation).
+ *
+ * Token format empirically observed (sub-session 25, 2026-05-27):
+ *   <signature>.<base64-encoded-json>
+ * (Two parts, not three. Standard JWTs are 3-part with separate
+ * header.payload.signature. Wix's app-instance tokens skip the
+ * header section.)
+ *
+ * We also accept the standard 3-part JWT shape as a forward-compat
+ * fallback in case Wix changes the format.
  */
-function decodeJwtPayloadUnsafe(jwt: string): DecodedInstance | null {
+function decodeWixInstanceToken(token: string): DecodedInstance | null {
   try {
-    const parts = jwt.split(".");
-    if (parts.length !== 3) return null;
-    // base64url → base64 → atob
-    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const parts = token.split(".");
+    let payloadB64: string | null = null;
+    if (parts.length === 2) {
+      // Wix format: <sig>.<payload>
+      payloadB64 = parts[1];
+    } else if (parts.length === 3) {
+      // Standard JWT: <header>.<payload>.<sig>
+      payloadB64 = parts[1];
+    }
+    if (!payloadB64) return null;
+    // base64url → base64 + add padding for atob
+    const b64 = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
     const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
     return JSON.parse(atob(padded)) as DecodedInstance;
   } catch {
@@ -111,12 +128,13 @@ function WixBridgeInner() {
 
   const decoded = useMemo(() => {
     if (!rawInstance) return null;
-    // If it looks like a JWT (three dot-separated segments), decode.
-    // Otherwise treat the raw value as a UUID directly.
-    if (rawInstance.includes(".") && rawInstance.split(".").length === 3) {
-      return decodeJwtPayloadUnsafe(rawInstance);
+    // Wix sends a 2-part token; standard JWT is 3-part. The
+    // decoder handles both. Try decoding any dotted value.
+    if (rawInstance.includes(".")) {
+      const result = decodeWixInstanceToken(rawInstance);
+      if (result) return result;
     }
-    // Looks like a raw UUID
+    // Raw UUID fallback (in case Wix ever sends the bare ID)
     if (/^[0-9a-f-]{36}$/i.test(rawInstance)) {
       return { instanceId: rawInstance } as DecodedInstance;
     }
