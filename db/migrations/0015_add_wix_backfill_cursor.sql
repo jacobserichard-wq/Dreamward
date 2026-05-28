@@ -1,0 +1,42 @@
+-- 0015_add_wix_backfill_cursor.sql
+-- Phase 10c (Wix backfill). Single additive column on wix_connections.
+--
+-- Why: the backfill route paginates through Wix orders via cursor
+-- (eCommerce v3 API uses cursorPaging with a next-page token, not
+-- numeric offsets). We need to persist the cursor between chunk
+-- invocations so:
+--   - A page-refresh on /integrations during a long backfill resumes
+--     where it left off rather than re-importing from scratch.
+--   - The Phase 10e cron reconciliation can pick up an abandoned
+--     backfill.
+--   - The frontend polling loop doesn't have to round-trip the cursor.
+--
+-- Shopify's backfill uses MAX(source_ref_id) to resume because Shopify
+-- order IDs are monotonic numeric. Wix order IDs are UUIDs (non-
+-- monotonic) so we can't use the same trick — hence this explicit
+-- column.
+--
+-- Null = "not in progress" (either not started or completed). The
+-- backfill_started_at / backfill_completed_at columns disambiguate.
+--
+-- Apply via:
+--   node --env-file=.env.local scripts/run-migration.mjs \
+--     db/migrations/0015_add_wix_backfill_cursor.sql
+--
+-- Verify with:
+--   SELECT column_name, data_type
+--     FROM information_schema.columns
+--    WHERE table_name = 'wix_connections'
+--      AND column_name = 'backfill_cursor';
+-- Expected: backfill_cursor | text
+--
+-- Rollback (safe; no data dependency):
+--   ALTER TABLE wix_connections DROP COLUMN backfill_cursor;
+--
+-- Data impact: additive, nullable, no default — all existing rows
+-- get NULL. No backfill behavior change for the one existing test
+-- row (it will start fresh from the beginning on next /api/wix/
+-- backfill invocation).
+
+ALTER TABLE wix_connections
+  ADD COLUMN backfill_cursor TEXT;
