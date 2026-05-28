@@ -41,7 +41,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { mintAccessToken, wixGet } from "@/lib/wix";
+import { fetchSiteDisplayName, mintAccessToken, wixGet } from "@/lib/wix";
 
 // UUID v4-ish pattern (Wix uses standard 8-4-4-4-12 UUIDs for instance IDs)
 const UUID_RE =
@@ -142,14 +142,25 @@ export async function POST(req: NextRequest) {
   // invalid instance ID (Wix rejects unknown instances), and the
   // site-properties response gives us the site display name to
   // hydrate the connection row with something user-friendly.
+  //
+  // Display name fallback chain:
+  //   1. businessName from site-properties (the merchant's actual
+  //      business name they entered in Wix dashboard)
+  //   2. fetchSiteDisplayName from /sites/v1/sites/current (Wix's
+  //      site title — auto-generated like "My Site 1" until the
+  //      merchant renames). Best-effort; failure is non-fatal.
+  //   3. Truncated UUID in the UI ("Site 970fe949…") — handled by
+  //      WixConnectionCard's displayLabel fallback.
   let siteName: string | null = null;
+  let accessToken: string;
   try {
-    const { accessToken } = await mintAccessToken({ instanceId });
+    const minted = await mintAccessToken({ instanceId });
+    accessToken = minted.accessToken;
     const props = await wixGet<WixSitePropertiesResponse>({
       accessToken,
       path: "/site-properties/v4/properties",
     });
-    siteName = props.businessName ?? null;
+    siteName = props.businessName?.trim() || null;
   } catch (err) {
     console.warn(
       `Wix bind: validation failed for instance=${instanceId} client=${client.id}:`,
@@ -162,6 +173,14 @@ export async function POST(req: NextRequest) {
       },
       { status: 400 }
     );
+  }
+
+  // Best-effort fallback to /sites/v1/sites/current if businessName
+  // was empty. fetchSiteDisplayName catches its own errors and
+  // returns null on failure — no try/catch needed here.
+  if (!siteName) {
+    const fallback = await fetchSiteDisplayName({ accessToken });
+    if (fallback?.trim()) siteName = fallback.trim();
   }
 
   // ── Insert binding ──────────────────────────────────────────
