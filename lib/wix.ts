@@ -285,37 +285,133 @@ export async function wixPost<T = unknown>(opts: {
 }
 
 // ---------------------------------------------------------------------
-// Order types (Phase 10c will use these — stubbed shape for now)
+// Orders API (Phase 10c — backfill + webhook ingestion)
 // ---------------------------------------------------------------------
+//
+// Endpoint: POST https://www.wixapis.com/ecom/v1/orders/search
+// Verified (sub-session 26, 2026-05-27):
+//   - The Wix Stores v2 orders API is deprecated; v3 / eCommerce is
+//     the current path (per Wix docs migration table reference).
+//   - Cursor pagination with cursorPaging.limit default 100.
+//   - Filterable fields include id, number, createdDate,
+//     priceSummary.total.amount, paymentStatus, buyerInfo.email,
+//     billingInfo.contactDetails.firstName/lastName,
+//     lineItems.productName.original.
+//
+// ⚠️ Response shape (specifically the cursor location) wasn't fully
+// documented externally — the parser below tries multiple known
+// Wix conventions. We log the raw response on the first call to
+// confirm the actual structure.
 
-/** Minimal subset of Wix Stores Order schema we expect to use for
- *  bookkeeping. ⚠️ TODO: validate exact field names against Wix
- *  Stores API v2/v3 docs during 10c implementation. */
+/**
+ * Wix eCommerce Order schema. Minimal subset for bookkeeping —
+ * everything we need to map to processed_items. Wix's actual
+ * response object has many more fields (we ignore them).
+ */
 export interface WixOrder {
   id: string;
-  number: number; // human-friendly order number
-  dateCreated: string; // ISO timestamp
-  totals: {
-    total: string; // decimal-as-string
-    subtotal: string;
-    tax: string;
-    shipping: string;
-    discount: string;
+  number?: string | number; // human-friendly order number
+  createdDate?: string; // ISO timestamp
+  paymentStatus?: string; // 'PAID' | 'NOT_PAID' | 'REFUNDED' | 'PARTIALLY_PAID' | etc.
+  fulfillmentStatus?: string;
+  priceSummary?: {
+    total?: { amount?: string; currency?: string };
+    subtotal?: { amount?: string };
+    tax?: { amount?: string };
+    shipping?: { amount?: string };
+    discount?: { amount?: string };
   };
-  currency: string; // ISO 4217
-  paymentStatus: string; // 'PAID' | 'PENDING' | 'REFUNDED' | etc.
-  fulfillmentStatus: string; // 'FULFILLED' | 'NOT_FULFILLED' | etc.
-  buyerInfo: {
-    email: string | null;
-    firstName: string | null;
-    lastName: string | null;
+  // Top-level currency may also appear separately from priceSummary
+  currency?: string;
+  buyerInfo?: {
+    email?: string | null;
+    contactId?: string | null;
   } | null;
-  lineItems: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    price: string;
+  billingInfo?: {
+    contactDetails?: {
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  } | null;
+  lineItems?: Array<{
+    id?: string;
+    productName?: { original?: string };
+    quantity?: number;
+    price?: { amount?: string };
   }>;
+}
+
+interface WixOrdersSearchResponse {
+  orders?: WixOrder[];
+  // Wix uses several cursor conventions across APIs — handle multiple
+  metadata?: {
+    cursors?: { next?: string | null; prev?: string | null };
+    count?: number;
+    hasNext?: boolean;
+  };
+  pagingMetadata?: {
+    cursors?: { next?: string | null };
+    count?: number;
+    hasNext?: boolean;
+  };
+}
+
+/**
+ * Fetch one page of orders for a Wix store. Cursor-paginated;
+ * pass the cursor from the previous response to get the next page.
+ * Returns null nextCursor when there are no more pages.
+ *
+ * Sorted ascending by createdDate so backfill imports oldest first
+ * (matches Shopify backfill behavior — lets the merchant see
+ * historical context populate naturally).
+ */
+export async function fetchOrdersPage(opts: {
+  accessToken: string;
+  cursor?: string | null;
+  limit?: number; // default 100, Wix max 100
+}): Promise<{
+  orders: WixOrder[];
+  nextCursor: string | null;
+}> {
+  const limit = Math.min(opts.limit ?? 100, 100);
+  const body: Record<string, unknown> = {
+    search: {
+      cursorPaging: opts.cursor
+        ? { limit, cursor: opts.cursor }
+        : { limit },
+      sort: [{ fieldName: "createdDate", order: "ASC" }],
+    },
+  };
+
+  const raw = await wixPost<WixOrdersSearchResponse>({
+    accessToken: opts.accessToken,
+    path: "/ecom/v1/orders/search",
+    body,
+  });
+
+  // Defensive cursor extraction — try the known shapes in order.
+  // Log the raw response keys on first call (when cursor is undefined)
+  // so we can verify the shape empirically.
+  if (!opts.cursor) {
+    console.log(
+      "Wix orders/search first-page response keys:",
+      Object.keys(raw),
+      "metadata keys:",
+      raw.metadata ? Object.keys(raw.metadata) : null,
+      "pagingMetadata keys:",
+      raw.pagingMetadata ? Object.keys(raw.pagingMetadata) : null
+    );
+  }
+
+  const nextCursor =
+    raw.metadata?.cursors?.next ??
+    raw.pagingMetadata?.cursors?.next ??
+    null;
+
+  return {
+    orders: raw.orders ?? [],
+    nextCursor: nextCursor || null,
+  };
 }
 
 // ---------------------------------------------------------------------
