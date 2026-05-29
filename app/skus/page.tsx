@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
 
 interface SkuRow {
   id: number;
@@ -75,6 +76,7 @@ export default function SkusPage() {
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
 
   const loadSkus = useCallback(
     async (includeInactive: boolean) => {
@@ -122,10 +124,40 @@ export default function SkusPage() {
     loadSkus(showArchived);
   }, [showArchived, loadSkus, loading]);
 
-  // ── Stub handler for the "+ New SKU" button (commit 2) ────────
+  // ── "+ New SKU" → open the create modal ──────────────────────
   const handleNewSku = useCallback(() => {
-    setError("The new-SKU form ships in the next commit. Sit tight!");
+    setError(null);
+    setFormOpen(true);
   }, []);
+
+  // ── SkuForm submit handler — POST + optimistic list update ───
+  const handleSaveSku = useCallback(
+    async (data: SkuFormSubmit) => {
+      const res = await fetch("/api/skus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const payload = (await res.json()) as { sku: SkuRow };
+      // Prepend the new row to keep the user's most recent add at
+      // the top of the table, then re-sort on next fetch. Updating
+      // local state instead of re-fetching avoids a layout flash.
+      setSkus((prev) =>
+        [payload.sku, ...prev].sort((a, b) => a.code.localeCompare(b.code))
+      );
+      setSummary((prev) =>
+        prev
+          ? { ...prev, totalActive: prev.totalActive + 1 }
+          : { totalActive: 1, totalArchived: 0 }
+      );
+      setFormOpen(false);
+    },
+    []
+  );
 
   // ── Derived display ──────────────────────────────────────────
   const visibleCount = useMemo(() => skus.length, [skus]);
@@ -317,6 +349,12 @@ export default function SkusPage() {
           <span className="text-slate-500 italic">Coming with Phase 12d.</span>
         </p>
       </div>
+
+      <SkuForm
+        open={formOpen}
+        onSave={handleSaveSku}
+        onClose={() => setFormOpen(false)}
+      />
     </div>
   );
 }
