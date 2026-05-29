@@ -22,7 +22,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
-import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
+import SkuForm, {
+  type SkuFormSubmit,
+  type SkuFormEditSubmit,
+} from "../components/SkuForm";
 
 interface SkuRow {
   id: number;
@@ -77,6 +80,7 @@ export default function SkusPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<SkuRow | null>(null);
 
   const loadSkus = useCallback(
     async (includeInactive: boolean) => {
@@ -127,7 +131,20 @@ export default function SkusPage() {
   // ── "+ New SKU" → open the create modal ──────────────────────
   const handleNewSku = useCallback(() => {
     setError(null);
+    setEditing(null);
     setFormOpen(true);
+  }, []);
+
+  // ── Click a row → open the edit modal pre-filled with it ─────
+  const handleEditSku = useCallback((sku: SkuRow) => {
+    setError(null);
+    setEditing(sku);
+    setFormOpen(true);
+  }, []);
+
+  const handleCloseForm = useCallback(() => {
+    setFormOpen(false);
+    setEditing(null);
   }, []);
 
   // ── SkuForm submit handler — POST + optimistic list update ───
@@ -155,8 +172,93 @@ export default function SkusPage() {
           : { totalActive: 1, totalArchived: 0 }
       );
       setFormOpen(false);
+      setEditing(null);
     },
     []
+  );
+
+  // ── Save edits to an existing SKU ────────────────────────────
+  const handleSaveEdit = useCallback(
+    async (data: SkuFormEditSubmit) => {
+      if (!editing) return;
+      const res = await fetch(`/api/skus/${editing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const payload = (await res.json()) as { sku: SkuRow };
+      // Update the row in place — count stays the same.
+      setSkus((prev) =>
+        prev.map((s) => (s.id === payload.sku.id ? payload.sku : s))
+      );
+      setFormOpen(false);
+      setEditing(null);
+    },
+    [editing]
+  );
+
+  // ── Archive (active=false) / Restore (active=true) handler ───
+  // Goes through the dedicated endpoints: DELETE for archive
+  // (mirrors REST convention) + PATCH for restore. Updates the
+  // local list to reflect the new active state. Whether the row
+  // stays visible depends on showArchived: if Active-only view is
+  // showing and the row got archived, drop it from the list to
+  // avoid a flicker before the next re-fetch.
+  const handleToggleActive = useCallback(
+    async (newActive: boolean) => {
+      if (!editing) return;
+      const url = `/api/skus/${editing.id}`;
+      let res: Response;
+      if (newActive) {
+        // Restore via PATCH active=true
+        res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: true }),
+        });
+      } else {
+        // Archive via DELETE
+        res = await fetch(url, { method: "DELETE" });
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const payload = (await res.json()) as { sku: SkuRow };
+      setSkus((prev) => {
+        const next = prev.map((s) =>
+          s.id === payload.sku.id ? payload.sku : s
+        );
+        // Drop archived rows from active-only view + drop restored
+        // rows from archived-only view (rare edge case but cheap).
+        if (!showArchived && !payload.sku.active) {
+          return next.filter((s) => s.id !== payload.sku.id);
+        }
+        return next;
+      });
+      setSummary((prev) => {
+        if (!prev) return prev;
+        if (newActive) {
+          // Restoring: archived -1, active +1
+          return {
+            totalActive: prev.totalActive + 1,
+            totalArchived: Math.max(0, prev.totalArchived - 1),
+          };
+        }
+        // Archiving: active -1, archived +1
+        return {
+          totalActive: Math.max(0, prev.totalActive - 1),
+          totalArchived: prev.totalArchived + 1,
+        };
+      });
+      setFormOpen(false);
+      setEditing(null);
+    },
+    [editing, showArchived]
   );
 
   // ── Derived display ──────────────────────────────────────────
@@ -307,7 +409,9 @@ export default function SkusPage() {
                 {skus.map((s) => (
                   <tr
                     key={s.id}
-                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50 group"
+                    onClick={() => handleEditSku(s)}
+                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50 cursor-pointer group"
+                    title="Click to edit"
                   >
                     <td className="py-3 px-4 text-slate-900 font-mono font-semibold whitespace-nowrap">
                       {s.code}
@@ -352,8 +456,21 @@ export default function SkusPage() {
 
       <SkuForm
         open={formOpen}
+        editing={
+          editing
+            ? {
+                id: editing.id,
+                code: editing.code,
+                name: editing.name,
+                description: editing.description,
+                active: editing.active,
+              }
+            : null
+        }
         onSave={handleSaveSku}
-        onClose={() => setFormOpen(false)}
+        onSaveEdit={handleSaveEdit}
+        onToggleActive={handleToggleActive}
+        onClose={handleCloseForm}
       />
     </div>
   );
