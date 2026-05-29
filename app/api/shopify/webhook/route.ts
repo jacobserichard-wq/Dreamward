@@ -161,7 +161,9 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
        $6, $7, $8, $9, $10,
        $11, $12
      )
-     ON CONFLICT (client_id, source, source_ref_id) DO UPDATE
+     ON CONFLICT (client_id, source, source_ref_id)
+       WHERE source_ref_id IS NOT NULL
+     DO UPDATE
        SET vendor = EXCLUDED.vendor,
            invoice_number = EXCLUDED.invoice_number,
            amount = EXCLUDED.amount,
@@ -254,7 +256,9 @@ async function handleRefundCreate(clientId: number, refund: ShopifyRefund) {
        $6, $7, $8, $9, $10,
        $11, $12
      )
-     ON CONFLICT (client_id, source, source_ref_id) DO UPDATE
+     ON CONFLICT (client_id, source, source_ref_id)
+       WHERE source_ref_id IS NOT NULL
+     DO UPDATE
        SET amount = EXCLUDED.amount,
            summary = EXCLUDED.summary,
            extracted_data = EXCLUDED.extracted_data`,
