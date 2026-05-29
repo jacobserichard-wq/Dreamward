@@ -1,0 +1,703 @@
+// app/skus/[id]/page.tsx
+//
+// Phase 12b commit 4 of 4. Detail page for a single SKU.
+//
+// Sections:
+//   1. Header card with code + name + active chip + Edit button
+//   2. Cost history table with × delete buttons (typo escape hatch)
+//   3. Inline "Add new cost" form (the primary cost-change path)
+//   4. Platform aliases list (display only; create UI ships in
+//      Phase 12d's bulk-match page)
+//
+// The Edit button re-uses the SkuForm modal from the list page so
+// the name + description + archive UX is consistent across both
+// surfaces.
+//
+// Data shape from GET /api/skus/[id]:
+//   { sku: SkuRow, costHistory: CostHistoryRow[], aliases: AliasRow[] }
+//
+// On any mutation (edit / add cost / delete cost / archive /
+// restore), we re-fetch the full payload rather than try to
+// reconstruct local state across three related lists. The detail
+// page is a single tab; a fresh fetch is cheap.
+
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import PageHeader from "../../components/PageHeader";
+import ErrorBanner from "../../components/ErrorBanner";
+import Spinner from "../../components/Spinner";
+import SkuForm, {
+  type SkuFormEditSubmit,
+} from "../../components/SkuForm";
+
+interface SkuRow {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  currentCost: number | null;
+  costCurrency: string | null;
+  costEffectiveDate: string | null;
+  salesCount: number;
+  lastSaleDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CostHistoryRow {
+  id: number;
+  cost: number;
+  currency: string;
+  effectiveDate: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+interface AliasRow {
+  id: number;
+  platform: string;
+  externalId: string;
+  externalSku: string | null;
+  createdAt: string;
+}
+
+interface SkuDetailResponse {
+  sku: SkuRow;
+  costHistory: CostHistoryRow[];
+  aliases: AliasRow[];
+}
+
+function fmtMoney(n: number, currency: string): string {
+  const sym = currency === "USD" || !currency ? "$" : `${currency} `;
+  return `${sym}${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })}`;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${monthNames[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
+
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+function platformLabel(p: string): { label: string; icon: string } {
+  switch (p) {
+    case "shopify":
+      return { label: "Shopify", icon: "\u{1F6CD}" };
+    case "wix":
+      return { label: "Wix", icon: "\u{1F310}" };
+    case "square":
+      return { label: "Square", icon: "\u{25A0}" };
+    default:
+      return { label: p, icon: "" };
+  }
+}
+
+export default function SkuDetailPage() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const skuId = Number(params?.id);
+
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<SkuDetailResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  // ── Add-cost inline form state ────────────────────────────────
+  const [newCost, setNewCost] = useState("");
+  const [newDate, setNewDate] = useState(todayIso());
+  const [newNotes, setNewNotes] = useState("");
+  const [addingCost, setAddingCost] = useState(false);
+
+  // ── Edit modal state ──────────────────────────────────────────
+  const [editOpen, setEditOpen] = useState(false);
+
+  // ── Cost deletion state (which row is being deleted) ─────────
+  const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
+
+  const loadDetail = useCallback(async () => {
+    if (!Number.isFinite(skuId)) return;
+    try {
+      const res = await fetch(`/api/skus/${skuId}`);
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.replace(`/signin?callbackUrl=/skus/${skuId}`);
+          return;
+        }
+        if (res.status === 403) {
+          setForbidden(true);
+          return;
+        }
+        if (res.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `HTTP ${res.status}`);
+        return;
+      }
+      const payload = (await res.json()) as SkuDetailResponse;
+      setData(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't load SKU");
+    }
+  }, [skuId, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadDetail();
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadDetail]);
+
+  // ── Mutation handlers ────────────────────────────────────────
+  const handleSaveEdit = useCallback(
+    async (form: SkuFormEditSubmit) => {
+      const res = await fetch(`/api/skus/${skuId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      await loadDetail();
+      setEditOpen(false);
+    },
+    [skuId, loadDetail]
+  );
+
+  const handleToggleActive = useCallback(
+    async (newActive: boolean) => {
+      const url = `/api/skus/${skuId}`;
+      let res: Response;
+      if (newActive) {
+        res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: true }),
+        });
+      } else {
+        res = await fetch(url, { method: "DELETE" });
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      await loadDetail();
+      setEditOpen(false);
+    },
+    [skuId, loadDetail]
+  );
+
+  const handleAddCost = useCallback(async () => {
+    setError(null);
+    const cleaned = newCost.replace(/[$,\s]/g, "");
+    const costNum = Number(cleaned);
+    if (!Number.isFinite(costNum) || costNum < 0) {
+      setError("Cost must be a non-negative number.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+      setError("Effective date must be a valid date.");
+      return;
+    }
+    setAddingCost(true);
+    try {
+      const res = await fetch(`/api/skus/${skuId}/costs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cost: costNum,
+          effectiveDate: newDate,
+          notes: newNotes.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `HTTP ${res.status}`);
+        return;
+      }
+      // Reset form + re-fetch the whole detail (current-cost may
+      // have flipped if this row's effective_date is the newest
+      // <= today).
+      setNewCost("");
+      setNewDate(todayIso());
+      setNewNotes("");
+      await loadDetail();
+    } finally {
+      setAddingCost(false);
+    }
+  }, [newCost, newDate, newNotes, skuId, loadDetail]);
+
+  const handleDeleteCost = useCallback(
+    async (costRowId: number) => {
+      // Soft-confirm — destructive but reversible by adding the
+      // cost back via the inline form. Native confirm is enough
+      // for the typo-escape-hatch UX.
+      if (
+        !window.confirm(
+          "Delete this cost row? Historical sales priced against it will fall back to the next-newest cost on their date."
+        )
+      ) {
+        return;
+      }
+      setError(null);
+      setDeletingCostId(costRowId);
+      try {
+        const res = await fetch(
+          `/api/skus/${skuId}/costs/${costRowId}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || `HTTP ${res.status}`);
+          return;
+        }
+        await loadDetail();
+      } finally {
+        setDeletingCostId(null);
+      }
+    },
+    [skuId, loadDetail]
+  );
+
+  // ── Identify which cost row is the "current" one (highlighted
+  // in the table). It's the newest row with effective_date <=
+  // today — same logic as the API's LATERAL subquery.
+  const currentCostRowId = useMemo(() => {
+    if (!data) return null;
+    const today = todayIso();
+    const active = data.costHistory
+      .filter((r) => r.effectiveDate <= today)
+      .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+    return active[0]?.id ?? null;
+  }, [data]);
+
+  // ── Render guards ────────────────────────────────────────────
+  if (!Number.isFinite(skuId)) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+          <PageHeader
+            backHref="/skus"
+            backLabel="SKUs"
+            title="Invalid SKU"
+            subtitle="The URL doesn't look right."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (forbidden) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+          <PageHeader
+            backHref="/skus"
+            backLabel="SKUs"
+            title="SKU details"
+            subtitle="Pro feature"
+          />
+          <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
+            <p className="text-base font-medium text-slate-700 m-0 mb-4">
+              SKU catalog is part of FlowWork Pro.
+            </p>
+            <Link
+              href="/upgrade"
+              className="inline-block py-2 px-4 rounded-lg bg-blue-500 text-white text-sm font-semibold no-underline hover:bg-blue-600"
+            >
+              See Pro plans
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+          <PageHeader
+            backHref="/skus"
+            backLabel="SKUs"
+            title="SKU not found"
+            subtitle="It may have been deleted or never existed."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !data) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+          <p className="text-center p-[60px] text-slate-500">Loading SKU…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { sku, costHistory, aliases } = data;
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader
+          backHref="/skus"
+          backLabel="SKUs"
+          title={
+            <span className="inline-flex items-center gap-3">
+              <span className="font-mono">{sku.code}</span>
+              <span className="text-slate-500 font-normal text-lg">
+                {"·"}
+              </span>
+              <span>{sku.name}</span>
+              {!sku.active && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium uppercase tracking-wide">
+                  Archived
+                </span>
+              )}
+            </span>
+          }
+          subtitle={sku.description ?? undefined}
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="py-2 px-4 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium cursor-pointer"
+            >
+              Edit details
+            </button>
+          }
+        />
+
+        {error && (
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        )}
+
+        {/* Summary chips */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <SummaryChip
+            label="Current cost"
+            value={
+              sku.currentCost != null
+                ? fmtMoney(sku.currentCost, sku.costCurrency || "USD")
+                : "—"
+            }
+            sub={
+              sku.costEffectiveDate
+                ? `effective ${fmtDate(sku.costEffectiveDate)}`
+                : undefined
+            }
+          />
+          <SummaryChip
+            label="Sales mapped"
+            value={sku.salesCount > 0 ? String(sku.salesCount) : "—"}
+            sub={
+              sku.lastSaleDate
+                ? `last ${fmtDate(sku.lastSaleDate)}`
+                : "no line items yet"
+            }
+          />
+          <SummaryChip
+            label="Aliases"
+            value={String(aliases.length)}
+            sub={
+              aliases.length === 0
+                ? "auto-fill begins with Phase 12c"
+                : `across ${new Set(aliases.map((a) => a.platform)).size} platform${
+                    new Set(aliases.map((a) => a.platform)).size === 1
+                      ? ""
+                      : "s"
+                  }`
+            }
+          />
+        </div>
+
+        {/* Cost history */}
+        <section className="mb-6">
+          <h2 className="text-base font-semibold text-slate-900 m-0 mb-3">
+            Cost history
+          </h2>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                  <th className="text-left py-2.5 px-4 font-medium">
+                    Effective date
+                  </th>
+                  <th className="text-right py-2.5 px-4 font-medium">Cost</th>
+                  <th className="text-left py-2.5 px-4 font-medium">Notes</th>
+                  <th className="w-32 text-right py-2.5 px-4 font-medium">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {costHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-slate-500">
+                      No cost history yet.
+                    </td>
+                  </tr>
+                ) : (
+                  costHistory.map((c) => {
+                    const isCurrent = c.id === currentCostRowId;
+                    const isFuture = c.effectiveDate > todayIso();
+                    return (
+                      <tr
+                        key={c.id}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
+                          {fmtDate(c.effectiveDate)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
+                          {fmtMoney(c.cost, c.currency)}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 text-xs">
+                          {c.notes ?? "—"}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            {isCurrent && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold uppercase tracking-wide">
+                                Current
+                              </span>
+                            )}
+                            {isFuture && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">
+                                Scheduled
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCost(c.id)}
+                              disabled={deletingCostId === c.id}
+                              title="Delete cost row"
+                              aria-label="Delete cost row"
+                              className="text-slate-300 hover:text-red-600 cursor-pointer bg-transparent border-0 text-base leading-none px-1.5 py-1 disabled:opacity-30"
+                            >
+                              {deletingCostId === c.id ? (
+                                <Spinner size={12} color="currentColor" />
+                              ) : (
+                                "\u{00D7}"
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Add new cost inline form */}
+        <section className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-700 m-0 mb-2">
+            Add new cost
+          </h3>
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_2fr_auto] gap-3 items-end">
+              <div>
+                <label
+                  htmlFor="new-cost"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
+                  Per-unit cost
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                    {"$"}
+                  </span>
+                  <input
+                    id="new-cost"
+                    type="text"
+                    inputMode="decimal"
+                    value={newCost}
+                    onChange={(e) => {
+                      setNewCost(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="0.00"
+                    disabled={addingCost}
+                    className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="new-date"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
+                  Effective date
+                </label>
+                <input
+                  id="new-date"
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  disabled={addingCost}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="new-notes"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
+                  Notes (optional)
+                </label>
+                <input
+                  id="new-notes"
+                  type="text"
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  placeholder="Why did the cost change?"
+                  disabled={addingCost}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddCost}
+                disabled={addingCost}
+                className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2 self-end whitespace-nowrap"
+              >
+                {addingCost && <Spinner size={12} color="white" />}
+                {addingCost ? "Adding..." : "Add cost"}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 m-0 mt-2">
+              Backdate to apply to historical sales, or future-date to
+              schedule a price change that goes live automatically.
+            </p>
+          </div>
+        </section>
+
+        {/* Platform aliases — display only in 12b */}
+        <section className="mb-6">
+          <h2 className="text-base font-semibold text-slate-900 m-0 mb-3">
+            Platform aliases
+          </h2>
+          <div className="bg-white rounded-xl border border-slate-200">
+            {aliases.length === 0 ? (
+              <div className="py-6 px-4 text-center text-sm text-slate-500">
+                <p className="m-0 mb-1">No platform aliases yet.</p>
+                <p className="m-0 text-xs">
+                  These auto-populate as Phase 12c (line-item
+                  ingestion) lands. Bulk-matching unmapped items will
+                  live at{" "}
+                  <span className="font-mono text-slate-400">
+                    /skus/unmatched
+                  </span>{" "}
+                  in Phase 12d.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100 m-0 p-0">
+                {aliases.map((a) => {
+                  const meta = platformLabel(a.platform);
+                  return (
+                    <li
+                      key={a.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3 list-none"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span>{meta.icon}</span>
+                        <span className="text-sm font-medium text-slate-700">
+                          {meta.label}
+                        </span>
+                        <span className="text-xs font-mono text-slate-500 truncate">
+                          {a.externalId}
+                        </span>
+                      </div>
+                      {a.externalSku && (
+                        <span className="text-xs text-slate-400 font-mono whitespace-nowrap">
+                          SKU {a.externalSku}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <SkuForm
+        open={editOpen}
+        editing={{
+          id: sku.id,
+          code: sku.code,
+          name: sku.name,
+          description: sku.description,
+          active: sku.active,
+        }}
+        onSave={async () => {
+          // Unreachable in edit mode — onSaveEdit is what runs.
+        }}
+        onSaveEdit={handleSaveEdit}
+        onToggleActive={handleToggleActive}
+        onClose={() => setEditOpen(false)}
+      />
+    </div>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-500 m-0 mb-1">
+        {label}
+      </p>
+      <p className="text-xl font-bold text-slate-900 m-0 tabular-nums">
+        {value}
+      </p>
+      {sub && <p className="text-xs text-slate-500 m-0 mt-0.5">{sub}</p>}
+    </div>
+  );
+}

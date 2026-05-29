@@ -99,6 +99,115 @@ function serializeSku(row: SkuRowDb) {
 }
 
 // ---------------------------------------------------------------------
+// GET — single SKU with cost history + aliases
+// ---------------------------------------------------------------------
+//
+// Powers the detail page at /skus/[id]. Returns three things in
+// one round trip:
+//
+//   - sku           the full enriched SkuRow shape (matches GET /api/skus)
+//   - costHistory   every sku_cost_history row, newest effective_date first
+//   - aliases       every sku_aliases row, grouped by platform asc
+//
+// Aliases will be empty in Phase 12b — line-item ingestion (Phase
+// 12c) populates them via the per-platform write paths, and the
+// bulk-match UI (Phase 12d) lets the merchant create them manually.
+// We surface the (currently empty) list now so the detail page
+// has a stable place to render them as soon as 12c+12d ship.
+
+interface CostHistoryRowDb {
+  id: number;
+  cost: string;
+  currency: string;
+  effective_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+interface AliasRowDb {
+  id: number;
+  platform: string;
+  external_id: string;
+  external_sku: string | null;
+  created_at: string;
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+    if (client.plan !== "pro") {
+      return NextResponse.json(
+        { error: "SKU catalog is a Pro feature." },
+        { status: 403 }
+      );
+    }
+
+    const { id: idParam } = await params;
+    const id = Number(idParam);
+    if (!Number.isInteger(id) || id <= 0) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
+    const enriched = await loadEnrichedSku(client.id, id);
+    if (!enriched) {
+      return NextResponse.json({ error: "SKU not found" }, { status: 404 });
+    }
+
+    // Cost history + aliases — two cheap parallel queries.
+    const [costRes, aliasRes] = await Promise.all([
+      pool.query<CostHistoryRowDb>(
+        `SELECT id, cost, currency, effective_date, notes, created_at
+           FROM sku_cost_history
+          WHERE sku_id = $1
+          ORDER BY effective_date DESC, id DESC`,
+        [id]
+      ),
+      pool.query<AliasRowDb>(
+        `SELECT id, platform, external_id, external_sku, created_at
+           FROM sku_aliases
+          WHERE sku_id = $1
+          ORDER BY platform ASC, created_at ASC`,
+        [id]
+      ),
+    ]);
+
+    return NextResponse.json({
+      sku: serializeSku(enriched),
+      costHistory: costRes.rows.map((r) => ({
+        id: r.id,
+        cost: Number(r.cost),
+        currency: r.currency,
+        effectiveDate: r.effective_date,
+        notes: r.notes,
+        createdAt: r.created_at,
+      })),
+      aliases: aliasRes.rows.map((r) => ({
+        id: r.id,
+        platform: r.platform,
+        externalId: r.external_id,
+        externalSku: r.external_sku,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("SKU GET error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to load SKU" },
+      { status: 500 }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
 // PATCH — update an existing SKU
 // ---------------------------------------------------------------------
 
