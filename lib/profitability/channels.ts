@@ -33,8 +33,9 @@ export type ChannelId =
   | "service"
   | "gmail"
   | "uploads"
-  | "etsy"        // coming soon (Phase 10)
-  | "square"      // coming soon
+  | "etsy"        // coming soon (Phase 10 — not the one we shipped)
+  | "square"      // live as of Phase 11b
+  | "wix"         // live as of Phase 10b (this fix backfills the missing channel registration)
   | "woocommerce" // coming soon
   ;
 
@@ -141,6 +142,16 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     comingSoon: false,
     emptyAddHref: "/integrations",
     emptyAddLabel: "Connect Square",
+    proGated: true,
+    drillHref: "/dashboard?tab=processed",
+  },
+  {
+    id: "wix",
+    label: "Wix",
+    icon: "\u{1F310}",
+    comingSoon: false,
+    emptyAddHref: "/integrations",
+    emptyAddLabel: "Connect Wix",
     proGated: true,
     drillHref: "/dashboard?tab=processed",
   },
@@ -285,6 +296,8 @@ function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
     return row.channel as ChannelId;
   }
   if (row.source === "shopify") return "shopify";
+  if (row.source === "wix") return "wix";
+  if (row.source === "square") return "square";
   if (row.source === "gmail" || row.source === "email") return "gmail";
   if (row.event_id !== null) return "markets";
   if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
@@ -315,6 +328,8 @@ function classifyExpenseRow(row: ChannelTxnRow): ChannelId | null {
   }
   if (row.event_id !== null) return "markets";
   if (row.source === "shopify") return "shopify";
+  if (row.source === "wix") return "wix";
+  if (row.source === "square") return "square";
   return null;
 }
 
