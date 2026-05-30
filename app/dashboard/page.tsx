@@ -1194,6 +1194,32 @@ export default function Home() {
               </div>
             )}
 
+            {/* Upload tips + template download. Sits below the event
+                picker so the framing reads top-down: action → option →
+                context. Helps merchants understand WHEN to use upload
+                vs. relying on platform integrations (most platform
+                sales auto-import via Shopify/Wix/Square/Gmail). */}
+            <div className="mb-5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-[280px]">
+                <span className="mr-1">{"\u{1F4A1}"}</span>
+                <span className="font-medium text-slate-700">
+                  Most platform sales auto-import.
+                </span>{" "}
+                Use Upload for market-day cash sales, Venmo/Zelle
+                transfers, wholesale invoices typed into a spreadsheet,
+                or any one-off transaction without a connected source.
+                {" "}For market days, pick the event above to batch-tag
+                every row.
+              </div>
+              <a
+                href="/templates/flowwork-sales-template.csv"
+                download="flowwork-sales-template.csv"
+                className="text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap font-medium"
+              >
+                {"\u{2B07}\u{FE0F}"} Download CSV template
+              </a>
+            </div>
+
             {/* Inline event-create form — appears when "+ Create new event"
                 is picked in the selector above. Reuses the standalone form
                 from /events; onCreated adds the new event to the local
