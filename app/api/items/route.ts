@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItems, updateItemStatus, getDashboardSummary } from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
+import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
+
+const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,15 +37,75 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
     const body = await request.json();
-    const { id, status } = body;
-    if (!id || !status) {
+    const { id, status, channel } = body;
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    // Status-only path delegates to the existing helper (preserves
+    // legacy behavior for the dashboard's Pending/Paid/Overdue
+    // status toggles).
+    if (status !== undefined && channel === undefined) {
+      const result = await updateItemStatus(id, status, client.id);
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { error: "Item not found" },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ item: result.rows[0] });
+    }
+
+    // Phase 13: channel reclassify path (and optionally combined
+    // status + channel). Builds a dynamic SET clause so callers
+    // can update one or both fields in a single request.
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let p = 1;
+
+    if (status !== undefined) {
+      updates.push(`status = $${p++}`);
+      values.push(status);
+    }
+    if (channel !== undefined) {
+      // Allow null to "clear" the explicit channel and let the
+      // classifier re-derive on next read. Otherwise validate
+      // against the canonical list — an unknown channel id would
+      // route to the "Uncategorized" bucket on the dashboard
+      // (technically harmless, but worth surfacing as 400 so
+      // the caller knows).
+      if (channel === null) {
+        updates.push(`channel = NULL`);
+      } else {
+        if (typeof channel !== "string" || !VALID_CHANNEL_IDS.has(channel as never)) {
+          return NextResponse.json(
+            { error: "Invalid channel" },
+            { status: 400 }
+          );
+        }
+        updates.push(`channel = $${p++}`);
+        values.push(channel);
+      }
+    }
+
+    if (updates.length === 0) {
       return NextResponse.json(
-        { error: "Missing id or status" },
+        { error: "No fields to update (provide status and/or channel)" },
         { status: 400 }
       );
     }
-    const result = await updateItemStatus(id, status, client.id);
-    if (result.rows.length === 0) {
+
+    updates.push(`updated_at = NOW()`);
+
+    const result = await pool.query(
+      `UPDATE processed_items
+          SET ${updates.join(", ")}
+        WHERE id = $${p++} AND client_id = $${p++}
+        RETURNING id, vendor, amount, status, channel, category`,
+      [...values, id, client.id]
+    );
+
+    if (result.rowCount === 0) {
       return NextResponse.json(
         { error: "Item not found" },
         { status: 404 }

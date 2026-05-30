@@ -14,6 +14,9 @@ import SalesBanner from "../components/SalesBanner";
 import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
 import CogsSummaryCard from "../components/CogsSummaryCard";
+import ReclassifyModal, {
+  type ReclassifyModalRow,
+} from "../components/ReclassifyModal";
 import UpcomingEventsCard, {
   type UpcomingEvent,
 } from "../components/UpcomingEventsCard";
@@ -44,6 +47,10 @@ interface ProcessedItem {
   rawEmailId: string;
   summary: string;
   source: string;
+  // Phase 13: current channel assignment. Drives the
+  // "Currently in X" preview in the ReclassifyModal + powers
+  // future per-channel filters on this tab.
+  channel: string | null;
 }
 
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
@@ -67,6 +74,11 @@ function formatCallDateTime(d: Date): string {
 export default function Home() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
+
+  // Phase 13: per-row channel reclassify modal. Set to the row
+  // being reclassified; null when the modal is closed.
+  const [reclassifyRow, setReclassifyRow] =
+    useState<ReclassifyModalRow | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<Label>("Invoices");
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(false);
@@ -147,6 +159,7 @@ export default function Home() {
         rawEmailId: item.raw_email_id || "",
         summary: item.summary || "",
         source: item.source || "email",
+        channel: item.channel ?? null,
       }));
       setProcessedItems(mapped);
     } catch (err) {
@@ -1363,6 +1376,29 @@ export default function Home() {
                         <span className="text-[13px] text-slate-500">Category</span>
                         <span className="text-[13px] font-medium text-slate-800">{item.category}</span>
                       </div>
+                      {/* Phase 13: channel row + reclassify trigger.
+                          Click the chip to open the modal and pick a
+                          different channel. Empty when the classifier
+                          can't derive one (rare). */}
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">Channel</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReclassifyRow({
+                              id: item.id,
+                              vendor: item.vendor,
+                              amount: item.amount,
+                              channel: item.channel,
+                            })
+                          }
+                          title="Reclassify channel"
+                          className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-0 cursor-pointer p-0 inline-flex items-center gap-1"
+                        >
+                          {item.channel ?? "Uncategorized"}
+                          <span className="text-[10px]" aria-hidden="true">{"\u{270E}"}</span>
+                        </button>
+                      </div>
                       <div className="flex justify-between py-1.5 border-b border-slate-50">
                         <span className="text-[13px] text-slate-500">Confidence</span>
                         <span
@@ -1659,6 +1695,20 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {/* Phase 13: per-row channel reclassify modal. Opens from
+            the Channel chip on any Processed-tab card. PATCH on
+            confirm; explicit channel beats classifier derivation
+            so the change sticks. */}
+        <ReclassifyModal
+          open={reclassifyRow !== null}
+          row={reclassifyRow}
+          onClose={() => setReclassifyRow(null)}
+          onSaved={async () => {
+            setReclassifyRow(null);
+            await loadItems();
+          }}
+        />
 
         {/* ── CSV REVIEW MODAL ── */}
         <CsvReviewModal
