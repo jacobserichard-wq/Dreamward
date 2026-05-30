@@ -183,6 +183,29 @@ export async function GET(req: NextRequest) {
       if (Number.isFinite(a)) totalAmount += a;
     }
 
+    // ── Phase 9.4: attachment counts per expense ───────────────
+    // One additional grouped query keyed by processed_item_id.
+    // Cheap because the join is index-supported and the result
+    // set is bounded by the visible page (≤ 500 rows).
+    const attachmentCounts = new Map<number, number>();
+    if (expenses.length > 0) {
+      const ids = expenses.map((r) => r.id);
+      const acRes = await pool.query<{
+        processed_item_id: number;
+        n: number;
+      }>(
+        `SELECT processed_item_id, COUNT(*)::int AS n
+           FROM expense_attachments
+          WHERE client_id = $1
+            AND processed_item_id = ANY($2::int[])
+          GROUP BY processed_item_id`,
+        [client.id, ids]
+      );
+      for (const r of acRes.rows) {
+        attachmentCounts.set(r.processed_item_id, r.n);
+      }
+    }
+
     return NextResponse.json({
       expenses: expenses.map((r) => ({
         id: r.id,
@@ -196,6 +219,7 @@ export async function GET(req: NextRequest) {
         status: r.status,
         notes: r.notes,
         createdAt: r.processed_at,
+        attachmentCount: attachmentCounts.get(r.id) ?? 0,
       })),
       summary: {
         totalAmount,

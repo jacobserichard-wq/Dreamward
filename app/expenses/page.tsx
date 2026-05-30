@@ -28,6 +28,7 @@ import ExpenseForm, {
   type ExpenseFormSubmit,
 } from "../components/ExpenseForm";
 import ConfirmModal from "../components/ConfirmModal";
+import AttachmentViewer from "../components/AttachmentViewer";
 import {
   CANONICAL_CHANNELS,
   type ChannelMeta,
@@ -45,6 +46,9 @@ interface ExpenseRow {
   status: string | null;
   notes: string | null;
   createdAt: string;
+  // Phase 9.4: how many receipt attachments are linked to this
+  // expense. Drives the 📎 N badge on each row.
+  attachmentCount: number;
 }
 
 interface ExpensesResponse {
@@ -119,6 +123,10 @@ export default function ExpensesPage() {
   // Delete-confirm modal state
   const [pendingDelete, setPendingDelete] = useState<ExpenseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Attachment viewer modal state
+  const [viewingAttachmentsFor, setViewingAttachmentsFor] =
+    useState<ExpenseRow | null>(null);
 
   // ── Data loaders ──────────────────────────────────────────────
   const loadExpenses = useCallback(async (channelFilter: string | null) => {
@@ -477,7 +485,26 @@ export default function ExpensesPage() {
                         {fmtDate(e.dueDate)}
                       </td>
                       <td className="py-3 px-4 text-slate-900 font-medium">
-                        {e.vendor || "—"}
+                        <span className="inline-flex items-center gap-1.5">
+                          <span>{e.vendor || "—"}</span>
+                          {e.attachmentCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setViewingAttachmentsFor(e);
+                              }}
+                              title={`View ${e.attachmentCount} receipt${e.attachmentCount === 1 ? "" : "s"}`}
+                              aria-label="View receipts"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 text-[10px] font-medium cursor-pointer border-0"
+                            >
+                              <span>{"\u{1F4CE}"}</span>
+                              <span className="tabular-nums">
+                                {e.attachmentCount}
+                              </span>
+                            </button>
+                          )}
+                        </span>
                         {e.notes && (
                           <p className="text-xs text-slate-500 m-0 mt-0.5 font-normal">
                             {e.notes}
@@ -556,6 +583,16 @@ export default function ExpensesPage() {
         busy={deleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      {/* Phase 9.4: receipt-viewer modal. Opens from the 📎 N
+          badge on rows with attachmentCount > 0. */}
+      <AttachmentViewer
+        open={viewingAttachmentsFor !== null}
+        expenseId={viewingAttachmentsFor?.id ?? null}
+        expenseLabel={viewingAttachmentsFor?.vendor ?? undefined}
+        onClose={() => setViewingAttachmentsFor(null)}
+        onChanged={() => loadExpenses(activeFilter)}
       />
     </div>
   );
