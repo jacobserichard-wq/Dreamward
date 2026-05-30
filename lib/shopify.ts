@@ -319,6 +319,17 @@ export interface ShopifyOrder {
     name: string;
     quantity: number;
     price: string;
+    /** Variant ID — the alias join key for sku_aliases when a SKU
+     *  is sold via Shopify. Null for custom non-catalog line items
+     *  (rare but possible via Shopify Admin manual orders). */
+    variant_id: number | null;
+    /** Product ID — the parent product, kept for diagnostics +
+     *  potential fallback if a merchant maps by product instead of
+     *  variant (not v1 behavior, but cheap to capture). */
+    product_id: number | null;
+    /** Platform-side SKU code from the merchant's catalog. Display
+     *  only — sku_aliases joins on variant_id, not this string. */
+    sku: string | null;
   }>;
 }
 
@@ -477,12 +488,49 @@ export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
       fulfillment_status: order.fulfillment_status,
       cancelled_at: order.cancelled_at,
       line_items: order.line_items.map((li) => ({
+        id: li.id,
         name: li.name,
         quantity: li.quantity,
         price: li.price,
+        variant_id: li.variant_id,
+        product_id: li.product_id,
+        sku: li.sku,
       })),
     },
   };
+}
+
+/**
+ * Phase 12c: extract line items from a Shopify order in the
+ * platform-agnostic shape required by
+ * lib/cogs/lineItems.bulkInsertLineItemsForParent.
+ *
+ * Each Shopify line item becomes one InternalLineItem:
+ *   externalId       = String(line_item.id)
+ *   externalItemId   = String(variant_id) — the alias join key
+ *   externalSku      = line_item.sku — display only
+ *   name, quantity   = as-is
+ *   unitPrice        = Number(price)
+ *   currency         = order-level currency (Shopify doesn't put
+ *                      currency on individual line items)
+ *
+ * Line items with no variant_id (rare — manual orders typed in
+ * Shopify Admin without a catalog item) still get inserted but
+ * with externalItemId = null. They'll surface in the Unmatched UI
+ * (Phase 12d) for the merchant to map manually.
+ */
+export function extractShopifyLineItems(
+  order: ShopifyOrder
+): import("./cogs/lineItems").InternalLineItem[] {
+  return order.line_items.map((li) => ({
+    externalId: String(li.id),
+    externalItemId: li.variant_id != null ? String(li.variant_id) : null,
+    externalSku: li.sku,
+    name: li.name,
+    quantity: li.quantity,
+    unitPrice: Number(li.price) || 0,
+    currency: order.currency,
+  }));
 }
 
 // ---------------------------------------------------------------------

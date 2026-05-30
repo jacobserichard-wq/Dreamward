@@ -36,8 +36,10 @@ import { decryptFromDb } from "@/lib/crypto";
 import {
   listOrders,
   mapOrderToProcessedItem,
+  extractShopifyLineItems,
   type ShopifyOrder,
 } from "@/lib/shopify";
+import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 
 // Free-tier cap (locked design decision 4.7). Configurable via env
 // var so we can A/B-test without a deploy. Default 30,000.
@@ -188,9 +190,21 @@ export async function POST() {
       // ── Bulk INSERT with ON CONFLICT DO NOTHING ──────────────
       // Build a multi-row VALUES list. Safer than INSERT-per-row
       // for backfill perf (1 query per 250 orders vs 250 queries).
-      const rows = page.orders
-        .slice(0, Math.max(0, hardCap - totalImported))
-        .map(mapOrderToProcessedItem);
+      //
+      // Phase 12c: now RETURNING (id, source_ref_id) so we can
+      // map each freshly-inserted parent row back to its source
+      // ShopifyOrder + fan its line items out into
+      // processed_item_line_items. Duplicates skipped by
+      // ON CONFLICT don't appear in the returning set, so we
+      // skip line-item fan-out for them (already-imported orders
+      // don't double up — re-importing historical line items
+      // requires the separate "Re-import line items" path that
+      // ships in Phase 12g polish).
+      const ordersThisPage = page.orders.slice(
+        0,
+        Math.max(0, hardCap - totalImported)
+      );
+      const rows = ordersThisPage.map(mapOrderToProcessedItem);
 
       if (rows.length > 0) {
         // Build parameterized VALUES. Each row needs 10 params
@@ -231,7 +245,10 @@ export async function POST() {
         //   CREATE UNIQUE INDEX idx_processed_items_source_ref
         //     ON processed_items (client_id, source, source_ref_id)
         //     WHERE source_ref_id IS NOT NULL;
-        await pool.query(
+        const insertRes = await pool.query<{
+          id: number;
+          source_ref_id: string;
+        }>(
           `INSERT INTO processed_items (
              vendor, invoice_number, amount, due_date, status,
              category, source, source_ref_id, confidence, summary,
@@ -239,9 +256,39 @@ export async function POST() {
            ) VALUES ${placeholders}
            ON CONFLICT (client_id, source, source_ref_id)
              WHERE source_ref_id IS NOT NULL
-           DO NOTHING`,
+           DO NOTHING
+           RETURNING id, source_ref_id`,
           values
         );
+
+        // ── Phase 12c: fan line items into processed_item_line_items
+        // for every parent row we just freshly inserted. ON CONFLICT
+        // skips already-imported parents, so this only runs for new
+        // ones — matches "don't re-fan historical line items on
+        // backfill re-runs" semantics.
+        if (insertRes.rowCount && insertRes.rowCount > 0) {
+          const orderById = new Map<string, ShopifyOrder>();
+          for (const o of ordersThisPage) orderById.set(String(o.id), o);
+          const parents = insertRes.rows
+            .map((r) => {
+              const order = orderById.get(r.source_ref_id);
+              if (!order) return null;
+              const mapped = mapOrderToProcessedItem(order);
+              return {
+                parentId: r.id,
+                soldAt: mapped.due_date,
+                items: extractShopifyLineItems(order),
+              };
+            })
+            .filter((p): p is NonNullable<typeof p> => p !== null);
+          if (parents.length > 0) {
+            await bulkInsertLineItemsAcrossParents({
+              clientId: client.id,
+              platform: "shopify",
+              parents,
+            });
+          }
+        }
 
         totalImported += rows.length;
         ordersThisRun += rows.length;

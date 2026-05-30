@@ -40,9 +40,11 @@ import {
   verifyWebhookHmac,
   mapOrderToProcessedItem,
   mapRefundToProcessedItem,
+  extractShopifyLineItems,
   type ShopifyOrder,
   type ShopifyRefund,
 } from "@/lib/shopify";
+import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 
 interface ShopifyConnectionLookup {
   id: number;
@@ -151,7 +153,15 @@ export async function POST(req: NextRequest) {
  */
 async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
   const row = mapOrderToProcessedItem(order);
-  await pool.query(
+  // Phase 12c: capture the parent id from RETURNING so we can fan
+  // out line items into processed_item_line_items. RETURNING fires
+  // on both INSERT and DO UPDATE paths, so webhook redelivery
+  // (which hits DO UPDATE) still gets the parent id and re-runs
+  // the line-item upsert. The (processed_item_id, external_id)
+  // UNIQUE constraint on processed_item_line_items + ON CONFLICT
+  // DO NOTHING in bulkInsertLineItemsForParent makes that
+  // idempotent: redeliveries skip rather than duplicating.
+  const upsertRes = await pool.query<{ id: number }>(
     `INSERT INTO processed_items (
        vendor, invoice_number, amount, due_date, status,
        category, source, source_ref_id, confidence, summary,
@@ -170,7 +180,8 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
            due_date = EXCLUDED.due_date,
            status = EXCLUDED.status,
            summary = EXCLUDED.summary,
-           extracted_data = EXCLUDED.extracted_data`,
+           extracted_data = EXCLUDED.extracted_data
+     RETURNING id`,
     [
       row.vendor,
       row.invoice_number,
@@ -186,6 +197,20 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
       clientId,
     ]
   );
+
+  const parentId = upsertRes.rows[0]?.id;
+  if (parentId) {
+    const lineItems = extractShopifyLineItems(order);
+    if (lineItems.length > 0) {
+      await bulkInsertLineItemsForParent({
+        parentId,
+        clientId,
+        platform: "shopify",
+        soldAt: row.due_date,
+        items: lineItems,
+      });
+    }
+  }
 }
 
 /**
