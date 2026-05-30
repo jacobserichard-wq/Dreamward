@@ -583,10 +583,18 @@ export default function SkuDetailPage() {
                             <button
                               type="button"
                               onClick={() => startEditingCost(c)}
-                              className="text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap bg-transparent border-0 cursor-pointer hover:bg-blue-50 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                              className="group inline-flex items-center gap-1.5 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap bg-transparent border-0 cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
                               title="Click to edit"
                             >
-                              {fmtMoney(c.cost, c.currency)}
+                              <span className="border-b border-dashed border-slate-300 group-hover:border-blue-500">
+                                {fmtMoney(c.cost, c.currency)}
+                              </span>
+                              <span
+                                aria-hidden="true"
+                                className="text-[11px] text-slate-300 group-hover:text-blue-600 transition-colors"
+                              >
+                                {"✎"}
+                              </span>
                             </button>
                           )}
                         </td>
