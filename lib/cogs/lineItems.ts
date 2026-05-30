@@ -99,10 +99,31 @@ export async function bulkInsertLineItemsForParent(opts: {
   // external_item_id, external_sku, name, quantity, unit_price,
   // currency, sold_at — 11 fields. matched_sku_id is filled by
   // the LATERAL join (NULL when no matching alias).
-  const fieldsPerRow = 11;
+  //
+  // The FIRST row carries explicit Postgres type casts so the
+  // anonymous VALUES list resolves to the right column types.
+  // Without these, pg infers some columns as TEXT (especially
+  // ones that are sometimes-null like external_item_id) and the
+  // downstream JOIN to skus.client_id (INTEGER) fails with
+  // "operator does not exist: integer = text". Subsequent rows
+  // inherit the cast types from the first row.
+  const COLUMN_CASTS = [
+    "int",       // processed_item_id
+    "int",       // client_id
+    "text",      // platform
+    "text",      // external_id
+    "text",      // external_item_id (nullable)
+    "text",      // external_sku (nullable)
+    "text",      // name
+    "numeric",   // quantity
+    "numeric",   // unit_price
+    "text",      // currency
+    "date",      // sold_at (passed as YYYY-MM-DD string)
+  ] as const;
+  const fieldsPerRow = COLUMN_CASTS.length;
   const values: unknown[] = [];
   const placeholders = items
-    .map((it) => {
+    .map((it, rowIdx) => {
       const base = values.length;
       values.push(
         parentId,
@@ -117,14 +138,14 @@ export async function bulkInsertLineItemsForParent(opts: {
         it.currency,
         soldAt
       );
-      return (
-        "(" +
-        Array.from(
-          { length: fieldsPerRow },
-          (_, j) => `$${base + j + 1}`
-        ).join(",") +
-        ")"
+      const cells = Array.from(
+        { length: fieldsPerRow },
+        (_, j) =>
+          rowIdx === 0
+            ? `$${base + j + 1}::${COLUMN_CASTS[j]}`
+            : `$${base + j + 1}`
       );
+      return "(" + cells.join(",") + ")";
     })
     .join(",");
 
