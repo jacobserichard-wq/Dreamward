@@ -29,12 +29,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { decryptFromDb } from "@/lib/crypto";
 import {
   getSquareEnvironment,
   mapPaymentToProcessedItem,
   verifyWebhookSignature,
+  getOrder,
+  extractSquareLineItems,
   type SquarePayment,
 } from "@/lib/square";
+import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 
 // Square's webhook subscription is keyed by notification URL.
 // Must match exactly what we registered in the Dev Console.
@@ -179,9 +183,16 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 6. Upsert into processed_items ──────────────────────────
+  let parentId: number | null = null;
+  let row: ReturnType<typeof mapPaymentToProcessedItem> | null = null;
   try {
-    const row = mapPaymentToProcessedItem(payment);
-    await pool.query(
+    row = mapPaymentToProcessedItem(payment);
+    // Phase 12c: RETURNING id so we can fan out line items below.
+    // RETURNING fires on both INSERT and DO UPDATE paths so webhook
+    // redelivery still gets the parent id and re-runs the line-item
+    // INSERT (idempotent via the (processed_item_id, external_id)
+    // UNIQUE index on processed_item_line_items).
+    const upsertRes = await pool.query<{ id: number }>(
       `INSERT INTO processed_items (
          vendor, invoice_number, amount, due_date, status,
          category, source, source_ref_id, channel, confidence,
@@ -193,7 +204,8 @@ export async function POST(req: NextRequest) {
          status = EXCLUDED.status,
          amount = EXCLUDED.amount,
          summary = EXCLUDED.summary,
-         extracted_data = EXCLUDED.extracted_data`,
+         extracted_data = EXCLUDED.extracted_data
+       RETURNING id`,
       [
         row.vendor,
         row.invoice_number,
@@ -210,6 +222,7 @@ export async function POST(req: NextRequest) {
         conn.client_id,
       ]
     );
+    parentId = upsertRes.rows[0]?.id ?? null;
 
     console.log(
       `Square webhook: event=${eventType} payment=${payment.id} → client_id=${conn.client_id} upserted`
@@ -217,6 +230,74 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Square webhook: upsert failed:", err);
     return NextResponse.json({ acknowledged: true, dbError: true });
+  }
+
+  // ── 7. Phase 12c: fan line items into processed_item_line_items
+  //
+  // Square is the only platform where line items aren't in the
+  // webhook payload — we have to fetch the parent Order to get
+  // them. That means doing the access-token dance from the
+  // webhook path. Pragmatic choice: read + decrypt the EXISTING
+  // token, attempt getOrder, silently skip line items on failure.
+  //
+  // Why no token refresh here:
+  //   - Webhooks are public, anonymous endpoints. A refresh
+  //     failure (Square down, refresh token expired) shouldn't
+  //     cascade into Square disabling the subscription via
+  //     repeated 5xx returns. We always return 200.
+  //   - The backfill + future daily-reconciliation paths DO
+  //     refresh tokens. They'll re-ingest any line items we
+  //     missed during a stale-token window via the Phase 12g
+  //     re-import path.
+  //
+  // If the payment has no order_id, skip entirely (rare — Square
+  // standalone API payments without an Order — they carry no SKU
+  // detail by design).
+  if (parentId && row && payment.order_id) {
+    try {
+      const tokenRow = await pool.query<{
+        ciphertext: Buffer;
+        iv: Buffer;
+        auth_tag: Buffer;
+      }>(
+        `SELECT access_token_ciphertext AS ciphertext,
+                access_token_iv        AS iv,
+                access_token_auth_tag  AS auth_tag
+           FROM square_connections
+          WHERE id = $1`,
+        [conn.id]
+      );
+      if (tokenRow.rows[0]) {
+        const accessToken = decryptFromDb({
+          ciphertext: tokenRow.rows[0].ciphertext,
+          iv: tokenRow.rows[0].iv,
+          authTag: tokenRow.rows[0].auth_tag,
+        });
+        const order = await getOrder({
+          accessToken,
+          orderId: payment.order_id,
+        });
+        if (order) {
+          const items = extractSquareLineItems(order);
+          if (items.length > 0) {
+            await bulkInsertLineItemsForParent({
+              parentId,
+              clientId: conn.client_id,
+              platform: "square",
+              soldAt: row.due_date,
+              items,
+            });
+          }
+        }
+      }
+    } catch (lineItemErr) {
+      // Don't fail the webhook — parent row is already saved.
+      // Re-import path can fill in missed line items later.
+      console.warn(
+        `Square webhook: line-item fan-out failed for payment=${payment.id}:`,
+        lineItemErr instanceof Error ? lineItemErr.message : lineItemErr
+      );
+    }
   }
 
   await touchSyncState(conn.id, eventType);

@@ -540,3 +540,153 @@ export function mapPaymentToProcessedItem(
     },
   };
 }
+
+// ---------------------------------------------------------------------
+// Phase 12c: Orders API (line-item resolution)
+// ---------------------------------------------------------------------
+//
+// Square payments carry an optional order_id. When present, the Order
+// holds the line-item breakdown (POS ring-up, Square Online checkout,
+// invoice items, etc.). When absent, the payment was made via the
+// raw Payments API without an Order — those stay as single-line
+// transactions in our system. Most real merchant traffic has order_id.
+
+/** Minimal Order schema. Square returns much more; we ignore what
+ *  we don't use for COGS. */
+export interface SquareOrder {
+  id: string;
+  location_id?: string;
+  /** Line items. Each one becomes a row in
+   *  processed_item_line_items after Phase 12c ingestion. */
+  line_items?: Array<{
+    /** Square's per-line-item identifier. Stable across an Order's
+     *  lifetime — used as external_id for ON CONFLICT dedup. */
+    uid?: string;
+    /** Display name at time of sale. */
+    name?: string;
+    /** STRING (not number) — Square returns "2.000" etc. We parse
+     *  to a number on the way into InternalLineItem.quantity. */
+    quantity?: string;
+    /** Variation-level identifier — the alias join key. Distinct
+     *  from the parent item id (which would be one level up in
+     *  Square's catalog). Mapping sku_aliases.external_id to this
+     *  variation id is the canonical pattern. */
+    catalog_object_id?: string;
+    /** Variation display name ("1lb bag", "Large", etc.). Combined
+     *  with `name` for the line item's external_sku display only. */
+    variation_name?: string;
+    /** Per-unit price BEFORE discounts (cents). */
+    base_price_money?: { amount?: number; currency?: string };
+    /** Variation-level total — sometimes set instead of
+     *  base_price_money depending on order type. */
+    variation_total_price_money?: { amount?: number; currency?: string };
+  }>;
+  /** Currency for the whole order. Line items inherit this when
+   *  their own money objects don't carry a currency string. */
+  total_money?: { amount?: number; currency?: string };
+}
+
+interface SquareOrderResponse {
+  order?: SquareOrder;
+  errors?: Array<{ category?: string; code?: string; detail?: string }>;
+}
+
+/**
+ * Fetch one Order by id from /v2/orders/{order_id}. Called per
+ * payment during backfill + webhook handlers — adds one Square
+ * API call per payment that has an order_id, but Square's
+ * documented rate limit (~100 RPS per app) gives plenty of
+ * headroom even for chunked backfills.
+ *
+ * Returns null when the order doesn't exist (rare — Square
+ * occasionally returns an order_id that's been deleted from a
+ * partial order flow) or on API error. The line-item fan-out
+ * silently skips in that case; the payment row still gets
+ * stored.
+ */
+export async function getOrder(opts: {
+  accessToken: string;
+  orderId: string;
+}): Promise<SquareOrder | null> {
+  try {
+    const data = await squareGet<SquareOrderResponse>({
+      accessToken: opts.accessToken,
+      path: `/v2/orders/${encodeURIComponent(opts.orderId)}`,
+    });
+    if (data.errors && data.errors.length > 0) {
+      const first = data.errors[0];
+      console.warn(
+        `Square getOrder(${opts.orderId}) returned errors: ` +
+          `${first.category}/${first.code} ${first.detail ?? ""}`
+      );
+      return null;
+    }
+    return data.order ?? null;
+  } catch (err) {
+    console.warn(
+      `Square getOrder(${opts.orderId}) threw:`,
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
+}
+
+/**
+ * Phase 12c: extract line items from a Square Order in the
+ * platform-agnostic shape required by
+ * lib/cogs/lineItems.bulkInsertLineItemsForParent.
+ *
+ *   externalId       = line_item.uid (required by Square's schema
+ *                      but defensive against missing values)
+ *   externalItemId   = line_item.catalog_object_id — the alias
+ *                      join key. Null for custom ring-ups
+ *                      ("Custom amount $5" at the POS) which
+ *                      surface in the Unmatched UI as catalog-less.
+ *   externalSku      = variation_name when distinct from name, else
+ *                      null — Square doesn't expose a separate SKU
+ *                      string on the line item; merchants who care
+ *                      about SKU strings put them in the catalog
+ *                      item's SKU field which we read at
+ *                      bulk-import time (Phase 12e).
+ *   name             = line_item.name (+ variation if distinct)
+ *   quantity         = parseFloat(line_item.quantity)
+ *   unitPrice        = (base_price_money.amount ?? 0) / 100  (cents → main unit)
+ *   currency         = line item's currency or fall back to the
+ *                      Order's total_money.currency or "USD"
+ *
+ * Skips line items with no uid (defensive — should never happen
+ * but Square's schema declares it optional).
+ */
+export function extractSquareLineItems(
+  order: SquareOrder
+): import("./cogs/lineItems").InternalLineItem[] {
+  const fallbackCurrency = order.total_money?.currency || "USD";
+  return (order.line_items ?? [])
+    .filter((li): li is NonNullable<typeof li> & { uid: string } =>
+      typeof li?.uid === "string" && li.uid.length > 0
+    )
+    .map((li) => {
+      const quantity = Number(li.quantity ?? "1") || 1;
+      const cents =
+        li.base_price_money?.amount ??
+        li.variation_total_price_money?.amount ??
+        0;
+      const currency =
+        li.base_price_money?.currency ||
+        li.variation_total_price_money?.currency ||
+        fallbackCurrency;
+      const displayName =
+        li.variation_name && li.name && li.variation_name !== li.name
+          ? `${li.name} (${li.variation_name})`
+          : (li.name ?? "Untitled item");
+      return {
+        externalId: li.uid,
+        externalItemId: li.catalog_object_id ?? null,
+        externalSku: li.variation_name ?? null,
+        name: displayName,
+        quantity,
+        unitPrice: cents / 100,
+        currency,
+      };
+    });
+}

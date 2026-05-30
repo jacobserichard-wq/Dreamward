@@ -18,7 +18,10 @@ import {
   fetchPaymentsPage,
   mapPaymentToProcessedItem,
   refreshAccessToken,
+  getOrder,
+  extractSquareLineItems,
 } from "@/lib/square";
+import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 
 // Vercel Pro 60s limit, 10s headroom for the final UPDATE.
 const TIME_BUDGET_MS = 50_000;
@@ -230,7 +233,17 @@ export async function POST() {
         })
         .join(",");
 
-      await pool.query(
+      // Phase 12c: RETURNING (id, source_ref_id) so we can fan
+      // line items into processed_item_line_items for every
+      // freshly-inserted parent. For Square, line items live on
+      // the Order (not the Payment), so we make one extra
+      // /v2/orders/{order_id} call per payment that has an
+      // order_id. Square's documented rate limit is ~100 RPS;
+      // a 100-payment chunk = 100 extra calls = well under quota.
+      const insertRes = await pool.query<{
+        id: number;
+        source_ref_id: string;
+      }>(
         `INSERT INTO processed_items (
            vendor, invoice_number, amount, due_date, status,
            category, source, source_ref_id, channel, confidence,
@@ -238,9 +251,49 @@ export async function POST() {
          ) VALUES ${placeholders}
          ON CONFLICT (client_id, source, source_ref_id)
            WHERE source_ref_id IS NOT NULL
-         DO NOTHING`,
+         DO NOTHING
+         RETURNING id, source_ref_id`,
         values
       );
+
+      if (insertRes.rowCount && insertRes.rowCount > 0) {
+        const paymentById = new Map<string, typeof page.payments[number]>();
+        for (const p of page.payments) paymentById.set(p.id, p);
+
+        type Parent = {
+          parentId: number;
+          soldAt: string;
+          items: ReturnType<typeof extractSquareLineItems>;
+        };
+        const parents: Parent[] = [];
+
+        for (const r of insertRes.rows) {
+          const payment = paymentById.get(r.source_ref_id);
+          if (!payment) continue;
+          if (!payment.order_id) continue;
+          const order = await getOrder({
+            accessToken,
+            orderId: payment.order_id,
+          });
+          if (!order) continue;
+          const items = extractSquareLineItems(order);
+          if (items.length === 0) continue;
+          const mapped = mapPaymentToProcessedItem(payment);
+          parents.push({
+            parentId: r.id,
+            soldAt: mapped.due_date,
+            items,
+          });
+        }
+
+        if (parents.length > 0) {
+          await bulkInsertLineItemsAcrossParents({
+            clientId: client.id,
+            platform: "square",
+            parents,
+          });
+        }
+      }
 
       totalImported += rows.length;
       paymentsThisRun += rows.length;
