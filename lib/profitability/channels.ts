@@ -80,7 +80,10 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     label: "Markets",
     icon: "\u{1F3EA}",
     comingSoon: false,
-    emptyAddHref: "/events/new",
+    // /events/new isn't a route — events use an inline-create
+     // pattern on /events via the "+ New event" toggle. Send the
+     // zero-state CTA to the list page where that button lives.
+    emptyAddHref: "/events",
     emptyAddLabel: "Add your first event",
     proGated: false,
     drillHref: "/events",

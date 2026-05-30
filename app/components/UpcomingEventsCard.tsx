@@ -120,8 +120,11 @@ export default function UpcomingEventsCard({
             <p className="text-sm text-slate-500 m-0 mb-2">
               No upcoming events
             </p>
+            {/* /events/new isn't a route — events use an inline-
+                create pattern on /events. Land on the list page
+                where the "+ New event" toggle button lives. */}
             <Link
-              href="/events/new"
+              href="/events"
               className="text-xs text-blue-600 hover:underline font-medium"
             >
               Add your first event {"\u{2192}"}
