@@ -13,6 +13,7 @@ import type { ChannelRow } from "../components/ChannelTable";
 import SalesBanner from "../components/SalesBanner";
 import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
+import CogsSummaryCard from "../components/CogsSummaryCard";
 import UpcomingEventsCard, {
   type UpcomingEvent,
 } from "../components/UpcomingEventsCard";
@@ -1547,6 +1548,13 @@ export default function Home() {
                 loading={availableEvents.length === 0 && !clientInfo}
               />
             </div>
+
+            {/* Phase 12g: COGS gross-margin widget. Pro-gated via the
+                /api/cogs/summary 403 (silent hide for non-Pro). Self-
+                fetches a 30-day window, surfaces top SKUs +
+                underwater + unmatched warnings, links to /cogs for
+                the full dashboard. */}
+            <CogsSummaryCard />
 
             {/* Phase 9.2: Top Categories removed from dashboard.
                 Same data lives on /reports as the by-category
