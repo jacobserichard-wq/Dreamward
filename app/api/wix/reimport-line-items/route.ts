@@ -37,7 +37,7 @@ interface ParentRow {
 async function fetchWixOrder(opts: {
   accessToken: string;
   orderId: string;
-}): Promise<WixOrder | null> {
+}): Promise<{ order: WixOrder | null; debug: Record<string, unknown> }> {
   const url = `https://www.wixapis.com/stores/v3/orders/${encodeURIComponent(opts.orderId)}`;
   const res = await fetch(url, {
     headers: {
@@ -45,26 +45,37 @@ async function fetchWixOrder(opts: {
       Accept: "application/json",
     },
   });
-  if (res.status === 404) return null;
+  if (res.status === 404) {
+    return { order: null, debug: { status: 404 } };
+  }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(
       `Wix order ${opts.orderId} fetch failed: HTTP ${res.status} ${txt.slice(0, 200)}`
     );
   }
-  // Wix's v3 single-order GET endpoint returns the order at the
-  // TOP LEVEL of the JSON, not wrapped in { order: ... } the way
-  // the search endpoint wraps its results in { orders: [...] }.
-  // Defensive parse handles either shape — falls back to checking
-  // for a top-level `id` to confirm we got an order rather than
-  // an error envelope.
   const data = (await res.json().catch(() => null)) as
     | (Partial<WixOrder> & { order?: WixOrder })
     | null;
-  if (!data) return null;
-  if (data.order && typeof data.order.id === "string") return data.order;
-  if (typeof data.id === "string") return data as WixOrder;
-  return null;
+  // Temporary debug surface (sub-session 31 smoke test). Captures
+  // the top-level keys + whether order is wrapped vs bare, so the
+  // reimport endpoint response can carry the shape back to the UI
+  // for inspection. Stripped once the response shape is confirmed.
+  const debug: Record<string, unknown> = {
+    status: res.status,
+    top_keys: data ? Object.keys(data) : [],
+    has_order_wrapper: !!(data && data.order),
+    has_top_level_id: !!(data && typeof data.id === "string"),
+    line_items_count: Array.isArray((data?.order ?? data)?.lineItems)
+      ? (data?.order ?? data)!.lineItems!.length
+      : null,
+  };
+  if (!data) return { order: null, debug };
+  if (data.order && typeof data.order.id === "string") {
+    return { order: data.order, debug };
+  }
+  if (typeof data.id === "string") return { order: data as WixOrder, debug };
+  return { order: null, debug };
 }
 
 export async function POST(req: Request) {
@@ -122,17 +133,29 @@ export async function POST(req: Request) {
     let lineItemsAdded = 0;
     let lastTouchedId = cursor;
     let done = false;
+    const debugPerParent: Array<{
+      parentId: number;
+      sourceRefId: string;
+      itemsExtracted: number;
+      fetchDebug: Record<string, unknown>;
+    }> = [];
 
     for (const parent of parentsRes.rows) {
       if (Date.now() - startMs > TIME_BUDGET_MS) break;
       lastTouchedId = parent.id;
-      const order = await fetchWixOrder({
+      const { order, debug: fetchDebug } = await fetchWixOrder({
         accessToken,
         orderId: parent.source_ref_id,
       });
       processed++;
+      const items = order ? extractWixLineItems(order) : [];
+      debugPerParent.push({
+        parentId: parent.id,
+        sourceRefId: parent.source_ref_id,
+        itemsExtracted: items.length,
+        fetchDebug,
+      });
       if (!order) continue;
-      const items = extractWixLineItems(order);
       if (items.length === 0) continue;
       const added = await bulkInsertLineItemsForParent({
         parentId: parent.id,
@@ -172,6 +195,8 @@ export async function POST(req: Request) {
       lineItemsAdded,
       cursor: lastTouchedId,
       totalRemaining: remainingRes.rows[0]?.remaining ?? 0,
+      // sub-session 31 smoke-test diagnostic
+      debug: debugPerParent,
     });
   } catch (err) {
     console.error("Wix reimport-line-items error:", err);
