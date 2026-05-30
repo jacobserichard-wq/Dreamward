@@ -11,6 +11,13 @@ interface ReportSummaryCardsProps {
   mileageCost: number;
   totalMiles: number;
   netProfit: number;
+  // Phase 13: when > 0, the layout splits Expenses into COGS +
+  // Operating Expenses and surfaces Gross Profit between them.
+  // When 0 (or undefined for legacy callers), the original 5-card
+  // layout renders.
+  cogs?: number;
+  grossProfit?: number;
+  operatingExpenses?: number;
 }
 
 function formatUsd(n: number): string {
@@ -57,9 +64,13 @@ export default function ReportSummaryCards({
   mileageCost,
   totalMiles,
   netProfit,
+  cogs,
+  grossProfit,
+  operatingExpenses,
 }: ReportSummaryCardsProps) {
   const netProfitTone =
     netProfit > 0 ? "text-green-700" : netProfit < 0 ? "text-red-700" : "text-slate-900";
+  const showCogsLayout = (cogs ?? 0) > 0;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
@@ -69,9 +80,29 @@ export default function ReportSummaryCards({
         icon={"\u{1F4B0}"}
         borderClass="border-t-green-600"
       />
+      {showCogsLayout && (
+        <>
+          <Card
+            label="Cost of goods"
+            value={formatUsd(cogs ?? 0)}
+            icon={"\u{1F4E6}"}
+            borderClass="border-t-orange-500"
+          />
+          <Card
+            label="Gross profit"
+            value={formatUsd(grossProfit ?? 0)}
+            sub="Revenue − COGS"
+            icon={"\u{1F4CA}"}
+            borderClass="border-t-emerald-500"
+            valueToneClass="text-emerald-800"
+          />
+        </>
+      )}
       <Card
-        label="Expenses"
-        value={formatUsd(expenses)}
+        label={showCogsLayout ? "Operating expenses" : "Expenses"}
+        value={formatUsd(
+          showCogsLayout ? (operatingExpenses ?? 0) : expenses
+        )}
         icon={"\u{1F4B3}"}
         borderClass="border-t-red-600"
       />

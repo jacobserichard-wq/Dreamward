@@ -160,6 +160,8 @@ export async function POST(req: NextRequest) {
       userFirstName,
       year,
       netProfit: summary.summary.netProfit,
+      grossProfit: summary.summary.grossProfit,
+      cogs: summary.summary.cogs,
     });
 
     try {

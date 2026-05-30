@@ -39,6 +39,11 @@ interface AnnualSummaryResponse {
     totalMiles: number;
     netProfit: number;
     unknownAmount: number;
+    // Phase 13: split COGS out from total expenses + surface
+    // gross profit as the headline mid-line on the P&L.
+    cogs: number;
+    grossProfit: number;
+    operatingExpenses: number;
   };
   byCategory: {
     income: Array<{ category: string; count: number; total: number }>;
@@ -50,6 +55,8 @@ interface AnnualSummaryResponse {
       // Phase 7c commit 9: Schedule C line surfaces in the category
       // table (badge) and the dedicated summary panel below.
       scheduleCLine: string | null;
+      // Phase 13: true when this category is tagged isCogs.
+      isCogs: boolean;
     }>;
   };
   // Phase 7c commit 9: Schedule C rollup — built by
@@ -403,6 +410,9 @@ export default function ReportsPage() {
               mileageCost={summary.summary.mileageCost}
               totalMiles={summary.summary.totalMiles}
               netProfit={summary.summary.netProfit}
+              cogs={summary.summary.cogs}
+              grossProfit={summary.summary.grossProfit}
+              operatingExpenses={summary.summary.operatingExpenses}
             />
 
             {/* Phase 7c commit 9: quarterly estimates panel. Renders an

@@ -353,12 +353,23 @@ export function cpaAnnualSummaryEmail(opts: {
   userFirstName: string;       // best-effort first name; falls back to business
   year: number;
   netProfit: number;
+  // Phase 13: when grossProfit is provided AND the business had
+  // non-zero COGS, the email's headline paragraph adds a
+  // gross-profit line above net profit so the CPA sees both
+  // figures up front.
+  grossProfit?: number;
+  cogs?: number;
 }) {
-  const { businessName, userFirstName, year, netProfit } = opts;
-  const formattedNet = `$${netProfit.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  const { businessName, userFirstName, year, netProfit, grossProfit, cogs } = opts;
+  const fmt = (n: number) =>
+    `$${n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  const formattedNet = fmt(netProfit);
+  const formattedGross = grossProfit != null ? fmt(grossProfit) : null;
+  const formattedCogs = cogs != null ? fmt(cogs) : null;
+  const showGross = (cogs ?? 0) > 0 && formattedGross !== null;
   const signoff = userFirstName.trim() || businessName;
 
   return {
@@ -380,8 +391,14 @@ export function cpaAnnualSummaryEmail(opts: {
             Summary, Income, Expense, and Mileage sections. Filter by the
             <strong>Section</strong> column in Excel or Sheets to isolate each.</li>
         </ul>
+        ${showGross ? `
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 8px;">
+          Gross profit: <strong>${formattedGross}</strong> (revenue minus
+          ${formattedCogs} cost of goods).
+        </p>
+        ` : ""}
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px;">
-          Headline number for ${year}: <strong>${formattedNet}</strong> net profit
+          ${showGross ? "Net" : "Headline number for " + year + ":"} <strong>${formattedNet}</strong>${showGross ? " net profit" : " net profit"}
           (cash basis).
         </p>
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">
