@@ -14,15 +14,16 @@
 //   - Provides a single place to add file-validation later (mime
 //     allowlist, virus-scan hook, etc.) without touching N callers
 //
-// On the "Private" store + access:'public' option:
-//   Despite the SDK naming, this is the correct combination for
-//   our use case. The Vercel Blob STORE is set to Private — which
-//   means reads require a token AT THE BLOB SERVICE LEVEL (signed
-//   URL or server-side token). The access:'public' option in put()
-//   refers to URL-shape, not auth — it tells Blob to use a
-//   permanent stable URL rather than a one-time-expiring upload
-//   URL. With a Private store, those "public-shape" URLs still
-//   require auth to fetch. See @vercel/blob docs §"Access".
+// On the access parameter:
+//   The SDK requires the put() access value to match the store's
+//   access type. Our store is configured Private (defense-in-
+//   depth — bare URLs alone can't be served), so we pass
+//   access: 'private'. Passing 'public' against a Private store
+//   throws "Cannot use public access on a private store" at
+//   upload time. The proxy route at /api/expenses/[id]/
+//   attachments/[id]/raw is the user-facing auth layer regardless
+//   of the store's setting — sessions + tenant checks happen
+//   there, not at the Blob layer.
 
 import { put, del } from "@vercel/blob";
 
@@ -74,7 +75,9 @@ export async function uploadAttachment(opts: {
   const pathname = `client/${opts.clientId}/expense/${opts.processedItemId}/${unique}-${safeName}`;
 
   const blob = await put(pathname, opts.body, {
-    access: "public", // see header comment — URL-shape, not auth
+    // Must match the store's access type — our store is Private
+    // (see header comment).
+    access: "private",
     contentType: opts.contentType,
     token,
     addRandomSuffix: false, // we already supplied a unique prefix
