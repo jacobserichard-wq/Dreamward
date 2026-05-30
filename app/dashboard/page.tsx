@@ -609,6 +609,14 @@ export default function Home() {
     "pending" | "overdue" | "needs_review" | "paid" | null
   >(null);
 
+  // Sub-session 32 polish: Processed tab as an inbox, not a log.
+  // Default-hides rows in a settled state (status === "paid") so the
+  // tab represents work that still needs attention. Cleared by the
+  // "Show N settled" toggle on the tab itself. Status-filter chip
+  // (above) takes precedence when active — clicking a dashboard pill
+  // for "paid" should still surface paid rows even with this on.
+  const [hideSettled, setHideSettled] = useState<boolean>(true);
+
 
 
   const requestClearSample = useCallback(() => {
@@ -986,7 +994,20 @@ export default function Home() {
             }`}
           >
             {tab === "emails" && "\u{1F4E7} Emails"}
-            {tab === "processed" && `\u{1F4C4} Processed (${processedItems.length})`}
+            {/* Sub-session 32 polish: badge reflects what's visible.
+                When hideSettled is on (default), show only the count
+                of actionable rows. When off, show the full count.
+                Stops the "Processed (8)" lying when 7 of them are
+                hidden by the inbox filter. */}
+            {tab === "processed" && (
+              <>
+                {"\u{1F4C4} Processed ("}
+                {hideSettled && processedStatusFilter === null
+                  ? processedItems.filter((i) => i.status !== "paid").length
+                  : processedItems.length}
+                {")"}
+              </>
+            )}
             {tab === "dashboard" && "\u{1F4CA} Dashboard"}
           </button>
         ))}
@@ -1353,12 +1374,55 @@ export default function Home() {
                 </button>
               </div>
             )}
+            {/* Sub-session 32 polish: settled-toggle chip. Visible
+                whenever the user has at least one paid row AND no
+                status-filter chip is active (the status-filter chip
+                takes precedence — clicking the dashboard's "paid"
+                pill should still surface paid items). */}
+            {processedStatusFilter === null &&
+              processedItems.some((i) => i.status === "paid") && (
+                <div className="mb-4 flex items-center gap-2 flex-wrap text-sm text-slate-600">
+                  {hideSettled ? (
+                    <>
+                      <span>
+                        {processedItems.filter((i) => i.status === "paid").length}{" "}
+                        settled {processedItems.filter((i) => i.status === "paid").length === 1 ? "item" : "items"} hidden
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setHideSettled(false)}
+                        className="text-blue-600 hover:underline cursor-pointer"
+                      >
+                        Show settled {"\u{2192}"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span>Showing settled items.</span>
+                      <button
+                        type="button"
+                        onClick={() => setHideSettled(true)}
+                        className="text-blue-600 hover:underline cursor-pointer"
+                      >
+                        Hide settled
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             {(() => {
               // Apply the status filter immediately above the empty-
               // state branch so "no rows after filter" gets a distinct
               // empty state from "no rows at all."
+              //
+              // Filter precedence (highest first):
+              //   1. processedStatusFilter — set via dashboard pill click
+              //   2. hideSettled — default inbox behavior, hides "paid"
+              //   3. no filter — show everything
               const visibleItems = processedStatusFilter
                 ? processedItems.filter((i) => i.status === processedStatusFilter)
+                : hideSettled
+                ? processedItems.filter((i) => i.status !== "paid")
                 : processedItems;
               return processedItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
@@ -1368,11 +1432,27 @@ export default function Home() {
             ) : visibleItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F50D}"}</p>
-                <p>
-                  No items match the{" "}
-                  <strong>{processedStatusFilter?.replace("_", " ")}</strong>{" "}
-                  filter.
-                </p>
+                {processedStatusFilter ? (
+                  <p>
+                    No items match the{" "}
+                    <strong>{processedStatusFilter.replace("_", " ")}</strong>{" "}
+                    filter.
+                  </p>
+                ) : (
+                  // hideSettled hid everything — every row is paid.
+                  // Show a positive "all caught up" message rather than
+                  // a generic empty state.
+                  <p>
+                    All caught up — nothing needs your attention.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setHideSettled(false)}
+                      className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[15px]"
+                    >
+                      Show settled items
+                    </button>
+                  </p>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
