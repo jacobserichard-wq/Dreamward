@@ -4,7 +4,12 @@ import {
   sendEmail,
   trialExpiringEmail,
   proCallReminderEmail,
+  cogsDailyDigestEmail,
 } from "@/lib/email";
+import {
+  computeMargin,
+  computeMarginBySku,
+} from "@/lib/cogs/compute";
 import { reclassifyClientItems } from "@/lib/reclassify";
 import { type Industry } from "@/lib/categories";
 import {
@@ -494,6 +499,97 @@ export async function GET(req: NextRequest) {
       console.error("[cron] Square reconcile pass aggregate failure:", err);
     }
 
+    // ── Phase 12g: COGS daily digest emails ────────────────────
+    //
+    // For every Pro client, compute yesterday's revenue / COGS /
+    // margin via the same engine that powers /cogs. Email a brief
+    // digest only when yesterday had at least one mapped line-item
+    // sale — silent days don't generate inbox noise.
+    //
+    // Sent at cron firing time. The cron schedule (vercel.json)
+    // runs daily; this assumes the schedule is morning-ish in the
+    // user's local time. v1 doesn't personalize timezone — that's
+    // a follow-up.
+    let cogsDigestsSent = 0;
+    let cogsDigestsSkipped = 0;
+    let cogsDigestErrors = 0;
+    try {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const yIso = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, "0")}-${String(yesterday.getUTCDate()).padStart(2, "0")}`;
+
+      const proClientsRes = await pool.query<{
+        id: number;
+        email: string;
+        business_name: string | null;
+      }>(
+        `SELECT id, email, business_name
+           FROM clients
+          WHERE plan = 'pro' AND email IS NOT NULL`
+      );
+
+      for (const c of proClientsRes.rows) {
+        try {
+          const totals = await computeMargin({
+            clientId: c.id,
+            periodStart: yIso,
+            periodEnd: yIso,
+          });
+          if (totals.totalLineItemCount === 0) {
+            cogsDigestsSkipped++;
+            continue;
+          }
+          // Pull top SKU + underwater count via the SKU breakdown.
+          // limit=20 is enough to find both signals cheaply.
+          const skuRows = await computeMarginBySku({
+            clientId: c.id,
+            periodStart: yIso,
+            periodEnd: yIso,
+            limit: 20,
+          });
+          const topSkuRow = skuRows.find(
+            (s) => s.skuId != null && s.revenue > 0
+          );
+          const underwaterCount = skuRows.filter(
+            (s) => s.underwater
+          ).length;
+
+          const email = cogsDailyDigestEmail({
+            businessName: c.business_name ?? "Your business",
+            date: yIso,
+            revenue: totals.revenue,
+            cogs: totals.cogs,
+            margin: totals.margin,
+            marginPercent: totals.marginPercent,
+            lineItemCount: totals.totalLineItemCount,
+            unmatchedLineItemCount: totals.unmatchedLineItemCount,
+            underwaterSkuCount: underwaterCount,
+            topSku: topSkuRow
+              ? {
+                  code: topSkuRow.skuCode ?? "—",
+                  name: topSkuRow.skuName ?? "",
+                  revenue: topSkuRow.revenue,
+                }
+              : null,
+          });
+          await sendEmail({ to: c.email, ...email });
+          cogsDigestsSent++;
+        } catch (err) {
+          console.error(
+            `[cron] COGS digest send failed for client ${c.id}:`,
+            err
+          );
+          cogsDigestErrors++;
+        }
+      }
+
+      console.log(
+        `[cron] COGS digests: ${cogsDigestsSent} sent, ` +
+          `${cogsDigestsSkipped} skipped (no sales), ${cogsDigestErrors} errors`
+      );
+    } catch (err) {
+      console.error("[cron] COGS digest pass aggregate failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -509,6 +605,9 @@ export async function GET(req: NextRequest) {
       squareConnectionsScanned,
       squarePaymentsUpserted,
       squareReconcileErrors,
+      cogsDigestsSent,
+      cogsDigestsSkipped,
+      cogsDigestErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);

@@ -237,6 +237,117 @@ export function arReminderEmail(opts: {
 //
 // Reply-To = the user's own email (set in the route, not here) so
 // the CPA's reply threads back to the vendor.
+/**
+ * Phase 12g daily COGS digest. Sent once per Pro merchant per day
+ * when yesterday had at least one mapped line-item sale. Skip
+ * threshold is in the cron handler (totalLineItemCount > 0) so
+ * silent days don't spam inboxes.
+ *
+ * Tone: a quick, scannable "yesterday's pulse" — the kind of
+ * thing a maker glances at over morning coffee. No call-to-action
+ * unless there's actionable signal (unmatched items, underwater
+ * SKUs).
+ */
+export function cogsDailyDigestEmail(opts: {
+  businessName: string;
+  date: string;          // YYYY-MM-DD that the digest is FOR
+  revenue: number;
+  cogs: number;
+  margin: number;
+  marginPercent: number | null;
+  lineItemCount: number;
+  unmatchedLineItemCount: number;
+  underwaterSkuCount: number;
+  topSku: { code: string; name: string; revenue: number } | null;
+}) {
+  const fmtUsd = (n: number) =>
+    `$${n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  const fmtPct = (n: number | null) =>
+    n == null ? "—" : `${n.toFixed(1)}%`;
+  const dateLabel = (() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(opts.date);
+    if (!m) return opts.date;
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${months[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+  })();
+
+  const actionBlocks: string[] = [];
+  if (opts.unmatchedLineItemCount > 0) {
+    actionBlocks.push(`
+      <p style="font-size: 14px; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin: 0 0 12px;">
+        ⚠️ ${opts.unmatchedLineItemCount} line item${opts.unmatchedLineItemCount === 1 ? "" : "s"} arrived without a SKU mapping — your margin reading is incomplete until you map them.
+        <a href="${baseUrl}/skus/unmatched" style="color: #92400e; font-weight: 600;">Map them →</a>
+      </p>
+    `);
+  }
+  if (opts.underwaterSkuCount > 0) {
+    actionBlocks.push(`
+      <p style="font-size: 14px; color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin: 0 0 12px;">
+        🚨 ${opts.underwaterSkuCount} SKU${opts.underwaterSkuCount === 1 ? "" : "s"} sold below cost yesterday.
+        <a href="${baseUrl}/cogs" style="color: #991b1b; font-weight: 600;">Review →</a>
+      </p>
+    `);
+  }
+  const topSkuBlock = opts.topSku
+    ? `
+      <p style="font-size: 14px; color: #475569; line-height: 1.5; margin: 16px 0 0;">
+        Top earner: <strong style="font-family: ui-monospace, monospace;">${opts.topSku.code}</strong> ${opts.topSku.name} — ${fmtUsd(opts.topSku.revenue)}
+      </p>
+    `
+    : "";
+
+  return {
+    subject: `${opts.businessName || "FlowWork"} — ${dateLabel}: ${fmtUsd(opts.revenue)} sold, ${fmtPct(opts.marginPercent)} margin`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+        <p style="font-size: 12px; color: #94a3b8; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+          Daily pulse — ${dateLabel}
+        </p>
+        <h1 style="font-size: 22px; color: #0f172a; margin: 0 0 20px;">
+          ${opts.businessName || "Your business"} — yesterday in numbers
+        </h1>
+
+        <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 0 16px;">
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; vertical-align: top; width: 33%;">
+              <p style="font-size: 10px; color: #64748b; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em;">Revenue</p>
+              <p style="font-size: 18px; color: #0f172a; margin: 0; font-weight: 700;">${fmtUsd(opts.revenue)}</p>
+            </td>
+            <td style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; vertical-align: top; width: 33%;">
+              <p style="font-size: 10px; color: #64748b; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em;">COGS</p>
+              <p style="font-size: 18px; color: #475569; margin: 0; font-weight: 700;">${fmtUsd(opts.cogs)}</p>
+            </td>
+            <td style="background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; vertical-align: top; width: 33%;">
+              <p style="font-size: 10px; color: #047857; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em;">Margin</p>
+              <p style="font-size: 18px; color: #065f46; margin: 0; font-weight: 700;">${fmtUsd(opts.margin)}</p>
+              <p style="font-size: 11px; color: #047857; margin: 2px 0 0;">${fmtPct(opts.marginPercent)} of revenue</p>
+            </td>
+          </tr>
+        </table>
+
+        <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">
+          ${opts.lineItemCount} line item${opts.lineItemCount === 1 ? "" : "s"} sold.
+        </p>
+
+        ${actionBlocks.join("")}
+
+        <a href="${baseUrl}/cogs" style="display: inline-block; padding: 10px 20px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 8px 0 0;">
+          Open full COGS dashboard →
+        </a>
+
+        ${topSkuBlock}
+
+        <p style="font-size: 11px; color: #cbd5e1; margin: 32px 0 0; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+          You receive this once a day on days you have mapped sales. To stop these, reply with "unsubscribe" and we'll handle it.
+        </p>
+      </div>
+    `,
+  };
+}
+
 export function cpaAnnualSummaryEmail(opts: {
   businessName: string;        // clients.business_name
   userFirstName: string;       // best-effort first name; falls back to business
