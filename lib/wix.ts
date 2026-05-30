@@ -555,6 +555,144 @@ export function mapWixOrderToProcessedItem(
  * Skips line items with no id (rare but defensive — every Wix
  * order line item should have a uuid).
  */
+// ---------------------------------------------------------------------
+// Phase 12e: Catalog API (bulk-import SKUs from Wix Stores)
+// ---------------------------------------------------------------------
+//
+// Wix's eCommerce V3 catalog returns Products, each with optional
+// variants and a stable catalogItemId (different from the product
+// id). When line items come in via orders, their
+// catalogReference.catalogItemId is what sku_aliases.external_id
+// stores — so that's what we use as the import key.
+//
+// Cost: Wix doesn't expose product cost via the public Catalog
+// API. Their inventory cost tracking lives in a separate add-on
+// app. We always surface cost = null and prompt the merchant in
+// the bulk-import UI.
+
+interface WixCatalogProduct {
+  id?: string;
+  name?: string;
+  /** Wix-internal stable catalog identifier — this is what line
+   *  items reference via catalogReference.catalogItemId. */
+  catalogItemId?: string;
+  /** Single-variant products carry the SKU at the product level.
+   *  Multi-variant products put it on each variant (handled below). */
+  physicalProperties?: { sku?: string | null } | null;
+  variants?: Array<{
+    id?: string;
+    physicalProperties?: { sku?: string | null } | null;
+    /** Variant-level name composed by Wix from the option values
+     *  (e.g., "Small / Red"). */
+    name?: string;
+  }>;
+  /** Sell-side currency for diagnostics — cost stays null. */
+  priceData?: { currency?: string };
+}
+
+interface WixProductsQueryResponse {
+  products?: WixCatalogProduct[];
+  /** Wix uses pagingMetadata.cursors.next for cursor pagination,
+   *  mirroring orders. */
+  pagingMetadata?: { cursors?: { next?: string | null } };
+}
+
+/** Flattened, FlowWork-friendly shape returned by listCatalog.
+ *  Single-variant products produce one row; multi-variant products
+ *  produce one row per variant. */
+export interface WixCatalogVariation {
+  /** catalogItemId — the alias join key for sku_aliases.external_id
+   *  when line items come in. */
+  externalId: string;
+  /** Wix internal product id (for diagnostics; not used for
+   *  matching). */
+  productId: string;
+  displayName: string;
+  sku: string | null;
+  /** Always null — Wix doesn't expose cost. */
+  cost: number | null;
+  currency: string | null;
+}
+
+/**
+ * Fetch the merchant's full Wix Stores catalog. Cursor-paginated
+ * via the Query Products endpoint; we walk every page.
+ */
+export async function listCatalog(opts: {
+  accessToken: string;
+}): Promise<WixCatalogVariation[]> {
+  const out: WixCatalogVariation[] = [];
+  let cursor: string | null = null;
+
+  while (true) {
+    const body: Record<string, unknown> = {
+      query: {
+        paging: { limit: 100 },
+      },
+    };
+    if (cursor) {
+      (body.query as Record<string, unknown>).cursorPaging = { cursor };
+    }
+
+    const res = await fetch("https://www.wixapis.com/stores/v3/products/query", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(
+        `Wix catalog query failed: HTTP ${res.status} ${txt.slice(0, 200)}`
+      );
+    }
+    const data = (await res.json()) as WixProductsQueryResponse;
+    const products = data.products ?? [];
+    if (products.length === 0) break;
+
+    for (const p of products) {
+      // Wix's catalogItemId is the matcher. If absent (rare —
+      // archived items), fall back to id.
+      const externalId = p.catalogItemId ?? p.id;
+      if (!externalId) continue;
+      const productName = p.name ?? "Untitled product";
+      const currency = p.priceData?.currency ?? null;
+
+      if (p.variants && p.variants.length > 0) {
+        for (const v of p.variants) {
+          const variantName = v.name && v.name.trim().length > 0 ? v.name : null;
+          out.push({
+            externalId,
+            productId: p.id ?? externalId,
+            displayName: variantName
+              ? `${productName} (${variantName})`
+              : productName,
+            sku: v.physicalProperties?.sku ?? null,
+            cost: null,
+            currency,
+          });
+        }
+      } else {
+        out.push({
+          externalId,
+          productId: p.id ?? externalId,
+          displayName: productName,
+          sku: p.physicalProperties?.sku ?? null,
+          cost: null,
+          currency,
+        });
+      }
+    }
+
+    cursor = data.pagingMetadata?.cursors?.next ?? null;
+    if (!cursor) break;
+  }
+
+  return out;
+}
+
 export function extractWixLineItems(
   order: WixOrder
 ): import("./cogs/lineItems").InternalLineItem[] {

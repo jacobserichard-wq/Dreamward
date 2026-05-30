@@ -657,6 +657,142 @@ export async function getOrder(opts: {
  * Skips line items with no uid (defensive — should never happen
  * but Square's schema declares it optional).
  */
+// ---------------------------------------------------------------------
+// Phase 12e: Catalog API (bulk-import SKUs from Square)
+// ---------------------------------------------------------------------
+//
+// Square's catalog is a tree of ITEM -> ITEM_VARIATION objects. A
+// single item ("Coffee Beans") can have many variations ("1lb",
+// "5lb"). For COGS purposes the VARIATION is the unit we map (one
+// FlowWork SKU per variation), since variations are what line items
+// reference via line_item.catalog_object_id.
+//
+// The Catalog List endpoint returns a flat list of CatalogObject
+// records, each typed (ITEM / ITEM_VARIATION / MODIFIER / etc.).
+// We request both ITEM and ITEM_VARIATION, then join in code to
+// rebuild the variation -> parent-item-name relationship.
+//
+// Cost: `default_unit_cost` (Money object) is on item_variation_data
+// in Square API version 2023-01-19+. It's only set if the merchant
+// has filled in a cost in the Square dashboard's Item Library. We
+// treat it as optional — if absent, the variation comes through with
+// cost = null and the bulk-import UI shows a prompt for the merchant
+// to fill in.
+
+interface SquareCatalogObject {
+  type: string;
+  id: string;
+  version?: number;
+  item_data?: {
+    name?: string;
+    description?: string;
+  };
+  item_variation_data?: {
+    item_id?: string;
+    name?: string;
+    sku?: string;
+    pricing_type?: string;
+    price_money?: { amount?: number; currency?: string };
+    /** Per-unit cost in cents. Optional — Square only populates
+     *  it when the merchant has filled cost in the Item Library. */
+    default_unit_cost?: { amount?: number; currency?: string };
+  };
+}
+
+interface SquareCatalogListResponse {
+  objects?: SquareCatalogObject[];
+  cursor?: string;
+  errors?: Array<{ category?: string; code?: string; detail?: string }>;
+}
+
+/** Flattened, FlowWork-friendly shape returned by listCatalog. */
+export interface SquareCatalogVariation {
+  /** Variation id (the catalog_object_id that line items reference,
+   *  i.e., what gets stored as sku_aliases.external_id). */
+  variationId: string;
+  /** Parent item id — kept for diagnostics; not used for matching. */
+  itemId: string;
+  /** "Parent Item Name (Variation Name)" if distinct, else just the
+   *  parent name. */
+  displayName: string;
+  /** Platform-side SKU code. Used to suggest the FlowWork code. */
+  sku: string | null;
+  /** Per-unit cost in dollars (or main currency unit). Null when
+   *  Square doesn't expose one. */
+  cost: number | null;
+  currency: string | null;
+}
+
+/**
+ * Fetch the merchant's full Square catalog (ITEM + ITEM_VARIATION),
+ * flattened to one row per variation. Cursor-paginated; we walk
+ * every page automatically.
+ *
+ * Throws on Square API errors so the caller's try/catch can map to
+ * a 502.
+ */
+export async function listCatalog(opts: {
+  accessToken: string;
+}): Promise<SquareCatalogVariation[]> {
+  const variations: SquareCatalogVariation[] = [];
+  const itemNames = new Map<string, string>();
+  let cursor: string | null = null;
+
+  while (true) {
+    const params = new URLSearchParams({
+      types: "ITEM,ITEM_VARIATION",
+    });
+    if (cursor) params.set("cursor", cursor);
+
+    const data = await squareGet<SquareCatalogListResponse>({
+      accessToken: opts.accessToken,
+      path: `/v2/catalog/list?${params.toString()}`,
+    });
+    if (data.errors && data.errors.length > 0) {
+      const first = data.errors[0];
+      throw new Error(
+        `Square catalog list error: ${first.category}/${first.code} ${first.detail ?? ""}`
+      );
+    }
+
+    for (const obj of data.objects ?? []) {
+      if (obj.type === "ITEM" && obj.item_data?.name) {
+        itemNames.set(obj.id, obj.item_data.name);
+      } else if (obj.type === "ITEM_VARIATION" && obj.item_variation_data) {
+        const v = obj.item_variation_data;
+        const cents = v.default_unit_cost?.amount ?? null;
+        variations.push({
+          variationId: obj.id,
+          itemId: v.item_id ?? "",
+          displayName: v.name ?? "",
+          sku: v.sku ?? null,
+          cost: cents != null ? cents / 100 : null,
+          currency: v.default_unit_cost?.currency ?? null,
+        });
+      }
+    }
+
+    cursor = data.cursor ?? null;
+    if (!cursor) break;
+  }
+
+  // Second pass: stitch parent item names into the variation
+  // displayName. Variations whose parent item hasn't been seen
+  // (cursor races, deletions) keep their own name.
+  for (const v of variations) {
+    const parentName = itemNames.get(v.itemId);
+    if (parentName) {
+      v.displayName =
+        v.displayName && v.displayName !== parentName
+          ? `${parentName} (${v.displayName})`
+          : parentName;
+    }
+    if (!v.displayName) v.displayName = "Untitled variation";
+  }
+
+  return variations;
+}
+
 export function extractSquareLineItems(
   order: SquareOrder
 ): import("./cogs/lineItems").InternalLineItem[] {

@@ -519,6 +519,129 @@ export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
  * with externalItemId = null. They'll surface in the Unmatched UI
  * (Phase 12d) for the merchant to map manually.
  */
+// ---------------------------------------------------------------------
+// Phase 12e: Catalog API (bulk-import SKUs from Shopify)
+// ---------------------------------------------------------------------
+//
+// Shopify's products endpoint returns Product objects each carrying
+// an array of variants. For COGS, the VARIANT is our SKU unit —
+// variant_id is what line items reference (and what gets stored as
+// sku_aliases.external_id).
+//
+// Cost: `cost` field on variant returns the merchant-entered "cost
+// per item" from the Shopify admin. Optional — only populated when
+// the merchant enabled inventory tracking + filled it in. When
+// absent we surface null and the bulk-import UI prompts the user.
+//
+// Pagination: Shopify supports both since_id and Link-header
+// pagination. We use since_id (matches our orders fetcher pattern)
+// against the variant id space. Variants pages are typically much
+// smaller than orders pages — 250-row pages should be plenty for
+// most maker catalogs.
+
+interface ShopifyProductForCatalog {
+  id: number;
+  title: string;
+  variants: Array<{
+    id: number;
+    title: string;
+    sku: string | null;
+    price: string;
+    /** Per-item cost as a decimal string (e.g., "4.50"). May be
+     *  absent on stores without inventory cost tracking enabled. */
+    cost?: string | null;
+  }>;
+}
+
+interface ShopifyProductsResponse {
+  products: ShopifyProductForCatalog[];
+}
+
+/** Flattened, FlowWork-friendly shape returned by listCatalog. */
+export interface ShopifyCatalogVariation {
+  /** Variant id (the alias join key — same field that orders'
+   *  line_items.variant_id references). */
+  variantId: string;
+  productId: string;
+  /** "Product Title - Variant Title" when the variant has a
+   *  distinct title, else just the product title. Variant title
+   *  "Default Title" is Shopify's convention for single-variant
+   *  products; we hide it for cleaner display names. */
+  displayName: string;
+  sku: string | null;
+  cost: number | null;
+  /** Shopify variants don't carry currency on cost; the store's
+   *  currency lives on the order/shop. We surface null here and
+   *  default to USD downstream. */
+  currency: string | null;
+}
+
+/**
+ * Fetch the merchant's full Shopify product catalog (every variant
+ * across every product), paginated via since_id. Walks every page
+ * automatically until an empty one returns.
+ */
+export async function listCatalog(opts: {
+  shopDomain: string;
+  accessToken: string;
+}): Promise<ShopifyCatalogVariation[]> {
+  const out: ShopifyCatalogVariation[] = [];
+  let sinceId = 0;
+
+  while (true) {
+    const params = new URLSearchParams({
+      limit: "250",
+      // Restrict to what we need — shrinks payload ~5x.
+      fields: "id,title,variants",
+    });
+    if (sinceId > 0) params.set("since_id", String(sinceId));
+
+    const apiVersion = process.env.SHOPIFY_API_VERSION;
+    if (!apiVersion)
+      throw new Error("SHOPIFY_API_VERSION env var is not set");
+    const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/products.json?${params.toString()}`;
+    const res = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": opts.accessToken,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `Shopify products list failed: HTTP ${res.status} ${body.slice(0, 200)}`
+      );
+    }
+    const data = (await res.json()) as ShopifyProductsResponse;
+    const products = data.products ?? [];
+    if (products.length === 0) break;
+
+    for (const p of products) {
+      for (const v of p.variants) {
+        const costNum =
+          v.cost != null && v.cost !== "" ? Number(v.cost) : null;
+        const distinctTitle =
+          v.title && v.title !== "Default Title" && v.title !== p.title;
+        out.push({
+          variantId: String(v.id),
+          productId: String(p.id),
+          displayName: distinctTitle
+            ? `${p.title} - ${v.title}`
+            : p.title,
+          sku: v.sku && v.sku.trim().length > 0 ? v.sku : null,
+          cost: Number.isFinite(costNum ?? NaN) ? costNum : null,
+          currency: null,
+        });
+      }
+    }
+
+    if (products.length < 250) break; // last page
+    sinceId = products[products.length - 1].id;
+  }
+
+  return out;
+}
+
 export function extractShopifyLineItems(
   order: ShopifyOrder
 ): import("./cogs/lineItems").InternalLineItem[] {
