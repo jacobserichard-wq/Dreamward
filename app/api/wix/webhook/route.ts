@@ -43,9 +43,11 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import {
   mapWixOrderToProcessedItem,
+  extractWixLineItems,
   verifyAppInstalledWebhook,
   type WixOrder,
 } from "@/lib/wix";
+import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 
 interface WixConnectionRow {
   id: number;
@@ -205,7 +207,12 @@ export async function POST(req: NextRequest) {
       row.status = "cancelled";
     }
 
-    await pool.query(
+    // Phase 12c: RETURNING id on both INSERT and DO UPDATE paths
+    // so we can fan line items into processed_item_line_items.
+    // Webhook redelivery is safe — the (processed_item_id,
+    // external_id) UNIQUE index on processed_item_line_items
+    // makes the line-item INSERT a no-op via ON CONFLICT DO NOTHING.
+    const upsertRes = await pool.query<{ id: number }>(
       `INSERT INTO processed_items (
          vendor, invoice_number, amount, due_date, status,
          category, source, source_ref_id, channel, confidence,
@@ -217,7 +224,8 @@ export async function POST(req: NextRequest) {
          status = EXCLUDED.status,
          amount = EXCLUDED.amount,
          summary = EXCLUDED.summary,
-         extracted_data = EXCLUDED.extracted_data`,
+         extracted_data = EXCLUDED.extracted_data
+       RETURNING id`,
       [
         row.vendor,
         row.invoice_number,
@@ -234,6 +242,20 @@ export async function POST(req: NextRequest) {
         conn.client_id,
       ]
     );
+
+    const parentId = upsertRes.rows[0]?.id;
+    if (parentId) {
+      const lineItems = extractWixLineItems(order);
+      if (lineItems.length > 0) {
+        await bulkInsertLineItemsForParent({
+          parentId,
+          clientId: conn.client_id,
+          platform: "wix",
+          soldAt: row.due_date,
+          items: lineItems,
+        });
+      }
+    }
 
     console.log(
       `Wix webhook: event=${eventType} order=${order.id} → client_id=${conn.client_id} upserted`

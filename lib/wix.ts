@@ -338,6 +338,22 @@ export interface WixOrder {
     productName?: { original?: string };
     quantity?: number;
     price?: { amount?: string };
+    /** Wix's stable reference to the catalog item being sold. The
+     *  alias join key (sku_aliases.external_id) is
+     *  catalogReference.catalogItemId. appId distinguishes which
+     *  Wix app sourced the line item (Stores vs. Bookings vs.
+     *  Restaurants etc.); we capture it for diagnostics but the
+     *  matching key is just catalogItemId. */
+    catalogReference?: {
+      appId?: string | null;
+      catalogItemId?: string | null;
+      /** Wix-internal map of variant options (size, color, etc.).
+       *  Kept opaque — not used for SKU matching v1. */
+      options?: Record<string, unknown> | null;
+    } | null;
+    /** Some Wix order shapes expose a top-level SKU code at the
+     *  line item level. Display only — matching is by catalogItemId. */
+    physicalProperties?: { sku?: string | null } | null;
   }>;
 }
 
@@ -512,9 +528,51 @@ export function mapWixOrderToProcessedItem(
         name: li.productName?.original,
         quantity: li.quantity,
         price: li.price?.amount,
+        catalog_item_id: li.catalogReference?.catalogItemId ?? null,
+        catalog_app_id: li.catalogReference?.appId ?? null,
+        sku: li.physicalProperties?.sku ?? null,
       })),
     },
   };
+}
+
+/**
+ * Phase 12c: extract line items from a Wix order in the
+ * platform-agnostic shape required by
+ * lib/cogs/lineItems.bulkInsertLineItemsForParent.
+ *
+ * Each Wix lineItem becomes one InternalLineItem:
+ *   externalId       = lineItem.id (Wix line-item UUID)
+ *   externalItemId   = catalogReference.catalogItemId — the
+ *                      alias join key
+ *   externalSku      = physicalProperties.sku — display only
+ *   name             = productName.original or "Untitled"
+ *   quantity         = lineItem.quantity or 1
+ *   unitPrice        = Number(price.amount) or 0
+ *   currency         = order-level currency from priceSummary or
+ *                      the order.currency fallback (USD if neither)
+ *
+ * Skips line items with no id (rare but defensive — every Wix
+ * order line item should have a uuid).
+ */
+export function extractWixLineItems(
+  order: WixOrder
+): import("./cogs/lineItems").InternalLineItem[] {
+  const currency =
+    order.priceSummary?.total?.currency || order.currency || "USD";
+  return (order.lineItems ?? [])
+    .filter((li): li is NonNullable<typeof li> & { id: string } =>
+      typeof li?.id === "string" && li.id.length > 0
+    )
+    .map((li) => ({
+      externalId: li.id,
+      externalItemId: li.catalogReference?.catalogItemId ?? null,
+      externalSku: li.physicalProperties?.sku ?? null,
+      name: li.productName?.original ?? "Untitled item",
+      quantity: typeof li.quantity === "number" ? li.quantity : 1,
+      unitPrice: Number(li.price?.amount ?? "0") || 0,
+      currency,
+    }));
 }
 
 // ---------------------------------------------------------------------

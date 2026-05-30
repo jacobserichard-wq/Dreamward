@@ -30,8 +30,11 @@ import { getSessionClient } from "@/lib/getClient";
 import {
   fetchOrdersPage,
   mapWixOrderToProcessedItem,
+  extractWixLineItems,
   mintAccessToken,
+  type WixOrder,
 } from "@/lib/wix";
+import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 
 // Vercel Pro = 60s hard limit; leaving 10s headroom for final
 // UPDATE + response serialization. Same as Shopify backfill.
@@ -191,7 +194,16 @@ export async function POST() {
       //   CREATE UNIQUE INDEX idx_processed_items_source_ref
       //     ON processed_items (client_id, source, source_ref_id)
       //     WHERE source_ref_id IS NOT NULL;
-      await pool.query(
+      // Phase 12c: RETURNING (id, source_ref_id) so we can fan
+      // line items out into processed_item_line_items for every
+      // freshly-inserted parent. ON CONFLICT skips on duplicate
+      // parents — we don't re-fan line items for already-imported
+      // orders (re-importing historical line items needs the
+      // explicit "Re-import line items" button queued for 12g).
+      const insertRes = await pool.query<{
+        id: number;
+        source_ref_id: string;
+      }>(
         `INSERT INTO processed_items (
            vendor, invoice_number, amount, due_date, status,
            category, source, source_ref_id, channel, confidence,
@@ -199,9 +211,34 @@ export async function POST() {
          ) VALUES ${placeholders}
          ON CONFLICT (client_id, source, source_ref_id)
            WHERE source_ref_id IS NOT NULL
-         DO NOTHING`,
+         DO NOTHING
+         RETURNING id, source_ref_id`,
         values
       );
+
+      if (insertRes.rowCount && insertRes.rowCount > 0) {
+        const orderById = new Map<string, WixOrder>();
+        for (const o of page.orders) orderById.set(o.id, o);
+        const parents = insertRes.rows
+          .map((r) => {
+            const order = orderById.get(r.source_ref_id);
+            if (!order) return null;
+            const mapped = mapWixOrderToProcessedItem(order);
+            return {
+              parentId: r.id,
+              soldAt: mapped.due_date,
+              items: extractWixLineItems(order),
+            };
+          })
+          .filter((p): p is NonNullable<typeof p> => p !== null);
+        if (parents.length > 0) {
+          await bulkInsertLineItemsAcrossParents({
+            clientId: client.id,
+            platform: "wix",
+            parents,
+          });
+        }
+      }
 
       totalImported += rows.length;
       ordersThisRun += rows.length;
