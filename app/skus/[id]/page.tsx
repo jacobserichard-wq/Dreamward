@@ -32,6 +32,7 @@ import Spinner from "../../components/Spinner";
 import SkuForm, {
   type SkuFormEditSubmit,
 } from "../../components/SkuForm";
+import ConfirmModal from "../../components/ConfirmModal";
 
 interface SkuRow {
   id: number;
@@ -55,6 +56,10 @@ interface CostHistoryRow {
   effectiveDate: string;
   notes: string | null;
   createdAt: string;
+  /** How many historical line items resolve their COGS through
+   *  this row. > 0 → edit/delete shows a confirm-modal warning
+   *  that the action will rewrite recorded historical COGS. */
+  affectedLineItemCount: number;
 }
 
 interface AliasRow {
@@ -139,6 +144,22 @@ export default function SkuDetailPage() {
   const [editingCostId, setEditingCostId] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [savingCostId, setSavingCostId] = useState<number | null>(null);
+  /** When the user acknowledges the historical-impact warning for
+   *  an edit, we add the row id to this set. commitCostEdit reads
+   *  it to know whether to pass acknowledgeHistoricalChange: true
+   *  to the PATCH endpoint. Cleared after the save commits. */
+  const [ackedHistoricalIds, setAckedHistoricalIds] = useState<Set<number>>(
+    new Set()
+  );
+
+  // Historical-impact confirm modal state. Fires when the user
+  // tries to edit or delete a cost row that has affected line
+  // items (the operation would silently rewrite historical COGS).
+  const [historicalConfirm, setHistoricalConfirm] = useState<{
+    kind: "edit" | "delete";
+    row: CostHistoryRow;
+  } | null>(null);
+  const [historicalConfirmBusy, setHistoricalConfirmBusy] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!Number.isFinite(skuId)) return;
@@ -261,11 +282,28 @@ export default function SkuDetailPage() {
   }, [newCost, newDate, newNotes, skuId, loadDetail]);
 
   // ── Inline cost edit handlers ────────────────────────────────
-  const startEditingCost = useCallback((row: CostHistoryRow) => {
+  /** Internal: actually open the inline editor (skips any
+   *  historical-impact gating — the gating wrapper below handles
+   *  that decision). */
+  const openCostEditor = useCallback((row: CostHistoryRow) => {
     setEditingCostId(row.id);
     setEditingValue(String(row.cost));
     setError(null);
   }, []);
+
+  /** Public: user-facing click handler. Routes through the
+   *  historical-impact confirm modal when affectedLineItemCount > 0
+   *  so the merchant knows their edit will rewrite recorded COGS. */
+  const startEditingCost = useCallback(
+    (row: CostHistoryRow) => {
+      if (row.affectedLineItemCount > 0) {
+        setHistoricalConfirm({ kind: "edit", row });
+        return;
+      }
+      openCostEditor(row);
+    },
+    [openCostEditor]
+  );
 
   const cancelEditingCost = useCallback(() => {
     setEditingCostId(null);
@@ -288,33 +326,84 @@ export default function SkuDetailPage() {
       setSavingCostId(costRowId);
       setError(null);
       try {
+        const body: Record<string, unknown> = { cost: num };
+        if (ackedHistoricalIds.has(costRowId)) {
+          body.acknowledgeHistoricalChange = true;
+        }
         const res = await fetch(
           `/api/skus/${skuId}/costs/${costRowId}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cost: num }),
+            body: JSON.stringify(body),
           }
         );
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          setError(body.error || `HTTP ${res.status}`);
+          const bodyJson = await res.json().catch(() => ({}));
+          setError(bodyJson.error || `HTTP ${res.status}`);
           return;
         }
+        // Clear the ack flag for this row on successful save —
+        // a future edit needs a fresh confirmation.
+        setAckedHistoricalIds((prev) => {
+          if (!prev.has(costRowId)) return prev;
+          const next = new Set(prev);
+          next.delete(costRowId);
+          return next;
+        });
         cancelEditingCost();
         await loadDetail();
       } finally {
         setSavingCostId(null);
       }
     },
-    [editingValue, skuId, loadDetail, cancelEditingCost]
+    [editingValue, skuId, loadDetail, cancelEditingCost, ackedHistoricalIds]
+  );
+
+  /** Internal: the actual DELETE network call. Caller is
+   *  responsible for any user confirmation. Returns true on
+   *  success so the historical-confirm modal can close itself. */
+  const runDeleteCost = useCallback(
+    async (
+      costRowId: number,
+      acknowledgeHistoricalChange: boolean
+    ): Promise<boolean> => {
+      setError(null);
+      setDeletingCostId(costRowId);
+      try {
+        const url = new URL(
+          `/api/skus/${skuId}/costs/${costRowId}`,
+          window.location.origin
+        );
+        if (acknowledgeHistoricalChange) {
+          url.searchParams.set("acknowledgeHistoricalChange", "true");
+        }
+        const res = await fetch(url.toString(), { method: "DELETE" });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || `HTTP ${res.status}`);
+          return false;
+        }
+        await loadDetail();
+        return true;
+      } finally {
+        setDeletingCostId(null);
+      }
+    },
+    [skuId, loadDetail]
   );
 
   const handleDeleteCost = useCallback(
-    async (costRowId: number) => {
-      // Soft-confirm — destructive but reversible by adding the
-      // cost back via the inline form. Native confirm is enough
-      // for the typo-escape-hatch UX.
+    async (row: CostHistoryRow) => {
+      // Two tiers of confirmation:
+      //   N > 0 → historical-impact ConfirmModal (handled by the
+      //           modal at the bottom of the page; we open it here)
+      //   N = 0 → native confirm — destructive but reversible
+      //           via the inline add-cost form.
+      if (row.affectedLineItemCount > 0) {
+        setHistoricalConfirm({ kind: "delete", row });
+        return;
+      }
       if (
         !window.confirm(
           "Delete this cost row? Historical sales priced against it will fall back to the next-newest cost on their date."
@@ -322,24 +411,9 @@ export default function SkuDetailPage() {
       ) {
         return;
       }
-      setError(null);
-      setDeletingCostId(costRowId);
-      try {
-        const res = await fetch(
-          `/api/skus/${skuId}/costs/${costRowId}`,
-          { method: "DELETE" }
-        );
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          setError(body.error || `HTTP ${res.status}`);
-          return;
-        }
-        await loadDetail();
-      } finally {
-        setDeletingCostId(null);
-      }
+      await runDeleteCost(row.id, false);
     },
-    [skuId, loadDetail]
+    [runDeleteCost]
   );
 
   // ── Identify which cost row is the "current" one (highlighted
@@ -613,9 +687,18 @@ export default function SkuDetailPage() {
                                 Scheduled
                               </span>
                             )}
+                            {c.affectedLineItemCount > 0 && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold uppercase tracking-wide"
+                                title={`This row's cost is the COGS source for ${c.affectedLineItemCount} historical line item${c.affectedLineItemCount === 1 ? "" : "s"}. Editing or deleting will retroactively change recorded COGS.`}
+                              >
+                                Used by {c.affectedLineItemCount} sale
+                                {c.affectedLineItemCount === 1 ? "" : "s"}
+                              </span>
+                            )}
                             <button
                               type="button"
-                              onClick={() => handleDeleteCost(c.id)}
+                              onClick={() => handleDeleteCost(c)}
                               disabled={deletingCostId === c.id}
                               title="Delete cost row"
                               aria-label="Delete cost row"
@@ -790,6 +873,58 @@ export default function SkuDetailPage() {
         onSaveEdit={handleSaveEdit}
         onToggleActive={handleToggleActive}
         onClose={() => setEditOpen(false)}
+      />
+
+      {/* Historical-impact confirm modal. Fires when the merchant
+          tries to edit OR delete a cost row that has historical line
+          items resolved through it. The confirm flow records an
+          acknowledgement that the PATCH/DELETE call carries through
+          to the API. */}
+      <ConfirmModal
+        open={historicalConfirm !== null}
+        title={
+          historicalConfirm?.kind === "delete"
+            ? "Delete past cost row?"
+            : "Edit past cost row?"
+        }
+        message={
+          historicalConfirm
+            ? (historicalConfirm.kind === "delete"
+                ? `Deleting this cost row (effective ${fmtDate(historicalConfirm.row.effectiveDate)}, ${fmtMoney(historicalConfirm.row.cost, historicalConfirm.row.currency)}) will retroactively rewrite COGS on ${historicalConfirm.row.affectedLineItemCount} historical sale${historicalConfirm.row.affectedLineItemCount === 1 ? "" : "s"}. Those sales will re-bucket to the next-earliest cost row (or $0 if none exists). Are you sure?`
+                : `Editing this cost (effective ${fmtDate(historicalConfirm.row.effectiveDate)}, currently ${fmtMoney(historicalConfirm.row.cost, historicalConfirm.row.currency)}) will retroactively rewrite COGS on ${historicalConfirm.row.affectedLineItemCount} historical sale${historicalConfirm.row.affectedLineItemCount === 1 ? "" : "s"}. Your gross-margin numbers for past periods will change. Continue?`)
+            : ""
+        }
+        confirmLabel={historicalConfirm?.kind === "delete" ? "Yes, delete" : "Yes, edit anyway"}
+        danger={historicalConfirm?.kind === "delete"}
+        busy={historicalConfirmBusy}
+        onConfirm={async () => {
+          if (!historicalConfirm) return;
+          setHistoricalConfirmBusy(true);
+          try {
+            if (historicalConfirm.kind === "delete") {
+              const ok = await runDeleteCost(
+                historicalConfirm.row.id,
+                true
+              );
+              if (ok) setHistoricalConfirm(null);
+            } else {
+              // For edit: record the ack flag for this row, then
+              // open the inline editor. commitCostEdit will read
+              // ackedHistoricalIds and pass it through to the
+              // PATCH endpoint.
+              setAckedHistoricalIds((prev) => {
+                const next = new Set(prev);
+                next.add(historicalConfirm.row.id);
+                return next;
+              });
+              openCostEditor(historicalConfirm.row);
+              setHistoricalConfirm(null);
+            }
+          } finally {
+            setHistoricalConfirmBusy(false);
+          }
+        }}
+        onCancel={() => setHistoricalConfirm(null)}
       />
     </div>
   );

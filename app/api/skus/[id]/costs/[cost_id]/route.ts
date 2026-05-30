@@ -62,6 +62,45 @@ import { getSessionClient } from "@/lib/getClient";
 interface PatchCostBody {
   cost?: unknown;
   notes?: unknown;
+  /** Required when the change would retroactively rewrite the
+   *  recorded COGS on existing line items. The /skus/[id] UI shows
+   *  a confirm modal in that case + passes true here on consent. */
+  acknowledgeHistoricalChange?: unknown;
+}
+
+/**
+ * Count how many processed_item_line_items rows currently resolve
+ * their COGS through this specific cost-history row. Used by both
+ * PATCH (when cost changes) and DELETE to decide whether the
+ * operation would silently rewrite historical COGS.
+ *
+ * Implementation mirrors the "reign window" computation in
+ * lib/cogs/compute: a line item resolves through cost row CH if
+ * sold_at >= CH.effective_date AND no later cost row's
+ * effective_date falls in (CH.effective_date, sold_at].
+ */
+async function countAffectedLineItems(
+  costId: number,
+  skuId: number
+): Promise<number> {
+  const res = await pool.query<{ n: number }>(
+    `SELECT COUNT(*)::int AS n
+       FROM processed_item_line_items pili
+      WHERE pili.matched_sku_id = $2
+        AND pili.sold_at >= (
+          SELECT effective_date FROM sku_cost_history WHERE id = $1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM sku_cost_history ch2
+           WHERE ch2.sku_id = $2
+             AND ch2.effective_date > (
+               SELECT effective_date FROM sku_cost_history WHERE id = $1
+             )
+             AND ch2.effective_date <= pili.sold_at
+        )`,
+    [costId, skuId]
+  );
+  return res.rows[0]?.n ?? 0;
 }
 
 function parseCost(v: unknown): number | null {
@@ -109,6 +148,7 @@ export async function PATCH(
     const updates: string[] = [];
     const values: unknown[] = [];
     let p = 1;
+    let costIsChanging = false;
 
     if (body.cost !== undefined) {
       const costNum = parseCost(body.cost);
@@ -120,6 +160,7 @@ export async function PATCH(
       }
       updates.push(`cost = $${p++}`);
       values.push(costNum);
+      costIsChanging = true;
     }
 
     if (body.notes !== undefined) {
@@ -140,6 +181,31 @@ export async function PATCH(
         { error: "No fields to update" },
         { status: 400 }
       );
+    }
+
+    // ── Historical-impact guard ───────────────────────────────
+    //
+    // If the cost value is changing AND existing line items resolve
+    // their COGS through this row, this PATCH would silently rewrite
+    // recorded COGS on those past sales. That's the Crafty Base
+    // "Historical Data Nightmare" anti-pattern. Require explicit
+    // acknowledgeHistoricalChange:true from the client (UI shows a
+    // confirm modal naming the count) before proceeding.
+    //
+    // Notes-only edits skip this — they don't affect COGS.
+    if (costIsChanging && body.acknowledgeHistoricalChange !== true) {
+      const affected = await countAffectedLineItems(costId, skuId);
+      if (affected > 0) {
+        return NextResponse.json(
+          {
+            error:
+              `This change would retroactively rewrite COGS on ${affected} historical sale${affected === 1 ? "" : "s"}. Pass acknowledgeHistoricalChange:true to confirm.`,
+            requiresAcknowledgement: true,
+            affectedLineItemCount: affected,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Tenant-scoped UPDATE — the WHERE EXISTS clause ensures the
@@ -194,7 +260,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; cost_id: string }> }
 ) {
   try {
@@ -220,6 +286,30 @@ export async function DELETE(
     }
     if (!Number.isInteger(costId) || costId <= 0) {
       return NextResponse.json({ error: "Invalid cost id" }, { status: 400 });
+    }
+
+    // ── Historical-impact guard ───────────────────────────────
+    //
+    // Same Crafty Base anti-pattern protection as the PATCH path.
+    // Deleting a cost row that had line items resolved through it
+    // re-buckets those sales to the NEXT-earliest cost (or $0).
+    // Requires explicit ack via ?acknowledgeHistoricalChange=true.
+    const url = new URL(req.url);
+    const ackParam =
+      url.searchParams.get("acknowledgeHistoricalChange") === "true";
+    if (!ackParam) {
+      const affected = await countAffectedLineItems(costId, skuId);
+      if (affected > 0) {
+        return NextResponse.json(
+          {
+            error:
+              `Deleting this cost row would rewrite COGS on ${affected} historical sale${affected === 1 ? "" : "s"} (they'd re-bucket to the next-earliest cost or $0). Pass ?acknowledgeHistoricalChange=true to confirm.`,
+            requiresAcknowledgement: true,
+            affectedLineItemCount: affected,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // ── Guardrail: refuse to delete the row currently in effect

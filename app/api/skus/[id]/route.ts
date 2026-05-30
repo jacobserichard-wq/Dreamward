@@ -122,6 +122,13 @@ interface CostHistoryRowDb {
   effective_date: string;
   notes: string | null;
   created_at: string;
+  /** How many processed_item_line_items rows resolved their COGS
+   *  through THIS cost-history row. Drives the "Used by N sales"
+   *  chip on the detail page + the warning modal that fires when
+   *  the merchant tries to edit or delete a row with N > 0
+   *  (because doing so retroactively changes recorded COGS — the
+   *  exact Crafty Base anti-pattern we're guarding against). */
+  affected_line_item_count: number;
 }
 
 interface AliasRowDb {
@@ -163,12 +170,34 @@ export async function GET(
     }
 
     // Cost history + aliases — two cheap parallel queries.
+    //
+    // The cost-history query LEFT JOIN LATERAL adds per-row
+    // affected_line_item_count: how many processed_item_line_items
+    // rows had this specific cost-history row picked as their cost
+    // source. The inverse of the LATERAL in the COGS compute
+    // engine: for each cost row, count the line items whose
+    // sold_at falls in the row's "reign" (sold_at >= effective_date
+    // AND no later cost row also has effective_date <= sold_at).
     const [costRes, aliasRes] = await Promise.all([
       pool.query<CostHistoryRowDb>(
-        `SELECT id, cost, currency, effective_date, notes, created_at
-           FROM sku_cost_history
-          WHERE sku_id = $1
-          ORDER BY effective_date DESC, id DESC`,
+        `SELECT ch.id, ch.cost, ch.currency, ch.effective_date,
+                ch.notes, ch.created_at,
+                COALESCE(affected.n, 0)::int AS affected_line_item_count
+           FROM sku_cost_history ch
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*)::int AS n
+               FROM processed_item_line_items pili
+              WHERE pili.matched_sku_id = ch.sku_id
+                AND pili.sold_at >= ch.effective_date
+                AND NOT EXISTS (
+                  SELECT 1 FROM sku_cost_history ch2
+                   WHERE ch2.sku_id = ch.sku_id
+                     AND ch2.effective_date > ch.effective_date
+                     AND ch2.effective_date <= pili.sold_at
+                )
+           ) affected ON true
+          WHERE ch.sku_id = $1
+          ORDER BY ch.effective_date DESC, ch.id DESC`,
         [id]
       ),
       pool.query<AliasRowDb>(
@@ -189,6 +218,7 @@ export async function GET(
         effectiveDate: r.effective_date,
         notes: r.notes,
         createdAt: r.created_at,
+        affectedLineItemCount: r.affected_line_item_count,
       })),
       aliases: aliasRes.rows.map((r) => ({
         id: r.id,
