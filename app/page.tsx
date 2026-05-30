@@ -169,6 +169,21 @@ export default async function MarketingLandingPage() {
             · WooCommerce · Stripe Connect
           </span>
         </p>
+
+        {/* Sub-session 32 marketing commit 2: link to the head-to-head
+            page. Positioned right above pricing — visitors comparing
+            tools see it before they see the price tag. Subtle pill so
+            it doesn't compete with the primary CTA. */}
+        <div className="text-center mt-8">
+          <Link
+            href="/compare/crafty-base"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-full px-4 py-2 no-underline hover:border-slate-400 hover:text-slate-900"
+          >
+            <span>{"\u{2696}\u{FE0F}"}</span>
+            <span>How FlowWork compares to Crafty Base</span>
+            <span className="text-slate-400">{"\u{2192}"}</span>
+          </Link>
+        </div>
       </section>
 
       {/* Pricing */}
