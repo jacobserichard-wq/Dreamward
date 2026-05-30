@@ -52,8 +52,19 @@ async function fetchWixOrder(opts: {
       `Wix order ${opts.orderId} fetch failed: HTTP ${res.status} ${txt.slice(0, 200)}`
     );
   }
-  const data = (await res.json()) as { order?: WixOrder };
-  return data.order ?? null;
+  // Wix's v3 single-order GET endpoint returns the order at the
+  // TOP LEVEL of the JSON, not wrapped in { order: ... } the way
+  // the search endpoint wraps its results in { orders: [...] }.
+  // Defensive parse handles either shape — falls back to checking
+  // for a top-level `id` to confirm we got an order rather than
+  // an error envelope.
+  const data = (await res.json().catch(() => null)) as
+    | (Partial<WixOrder> & { order?: WixOrder })
+    | null;
+  if (!data) return null;
+  if (data.order && typeof data.order.id === "string") return data.order;
+  if (typeof data.id === "string") return data as WixOrder;
+  return null;
 }
 
 export async function POST(req: Request) {
