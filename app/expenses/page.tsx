@@ -223,20 +223,73 @@ export default function ExpensesPage() {
   // ── Save handler (passed to form) ─────────────────────────────
   // Switches between POST (new) and PATCH (edit) based on whether
   // `editing` is set when the form submits.
+  //
+  // Phase 9.4: After the expense saves, upload any staged receipt
+  // files in parallel to /api/expenses/{id}/attachments. JSON
+  // body excludes files (FormData can't be JSON-serialized) so
+  // the expense create/edit call sends just metadata; per-file
+  // POSTs carry the binary payload.
   const handleSaveExpense = useCallback(
     async (data: ExpenseFormSubmit) => {
       const isEdit = editing !== null;
       const url = isEdit ? `/api/expenses/${editing.id}` : "/api/expenses";
       const method = isEdit ? "PATCH" : "POST";
+
+      // Strip files out of the JSON body; they go via FormData below.
+      const { files, ...metadata } = data;
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(metadata),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
+
+      // Determine the expense id we just saved against. In edit
+      // mode we already have it; in create mode it comes back in
+      // the response (POST /api/expenses returns
+      // { expense: { id, ... } }).
+      let savedId: number | null = isEdit ? (editing?.id ?? null) : null;
+      if (!isEdit) {
+        const payload = (await res.json().catch(() => null)) as
+          | { expense?: { id?: number } }
+          | null;
+        savedId = payload?.expense?.id ?? null;
+      }
+
+      // Upload staged files. Best-effort: any single failure
+      // throws so the form's error UI surfaces it, but the
+      // expense row itself stays saved.
+      if (savedId !== null && files.length > 0) {
+        const failures: string[] = [];
+        await Promise.all(
+          files.map(async (file) => {
+            const fd = new FormData();
+            fd.append("file", file);
+            const upRes = await fetch(
+              `/api/expenses/${savedId}/attachments`,
+              { method: "POST", body: fd }
+            );
+            if (!upRes.ok) {
+              const body = await upRes.json().catch(() => ({}));
+              failures.push(`${file.name}: ${body.error ?? `HTTP ${upRes.status}`}`);
+            }
+          })
+        );
+        if (failures.length > 0) {
+          // Some files failed; the expense itself was saved.
+          // Re-fetch the list so the row appears + throw so the
+          // form's inline error surfaces what went wrong.
+          await loadExpenses(activeFilter);
+          throw new Error(
+            `Expense saved, but ${failures.length} attachment${failures.length === 1 ? "" : "s"} failed: ${failures.join("; ")}`
+          );
+        }
+      }
+
       setFormOpen(false);
       setEditing(null);
       await loadExpenses(activeFilter);

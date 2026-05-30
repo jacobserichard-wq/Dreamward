@@ -48,6 +48,12 @@ export interface ExpenseFormSubmit {
   channel: string | null;
   eventId: number | null;
   notes: string | null;
+  /** Phase 9.4: staged receipt files to upload after the expense
+   *  saves. Parent's onSave handler uploads each in parallel to
+   *  /api/expenses/{id}/attachments using the freshly-saved
+   *  expense's id (or editing.id in edit mode). Empty array when
+   *  the merchant didn't attach anything. */
+  files: File[];
 }
 
 export interface ExpenseFormProps {
@@ -130,6 +136,12 @@ export default function ExpenseForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Phase 9.4: staged receipt files. Validated client-side as
+  // they're added (size + mime); parent uploads them after the
+  // expense save succeeds.
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   // Phase 9.3.2: in-line "create new category" state. creatingCategory
   // toggles to the input mode; newCategoryName holds the typed name;
   // creatingBusy disables the Save button while the PATCH is in flight.
@@ -163,6 +175,8 @@ export default function ExpenseForm({
     setError(null);
     setCreatingCategory(false);
     setNewCategoryName("");
+    setFiles([]);
+    setIsDragOver(false);
   }, [open, editing, defaultChannel, defaultEventId]);
 
   // Phase 9.3.2: handle the "+ Create new category..." submit.
@@ -213,6 +227,91 @@ export default function ExpenseForm({
   // markets expense).
   const showEventPicker = channel === "markets";
 
+  // ── File-handling helpers (Phase 9.4) ────────────────────────
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+  const ALLOWED_MIME_TYPES = new Set([
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/heic",
+    "image/heif",
+    "image/webp",
+    "application/pdf",
+  ]);
+
+  const formatBytes = (n: number): string => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MB`;
+  };
+
+  /** Add files to the staged list, validating each. Rejected
+   *  files surface in the inline error rather than silently
+   *  disappearing. Duplicates (same name + size) are skipped. */
+  const addFiles = (incoming: File[]) => {
+    setError(null);
+    const rejected: string[] = [];
+    setFiles((prev) => {
+      const next = [...prev];
+      for (const f of incoming) {
+        const mime = (f.type || "").toLowerCase();
+        if (!ALLOWED_MIME_TYPES.has(mime)) {
+          rejected.push(`${f.name}: unsupported type (${mime || "unknown"})`);
+          continue;
+        }
+        if (f.size === 0) {
+          rejected.push(`${f.name}: empty file`);
+          continue;
+        }
+        if (f.size > MAX_FILE_SIZE_BYTES) {
+          rejected.push(
+            `${f.name}: too large (${formatBytes(f.size)}, limit 10 MB)`
+          );
+          continue;
+        }
+        // Skip exact duplicates already in the staged list
+        if (next.some((existing) => existing.name === f.name && existing.size === f.size)) {
+          continue;
+        }
+        next.push(f);
+      }
+      return next;
+    });
+    if (rejected.length > 0) {
+      setError(rejected.join("; "));
+    }
+  };
+
+  const removeFileAt = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleFileInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const list = e.target.files;
+    if (!list || list.length === 0) return;
+    addFiles(Array.from(list));
+    // Clear the input so re-picking the same file works
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isDragOver) setIsDragOver(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const dropped = e.dataTransfer.files;
+    if (!dropped || dropped.length === 0) return;
+    addFiles(Array.from(dropped));
+  };
+
   const handleSave = async () => {
     setError(null);
     const trimmedVendor = vendor.trim();
@@ -245,6 +344,7 @@ export default function ExpenseForm({
         channel: channel || null,
         eventId: showEventPicker && eventId ? Number(eventId) : null,
         notes: notes.trim() || null,
+        files,
       });
       // Parent handles closing on success
     } catch (err) {
@@ -484,6 +584,75 @@ export default function ExpenseForm({
               disabled={saving}
               className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 resize-y"
             />
+          </Field>
+
+          {/* Phase 9.4: Receipt attachments — drag-drop file area.
+              Files are STAGED here and uploaded by the parent after
+              the expense saves (so we have an expense id to attach
+              to). Inline validation rejects unsupported types + size
+              limit before they ever leave the browser. */}
+          <Field label="Receipts (optional)" htmlFor="expense-files">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
+                isDragOver
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-slate-200 bg-slate-50/50"
+              }`}
+            >
+              <input
+                id="expense-files"
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf"
+                onChange={handleFileInputChange}
+                disabled={saving}
+                className="hidden"
+              />
+              <label
+                htmlFor="expense-files"
+                className={`text-xs text-slate-600 ${saving ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+              >
+                <span className="text-base mr-1.5">{"\u{1F4CE}"}</span>
+                <span className="font-medium text-blue-600">
+                  Click to add
+                </span>
+                <span> or drag receipts here</span>
+                <p className="text-[10px] text-slate-400 m-0 mt-1">
+                  JPEG · PNG · HEIC · WebP · PDF · 10 MB each
+                </p>
+              </label>
+            </div>
+            {files.length > 0 && (
+              <ul className="m-0 mt-2 p-0 list-none space-y-1">
+                {files.map((f, idx) => (
+                  <li
+                    key={`${f.name}-${f.size}-${idx}`}
+                    className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-slate-50 border border-slate-100 text-xs"
+                  >
+                    <span className="truncate flex-1">
+                      <span className="mr-1.5">{"\u{1F4C4}"}</span>
+                      <span className="text-slate-700">{f.name}</span>
+                      <span className="text-slate-400 ml-2">
+                        {formatBytes(f.size)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFileAt(idx)}
+                      disabled={saving}
+                      className="text-slate-400 hover:text-red-600 bg-transparent border-0 cursor-pointer text-sm leading-none px-1 disabled:opacity-40"
+                      aria-label={`Remove ${f.name}`}
+                      title="Remove"
+                    >
+                      {"\u{00D7}"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Field>
         </div>
 
