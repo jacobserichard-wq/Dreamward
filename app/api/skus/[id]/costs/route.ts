@@ -143,7 +143,7 @@ export async function POST(
         return NextResponse.json(
           {
             error:
-              "A cost already exists for this SKU on that date. Delete the existing row first or pick a different date.",
+              "A cost already exists for this SKU on that date. Click the existing row's cost value to edit it in place, or pick a different effective date.",
           },
           { status: 409 }
         );

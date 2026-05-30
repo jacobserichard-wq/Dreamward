@@ -27,6 +27,172 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 
+// ---------------------------------------------------------------------
+// PATCH — edit the cost amount or notes in place
+// ---------------------------------------------------------------------
+//
+// Smoke-test follow-up (sub-session 30). The original Phase 12b
+// design kept cost rows immutable except for delete, on the
+// theory that mutating an existing row silently rewrites the
+// COGS of any sales priced against it (Crafty Base's exact
+// historical-data anti-pattern).
+//
+// In practice, "fix today's typo" + "no sales priced against it
+// yet" is the common case, and the workaround
+// (delete + re-add) is annoying because the new delete guard
+// requires another in-effect row first.
+//
+// We allow PATCH but only to two fields:
+//   - cost (NUMERIC, >= 0)
+//   - notes (TEXT, nullable)
+//
+// effective_date is intentionally NOT mutable — it's the join
+// key historical line items resolve through, so changing it would
+// silently re-bucket COGS for past sales. To "move" a cost row
+// to a different date, the merchant must add+delete.
+//
+// Audit-trail caveat: the audit-trail modal (Phase 12f.3)
+// surfaces "cost_history #N · effective Mon DD" per line item.
+// After a PATCH, future drill-ins still show the same row id +
+// date but with the NEW cost. We accept that — the merchant
+// explicitly took action to update it. Crafty Base's issue was
+// that recipe-cost changes propagated WITHOUT a deliberate
+// action on the cost-history row itself.
+
+interface PatchCostBody {
+  cost?: unknown;
+  notes?: unknown;
+}
+
+function parseCost(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const s = typeof v === "number" ? String(v) : String(v).replace(/[$,\s]/g, "");
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; cost_id: string }> }
+) {
+  try {
+    const client = await getSessionClient();
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+    if (client.plan !== "pro") {
+      return NextResponse.json(
+        { error: "SKU catalog is a Pro feature." },
+        { status: 403 }
+      );
+    }
+
+    const { id: idParam, cost_id: costIdParam } = await params;
+    const skuId = Number(idParam);
+    const costId = Number(costIdParam);
+    if (!Number.isInteger(skuId) || skuId <= 0) {
+      return NextResponse.json({ error: "Invalid sku id" }, { status: 400 });
+    }
+    if (!Number.isInteger(costId) || costId <= 0) {
+      return NextResponse.json({ error: "Invalid cost id" }, { status: 400 });
+    }
+
+    const body = (await req.json().catch(() => null)) as PatchCostBody | null;
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let p = 1;
+
+    if (body.cost !== undefined) {
+      const costNum = parseCost(body.cost);
+      if (costNum === null) {
+        return NextResponse.json(
+          { error: "cost must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+      updates.push(`cost = $${p++}`);
+      values.push(costNum);
+    }
+
+    if (body.notes !== undefined) {
+      const notes =
+        typeof body.notes === "string" && body.notes.trim().length > 0
+          ? body.notes.trim()
+          : null;
+      if (notes === null) {
+        updates.push(`notes = NULL`);
+      } else {
+        updates.push(`notes = $${p++}`);
+        values.push(notes);
+      }
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
+    }
+
+    // Tenant-scoped UPDATE — the WHERE EXISTS clause ensures the
+    // cost row's parent SKU belongs to this client. Forged ids
+    // get rowCount=0 → 404.
+    const result = await pool.query<{
+      id: number;
+      cost: string;
+      currency: string;
+      effective_date: string;
+      notes: string | null;
+      created_at: string;
+    }>(
+      `UPDATE sku_cost_history
+          SET ${updates.join(", ")}
+        WHERE id = $${p++}
+          AND sku_id = $${p++}
+          AND EXISTS (
+            SELECT 1 FROM skus s
+             WHERE s.id = $${p - 1} AND s.client_id = $${p++}
+          )
+        RETURNING id, cost::text AS cost, currency, effective_date::text AS effective_date,
+                  notes, created_at::text AS created_at`,
+      [...values, costId, skuId, client.id]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { error: "Cost row not found" },
+        { status: 404 }
+      );
+    }
+
+    const r = result.rows[0];
+    return NextResponse.json({
+      cost: {
+        id: r.id,
+        cost: Number(r.cost),
+        currency: r.currency,
+        effectiveDate: r.effective_date,
+        notes: r.notes,
+        createdAt: r.created_at,
+      },
+    });
+  } catch (err) {
+    console.error("Cost PATCH error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update cost" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; cost_id: string }> }

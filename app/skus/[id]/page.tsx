@@ -134,6 +134,12 @@ export default function SkuDetailPage() {
   // ── Cost deletion state (which row is being deleted) ─────────
   const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
 
+  // Inline-edit state for cost amount in the history table.
+  // editingCostId is the row currently in edit mode (null when none).
+  const [editingCostId, setEditingCostId] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [savingCostId, setSavingCostId] = useState<number | null>(null);
+
   const loadDetail = useCallback(async () => {
     if (!Number.isFinite(skuId)) return;
     try {
@@ -253,6 +259,56 @@ export default function SkuDetailPage() {
       setAddingCost(false);
     }
   }, [newCost, newDate, newNotes, skuId, loadDetail]);
+
+  // ── Inline cost edit handlers ────────────────────────────────
+  const startEditingCost = useCallback((row: CostHistoryRow) => {
+    setEditingCostId(row.id);
+    setEditingValue(String(row.cost));
+    setError(null);
+  }, []);
+
+  const cancelEditingCost = useCallback(() => {
+    setEditingCostId(null);
+    setEditingValue("");
+  }, []);
+
+  const commitCostEdit = useCallback(
+    async (costRowId: number, originalCost: number) => {
+      const cleaned = editingValue.replace(/[$,\s]/g, "");
+      // Empty/identical → no-op, just close the editor
+      if (cleaned === "" || cleaned === String(originalCost)) {
+        cancelEditingCost();
+        return;
+      }
+      const num = Number(cleaned);
+      if (!Number.isFinite(num) || num < 0) {
+        setError("Cost must be a non-negative number.");
+        return;
+      }
+      setSavingCostId(costRowId);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/skus/${skuId}/costs/${costRowId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cost: num }),
+          }
+        );
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || `HTTP ${res.status}`);
+          return;
+        }
+        cancelEditingCost();
+        await loadDetail();
+      } finally {
+        setSavingCostId(null);
+      }
+    },
+    [editingValue, skuId, loadDetail, cancelEditingCost]
+  );
 
   const handleDeleteCost = useCallback(
     async (costRowId: number) => {
@@ -497,7 +553,42 @@ export default function SkuDetailPage() {
                           {fmtDate(c.effectiveDate)}
                         </td>
                         <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
-                          {fmtMoney(c.cost, c.currency)}
+                          {editingCostId === c.id ? (
+                            <div className="inline-flex items-center gap-1">
+                              <span className="text-slate-500">$</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={editingValue}
+                                onChange={(e) =>
+                                  setEditingValue(e.target.value)
+                                }
+                                onBlur={() => commitCostEdit(c.id, c.cost)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.currentTarget.blur();
+                                  } else if (e.key === "Escape") {
+                                    cancelEditingCost();
+                                  }
+                                }}
+                                autoFocus
+                                disabled={savingCostId === c.id}
+                                className="w-24 py-1 px-2 text-sm text-right font-semibold tabular-nums border border-blue-300 rounded outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:bg-slate-50"
+                              />
+                              {savingCostId === c.id && (
+                                <Spinner size={12} color="currentColor" />
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEditingCost(c)}
+                              className="text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap bg-transparent border-0 cursor-pointer hover:bg-blue-50 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                              title="Click to edit"
+                            >
+                              {fmtMoney(c.cost, c.currency)}
+                            </button>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-slate-600 text-xs">
                           {c.notes ?? "—"}
