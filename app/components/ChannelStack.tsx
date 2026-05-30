@@ -92,26 +92,33 @@ export default function ChannelStack({
               </span>
               Add another channel ({hidden.length} available)
             </summary>
-            <ul className="mt-2 space-y-1 m-0 p-0 list-none">
+            <ul className="mt-2 space-y-2 m-0 p-0 list-none">
               {hidden.map((ch) => (
                 <li
                   key={ch.id}
-                  className="flex items-center justify-between gap-3 text-xs py-1.5 pl-5"
+                  className="flex items-start justify-between gap-3 text-xs py-1.5 pl-5"
                 >
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <span className="text-base">{ch.icon}</span>
-                    <span>{ch.label}</span>
-                    {ch.comingSoon && (
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                        Coming soon
-                      </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-700 flex items-center gap-2">
+                      <span className="text-base">{ch.icon}</span>
+                      <span className="font-medium">{ch.label}</span>
+                      {ch.comingSoon && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                          Coming soon
+                        </span>
+                      )}
+                    </div>
+                    {ch.description && (
+                      <p className="text-[11px] text-slate-500 m-0 mt-0.5 ml-7 leading-snug">
+                        {ch.description}
+                      </p>
                     )}
-                  </span>
+                  </div>
                   {!ch.comingSoon && (
                     <button
                       type="button"
                       onClick={() => onToggleCollapse(ch.id)}
-                      className="text-blue-600 hover:underline cursor-pointer text-xs bg-transparent border-0"
+                      className="text-blue-600 hover:underline cursor-pointer text-xs bg-transparent border-0 whitespace-nowrap pt-0.5"
                     >
                       + Add
                     </button>

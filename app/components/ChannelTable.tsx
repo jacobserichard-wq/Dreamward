@@ -32,6 +32,10 @@ export interface ChannelRow {
   /** Where clicking a populated channel card drills to.
    *  null = no click target (typically coming-soon channels). */
   drillHref?: string | null;
+  /** Phase 13: short plain-language sub-line shown under the
+   *  channel label in the "Add another channel" disclosure.
+   *  Sourced from CANONICAL_CHANNELS[].description. */
+  description?: string;
 }
 
 export interface ChannelTableProps {

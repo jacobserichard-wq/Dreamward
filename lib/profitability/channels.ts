@@ -59,6 +59,13 @@ export interface ChannelMeta {
    *  null for coming-soon channels (no click). The whole card
    *  becomes a Link when this is non-null AND the channel has data. */
   drillHref: string | null;
+  /** Short plain-language explanation of what this channel
+   *  represents. Rendered as a sub-line under the channel label
+   *  in the "Add another channel" disclosure so merchants can
+   *  tell at a glance whether the channel applies to their
+   *  business. Omit for channels with self-explanatory names
+   *  (e.g., "Shopify" — what else could it be?). */
+  description?: string;
 }
 
 /** The fixed canonical channel list rendered on the dashboard table
@@ -97,6 +104,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Create your first invoice",
     proGated: false,
     drillHref: "/invoices",
+    description: "B2B sales — invoices to other businesses, distributors, or retailers buying your goods to resell.",
   },
   {
     id: "service",
@@ -107,26 +115,35 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Add a service invoice",
     proGated: false,
     drillHref: "/invoices",
+    description: "Consulting, custom orders, retainers, hourly work — revenue from your time rather than a physical product.",
   },
   {
+    // Phase 13 rename: "Gmail invoices" → "Forwarded invoices".
+    // The id stays "gmail" for back-compat with existing data
+    // and the classifyIncomeRow router (source === 'gmail').
     id: "gmail",
-    label: "Gmail invoices",
+    label: "Forwarded invoices",
     icon: "\u{1F4E7}",
     comingSoon: false,
     emptyAddHref: "/help/gmail-setup",
     emptyAddLabel: "Set up Gmail labels",
     proGated: true,
     drillHref: "/dashboard?tab=processed&filter=gmail",
+    description: "Invoices + receipts forwarded into the FlowWork Gmail label, parsed by AI. Requires the Gmail integration (Pro).",
   },
   {
+    // Phase 13 rename: "Uploads" → "Uncategorized". The id
+    // stays "uploads" because it's stored on rows + referenced
+    // by the classifier's fallback path.
     id: "uploads",
-    label: "Uploads",
+    label: "Uncategorized",
     icon: "\u{1F4C1}",
     comingSoon: false,
     emptyAddHref: "/dashboard",
     emptyAddLabel: "Upload a file",
     proGated: false,
     drillHref: "/dashboard?tab=processed",
+    description: "Catch-all for transactions that don't fit any other channel. Mostly CSV-uploaded rows without an obvious tag — review periodically to re-tag.",
   },
   {
     id: "etsy",
@@ -229,6 +246,11 @@ export interface ChannelMetrics {
   proGated: boolean;
   /** Where clicking a populated channel card drills the user to */
   drillHref: string | null;
+  /** Phase 13: plain-language sub-line surfaced in the "Add
+   *  another channel" disclosure on the dashboard. Sourced
+   *  from ChannelMeta.description; absent for self-explanatory
+   *  channels. */
+  description?: string;
 }
 
 export interface ChannelAggregateResult {
@@ -376,6 +398,7 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
       emptyAddLabel: meta.emptyAddLabel,
       proGated: meta.proGated,
       drillHref: meta.drillHref,
+      description: meta.description,
     });
   }
 
