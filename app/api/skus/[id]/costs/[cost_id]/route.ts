@@ -56,59 +56,101 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid cost id" }, { status: 400 });
     }
 
-    // ── Guardrail: refuse to delete the only cost row ─────────
-    // Count first, then delete. Single round trip via CTE keeps
-    // the check atomic.
+    // ── Guardrail: refuse to delete the row currently in effect
+    // unless a replacement also-in-effect row exists.
+    //
+    // The original guard only counted total rows, so deleting an
+    // "effective today" row was allowed when a future-dated
+    // ("scheduled") row also existed. That left the SKU with
+    // current_cost = NULL until the scheduled row's effective_date
+    // arrived — confusing UX even though COGS reports handled the
+    // NULL gracefully.
+    //
+    // New rule: a delete is refused when has_current_before is
+    // true AND has_current_after would be false (i.e., the row
+    // being deleted was the only one whose effective_date <=
+    // CURRENT_DATE). All other deletes — future-dated rows, old
+    // back-dated rows that aren't the current pick, deletions on
+    // SKUs that already have no current cost — are allowed.
+    //
+    // Single CTE keeps the ownership check + status snapshot +
+    // conditional DELETE atomic. Skus that don't belong to this
+    // client return owns_sku=false → 404.
     const result = await pool.query<{
-      remaining: number;
+      owns_sku: boolean;
+      row_exists: boolean;
+      has_current_before: boolean;
+      has_current_after: boolean;
       deleted: number;
     }>(
-      `WITH guard AS (
-         SELECT COUNT(*)::int AS n
-           FROM sku_cost_history ch
-           JOIN skus s ON s.id = ch.sku_id
-          WHERE ch.sku_id = $1
-            AND s.client_id = $2
+      `WITH status AS (
+         SELECT
+           EXISTS (
+             SELECT 1 FROM skus s
+              WHERE s.id = $1 AND s.client_id = $2
+           ) AS owns_sku,
+           EXISTS (
+             SELECT 1 FROM sku_cost_history ch
+              WHERE ch.sku_id = $1 AND ch.id = $3
+           ) AS row_exists,
+           EXISTS (
+             SELECT 1 FROM sku_cost_history ch
+              WHERE ch.sku_id = $1 AND ch.effective_date <= CURRENT_DATE
+           ) AS has_current_before,
+           EXISTS (
+             SELECT 1 FROM sku_cost_history ch
+              WHERE ch.sku_id = $1
+                AND ch.id <> $3
+                AND ch.effective_date <= CURRENT_DATE
+           ) AS has_current_after
        ),
        del AS (
          DELETE FROM sku_cost_history
           WHERE id = $3
             AND sku_id = $1
-            AND (SELECT n FROM guard) > 1
-            AND EXISTS (
-              SELECT 1 FROM skus
-               WHERE id = $1 AND client_id = $2
+            AND (SELECT owns_sku FROM status)
+            AND NOT (
+              (SELECT has_current_before FROM status)
+              AND NOT (SELECT has_current_after FROM status)
             )
           RETURNING id
        )
        SELECT
-         (SELECT n FROM guard) AS remaining,
+         (SELECT owns_sku FROM status) AS owns_sku,
+         (SELECT row_exists FROM status) AS row_exists,
+         (SELECT has_current_before FROM status) AS has_current_before,
+         (SELECT has_current_after FROM status) AS has_current_after,
          COALESCE((SELECT COUNT(*)::int FROM del), 0) AS deleted`,
       [skuId, client.id, costId]
     );
 
     const row = result.rows[0];
-    // No rows returned at all means the SKU isn't visible to this
-    // client (or doesn't exist).
-    if (!row || row.remaining === 0) {
+    if (!row || !row.owns_sku) {
       return NextResponse.json({ error: "SKU not found" }, { status: 404 });
     }
-    // Guard tripped — there was only one cost row, refuse.
-    if (row.remaining === 1) {
+    if (!row.row_exists) {
+      return NextResponse.json(
+        { error: "Cost row not found" },
+        { status: 404 }
+      );
+    }
+    // Guard tripped — would have orphaned the currently-in-effect
+    // cost (i.e., row being deleted was the only one with
+    // effective_date <= today, and SKU currently has a current cost).
+    if (row.has_current_before && !row.has_current_after) {
       return NextResponse.json(
         {
           error:
-            "Can't delete the only cost row. Add a replacement first, or archive the SKU instead.",
+            "Can't delete the cost row that's currently in effect. Add a back-dated replacement cost first, or delete the future-dated rows so this SKU has no scheduled costs to fall back on.",
         },
         { status: 409 }
       );
     }
-    // Delete actually ran but matched zero rows → cost_id was
-    // wrong (or already deleted).
+    // Defensive — should be impossible after the checks above.
     if (row.deleted === 0) {
       return NextResponse.json(
-        { error: "Cost row not found" },
-        { status: 404 }
+        { error: "Cost row could not be deleted" },
+        { status: 500 }
       );
     }
 

@@ -298,6 +298,20 @@ export default function SkuDetailPage() {
     return active[0]?.id ?? null;
   }, [data]);
 
+  // ── Soonest future-dated cost (for the "current cost is —"
+  // explainer chip). Only computed when no current cost exists;
+  // helps the merchant understand that the SKU isn't broken —
+  // just hasn't started using any of its scheduled costs yet.
+  const nextFutureCost = useMemo(() => {
+    if (!data) return null;
+    if (data.sku.currentCost != null) return null; // current cost exists, no explainer needed
+    const today = todayIso();
+    const future = data.costHistory
+      .filter((r) => r.effectiveDate > today)
+      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+    return future[0] ?? null;
+  }, [data]);
+
   // ── Render guards ────────────────────────────────────────────
   if (!Number.isFinite(skuId)) {
     return (
@@ -415,7 +429,9 @@ export default function SkuDetailPage() {
             sub={
               sku.costEffectiveDate
                 ? `effective ${fmtDate(sku.costEffectiveDate)}`
-                : undefined
+                : nextFutureCost
+                  ? `next: ${fmtMoney(nextFutureCost.cost, nextFutureCost.currency)} starts ${fmtDate(nextFutureCost.effectiveDate)}`
+                  : "no cost on or before today"
             }
           />
           <SummaryChip
