@@ -30,6 +30,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import CogsAuditTrailModal, {
+  type CogsDrillScopeOpts,
+} from "../components/CogsAuditTrailModal";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
 
 interface MarginTotals {
@@ -144,6 +147,9 @@ export default function CogsPage() {
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+
+  // Audit trail modal state
+  const [auditScope, setAuditScope] = useState<CogsDrillScopeOpts | null>(null);
 
   const range = useMemo(() => {
     if (preset === "custom") {
@@ -313,7 +319,13 @@ export default function CogsPage() {
               <StatCard
                 label="Cost of goods"
                 value={fmtUsd(totals.cogs)}
-                sub="See the math (drill-in coming next commit)"
+                sub="See the math →"
+                onClick={() =>
+                  setAuditScope({
+                    scope: "totals",
+                    label: "All line items in this period",
+                  })
+                }
               />
               <StatCard
                 label="Gross margin"
@@ -398,12 +410,13 @@ export default function CogsPage() {
                     <th className="text-right py-2.5 px-4 font-medium">
                       Margin %
                     </th>
+                    <th className="w-24 text-right py-2.5 px-4 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {data!.byChannel.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-slate-500 text-sm">
+                      <td colSpan={6} className="py-6 text-center text-slate-500 text-sm">
                         No sales in this period.
                       </td>
                     </tr>
@@ -435,6 +448,21 @@ export default function CogsPage() {
                           <td className="py-3 px-4 text-right text-slate-700 tabular-nums whitespace-nowrap">
                             {fmtPct(row.marginPercent)}
                           </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAuditScope({
+                                  scope: "channel",
+                                  id: row.channel ?? "null",
+                                  label: `Channel: ${meta.label}`,
+                                })
+                              }
+                              className="text-xs font-medium text-blue-600 hover:text-blue-700 bg-transparent border-0 cursor-pointer whitespace-nowrap"
+                            >
+                              Audit →
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
@@ -461,12 +489,13 @@ export default function CogsPage() {
                     <th className="text-right py-2.5 px-4 font-medium">
                       Margin %
                     </th>
+                    <th className="w-24 text-right py-2.5 px-4 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {data!.bySku.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-slate-500 text-sm">
+                      <td colSpan={7} className="py-6 text-center text-slate-500 text-sm">
                         No mapped line items in this period.
                       </td>
                     </tr>
@@ -513,6 +542,28 @@ export default function CogsPage() {
                         <td className="py-3 px-4 text-right text-slate-700 tabular-nums whitespace-nowrap">
                           {fmtPct(s.marginPercent)}
                         </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAuditScope(
+                                s.skuId == null
+                                  ? {
+                                      scope: "unmatched",
+                                      label: "Unmatched bucket",
+                                    }
+                                  : {
+                                      scope: "sku",
+                                      id: String(s.skuId),
+                                      label: `SKU: ${s.skuCode ?? s.skuId}`,
+                                    }
+                              )
+                            }
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 bg-transparent border-0 cursor-pointer whitespace-nowrap"
+                          >
+                            Audit →
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -529,6 +580,16 @@ export default function CogsPage() {
           </>
         )}
       </div>
+
+      {range && (
+        <CogsAuditTrailModal
+          open={auditScope !== null}
+          scope={auditScope}
+          from={range.from}
+          to={range.to}
+          onClose={() => setAuditScope(null)}
+        />
+      )}
     </div>
   );
 }
@@ -538,20 +599,24 @@ function StatCard({
   value,
   sub,
   highlight,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: string;
   highlight?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div
-      className={`rounded-xl border p-4 ${
-        highlight
-          ? "bg-emerald-50 border-emerald-200"
-          : "bg-white border-slate-200"
-      }`}
-    >
+  const baseClass = `rounded-xl border p-4 ${
+    highlight
+      ? "bg-emerald-50 border-emerald-200"
+      : "bg-white border-slate-200"
+  }`;
+  const interactiveClass = onClick
+    ? "cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all text-left w-full"
+    : "";
+  const content = (
+    <>
       <p className="text-xs uppercase tracking-wide text-slate-500 m-0 mb-1">
         {label}
       </p>
@@ -560,7 +625,23 @@ function StatCard({
       >
         {value}
       </p>
-      {sub && <p className="text-xs text-slate-500 m-0 mt-0.5">{sub}</p>}
-    </div>
+      {sub && (
+        <p className={`text-xs m-0 mt-0.5 ${onClick ? "text-blue-600 font-medium" : "text-slate-500"}`}>
+          {sub}
+        </p>
+      )}
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${baseClass} ${interactiveClass}`}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div className={baseClass}>{content}</div>;
 }
