@@ -41,12 +41,26 @@ export interface AnnualSummary {
   basis: "cash";
   summary: {
     totalRevenue: number;
+    /** Sum of ALL expense-category rows in byCategory.expense
+     *  (INCLUDES COGS-tagged categories for back-compat with
+     *  pre-Phase-13 consumers). Use `operatingExpenses` for the
+     *  Schedule-C-style P&L denominator. */
     totalExpenses: number;
     boothFees: number;
     mileageCost: number;
     totalMiles: number;
     netProfit: number;
     unknownAmount: number;
+    /** Phase 13: total of expense categories with isCogs=true.
+     *  Subset of totalExpenses (not in addition to it). */
+    cogs: number;
+    /** Phase 13: totalRevenue minus cogs. The headline number on
+     *  a Schedule-C-style P&L (above operating expenses). */
+    grossProfit: number;
+    /** Phase 13: totalExpenses minus cogs. The "operating
+     *  expenses" line on a P&L (booth fees + mileage are still
+     *  tracked separately on top of this). */
+    operatingExpenses: number;
   };
   byCategory: {
     income: Array<{ category: string; count: number; total: number }>;
@@ -60,6 +74,10 @@ export interface AnnualSummary {
       // (rare — categories with truly novel content; would land on
       // "27a" Other expenses on the actual return).
       scheduleCLine: string | null;
+      // Phase 13: true when the category is tagged isCogs in
+      // lib/categories.ts. Drives the P&L's separate Gross Profit
+      // line on screen + in PDF/CSV exports.
+      isCogs: boolean;
     }>;
   };
   // Phase 7c: roll up expense totals by Schedule C line. Sorted by total
@@ -269,6 +287,21 @@ export function buildScheduleCSummary(
     .sort((a, b) => b.total - a.total);
 }
 
+// Phase 13: Map of category name → isCogs flag for the requested
+// industry. Mirror of buildTaxDeductibleMap / buildScheduleCMap.
+// Defaults to false when the underlying category doesn't set the
+// field. Custom categories (added via /settings) are not in this
+// map and naturally default to false in the report consumer when
+// .get() returns undefined.
+export function buildIsCogsMap(industry: Industry): Map<string, boolean> {
+  const m = new Map<string, boolean>();
+  for (const c of getCategoriesForIndustry(industry)) {
+    if (c.type !== "expense") continue;
+    m.set(c.name, c.isCogs === true);
+  }
+  return m;
+}
+
 // Map of category name → taxDeductible flag for the requested industry.
 // Used to annotate byCategory.expense rows. taxDeductible is omitted
 // from many categories in lib/categories.ts (timing/Section-179
@@ -450,6 +483,7 @@ export async function annualSummary(opts: {
   const classify = buildClassifier(industry, customIncome, customExpense);
   const deductibleMap = buildTaxDeductibleMap(industry);
   const scheduleCMap = buildScheduleCMap(industry);
+  const isCogsMap = buildIsCogsMap(industry);
 
   // IRS rate + rateSource per phase-7a-tax-reports-design.md §1 #5.
   const irsRaw = appSettingResult.rows[0]?.value;
@@ -547,8 +581,20 @@ export async function annualSummary(opts: {
   let totalRevenue = 0;
   for (const v of byCategoryIncome.values()) totalRevenue += v.total;
   let totalExpenses = 0;
-  for (const v of byCategoryExpense.values()) totalExpenses += v.total;
+  let cogs = 0;
+  for (const [categoryName, v] of byCategoryExpense) {
+    totalExpenses += v.total;
+    if (isCogsMap.get(categoryName) === true) {
+      cogs += v.total;
+    }
+  }
+  const operatingExpenses = totalExpenses - cogs;
+  const grossProfit = totalRevenue - cogs;
   const mileageCost = totalMiles * irsMileageRate;
+  // Net profit math is unchanged — booth fees + mileage are still
+  // tracked separately on top of operating expenses, and totalExpenses
+  // still bundles COGS in for back-compat with downstream consumers
+  // that read it directly.
   const netProfit = totalRevenue - boothFees - totalExpenses - mileageCost;
 
   // byMonth in chronological order with computed netProfit.
@@ -575,6 +621,7 @@ export async function annualSummary(opts: {
       total: v.total,
       taxDeductible: deductibleMap.get(category) ?? null,
       scheduleCLine: scheduleCMap.get(category) ?? null,
+      isCogs: isCogsMap.get(category) === true,
     }))
     .sort((a, b) => b.total - a.total);
   const scheduleCSummary = buildScheduleCSummary(expenseArr);
@@ -598,6 +645,9 @@ export async function annualSummary(opts: {
       totalMiles,
       netProfit,
       unknownAmount,
+      cogs,
+      grossProfit,
+      operatingExpenses,
     },
     byCategory: {
       income: incomeArr,
