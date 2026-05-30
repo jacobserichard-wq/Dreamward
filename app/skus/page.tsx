@@ -360,10 +360,12 @@ export default function SkusPage() {
           </div>
         )}
 
-        {/* Forward pointers for the future sister pages */}
+        {/* Sister-page links */}
         <p className="text-xs text-slate-400 text-center mt-6">
-          Want to bulk-match unmatched line items?{" "}
-          <span className="text-slate-500 italic">Coming with Phase 12d.</span>
+          Need to map items from your stores?{" "}
+          <Link href="/skus/unmatched" className="text-blue-600 hover:underline">
+            Unmatched items →
+          </Link>
         </p>
       </div>
 
