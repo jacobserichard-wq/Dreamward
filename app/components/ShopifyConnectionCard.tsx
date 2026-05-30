@@ -33,6 +33,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 // Backfill polling cadence — how often the card re-fetches state
 // while a backfill is running. 5s is a good balance: responsive
@@ -406,6 +407,11 @@ export default function ShopifyConnectionCard() {
                 </span>
               </div>
             )}
+
+            <ReimportLineItemsButton
+              platform="shopify"
+              platformLabel="Shopify orders"
+            />
 
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button

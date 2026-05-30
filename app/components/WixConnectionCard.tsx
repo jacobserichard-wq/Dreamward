@@ -38,6 +38,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 // While disconnected, re-fetch connection state every 5s to catch
 // the merchant's return from the install flow without requiring a
@@ -455,6 +456,11 @@ export default function WixConnectionCard() {
                 </button>
               </div>
             )}
+
+            <ReimportLineItemsButton
+              platform="wix"
+              platformLabel="Wix orders"
+            />
 
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button

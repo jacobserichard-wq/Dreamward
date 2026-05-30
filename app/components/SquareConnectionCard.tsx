@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 // Phase 11c: while a backfill is in-progress, re-trigger the next
 // chunk + refresh state every 5s. Mirrors WixConnectionCard.
@@ -395,6 +396,11 @@ export default function SquareConnectionCard() {
                 </button>
               </div>
             )}
+
+            <ReimportLineItemsButton
+              platform="square"
+              platformLabel="Square payments"
+            />
 
             <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
               <button
