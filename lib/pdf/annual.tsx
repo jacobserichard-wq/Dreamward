@@ -168,8 +168,11 @@ export function AnnualPdfDocument({
           Annual Business Summary — Cash Basis
         </Text>
 
-        {/* Summary — five lines + net total. wrap={false} so this
-            small fixed section never page-breaks mid-table. */}
+        {/* Summary — Schedule-C-style P&L layout when COGS is
+            non-zero. Conditional rendering avoids empty rows for
+            service businesses that don't sell physical inventory.
+            wrap={false} so this small fixed section never
+            page-breaks mid-table. */}
         <View style={styles.section} wrap={false}>
           <Text style={styles.sectionTitle}>Summary</Text>
 
@@ -177,13 +180,37 @@ export function AnnualPdfDocument({
             <Text style={styles.summaryLabel}>Revenue</Text>
             <Text style={styles.summaryValue}>{fmtUsd(s.totalRevenue)}</Text>
           </View>
+          {s.cogs > 0 && (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Cost of goods sold</Text>
+                <Text style={styles.summaryValue}>{fmtUsd(s.cogs)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text
+                  style={[styles.summaryLabel, { fontWeight: "bold" }]}
+                >
+                  Gross profit
+                </Text>
+                <Text
+                  style={[styles.summaryValue, { fontWeight: "bold" }]}
+                >
+                  {fmtUsd(s.grossProfit)}
+                </Text>
+              </View>
+            </>
+          )}
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>
+              {s.cogs > 0 ? "Operating expenses" : "Expenses"}
+            </Text>
+            <Text style={styles.summaryValue}>
+              {fmtUsd(s.cogs > 0 ? s.operatingExpenses : s.totalExpenses)}
+            </Text>
+          </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Booth fees</Text>
             <Text style={styles.summaryValue}>{fmtUsd(s.boothFees)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Expenses</Text>
-            <Text style={styles.summaryValue}>{fmtUsd(s.totalExpenses)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>
