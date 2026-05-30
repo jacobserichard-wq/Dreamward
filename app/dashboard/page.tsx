@@ -827,6 +827,33 @@ export default function Home() {
                 {clientInfo.plan}
               </a>
             )}
+            {/* Sub-session 32 polish: Upload action surfaced in the
+                header. The CSV/XLSX upload UI also lives on the
+                Emails tab, but burying a primary action two clicks
+                deep (Dashboard → Emails tab → Upload button) hides
+                a core feature. Same handleUpload callback the
+                Emails-tab button uses — state + review modal wire
+                through identically. */}
+            <label
+              className={`bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 inline-flex items-center gap-1 m-0 ${
+                uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:text-white"
+              }`}
+              title="Upload a CSV, TSV, or XLSX file"
+            >
+              {uploading ? <Spinner size={11} color="white" /> : <span>{"\u{1F4C1}"}</span>}
+              {uploading ? "Uploading..." : "Upload"}
+              <input
+                type="file"
+                accept=".csv,.tsv,.xlsx"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload(f);
+                  e.target.value = "";
+                }}
+                disabled={uploading}
+              />
+            </label>
             <Link
               href="/events"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
