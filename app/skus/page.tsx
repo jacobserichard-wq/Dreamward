@@ -23,6 +23,9 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
+import SkuBulkCostModal, {
+  type SelectedSkuForCost,
+} from "../components/SkuBulkCostModal";
 
 interface SkuRow {
   id: number;
@@ -77,6 +80,11 @@ export default function SkusPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+
+  // Bulk-select state (Phase 12d commit 4)
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkCostOpen, setBulkCostOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const loadSkus = useCallback(
     async (includeInactive: boolean) => {
@@ -143,6 +151,65 @@ export default function SkusPage() {
       router.push(`/skus/${id}`);
     },
     [router]
+  );
+
+  // ── Selection handlers (Phase 12d) ────────────────────────────
+  const toggleOne = useCallback((id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      if (prev.size === skus.length) return new Set();
+      return new Set(skus.map((s) => s.id));
+    });
+  }, [skus]);
+
+  // Build the items array the modal needs from the current
+  // selection. Filters out any selected IDs that aren't in the
+  // currently-loaded skus (rare race, but defensive).
+  const selectedForCost: SelectedSkuForCost[] = useMemo(() => {
+    return skus
+      .filter((s) => selected.has(s.id))
+      .map((s) => ({
+        id: s.id,
+        code: s.code,
+        name: s.name,
+        currentCost: s.currentCost,
+      }));
+  }, [skus, selected]);
+
+  const handleBulkCostSaved = useCallback(
+    async (info: {
+      updated: number;
+      skipped: number;
+      errored: number;
+    }) => {
+      setBulkCostOpen(false);
+      setSelected(new Set());
+      // Re-fetch so the table reflects the new "current cost"
+      // for every successfully-updated row.
+      await loadSkus(showArchived);
+      const parts: string[] = [
+        `${info.updated} cost${info.updated === 1 ? "" : "s"} updated`,
+      ];
+      if (info.skipped > 0) {
+        parts.push(
+          `${info.skipped} skipped (existing cost on that date)`
+        );
+      }
+      if (info.errored > 0) {
+        parts.push(`${info.errored} errored`);
+      }
+      setSuccessToast(parts.join(" · "));
+      window.setTimeout(() => setSuccessToast(null), 6000);
+    },
+    [loadSkus, showArchived]
   );
 
   // ── SkuForm submit handler — POST + optimistic list update ───
@@ -221,6 +288,45 @@ export default function SkusPage() {
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        )}
+
+        {successToast && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-start gap-3">
+            <span>{"\u{2705}"} {successToast}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessToast(null)}
+              className="text-emerald-700 hover:text-emerald-900 bg-transparent border-0 cursor-pointer text-base leading-none"
+              aria-label="Dismiss"
+            >
+              {"\u{00D7}"}
+            </button>
+          </div>
+        )}
+
+        {/* Bulk action bar (appears when SKUs are selected) */}
+        {selected.size > 0 && (
+          <div className="bg-slate-900 text-white rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3 shadow-lg">
+            <span className="text-sm font-medium">
+              {selected.size} SKU{selected.size === 1 ? "" : "s"} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="text-xs text-slate-300 hover:text-white bg-transparent border-0 cursor-pointer px-2"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkCostOpen(true)}
+                className="py-1.5 px-3 rounded-lg bg-white text-slate-900 text-sm font-semibold border-0 cursor-pointer hover:bg-slate-100"
+              >
+                Update costs →
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Action bar */}
@@ -306,6 +412,22 @@ export default function SkusPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                  <th className="w-10 text-center py-2.5 px-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={
+                        selected.size > 0 && selected.size === skus.length
+                      }
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            selected.size > 0 && selected.size < skus.length;
+                      }}
+                      onChange={toggleAll}
+                      className="cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left py-2.5 px-4 font-medium">Code</th>
                   <th className="text-left py-2.5 px-4 font-medium">Name</th>
                   <th className="text-right py-2.5 px-4 font-medium">
@@ -319,42 +441,59 @@ export default function SkusPage() {
                 </tr>
               </thead>
               <tbody>
-                {skus.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => handleRowClick(s.id)}
-                    className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50 cursor-pointer group"
-                    title="Click for details"
-                  >
-                    <td className="py-3 px-4 text-slate-900 font-mono font-semibold whitespace-nowrap">
-                      {s.code}
-                    </td>
-                    <td className="py-3 px-4 text-slate-900">
-                      {s.name}
-                      {s.description && (
-                        <p className="text-xs text-slate-500 m-0 mt-0.5">
-                          {s.description}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
-                      {fmtMoney(s.currentCost, s.costCurrency)}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-600 tabular-nums whitespace-nowrap">
-                      {s.salesCount > 0 ? s.salesCount : "—"}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
-                      {fmtDate(s.lastSaleDate)}
-                    </td>
-                    <td className="py-3 pr-3 text-xs">
-                      {!s.active && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase tracking-wide">
-                          Archived
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {skus.map((s) => {
+                  const isSelected = selected.has(s.id);
+                  return (
+                    <tr
+                      key={s.id}
+                      onClick={() => handleRowClick(s.id)}
+                      className={`border-b border-slate-100 last:border-b-0 cursor-pointer group ${
+                        isSelected ? "bg-blue-50/50" : "hover:bg-slate-50"
+                      }`}
+                      title="Click for details"
+                    >
+                      <td
+                        className="py-3 px-2 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${s.code}`}
+                          checked={isSelected}
+                          onChange={() => toggleOne(s.id)}
+                          className="cursor-pointer"
+                        />
+                      </td>
+                      <td className="py-3 px-4 text-slate-900 font-mono font-semibold whitespace-nowrap">
+                        {s.code}
+                      </td>
+                      <td className="py-3 px-4 text-slate-900">
+                        {s.name}
+                        {s.description && (
+                          <p className="text-xs text-slate-500 m-0 mt-0.5">
+                            {s.description}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
+                        {fmtMoney(s.currentCost, s.costCurrency)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-600 tabular-nums whitespace-nowrap">
+                        {s.salesCount > 0 ? s.salesCount : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
+                        {fmtDate(s.lastSaleDate)}
+                      </td>
+                      <td className="py-3 pr-3 text-xs">
+                        {!s.active && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase tracking-wide">
+                            Archived
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -373,6 +512,13 @@ export default function SkusPage() {
         open={formOpen}
         onSave={handleSaveSku}
         onClose={handleCloseForm}
+      />
+
+      <SkuBulkCostModal
+        open={bulkCostOpen}
+        items={selectedForCost}
+        onClose={() => setBulkCostOpen(false)}
+        onSaved={handleBulkCostSaved}
       />
     </div>
   );
