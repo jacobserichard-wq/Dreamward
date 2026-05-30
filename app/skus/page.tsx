@@ -370,7 +370,14 @@ export default function SkusPage() {
                 : "loading..."}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/skus/bulk-import"
+              className="py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5 no-underline"
+              title="Pull SKUs from a connected store (Square, Shopify, Wix)"
+            >
+              <span>{"\u{1F4E5}"}</span> Pull from a store
+            </Link>
             <button
               type="button"
               onClick={() => setPasteOpen(true)}
