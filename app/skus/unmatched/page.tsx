@@ -22,6 +22,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../../components/PageHeader";
 import ErrorBanner from "../../components/ErrorBanner";
+import SkuMatchModal, {
+  type ExistingSkuOption,
+  type SelectedUnmatchedItem,
+} from "../../components/SkuMatchModal";
 
 interface UnmatchedItem {
   platform: string;
@@ -83,8 +87,21 @@ export default function UnmatchedPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<UnmatchedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
+
+  // Bulk-select state — Set<groupKey>
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Modal state
+  const [matchOpen, setMatchOpen] = useState(false);
+  const [matchItems, setMatchItems] = useState<SelectedUnmatchedItem[]>([]);
+
+  // Existing SKUs list for the "Map to existing" tab in the modal.
+  // Fetched once on mount + refreshed after every successful map
+  // (so newly-created SKUs appear immediately).
+  const [existingSkus, setExistingSkus] = useState<ExistingSkuOption[]>([]);
 
   const load = useCallback(
     async (platformFilter: string | null) => {
@@ -114,10 +131,27 @@ export default function UnmatchedPage() {
     [router]
   );
 
+  /** Load the existing SKUs list for the modal's "Map to existing"
+   *  tab. Cheap call — Pro merchants typically have <100 SKUs. */
+  const loadExistingSkus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/skus?limit=500");
+      if (!res.ok) return; // non-fatal — modal just won't offer the existing tab
+      const data = (await res.json()) as {
+        skus: Array<{ id: number; code: string; name: string }>;
+      };
+      setExistingSkus(
+        data.skus.map((s) => ({ id: s.id, code: s.code, name: s.name }))
+      );
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await load(activePlatform);
+      await Promise.all([load(activePlatform), loadExistingSkus()]);
       if (!cancelled) setLoading(false);
     })();
     return () => {
@@ -129,12 +163,65 @@ export default function UnmatchedPage() {
   useEffect(() => {
     if (loading) return;
     load(activePlatform);
+    // Clear any stale selection when the filter changes — selected
+    // groupKeys that aren't in the new list would still appear in
+    // the modal otherwise.
+    setSelected(new Set());
   }, [activePlatform, load, loading]);
 
-  // Stub action handler for commit 2 — actions ship in commit 3.
-  const handleStubAction = useCallback(() => {
-    setError("The bulk-match actions ship in the next commit. Sit tight!");
+  // ── Selection helpers ─────────────────────────────────────────
+  const toggleOne = useCallback((groupKey: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
   }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      if (!data) return prev;
+      const allKeys = data.items.map((i) => i.groupKey);
+      if (prev.size === allKeys.length) return new Set();
+      return new Set(allKeys);
+    });
+  }, [data]);
+
+  // ── Open the match modal with current selection (or one row) ──
+  const openMatch = useCallback(
+    (rowItem?: UnmatchedItem) => {
+      if (!data) return;
+      let items: SelectedUnmatchedItem[];
+      if (rowItem) {
+        items = [rowItem];
+      } else {
+        items = data.items.filter((it) => selected.has(it.groupKey));
+      }
+      if (items.length === 0) return;
+      setMatchItems(items);
+      setMatchOpen(true);
+    },
+    [data, selected]
+  );
+
+  // ── Save handler from the modal ───────────────────────────────
+  const handleMatchSaved = useCallback(
+    async (info: { skuId: number; skuCode: string; resolvedCount: number }) => {
+      setMatchOpen(false);
+      setSelected(new Set());
+      // Re-fetch both the unmatched list (mapped items dropped)
+      // and the existing SKUs list (newly-created SKU now available
+      // in the "Map to existing" tab for next time).
+      await Promise.all([load(activePlatform), loadExistingSkus()]);
+      setSuccessToast(
+        `Mapped to ${info.skuCode}: ${info.resolvedCount} historical sale${info.resolvedCount === 1 ? "" : "s"} now have COGS calculated.`
+      );
+      // Auto-dismiss after 6 seconds.
+      window.setTimeout(() => setSuccessToast(null), 6000);
+    },
+    [activePlatform, load, loadExistingSkus]
+  );
 
   // Detect Square POS Custom Amount items in the current page →
   // shows the explainer banner only when there are any to discuss.
@@ -184,6 +271,20 @@ export default function UnmatchedPage() {
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        )}
+
+        {successToast && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-start gap-3">
+            <span>{"\u{2728}"} {successToast}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessToast(null)}
+              className="text-emerald-700 hover:text-emerald-900 bg-transparent border-0 cursor-pointer text-base leading-none"
+              aria-label="Dismiss"
+            >
+              {"\u{00D7}"}
+            </button>
+          </div>
         )}
 
         {/* Anti-Crafty: Square Custom Amount info banner */}
@@ -271,86 +372,152 @@ export default function UnmatchedPage() {
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
-                  <th className="text-left py-2.5 px-4 font-medium">
-                    Item name
-                  </th>
-                  <th className="text-left py-2.5 px-4 font-medium">Platform</th>
-                  <th className="text-left py-2.5 px-4 font-medium">
-                    Platform SKU / ID
-                  </th>
-                  <th className="text-right py-2.5 px-4 font-medium">Sales</th>
-                  <th className="text-right py-2.5 px-4 font-medium">Revenue</th>
-                  <th className="text-left py-2.5 px-4 font-medium">
-                    Last sale
-                  </th>
-                  <th className="w-32 text-right py-2.5 px-4 font-medium">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((it) => {
-                  const meta = platformMeta(it.platform);
-                  const isCustom = it.externalItemId === null;
-                  return (
-                    <tr
-                      key={it.groupKey}
-                      className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50"
-                    >
-                      <td className="py-3 px-4 text-slate-900 font-medium">
-                        {it.name}
-                        {isCustom && (
-                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase tracking-wide">
-                            Custom amount
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}
-                        >
-                          <span>{meta.icon}</span>
-                          <span>{meta.label}</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-500 text-xs font-mono">
-                        {it.externalSku ?? it.externalItemId ?? "—"}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-700 tabular-nums">
-                        {it.lineItemCount}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
-                        {fmtUsd(it.totalRevenue)}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
-                        {fmtDate(it.lastSoldAt)}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={handleStubAction}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer bg-transparent border-0"
-                        >
-                          Map →
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <>
+            {/* Bulk action bar — sticky-feeling chrome when selected > 0 */}
+            {selected.size > 0 && (
+              <div className="bg-slate-900 text-white rounded-xl px-4 py-3 mb-3 flex items-center justify-between gap-3 shadow-lg">
+                <span className="text-sm font-medium">
+                  {selected.size} item{selected.size === 1 ? "" : "s"} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(new Set())}
+                    className="text-xs text-slate-300 hover:text-white bg-transparent border-0 cursor-pointer px-2"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openMatch()}
+                    className="py-1.5 px-3 rounded-lg bg-white text-slate-900 text-sm font-semibold border-0 cursor-pointer hover:bg-slate-100"
+                  >
+                    Map {selected.size} item{selected.size === 1 ? "" : "s"} →
+                  </button>
+                </div>
+              </div>
+            )}
 
-        <p className="text-xs text-slate-400 text-center mt-6">
-          Bulk-match UX (select N items → create or map in one shot) ships in
-          the next commit.
-        </p>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                    <th className="w-10 text-center py-2.5 px-2">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all"
+                        checked={
+                          selected.size > 0 &&
+                          selected.size === data.items.length
+                        }
+                        ref={(el) => {
+                          if (el)
+                            el.indeterminate =
+                              selected.size > 0 &&
+                              selected.size < data.items.length;
+                        }}
+                        onChange={toggleAll}
+                        className="cursor-pointer"
+                      />
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium">
+                      Item name
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium">
+                      Platform
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium">
+                      Platform SKU / ID
+                    </th>
+                    <th className="text-right py-2.5 px-4 font-medium">
+                      Sales
+                    </th>
+                    <th className="text-right py-2.5 px-4 font-medium">
+                      Revenue
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium">
+                      Last sale
+                    </th>
+                    <th className="w-24 text-right py-2.5 px-4 font-medium">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((it) => {
+                    const meta = platformMeta(it.platform);
+                    const isCustom = it.externalItemId === null;
+                    const isSelected = selected.has(it.groupKey);
+                    return (
+                      <tr
+                        key={it.groupKey}
+                        className={`border-b border-slate-100 last:border-b-0 ${
+                          isSelected ? "bg-blue-50/50" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <td className="py-3 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${it.name}`}
+                            checked={isSelected}
+                            onChange={() => toggleOne(it.groupKey)}
+                            className="cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-3 px-4 text-slate-900 font-medium">
+                          {it.name}
+                          {isCustom && (
+                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase tracking-wide">
+                              Custom amount
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}
+                          >
+                            <span>{meta.icon}</span>
+                            <span>{meta.label}</span>
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 text-xs font-mono">
+                          {it.externalSku ?? it.externalItemId ?? "—"}
+                        </td>
+                        <td className="py-3 px-4 text-right text-slate-700 tabular-nums">
+                          {it.lineItemCount}
+                        </td>
+                        <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
+                          {fmtUsd(it.totalRevenue)}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
+                          {fmtDate(it.lastSoldAt)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openMatch(it)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer bg-transparent border-0"
+                          >
+                            Map →
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
+
+      <SkuMatchModal
+        open={matchOpen}
+        items={matchItems}
+        existingSkus={existingSkus}
+        onClose={() => setMatchOpen(false)}
+        onSaved={handleMatchSaved}
+      />
     </div>
   );
 }
