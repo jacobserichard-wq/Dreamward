@@ -841,6 +841,19 @@ export default function Home() {
             >
               AR
             </Link>
+            {/* Phase 12f: COGS gross-margin dashboard. Pro-only.
+                Sits just before Reports since it IS a report
+                conceptually but lives outside the broader /reports
+                surface (which is invoicing-focused). */}
+            {clientInfo?.plan === "pro" && (
+              <Link
+                href="/cogs"
+                className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+                title="Cost of goods sold + gross margin per channel and per SKU"
+              >
+                COGS
+              </Link>
+            )}
             {/* Phase 7a commit 9: Reports nav link. Pro-only — matches the
                 /reports route plan-gate. Sits between Invoices and Settings
                 to keep the financial-flow grouping (Events → Invoices →
