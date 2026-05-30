@@ -121,8 +121,8 @@ export async function saveProcessedItem(item: any, clientId: number) {
     "(vendor, invoice_number, amount, due_date, " +
     "status, category, confidence, summary, " +
     "raw_email_id, extracted_data, client_id, source, " +
-    "ai_classified_at, ai_model, original_ai_category, event_id) " +
-    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) " +
+    "ai_classified_at, ai_model, original_ai_category, event_id, channel) " +
+    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) " +
     "RETURNING *";
   const vals = [
     item.vendor || "Unknown",
@@ -143,6 +143,14 @@ export async function saveProcessedItem(item: any, clientId: number) {
     item.ai_model || item.aiModel || null,
     item.original_ai_category || item.originalAiCategory || null,
     item.event_id || item.eventId || null,
+    // Sub-session 32 polish: persist the channel column on insert so
+    // the Processed-tab card UI matches what the Dashboard rollup
+    // already computes via classifyIncomeRow. Caller (e.g.
+    // /api/upload/confirm) is expected to pre-derive via
+    // deriveStorageChannel(). null when genuinely undeterminable —
+    // the classifier's catch-all still puts those in "uploads" at
+    // rollup time without polluting the persisted column.
+    item.channel || null,
   ];
   return pool.query(sql, vals);
 }

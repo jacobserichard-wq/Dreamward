@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import pool, { saveProcessedItem } from "@/lib/db";
+import { deriveStorageChannel } from "@/lib/profitability/channels";
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,6 +51,16 @@ export async function POST(req: NextRequest) {
         !isStarterGated && validEventIds.has(row.event_id)
           ? row.event_id
           : null;
+      // Sub-session 32 polish: pre-derive the channel from category
+      // + event_id so the Processed-tab card UI matches the dashboard
+      // rollup. Without this, every CSV row inserts with channel=null
+      // and displays "Uncategorized" even when the classifier already
+      // routes it to Markets/Wholesale/etc. behind the scenes.
+      const category = row.category || "expense";
+      const derivedChannel = deriveStorageChannel({
+        category,
+        event_id: eventId,
+      });
       const saved = await saveProcessedItem(
         {
           vendor: row.vendor || "Unknown",
@@ -57,7 +68,7 @@ export async function POST(req: NextRequest) {
           amount: row.amount || 0,
           due_date: row.due_date || null,
           status: "needs_review",
-          category: row.category || "expense",
+          category,
           confidence: row.confidence || 0,
           summary: row.description || null,
           raw_email_id: null,
@@ -66,6 +77,7 @@ export async function POST(req: NextRequest) {
           ai_classified_at: new Date(),
           ai_model: "claude-sonnet-4-20250514",
           event_id: eventId,
+          channel: derivedChannel,
         },
         client.id
       );

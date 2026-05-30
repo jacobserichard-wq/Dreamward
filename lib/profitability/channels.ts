@@ -305,6 +305,28 @@ const VALID_CHANNEL_IDS = new Set<ChannelId>(
   CANONICAL_CHANNELS.map((c) => c.id)
 );
 
+/** Sub-session 32: storage-time channel derivation for CSV/manual
+ *  inserts. Mirrors the income-side rules from classifyIncomeRow
+ *  but excludes the source-routed branches (shopify/wix/square/gmail)
+ *  because those are set at insert time by their respective ingest
+ *  paths — we don't want to double-write them.
+ *
+ *  Used by /api/upload/confirm to bind newly-imported rows to the
+ *  right channel BEFORE they hit the dashboard, so the Processed-
+ *  tab card UI matches the rollup. Returns null when no channel
+ *  can be derived — the row stays "uncategorized" honestly, and
+ *  the user can re-tag via the Reclassify modal. */
+export function deriveStorageChannel(row: {
+  category: string | null;
+  event_id: number | null;
+}): ChannelId | null {
+  if (row.event_id !== null) return "markets";
+  if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
+    return CATEGORY_TO_CHANNEL[row.category];
+  }
+  return null;
+}
+
 /** Categorize a single income row into a channel. Priority:
  *  0. Phase 9.3: explicit row.channel set by user → use verbatim
  *     (if it's a valid known channel ID)
