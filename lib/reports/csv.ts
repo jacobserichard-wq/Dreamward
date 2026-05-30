@@ -22,6 +22,7 @@ import {
   buildClassifier,
   buildScheduleCMap,
   buildScheduleCSummary,
+  buildIsCogsMap,
   csvBusinessSlug,
   isoYearBounds,
   type AppSettingRow,
@@ -137,6 +138,7 @@ export async function renderAnnualCsvBody(opts: {
   // ScheduleC Line column, and the ScheduleC Summary section at the
   // end of the body rolls up totals by line. Built once for the year.
   const scheduleCMap = buildScheduleCMap(industry);
+  const isCogsMap = buildIsCogsMap(industry);
   // Accumulator of expense totals by category — feeds the ScheduleC
   // Summary section computed after row iteration. Keeps the CSV
   // self-contained (no need to call annualSummary just for the rollup).
@@ -303,6 +305,16 @@ export async function renderAnnualCsvBody(opts: {
   const mileageCost = totalMiles * irsRate;
   const netProfit = totalRevenue - boothFees - totalExpenses - mileageCost;
 
+  // Phase 13: split COGS out of totalExpenses for the P&L
+  // headline section. cogs + operatingExpenses sum back to
+  // totalExpenses, so netProfit math is unchanged.
+  let cogs = 0;
+  for (const [category, v] of expenseTotalsByCategory) {
+    if (isCogsMap.get(category) === true) cogs += v.total;
+  }
+  const operatingExpenses = totalExpenses - cogs;
+  const grossProfit = totalRevenue - cogs;
+
   const header = csvRow([
     "Section",
     "Date",
@@ -314,7 +326,13 @@ export async function renderAnnualCsvBody(opts: {
     "Amount",
     "Notes",
   ]);
-  const summarySection = [
+  // Phase 13 Schedule-C-style P&L layout:
+  //   Revenue → COGS → Gross Profit → Operating Expenses
+  //          → Booth Fees → Mileage → Net Profit
+  // COGS row appears only when there's a non-zero amount so single-
+  // service businesses (no inventory) don't see an empty placeholder.
+  const summarySection: string[] = [];
+  summarySection.push(
     csvRow([
       "Summary",
       eoy,
@@ -325,7 +343,52 @@ export async function renderAnnualCsvBody(opts: {
       "",
       formatMoney2(totalRevenue),
       "",
-    ]),
+    ])
+  );
+  if (cogs > 0) {
+    summarySection.push(
+      csvRow([
+        "Summary",
+        eoy,
+        "Cost of goods sold",
+        "",
+        "Materials + inventory consumed (cash basis)",
+        "",
+        "",
+        formatMoney2(cogs),
+        "",
+      ])
+    );
+    summarySection.push(
+      csvRow([
+        "Summary",
+        eoy,
+        "Gross profit",
+        "",
+        "Revenue − COGS",
+        "",
+        "",
+        formatMoney2(grossProfit),
+        "",
+      ])
+    );
+  }
+  summarySection.push(
+    csvRow([
+      "Summary",
+      eoy,
+      cogs > 0 ? "Operating expenses" : "Expense total",
+      "",
+      cogs > 0
+        ? "Annual operating expenses (excludes COGS, booth, mileage)"
+        : "Annual expenses (cash basis)",
+      "",
+      "",
+      formatMoney2(cogs > 0 ? operatingExpenses : totalExpenses),
+      "",
+    ])
+  );
+  summarySection.push(
     csvRow([
       "Summary",
       eoy,
@@ -336,18 +399,9 @@ export async function renderAnnualCsvBody(opts: {
       "",
       formatMoney2(boothFees),
       "",
-    ]),
-    csvRow([
-      "Summary",
-      eoy,
-      "Expense total",
-      "",
-      "Annual expenses (cash basis)",
-      "",
-      "",
-      formatMoney2(totalExpenses),
-      "",
-    ]),
+    ])
+  );
+  summarySection.push(
     csvRow([
       "Summary",
       eoy,
@@ -358,19 +412,23 @@ export async function renderAnnualCsvBody(opts: {
       "9",
       formatMoney2(mileageCost),
       "",
-    ]),
+    ])
+  );
+  summarySection.push(
     csvRow([
       "Summary",
       eoy,
       "Net profit",
       "",
-      "Revenue − Booth − Expenses − Mileage",
+      cogs > 0
+        ? "Gross Profit − Operating − Booth − Mileage"
+        : "Revenue − Booth − Expenses − Mileage",
       "",
       "",
       formatMoney2(netProfit),
       "",
-    ]),
-  ];
+    ])
+  );
 
   // Phase 7c ScheduleC Summary section. Roll up expense totals by IRS
   // Schedule C line via the shared buildScheduleCSummary helper. One
