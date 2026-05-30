@@ -60,6 +60,25 @@ export type Category = {
   // "27a" (Other expenses, itemize on Part V). Sub-session 24 Phase 7c
   // commit 1 added the field; commit 2 fills in the mappings.
   scheduleC?: string;
+  // Phase 13: Is this category a "Cost of Goods Sold" expense?
+  // COGS = inputs that become the product sold (raw materials,
+  // finished-goods inventory, deliverable consumables). Drives the
+  // separate "Gross Profit" line on the P&L report — gross profit
+  // = revenue minus COGS, then operating expenses come off
+  // gross profit to compute net.
+  //
+  // Not the same as IRS Part III COGS (lines 33-42) which most
+  // small filers skip in favor of bucketing COGS-flavored items
+  // on Part II line 22 (Supplies). We support either filing
+  // approach — the flag just tells the report engine where to
+  // surface the dollars.
+  //
+  // Conservative tagging: only inputs to finished goods get this
+  // flag. Packaging supplies, office supplies, disposable
+  // restaurant supplies stay as regular expenses even though they
+  // also land on line 22. Merchant can flip on custom categories
+  // via /settings if their accounting prefers stricter inclusion.
+  isCogs?: boolean;
 };
 
 export const UNIVERSAL_CATEGORIES: Category[] = [
@@ -154,6 +173,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Packaging & Shipping Supplies",
@@ -259,6 +279,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Disposal & Dump Fees",
@@ -298,6 +319,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Disposable Supplies",
@@ -367,6 +389,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Marketplace & Platform Fees",
@@ -458,6 +481,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Wedding & Event Photography",
@@ -703,6 +727,7 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       type: "expense",
       taxDeductible: true,
       scheduleC: "22",
+      isCogs: true,
     },
     {
       name: "Office Supplies",
