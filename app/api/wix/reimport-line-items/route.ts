@@ -38,7 +38,12 @@ async function fetchWixOrder(opts: {
   accessToken: string;
   orderId: string;
 }): Promise<{ order: WixOrder | null; debug: Record<string, unknown> }> {
-  const url = `https://www.wixapis.com/stores/v3/orders/${encodeURIComponent(opts.orderId)}`;
+  // Wix's eCommerce v1 namespace is the right home for Orders —
+  // /stores/v3/ is for Catalog/Products only. The backfill flow
+  // hits /ecom/v1/orders/search; single-order GET is the
+  // corresponding /ecom/v1/orders/{id} (Get Order endpoint).
+  // Previously this used /stores/v3/orders/{id} → 404.
+  const url = `https://www.wixapis.com/ecom/v1/orders/${encodeURIComponent(opts.orderId)}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${opts.accessToken}`,
