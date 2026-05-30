@@ -854,6 +854,21 @@ export default function Home() {
                 disabled={uploading}
               />
             </label>
+            {/* Template download sits next to Upload so discovery
+                happens BEFORE upload, not after a failed parse.
+                Subtle styling — small, parenthesized, no icon — so
+                it reads as a helper link rather than another nav
+                item. The file lives in public/templates/ (commit
+                06e1aa4) and downloads via the native `download`
+                attribute, no server round-trip. */}
+            <a
+              href="/templates/flowwork-sales-template.csv"
+              download="flowwork-sales-template.csv"
+              className="bg-transparent text-white/50 text-[11px] sm:text-xs no-underline px-1 py-1.5 hover:text-white/80"
+              title="Download the CSV template with example rows"
+            >
+              (template)
+            </a>
             <Link
               href="/events"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
