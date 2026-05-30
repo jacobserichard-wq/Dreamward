@@ -26,9 +26,15 @@ import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
 
 export const metadata = {
-  title: "FlowWork — Mission control for your money",
+  title: "FlowWork — Gross margin tracking + Schedule-C P&L for small business",
   description:
-    "One dashboard for every revenue source. Sync Shopify, pull invoices from Gmail, upload CSV/XLSX from Square/Stripe/QuickBooks — and see which channels are profitable so you can decide where to focus.",
+    "Track real gross margin per product across Shopify, Wix, and Square. Effective-date COGS — your historical margins never silently rewrite when a cost changes today. Schedule-C-ready P&L for your CPA, receipts attached.",
+  openGraph: {
+    title: "FlowWork — Gross margin tracking that doesn't lie",
+    description:
+      "Per-SKU COGS, per-channel margin, audit-trail on every number, Schedule-C P&L. Built for makers + small business who outgrew spreadsheets but don't need a $500/mo ERP.",
+    type: "website",
+  },
 };
 
 export default async function MarketingLandingPage() {
@@ -56,26 +62,26 @@ export default async function MarketingLandingPage() {
           </Link>
         </div>
 
-        {/* Hero. Phase 8f shipped the "command center" positioning;
-            Phase 9 prelude reframes the sub-copy from "tax-time
-            workflow" to "decision-support layer" per Jacob's read:
-            we're NOT QuickBooks (no double-entry, no bank rec); we
-            ARE a centralized revenue/expense aggregator that helps
-            business owners decide what's working. Tax-time / CPA
-            handoff stays in the features section but no longer
-            leads the headline pitch. AI language stays softened
-            (Jacob's other call). */}
+        {/* Hero. Sub-session 32 marketing refresh: leads with the
+            gross-margin + audit-trail differentiation shipped in
+            Phase 12 (COGS) + Phase 13 (Schedule-C P&L). The
+            "mission control" brand line stays — it works whether
+            you're describing channel rollups or per-SKU margin.
+            Sub-copy now anchors on the concrete differentiator
+            (real gross margin, effective-date discipline) instead
+            of the generic "one dashboard" pitch. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-12 sm:pt-20 pb-16 sm:pb-24 text-center">
           <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
             Mission control for your money.
           </h2>
           <p className="text-xl sm:text-2xl font-semibold text-white m-0 mb-2 leading-snug">
-            One dashboard. Every revenue source. Smarter business decisions.
+            Real gross margin. Per product. Per channel. Per period.
           </p>
           <p className="text-base text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
-            FlowWork pulls every dollar into one dashboard — so you can
-            see which channels are profitable, where your money&apos;s
-            going, and what your CPA needs at tax time.
+            FlowWork tracks the actual cost behind every sale — so when
+            wholesale prices change, your historical margins{" "}
+            <em>stay historical</em>. Built for makers + small businesses
+            who outgrew spreadsheets but don&apos;t need a $500/month ERP.
           </p>
           <SignInButton label="Start your free trial &rarr;" />
           <p className="text-xs text-white/60 mt-4">
@@ -84,31 +90,35 @@ export default async function MarketingLandingPage() {
         </div>
       </header>
 
-      {/* Feature bullets. Phase 8f rewrite: Shopify-led ordering +
-          softened AI language throughout. Card #1 leads with the
-          actual new differentiator. Card #4 folds mileage into the
-          CPA-handoff card (still surfaced, just consolidated). */}
+      {/* Feature cards. Sub-session 32 rewrite: leads with the
+          gross-margin + audit-trail combo (Phase 12). Card #2
+          surfaces Schedule-C P&L (Phase 13). Card #3 names every
+          live integration (no more "Coming soon: Square" — we
+          shipped Square + Wix). Card #4 is the receipt vault
+          (Phase 9.4). Gmail + CSV moved to the channels section
+          below — they're ingestion methods, not headline
+          differentiators. */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FeatureCard
-            icon={"\u{1F6D2}"}
-            title="Sync your Shopify store"
-            body="Connect once. FlowWork pulls every order, refund, and shipping fee automatically. Coming soon: Etsy, Square, WooCommerce."
-          />
-          <FeatureCard
-            icon={"\u{1F4E7}"}
-            title="Reads your Gmail invoices"
-            body="Label vendor bills in Gmail; FlowWork extracts vendor, amount, date, and category in seconds. 90%+ correct on the first pass."
-          />
-          <FeatureCard
-            icon={"\u{1F4C1}"}
-            title="Upload from anywhere"
-            body="CSV or XLSX from Square, Stripe, QuickBooks, Xero, Wave — column mapping happens automatically. No template required."
-          />
-          <FeatureCard
             icon={"\u{1F4CA}"}
-            title="CPA-ready in one click"
-            body="Annual summary with Schedule C line mapping + quarterly estimates + mileage deductions, exported as CSV and PDF to your CPA's inbox."
+            title="Real gross margin tracking"
+            body="Per-SKU cost history with effective-date discipline. Change today's wholesale price and old sales keep their old cost — no retroactive rewrites. Audit trail on every number shows exactly which cost row was used."
+          />
+          <FeatureCard
+            icon={"\u{1F4D1}"}
+            title="Schedule-C P&L for your CPA"
+            body="Annual report formatted as a true profit & loss statement — Revenue → COGS → Gross Profit → Operating Expenses → Net. PDF + CSV in one click, ready to email to your accountant."
+          />
+          <FeatureCard
+            icon={"\u{1F6D2}"}
+            title="Sync every revenue source"
+            body="Real-time webhook sync from Shopify, Wix, and Square. Line items flow into per-product margin automatically. Gmail label sweep + CSV/XLSX upload cover everything else."
+          />
+          <FeatureCard
+            icon={"\u{1F4CE}"}
+            title="Receipt vault for every expense"
+            body="Drag-drop receipts into any expense. Private Vercel Blob storage, full audit-defense compliance. Preview images + PDFs inline; download originals anytime."
           />
         </div>
       </section>
@@ -131,17 +141,17 @@ export default async function MarketingLandingPage() {
           <ChannelCard
             icon={"\u{1F6D2}"}
             label="Shopify"
-            blurb="Live sync of orders, refunds, fees"
+            blurb="Real-time orders + per-SKU line items"
           />
           <ChannelCard
-            icon={"\u{1F4E7}"}
-            label="Gmail"
-            blurb="Vendor invoices, customer payments"
+            icon={"\u{1F310}"}
+            label="Wix"
+            blurb="eCommerce orders auto-pulled with COGS"
           />
           <ChannelCard
-            icon={"\u{1F4C1}"}
-            label="CSV / XLSX"
-            blurb="Square, Stripe, QuickBooks, Xero, Wave"
+            icon={"\u{1F4B3}"}
+            label="Square"
+            blurb="POS + online payments with line-item COGS"
           />
           <ChannelCard
             icon={"\u{1F697}"}
@@ -150,8 +160,14 @@ export default async function MarketingLandingPage() {
           />
         </div>
         <p className="text-center text-xs text-slate-500 mt-6">
-          <strong className="text-slate-700">Coming next:</strong>{" "}
-          Etsy · Square · WooCommerce · Stripe Connect
+          <strong className="text-slate-700">Also supported:</strong>{" "}
+          Gmail label sweep · CSV/XLSX from QuickBooks/Stripe/anything ·
+          Manual entry
+          <br />
+          <span className="text-slate-400">
+            <strong className="text-slate-500">Coming next:</strong> Etsy
+            · WooCommerce · Stripe Connect
+          </span>
         </p>
       </section>
 
@@ -212,20 +228,21 @@ export default async function MarketingLandingPage() {
               ctaLabel="Start with Growth"
               highlighted
             />
-            {/* Phase 8f: Pro tile updated to lead with Shopify
-                integration (the new Pro-only headline feature).
-                "Custom categories" dropped from visible bullets
-                (still exists in product; weaker selling point than
-                the other 4). */}
+            {/* Sub-session 32 marketing refresh: Pro tile re-led
+                with the new Phase 12/13 features (COGS, gross
+                margin, Schedule-C P&L). Integration list updated
+                from "Shopify" → "Shopify · Wix · Square" since
+                Wix + Square shipped in Phase 10 / Phase 11. */}
             <PricingTile
               name="Pro"
               price="$89"
               priceSub="/month"
               features={[
                 "Everything in Growth",
-                "Shopify integration",
-                "Gmail auto-fetch",
-                "Tax reports + Schedule C",
+                "Shopify · Wix · Square integrations",
+                "Per-SKU COGS + gross margin",
+                "Schedule-C P&L with audit trail",
+                "Gmail auto-fetch + receipt vault",
                 "White-glove onboarding call",
               ]}
               ctaLabel="Start with Pro"
