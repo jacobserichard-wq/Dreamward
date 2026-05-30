@@ -26,6 +26,7 @@ import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
 import SkuBulkCostModal, {
   type SelectedSkuForCost,
 } from "../components/SkuBulkCostModal";
+import SkuPasteImportModal from "../components/SkuPasteImportModal";
 
 interface SkuRow {
   id: number;
@@ -84,6 +85,7 @@ export default function SkusPage() {
   // Bulk-select state (Phase 12d commit 4)
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkCostOpen, setBulkCostOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const loadSkus = useCallback(
@@ -183,6 +185,29 @@ export default function SkusPage() {
         currentCost: s.currentCost,
       }));
   }, [skus, selected]);
+
+  const handlePasteSaved = useCallback(
+    async (info: {
+      imported: number;
+      skipped: number;
+      errored: number;
+    }) => {
+      // Don't auto-close — the modal shows the per-row results
+      // pane and the user closes it manually via "Done". Just
+      // re-fetch so the new SKUs show in the table behind the
+      // modal.
+      await loadSkus(showArchived);
+      const parts: string[] = [
+        `${info.imported} SKU${info.imported === 1 ? "" : "s"} imported`,
+      ];
+      if (info.skipped > 0)
+        parts.push(`${info.skipped} skipped (duplicate code)`);
+      if (info.errored > 0) parts.push(`${info.errored} errored`);
+      setSuccessToast(parts.join(" · "));
+      window.setTimeout(() => setSuccessToast(null), 6000);
+    },
+    [loadSkus, showArchived]
+  );
 
   const handleBulkCostSaved = useCallback(
     async (info: {
@@ -345,13 +370,23 @@ export default function SkusPage() {
                 : "loading..."}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={handleNewSku}
-            className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-2"
-          >
-            <span>+</span> New SKU
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPasteOpen(true)}
+              className="py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5"
+              title="Paste from Excel, Google Sheets, Numbers, or Airtable"
+            >
+              <span>{"\u{1F4CB}"}</span> Paste from spreadsheet
+            </button>
+            <button
+              type="button"
+              onClick={handleNewSku}
+              className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-2"
+            >
+              <span>+</span> New SKU
+            </button>
+          </div>
         </div>
 
         {/* Archived toggle — only shown if there's anything archived */}
@@ -519,6 +554,12 @@ export default function SkusPage() {
         items={selectedForCost}
         onClose={() => setBulkCostOpen(false)}
         onSaved={handleBulkCostSaved}
+      />
+
+      <SkuPasteImportModal
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        onSaved={handlePasteSaved}
       />
     </div>
   );
