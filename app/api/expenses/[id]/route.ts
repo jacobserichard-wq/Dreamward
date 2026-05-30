@@ -289,6 +289,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
+    // Phase 9.4: collect attachment Blob pathnames BEFORE the
+    // processed_items DELETE so we can clean up Vercel Blob
+    // storage. The expense_attachments rows themselves are
+    // removed by the FK CASCADE on processed_item_id, but that
+    // only handles the DB side — without explicit del() the
+    // Blob bytes would be orphaned + paid-for forever.
+    //
+    // Best-effort cleanup: Blob delete errors don't block the
+    // expense deletion. Worst case we leak some storage; the
+    // user got the experience they expected.
+    const pathnamesRes = await pool.query<{ blob_pathname: string }>(
+      `SELECT ea.blob_pathname
+         FROM expense_attachments ea
+         JOIN processed_items pi ON pi.id = ea.processed_item_id
+        WHERE ea.processed_item_id = $1
+          AND pi.client_id = $2`,
+      [id, client.id]
+    );
+
     const result = await pool.query(
       `DELETE FROM processed_items
         WHERE id = $1 AND client_id = $2`,
@@ -300,6 +319,24 @@ export async function DELETE(
         { error: "Expense not found" },
         { status: 404 }
       );
+    }
+
+    // Fire blob deletions in parallel after the DB delete
+    // succeeded. Errors are logged but don't fail the request.
+    if (pathnamesRes.rowCount && pathnamesRes.rowCount > 0) {
+      const { deleteAttachment } = await import("@/lib/blob");
+      await Promise.allSettled(
+        pathnamesRes.rows.map((r) => deleteAttachment(r.blob_pathname))
+      ).then((settled) => {
+        for (const r of settled) {
+          if (r.status === "rejected") {
+            console.warn(
+              "Expense DELETE: blob cleanup failed (storage may leak):",
+              r.reason
+            );
+          }
+        }
+      });
     }
 
     return NextResponse.json({ deleted: true });
