@@ -27,6 +27,10 @@ interface ExpenseRow {
   total: number;
   taxDeductible: boolean | null;
   scheduleCLine: string | null;
+  // Phase 13: true when the underlying category is tagged
+  // isCogs in lib/categories.ts. Drives the COGS/Operating
+  // subsection split when at least one row qualifies.
+  isCogs: boolean;
 }
 
 interface ReportByCategoryTableProps {
@@ -110,37 +114,85 @@ export default function ReportByCategoryTable({
             No expenses recorded for this year.
           </p>
         ) : (
+          <ExpenseList rows={expense} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Phase 13 polish: split into "Cost of Goods Sold" + "Operating
+// Expenses" subsections when at least one row is tagged isCogs.
+// Matches the Summary section's COGS/Gross Profit/Operating
+// layout from commit 5 of Phase 13. When zero COGS rows, the
+// original single flat list renders unchanged.
+function ExpenseList({ rows }: { rows: ExpenseRow[] }) {
+  const cogsRows = rows.filter((r) => r.isCogs);
+  const opexRows = rows.filter((r) => !r.isCogs);
+
+  if (cogsRows.length === 0) {
+    return (
+      <ul className="space-y-1.5 m-0 p-0 list-none">
+        {opexRows.map((row) => (
+          <ExpenseLi key={row.category} row={row} />
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-2 font-semibold">
+          Cost of Goods Sold
+        </h4>
+        <ul className="space-y-1.5 m-0 p-0 list-none">
+          {cogsRows.map((row) => (
+            <ExpenseLi key={row.category} row={row} />
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-2 font-semibold">
+          Operating Expenses
+        </h4>
+        {opexRows.length === 0 ? (
+          <p className="text-xs text-slate-500 italic m-0">None</p>
+        ) : (
           <ul className="space-y-1.5 m-0 p-0 list-none">
-            {expense.map((row) => (
-              <li
-                key={row.category}
-                className="flex items-baseline justify-between gap-3 text-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-slate-700 truncate">{row.category}</span>
-                    <DeductibilityPill value={row.taxDeductible} />
-                    {row.scheduleCLine && (
-                      <span
-                        title={`Schedule C Part II Line ${row.scheduleCLine}`}
-                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200"
-                      >
-                        L{row.scheduleCLine}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {row.count} {row.count === 1 ? "row" : "rows"}
-                  </div>
-                </div>
-                <span className="font-medium text-slate-900 tabular-nums whitespace-nowrap">
-                  {formatUsd(row.total)}
-                </span>
-              </li>
+            {opexRows.map((row) => (
+              <ExpenseLi key={row.category} row={row} />
             ))}
           </ul>
         )}
       </div>
     </div>
+  );
+}
+
+function ExpenseLi({ row }: { row: ExpenseRow }) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 text-sm">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-slate-700 truncate">{row.category}</span>
+          <DeductibilityPill value={row.taxDeductible} />
+          {row.scheduleCLine && (
+            <span
+              title={`Schedule C Part II Line ${row.scheduleCLine}`}
+              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200"
+            >
+              L{row.scheduleCLine}
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-slate-400">
+          {row.count} {row.count === 1 ? "row" : "rows"}
+        </div>
+      </div>
+      <span className="font-medium text-slate-900 tabular-nums whitespace-nowrap">
+        {formatUsd(row.total)}
+      </span>
+    </li>
   );
 }

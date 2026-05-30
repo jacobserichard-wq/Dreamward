@@ -251,11 +251,22 @@ export function AnnualPdfDocument({
               )}
             </View>
             <View style={styles.col}>
-              <Text style={styles.sectionTitleSmall}>Expenses</Text>
-              {summary.byCategory.expense.length === 0 ? (
-                <Text style={styles.emptyMuted}>None</Text>
-              ) : (
-                summary.byCategory.expense.map((row) => {
+              {/* Phase 13 polish: split the right column into a
+                  "Cost of Goods Sold" subsection above
+                  "Operating Expenses" when there are any COGS
+                  rows. Keeps the visual consistent with the
+                  Summary section above (which already separates
+                  the two). When cogs === 0, the original single
+                  "Expenses" list renders unchanged. */}
+              {(() => {
+                const cogsRows = summary.byCategory.expense.filter(
+                  (r) => r.isCogs
+                );
+                const opexRows = summary.byCategory.expense.filter(
+                  (r) => !r.isCogs
+                );
+
+                const renderRow = (row: typeof summary.byCategory.expense[number]) => {
                   // (D) suffix when taxDeductible === true; blank otherwise.
                   // No marker for false / null — keeps visual noise low and
                   // delegates ambiguity to the Notes section's blanket
@@ -285,8 +296,37 @@ export function AnnualPdfDocument({
                       <Text style={styles.catAmount}>{fmtUsd(row.total)}</Text>
                     </View>
                   );
-                })
-              )}
+                };
+
+                if (cogsRows.length === 0) {
+                  return (
+                    <>
+                      <Text style={styles.sectionTitleSmall}>Expenses</Text>
+                      {opexRows.length === 0 ? (
+                        <Text style={styles.emptyMuted}>None</Text>
+                      ) : (
+                        opexRows.map(renderRow)
+                      )}
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <Text style={styles.sectionTitleSmall}>
+                      Cost of Goods Sold
+                    </Text>
+                    {cogsRows.map(renderRow)}
+                    <Text style={[styles.sectionTitleSmall, { marginTop: 8 }]}>
+                      Operating Expenses
+                    </Text>
+                    {opexRows.length === 0 ? (
+                      <Text style={styles.emptyMuted}>None</Text>
+                    ) : (
+                      opexRows.map(renderRow)
+                    )}
+                  </>
+                );
+              })()}
             </View>
           </View>
         </View>
