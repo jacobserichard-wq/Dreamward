@@ -102,8 +102,8 @@ export default async function MarketingLandingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FeatureCard
             icon={"\u{1F4CA}"}
-            title="Real gross margin tracking"
-            body="Per-SKU cost history with effective-date discipline. Change today's wholesale price and old sales keep their old cost — no retroactive rewrites. Audit trail on every number shows exactly which cost row was used."
+            title="Real gross margin + live stock"
+            body="Per-SKU cost history with effective-date discipline — change today's wholesale price and old sales keep their old cost, no retroactive rewrites. Stock counts decrement on every sale automatically. Audit trail on every number shows exactly which cost row was used."
           />
           <FeatureCard
             icon={"\u{1F4D1}"}
@@ -256,6 +256,7 @@ export default async function MarketingLandingPage() {
                 "Everything in Growth",
                 "Shopify · Wix · Square integrations",
                 "Per-SKU COGS + gross margin",
+                "Live stock counts + receive history",
                 "Schedule-C P&L with audit trail",
                 "Gmail auto-fetch + receipt vault",
                 "White-glove onboarding call",

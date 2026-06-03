@@ -240,6 +240,29 @@ export default function GettingStartedGuide() {
             If you&apos;re trying to back-rate a price increase, stop and add a
             new row with a future effective date instead.
           </p>
+          <p>
+            <strong>Tracking stock on hand.</strong> Each SKU also tracks
+            how many units you have in stock. Click &ldquo;+ Receive
+            stock&rdquo; on the SKU detail page to record a shipment, a
+            production run, or your starting count when first setting up.
+            Every sale auto-decrements stock as it flows in from Shopify,
+            Wix, or Square — you&apos;ll see a running history of every
+            adjustment with a balance-after column so you can trace exactly
+            how the current count got there.
+          </p>
+          <Callout variant="tip">
+            The stock badge on the SKU list page is color-coded:{" "}
+            <span className="text-emerald-700 font-semibold">green</span> for
+            healthy (over 10),{" "}
+            <span className="text-amber-700 font-semibold">amber</span> for
+            low (1–10),{" "}
+            <span className="text-slate-700 font-semibold">slate</span> for
+            zero, and{" "}
+            <span className="text-red-700 font-semibold">red</span> for
+            negative — which means the SKU sold more than it has on record,
+            usually because you never set a starting count. Click into the
+            SKU and use &ldquo;+ Receive stock&rdquo; to fix it.
+          </Callout>
         </Section>
 
         <Section id="log-market-day" title="5. Log your first market day">
