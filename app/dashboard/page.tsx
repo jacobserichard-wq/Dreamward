@@ -953,6 +953,18 @@ export default function Home() {
             >
               Integrations
             </Link>
+            {/* Sub-session 32: Help hub. Linked from the header
+                so the guide is one click away from anywhere on the
+                dashboard. /help is the canonical entry point for
+                all guides (getting-started + future reference
+                pages). */}
+            <Link
+              href="/help"
+              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
+              title="User guides and walkthroughs"
+            >
+              Help
+            </Link>
             <Link
               href="/settings"
               className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
