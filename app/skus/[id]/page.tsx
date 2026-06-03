@@ -33,6 +33,7 @@ import SkuForm, {
   type SkuFormEditSubmit,
 } from "../../components/SkuForm";
 import ConfirmModal from "../../components/ConfirmModal";
+import ReceiveStockModal from "../../components/ReceiveStockModal";
 
 interface SkuRow {
   id: number;
@@ -45,6 +46,10 @@ interface SkuRow {
   costEffectiveDate: string | null;
   salesCount: number;
   lastSaleDate: string | null;
+  // Sub-session 33 Tier 1 commit 3: stock cache from migration 0020.
+  // Drives the Stock section + the Receive Stock modal's current
+  // count display.
+  quantityOnHand: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,6 +140,9 @@ export default function SkuDetailPage() {
 
   // ── Edit modal state ──────────────────────────────────────────
   const [editOpen, setEditOpen] = useState(false);
+
+  // ── Receive stock modal state (Tier 1 commit 3) ───────────────
+  const [receiveOpen, setReceiveOpen] = useState(false);
 
   // ── Cost deletion state (which row is being deleted) ─────────
   const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
@@ -588,6 +596,63 @@ export default function SkuDetailPage() {
           />
         </div>
 
+        {/* Stock on hand (Sub-session 33 Tier 1 commit 3). Sits above
+            Cost history because "do I have any" is the question
+            merchants check first when opening a SKU. Color cues:
+            red < 0 (data quality flag — sold more than received,
+            usually means initial stock was never set), amber 1-10
+            (low stock warning), green > 10 (healthy), slate = 0
+            (out of stock — neutral, not alarming if expected). */}
+        <section className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-slate-900 m-0">
+              Stock on hand
+            </h2>
+            <button
+              type="button"
+              onClick={() => setReceiveOpen(true)}
+              className="py-1.5 px-3 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer"
+            >
+              + Receive stock
+            </button>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-baseline gap-3">
+            <span
+              className={`text-3xl font-bold tabular-nums ${
+                sku.quantityOnHand < 0
+                  ? "text-red-600"
+                  : sku.quantityOnHand === 0
+                    ? "text-slate-400"
+                    : sku.quantityOnHand <= 10
+                      ? "text-amber-600"
+                      : "text-emerald-600"
+              }`}
+            >
+              {sku.quantityOnHand.toLocaleString()}
+            </span>
+            <span className="text-sm text-slate-500">
+              {sku.quantityOnHand === 1 ? "unit" : "units"}
+            </span>
+            {sku.quantityOnHand < 0 && (
+              <span className="text-xs text-red-600 ml-2">
+                Negative — likely missing a starting count. Click &ldquo;Receive
+                stock&rdquo; to set it.
+              </span>
+            )}
+            {sku.quantityOnHand === 0 && sku.salesCount > 0 && (
+              <span className="text-xs text-slate-500 ml-2">
+                Out of stock.
+              </span>
+            )}
+            {sku.quantityOnHand === 0 && sku.salesCount === 0 && (
+              <span className="text-xs text-slate-500 ml-2">
+                Not counted yet. Click &ldquo;Receive stock&rdquo; to set a
+                starting count.
+              </span>
+            )}
+          </div>
+        </section>
+
         {/* Cost history */}
         <section className="mb-6">
           <h2 className="text-base font-semibold text-slate-900 m-0 mb-3">
@@ -926,6 +991,32 @@ export default function SkuDetailPage() {
         }}
         onCancel={() => setHistoricalConfirm(null)}
       />
+
+      {/* Receive stock modal (Sub-session 33 Tier 1 commit 3). Only
+          rendered when a SKU is loaded — defensive against opening
+          before the detail fetch completes. */}
+      {sku && (
+        <ReceiveStockModal
+          open={receiveOpen}
+          skuId={sku.id}
+          skuCode={sku.code}
+          skuName={sku.name}
+          currentQuantity={sku.quantityOnHand}
+          onClose={() => setReceiveOpen(false)}
+          onSaved={(newQty) => {
+            // Patch local state so the UI reflects the new total
+            // immediately without a refetch round trip. data is the
+            // single source of truth for the page; we mutate just
+            // the sku.quantityOnHand leaf.
+            setData((prev) =>
+              prev
+                ? { ...prev, sku: { ...prev.sku, quantityOnHand: newQty } }
+                : prev
+            );
+            setReceiveOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -39,6 +39,10 @@ interface SkuRowDb {
   cost_effective_date: string | null;
   sales_count: number;
   last_sale_date: string | null;
+  // Sub-session 33 Tier 1 commit 3: inventory cache. Surfaced so
+  // the detail page can show the running stock count without a
+  // second round trip.
+  quantity_on_hand: number;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +64,7 @@ async function loadEnrichedSku(
             ch.effective_date AS cost_effective_date,
             COALESCE(sales.sales_count, 0)::int AS sales_count,
             sales.last_sale_date,
+            s.quantity_on_hand,
             s.created_at, s.updated_at
        FROM skus s
        LEFT JOIN LATERAL (
@@ -93,6 +98,7 @@ function serializeSku(row: SkuRowDb) {
     costEffectiveDate: row.cost_effective_date,
     salesCount: row.sales_count,
     lastSaleDate: row.last_sale_date,
+    quantityOnHand: row.quantity_on_hand,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
