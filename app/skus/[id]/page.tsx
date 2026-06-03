@@ -81,6 +81,31 @@ interface SkuDetailResponse {
   aliases: AliasRow[];
 }
 
+// Sub-session 33 Tier 1 commit 4: stock history row shape mirrors
+// the API response from /api/skus/[id]/inventory/history.
+interface InventoryHistoryRow {
+  id: number;
+  delta: number;
+  reason: "sale" | "receive" | "manual" | "recount" | "correction";
+  notes: string | null;
+  sourceLineItemId: number | null;
+  runningBalance: number;
+  createdAt: string;
+}
+
+interface InventoryHistoryResponse {
+  adjustments: InventoryHistoryRow[];
+  totalCount: number;
+}
+
+const REASON_LABELS: Record<InventoryHistoryRow["reason"], string> = {
+  sale: "Sale",
+  receive: "Received",
+  manual: "Manual adjustment",
+  recount: "Recount",
+  correction: "Correction",
+};
+
 function fmtMoney(n: number, currency: string): string {
   const sym = currency === "USD" || !currency ? "$" : `${currency} `;
   return `${sym}${n.toLocaleString("en-US", {
@@ -144,6 +169,14 @@ export default function SkuDetailPage() {
   // ── Receive stock modal state (Tier 1 commit 3) ───────────────
   const [receiveOpen, setReceiveOpen] = useState(false);
 
+  // ── Stock history state (Tier 1 commit 4) ─────────────────────
+  // Loaded lazily — first fetch fires after the SKU detail loads.
+  // Re-fetched after a successful receive so the new row shows up
+  // at the top of the table.
+  const [stockHistory, setStockHistory] = useState<InventoryHistoryRow[]>([]);
+  const [stockHistoryTotal, setStockHistoryTotal] = useState<number>(0);
+  const [stockHistoryLoading, setStockHistoryLoading] = useState(false);
+
   // ── Cost deletion state (which row is being deleted) ─────────
   const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
 
@@ -197,16 +230,43 @@ export default function SkuDetailPage() {
     }
   }, [skuId, router]);
 
+  // Sub-session 33 Tier 1 commit 4: stock history loader. Separate
+  // from loadDetail so the Stock section can refresh after a receive
+  // without re-fetching cost history + aliases too.
+  const loadStockHistory = useCallback(async () => {
+    if (!Number.isFinite(skuId)) return;
+    setStockHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/skus/${skuId}/inventory/history?limit=50`);
+      if (!res.ok) {
+        // Non-fatal — the rest of the page still works. Log + leave
+        // history empty so the empty-state row renders.
+        console.error("Stock history load failed:", res.status);
+        return;
+      }
+      const payload = (await res.json()) as InventoryHistoryResponse;
+      setStockHistory(payload.adjustments);
+      setStockHistoryTotal(payload.totalCount);
+    } catch (err) {
+      console.error("Stock history load failed:", err);
+    } finally {
+      setStockHistoryLoading(false);
+    }
+  }, [skuId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Detail first so the page shell renders ASAP; history is
+      // secondary and loads in parallel without blocking the shell.
       await loadDetail();
       if (!cancelled) setLoading(false);
+      void loadStockHistory();
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadDetail]);
+  }, [loadDetail, loadStockHistory]);
 
   // ── Mutation handlers ────────────────────────────────────────
   const handleSaveEdit = useCallback(
@@ -651,6 +711,86 @@ export default function SkuDetailPage() {
               </span>
             )}
           </div>
+
+          {/* Stock history table (Sub-session 33 Tier 1 commit 4).
+              Renders below the badge so the most important info
+              ("how many do I have right now?") is read first. The
+              running-balance column is computed server-side via
+              window function so it stays correct even when the
+              table is paginated. */}
+          {(stockHistory.length > 0 || stockHistoryLoading) && (
+            <div className="mt-4 bg-white rounded-xl border border-slate-200 overflow-x-auto">
+              <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xs uppercase tracking-wide text-slate-500 font-semibold m-0">
+                  Stock history
+                </h3>
+                {stockHistoryTotal > stockHistory.length && (
+                  <span className="text-xs text-slate-400">
+                    Showing {stockHistory.length} of {stockHistoryTotal}
+                  </span>
+                )}
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                    <th className="text-left py-2.5 px-4 font-medium">Date</th>
+                    <th className="text-left py-2.5 px-4 font-medium">Reason</th>
+                    <th className="text-right py-2.5 px-4 font-medium">
+                      Change
+                    </th>
+                    <th className="text-right py-2.5 px-4 font-medium">
+                      Balance after
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockHistoryLoading && stockHistory.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-6 text-center text-slate-400 text-xs"
+                      >
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : (
+                    stockHistory.map((adj) => (
+                      <tr
+                        key={adj.id}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="py-2.5 px-4 text-slate-700 whitespace-nowrap text-xs">
+                          {fmtDate(adj.createdAt)}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-700 text-xs">
+                          {REASON_LABELS[adj.reason] ?? adj.reason}
+                        </td>
+                        <td
+                          className={`py-2.5 px-4 text-right tabular-nums font-semibold whitespace-nowrap ${
+                            adj.delta > 0
+                              ? "text-emerald-600"
+                              : "text-slate-700"
+                          }`}
+                        >
+                          {adj.delta > 0 ? "+" : ""}
+                          {adj.delta.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-4 text-right text-slate-700 tabular-nums whitespace-nowrap">
+                          {adj.runningBalance.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-500 text-xs">
+                          {adj.notes ?? (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         {/* Cost history */}
@@ -1014,6 +1154,10 @@ export default function SkuDetailPage() {
                 : prev
             );
             setReceiveOpen(false);
+            // Refresh stock history so the new receive row appears
+            // at the top of the table. Cheap query — single SKU, 50
+            // rows max.
+            void loadStockHistory();
           }}
         />
       )}

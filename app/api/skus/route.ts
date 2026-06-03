@@ -44,6 +44,10 @@ interface SkuRowDb {
   cost_effective_date: string | null;
   sales_count: number;
   last_sale_date: string | null;
+  // Sub-session 33 Tier 1 commit 4: stock cache. Surfaced so the
+  // /skus list page can render a per-SKU stock badge + low-stock
+  // warning without a second round trip.
+  quantity_on_hand: number;
   created_at: string;
   updated_at: string;
 }
@@ -104,6 +108,7 @@ export async function GET(req: NextRequest) {
               ch.effective_date AS cost_effective_date,
               COALESCE(sales.sales_count, 0)::int AS sales_count,
               sales.last_sale_date,
+              s.quantity_on_hand,
               s.created_at, s.updated_at
          FROM skus s
          LEFT JOIN LATERAL (
@@ -155,6 +160,7 @@ export async function GET(req: NextRequest) {
         costEffectiveDate: r.cost_effective_date,
         salesCount: r.sales_count,
         lastSaleDate: r.last_sale_date,
+        quantityOnHand: r.quantity_on_hand,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),

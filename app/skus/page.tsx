@@ -39,8 +39,23 @@ interface SkuRow {
   costEffectiveDate: string | null;
   salesCount: number;
   lastSaleDate: string | null;
+  // Sub-session 33 Tier 1 commit 4: stock badge in the list view.
+  quantityOnHand: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// Sub-session 33 Tier 1 commit 4: color-coded stock badge. Same
+// thresholds as the detail page so the visual cue stays consistent:
+//   < 0  : red    — data-quality flag (sold without recorded receive)
+//   = 0  : slate  — neutral out-of-stock
+//   1-10 : amber  — low; consider reordering
+//   > 10 : green  — healthy
+function stockBadgeClasses(qty: number): string {
+  if (qty < 0) return "text-red-600";
+  if (qty === 0) return "text-slate-400";
+  if (qty <= 10) return "text-amber-600";
+  return "text-emerald-600";
 }
 
 interface SkusResponse {
@@ -475,6 +490,7 @@ export default function SkusPage() {
                   <th className="text-right py-2.5 px-4 font-medium">
                     Current cost
                   </th>
+                  <th className="text-right py-2.5 px-4 font-medium">Stock</th>
                   <th className="text-right py-2.5 px-4 font-medium">Sales</th>
                   <th className="text-left py-2.5 px-4 font-medium">
                     Last sale
@@ -519,6 +535,20 @@ export default function SkusPage() {
                       </td>
                       <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
                         {fmtMoney(s.currentCost, s.costCurrency)}
+                      </td>
+                      <td
+                        className={`py-3 px-4 text-right font-semibold tabular-nums whitespace-nowrap ${stockBadgeClasses(s.quantityOnHand)}`}
+                        title={
+                          s.quantityOnHand < 0
+                            ? "Negative — likely missing a starting count"
+                            : s.quantityOnHand === 0
+                              ? "Out of stock"
+                              : s.quantityOnHand <= 10
+                                ? "Low stock"
+                                : "Healthy stock"
+                        }
+                      >
+                        {s.quantityOnHand.toLocaleString()}
                       </td>
                       <td className="py-3 px-4 text-right text-slate-600 tabular-nums whitespace-nowrap">
                         {s.salesCount > 0 ? s.salesCount : "—"}
