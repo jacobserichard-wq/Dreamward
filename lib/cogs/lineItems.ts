@@ -32,6 +32,7 @@
 
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
+import { recordSaleAdjustments } from "@/lib/inventory/adjustments";
 
 /** The intermediate shape every platform mapper returns. Mirrors
  *  the processed_item_line_items column set 1:1 minus the FK +
@@ -157,7 +158,15 @@ export async function bulkInsertLineItemsForParent(opts: {
   // ON CONFLICT DO NOTHING — repeat of (processed_item_id,
   // external_id) is the idempotent skip path for webhook
   // redelivery + chunked backfill resumption.
-  const result = await db.query<{ id: number }>(
+  // RETURNING includes matched_sku_id + quantity so the inventory
+  // hook below knows which SKUs to decrement and by how much. The
+  // previous version returned only `id` for the rowCount; reading
+  // two extra columns is free.
+  const result = await db.query<{
+    id: number;
+    matched_sku_id: number | null;
+    quantity: string; // numeric column comes back as string
+  }>(
     `INSERT INTO processed_item_line_items (
        processed_item_id, client_id, platform, external_id,
        external_item_id, external_sku, name, quantity, unit_price,
@@ -179,9 +188,33 @@ export async function bulkInsertLineItemsForParent(opts: {
               ON s.id = a.sku_id
              AND s.client_id = i.client_id
      ON CONFLICT (processed_item_id, external_id) DO NOTHING
-     RETURNING id`,
+     RETURNING id, matched_sku_id, quantity`,
     values
   );
+
+  // Sub-session 33 Tier 1 commit 2: inventory side-effect. Every
+  // line item that resolved to a known SKU (matched_sku_id non-null)
+  // gets a sale adjustment, and that SKU's quantity_on_hand
+  // decrements. Unmatched items are skipped — they'll get backfilled
+  // later by createAliasWithResolve when the merchant maps them.
+  //
+  // Runs on the SAME dbClient (or pool) so the ledger insert +
+  // stock decrement share the same transaction as the parent line-
+  // item insert. A crash between them can't desync.
+  const matchedSales = result.rows
+    .filter((r) => r.matched_sku_id !== null)
+    .map((r) => ({
+      lineItemId: r.id,
+      skuId: r.matched_sku_id as number,
+      quantity: parseFloat(r.quantity),
+    }));
+
+  if (matchedSales.length > 0) {
+    await recordSaleAdjustments({
+      dbClient: opts.dbClient,
+      items: matchedSales,
+    });
+  }
 
   return result.rowCount ?? 0;
 }

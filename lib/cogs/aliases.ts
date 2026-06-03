@@ -21,6 +21,10 @@
 
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
+import {
+  recordSaleAdjustments,
+  reverseSaleAdjustments,
+} from "@/lib/inventory/adjustments";
 
 export type AliasPlatform = "shopify" | "wix" | "square";
 
@@ -97,16 +101,33 @@ export async function createAliasWithResolve(opts: {
   // gets filled in with the new SKU. Crafty Base's users have to
   // re-import or manually adjust historical sales when they fix
   // a SKU mapping — this single UPDATE does it for them.
-  const resolveRes = await db.query<{ id: number }>(
+  const resolveRes = await db.query<{ id: number; quantity: string }>(
     `UPDATE processed_item_line_items
         SET matched_sku_id = $1
       WHERE client_id = $2
         AND platform = $3
         AND external_item_id = $4
         AND matched_sku_id IS NULL
-      RETURNING id`,
+      RETURNING id, quantity`,
     [alias.skuId, clientId, alias.platform, alias.externalId]
   );
+
+  // Sub-session 33 Tier 1 commit 2: inventory backfill. Every
+  // historical line item we just resolved becomes a sale-adjustment
+  // and decrements stock. Without this hook the running stock count
+  // would silently miss every sale that happened before the alias
+  // got created — exactly the data-quality issue the comparison
+  // page calls out about Crafty Base.
+  if ((resolveRes.rowCount ?? 0) > 0) {
+    await recordSaleAdjustments({
+      dbClient: opts.dbClient,
+      items: resolveRes.rows.map((r) => ({
+        lineItemId: r.id,
+        skuId: alias.skuId,
+        quantity: parseFloat(r.quantity),
+      })),
+    });
+  }
 
   return {
     aliasId,
@@ -157,15 +178,31 @@ export async function deleteAliasAndUnresolve(opts: {
   // clear matches from OTHER aliases that happen to point at the
   // same SKU. (One SKU can have multiple aliases across platforms;
   // deleting the Wix alias shouldn't unresolve Shopify line items.)
-  const unresolveRes = await db.query(
+  //
+  // RETURNING gives us the line-item ids so the inventory step can
+  // reverse their sale adjustments and credit stock back.
+  const unresolveRes = await db.query<{ id: number }>(
     `UPDATE processed_item_line_items
         SET matched_sku_id = NULL
       WHERE client_id = $1
         AND platform = $2
         AND external_item_id = $3
-        AND matched_sku_id = $4`,
+        AND matched_sku_id = $4
+      RETURNING id`,
     [clientId, platform, external_id, sku_id]
   );
+
+  // Sub-session 33 Tier 1 commit 2: undo the inventory side-effects
+  // of every line item we just unresolved. The DELETE goes BEFORE
+  // the alias DELETE so we still have the line-item references; the
+  // reverseSaleAdjustments helper removes the ledger rows + credits
+  // stock back atomically per SKU.
+  if ((unresolveRes.rowCount ?? 0) > 0) {
+    await reverseSaleAdjustments({
+      dbClient: opts.dbClient,
+      lineItemIds: unresolveRes.rows.map((r) => r.id),
+    });
+  }
 
   // ── 3. Delete the alias.
   await db.query(`DELETE FROM sku_aliases WHERE id = $1`, [aliasId]);
