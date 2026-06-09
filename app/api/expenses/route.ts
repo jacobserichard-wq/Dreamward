@@ -183,18 +183,28 @@ export async function GET(req: NextRequest) {
       if (Number.isFinite(a)) totalAmount += a;
     }
 
-    // ── Phase 9.4: attachment counts per expense ───────────────
-    // One additional grouped query keyed by processed_item_id.
-    // Cheap because the join is index-supported and the result
-    // set is bounded by the visible page (≤ 500 rows).
-    const attachmentCounts = new Map<number, number>();
+    // ── Phase 9.4 + sub-session 33: attachment count AND the first
+    // attachment's id + mime per expense, in one grouped query.
+    // The first attachment (earliest uploaded) drives an inline
+    // thumbnail on the expense row — an image preview for image
+    // mime types, a doc icon otherwise. ARRAY_AGG ... ORDER BY
+    // picks the earliest deterministically.
+    const attachmentInfo = new Map<
+      number,
+      { count: number; firstId: number | null; firstMime: string | null }
+    >();
     if (expenses.length > 0) {
       const ids = expenses.map((r) => r.id);
       const acRes = await pool.query<{
         processed_item_id: number;
         n: number;
+        first_id: number | null;
+        first_mime: string | null;
       }>(
-        `SELECT processed_item_id, COUNT(*)::int AS n
+        `SELECT processed_item_id,
+                COUNT(*)::int AS n,
+                (ARRAY_AGG(id ORDER BY uploaded_at ASC, id ASC))[1] AS first_id,
+                (ARRAY_AGG(mime_type ORDER BY uploaded_at ASC, id ASC))[1] AS first_mime
            FROM expense_attachments
           WHERE client_id = $1
             AND processed_item_id = ANY($2::int[])
@@ -202,25 +212,34 @@ export async function GET(req: NextRequest) {
         [client.id, ids]
       );
       for (const r of acRes.rows) {
-        attachmentCounts.set(r.processed_item_id, r.n);
+        attachmentInfo.set(r.processed_item_id, {
+          count: r.n,
+          firstId: r.first_id,
+          firstMime: r.first_mime,
+        });
       }
     }
 
     return NextResponse.json({
-      expenses: expenses.map((r) => ({
-        id: r.id,
-        vendor: r.vendor,
-        amount: Number(r.amount),
-        dueDate: r.due_date,
-        category: r.category,
-        source: r.source,
-        channel: r.channel,
-        eventId: r.event_id,
-        status: r.status,
-        notes: r.notes,
-        createdAt: r.processed_at,
-        attachmentCount: attachmentCounts.get(r.id) ?? 0,
-      })),
+      expenses: expenses.map((r) => {
+        const ai = attachmentInfo.get(r.id);
+        return {
+          id: r.id,
+          vendor: r.vendor,
+          amount: Number(r.amount),
+          dueDate: r.due_date,
+          category: r.category,
+          source: r.source,
+          channel: r.channel,
+          eventId: r.event_id,
+          status: r.status,
+          notes: r.notes,
+          createdAt: r.processed_at,
+          attachmentCount: ai?.count ?? 0,
+          firstAttachmentId: ai?.firstId ?? null,
+          firstAttachmentMime: ai?.firstMime ?? null,
+        };
+      }),
       summary: {
         totalAmount,
         count: expenses.length,

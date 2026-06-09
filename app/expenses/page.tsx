@@ -49,6 +49,10 @@ interface ExpenseRow {
   // Phase 9.4: how many receipt attachments are linked to this
   // expense. Drives the 📎 N badge on each row.
   attachmentCount: number;
+  // Sub-session 33: the first attachment's id + mime, for the
+  // inline thumbnail. Null when the expense has no attachments.
+  firstAttachmentId: number | null;
+  firstAttachmentMime: string | null;
 }
 
 interface ExpensesResponse {
@@ -496,12 +500,30 @@ export default function ExpensesPage() {
                               }}
                               title={`View ${e.attachmentCount} receipt${e.attachmentCount === 1 ? "" : "s"}`}
                               aria-label="View receipts"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 text-[10px] font-medium cursor-pointer border-0"
+                              className="group relative inline-flex items-center cursor-pointer border-0 bg-transparent p-0"
                             >
-                              <span>{"\u{1F4CE}"}</span>
-                              <span className="tabular-nums">
-                                {e.attachmentCount}
-                              </span>
+                              {/* Sub-session 33: inline thumbnail. Image
+                                  attachments preview via the raw proxy
+                                  (browser sends the session cookie);
+                                  PDFs + other types show a doc icon. */}
+                              {e.firstAttachmentId !== null &&
+                              e.firstAttachmentMime?.startsWith("image/") ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={`/api/expenses/${e.id}/attachments/${e.firstAttachmentId}/raw`}
+                                  alt="Receipt"
+                                  className="w-8 h-8 rounded object-cover border border-slate-200 group-hover:border-blue-400"
+                                />
+                              ) : (
+                                <span className="w-8 h-8 rounded border border-slate-200 group-hover:border-blue-400 bg-slate-50 inline-flex items-center justify-center text-base">
+                                  {"\u{1F4C4}"}
+                                </span>
+                              )}
+                              {e.attachmentCount > 1 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-slate-700 text-white text-[9px] font-semibold rounded-full min-w-[15px] h-[15px] px-1 inline-flex items-center justify-center tabular-nums">
+                                  {e.attachmentCount}
+                                </span>
+                              )}
                             </button>
                           )}
                         </span>
