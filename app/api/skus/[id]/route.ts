@@ -255,6 +255,7 @@ interface PatchSkuBody {
   name?: unknown;
   description?: unknown;
   active?: unknown;
+  reorderPoint?: unknown;
 }
 
 export async function PATCH(
@@ -325,6 +326,20 @@ export async function PATCH(
       }
       updates.push(`active = $${p++}`);
       values.push(body.active);
+    }
+
+    // Inventory: per-SKU reorder point. Non-negative number; 0 means
+    // "no threshold" (the inventory page falls back to <=10).
+    if (body.reorderPoint !== undefined) {
+      const rp = Number(body.reorderPoint);
+      if (!Number.isFinite(rp) || rp < 0) {
+        return NextResponse.json(
+          { error: "reorderPoint must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+      updates.push(`reorder_point = $${p++}`);
+      values.push(rp);
     }
 
     if (updates.length === 0) {

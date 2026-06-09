@@ -87,6 +87,11 @@ export default function InventoryPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [receiveFor, setReceiveFor] = useState<InventoryItem | null>(null);
 
+  // Inline reorder-point editing.
+  const [editingReorderId, setEditingReorderId] = useState<number | null>(null);
+  const [reorderDraft, setReorderDraft] = useState<string>("");
+  const [savingReorder, setSavingReorder] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/inventory");
@@ -114,6 +119,32 @@ export default function InventoryPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const saveReorder = useCallback(
+    async (skuId: number) => {
+      const value = Number(reorderDraft);
+      if (!Number.isFinite(value) || value < 0) {
+        setEditingReorderId(null);
+        return;
+      }
+      setSavingReorder(true);
+      try {
+        const res = await fetch(`/api/skus/${skuId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reorderPoint: value }),
+        });
+        if (res.ok) {
+          // Reload so the status recomputes against the new threshold.
+          await load();
+        }
+      } finally {
+        setSavingReorder(false);
+        setEditingReorderId(null);
+      }
+    },
+    [reorderDraft, load]
+  );
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -349,10 +380,42 @@ export default function InventoryPage() {
                       <td className="py-3 px-4 text-right tabular-nums font-semibold text-slate-900 whitespace-nowrap">
                         {usd(item.stockValue)}
                       </td>
-                      <td className="py-3 px-4 text-right tabular-nums text-slate-500 whitespace-nowrap">
-                        {item.reorderPoint > 0
-                          ? item.reorderPoint.toLocaleString()
-                          : "—"}
+                      <td className="py-3 px-4 text-right tabular-nums whitespace-nowrap">
+                        {editingReorderId === item.id ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoFocus
+                            value={reorderDraft}
+                            disabled={savingReorder}
+                            onChange={(e) => setReorderDraft(e.target.value)}
+                            onBlur={() => saveReorder(item.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                              else if (e.key === "Escape")
+                                setEditingReorderId(null);
+                            }}
+                            className="w-16 py-1 px-1.5 text-sm text-right border border-blue-400 rounded outline-none"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingReorderId(item.id);
+                              setReorderDraft(
+                                item.reorderPoint > 0
+                                  ? String(item.reorderPoint)
+                                  : ""
+                              );
+                            }}
+                            title="Set a reorder point"
+                            className="text-slate-500 hover:text-blue-700 cursor-pointer bg-transparent border-0 border-b border-dotted border-slate-300 px-0.5"
+                          >
+                            {item.reorderPoint > 0
+                              ? item.reorderPoint.toLocaleString()
+                              : "set"}
+                          </button>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span
