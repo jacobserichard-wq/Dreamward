@@ -186,89 +186,166 @@ export default async function MarketingLandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing — Sub-session 33 strategic pivot.
+          "Built for people. Priced for people." — feature-flat
+          pricing where every paying tier gets every product feature.
+          Tiers differentiate by business size (auto-detected from
+          tracked revenue) and service level, never by which features
+          the customer is allowed to use. The corporate playbook —
+          gate features by tier, coerce upgrades — is what we're
+          building against; the pricing tiles + section copy reflect
+          that position deliberately. */}
       <section className="bg-slate-50 py-12 sm:py-20">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8">
+          <div className="text-center mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
+              Built for people. Priced for people.
+            </span>
+          </div>
           <div className="text-center mb-10">
             <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2">
-              Simple pricing. Start free.
+              Pricing that grows with you. Not against you.
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 m-0">
-              Upgrade when you outgrow the free tier — your data stays
-              with you.
+            <p className="text-sm sm:text-base text-slate-600 m-0 max-w-2xl mx-auto leading-relaxed">
+              Every tier includes every feature. We charge based on
+              your business size, not which tools you&apos;re allowed
+              to use. As your revenue grows, your tier auto-updates —
+              no upsell calls, no &ldquo;upgrade to unlock&rdquo;
+              walls.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <PricingTile
-              name="Trial"
-              price="Free"
-              priceSub="for 14 days"
+              name="Dream"
+              price="$10"
+              priceSub="/month"
+              eligibility="Under $5k/year revenue"
               features={[
-                "25 items/month",
-                "Invoices, expenses, dashboard",
-                "CSV + XLSX upload",
-                "Manual entry",
+                "Every product feature included",
+                "All integrations",
+                "Full COGS + gross margin",
+                "Schedule-C P&L for your CPA",
+                "Standard email support",
               ]}
-              ctaLabel="Start free"
+              ctaLabel="Start with Dream"
               highlighted={false}
             />
+            {/* Maker carries "Most popular" — the new conversion sweet
+                spot. Solo makers graduating out of Dream land here;
+                $19/mo with everything included is the price-to-value
+                story we want front and center. */}
             <PricingTile
-              name="Starter"
+              name="Maker"
               price="$19"
               priceSub="/month"
+              eligibility="$5k–$50k/year revenue"
               features={[
-                "100 items/month",
-                "Everything in Trial",
-                "Sample data + onboarding",
-                "Email support",
+                "Every product feature included",
+                "All integrations",
+                "Full COGS + gross margin",
+                "Schedule-C P&L for your CPA",
+                "Standard email support",
               ]}
-              ctaLabel="Start with Starter"
-              highlighted={false}
+              ctaLabel="Start with Maker"
+              highlighted
             />
-            {/* Growth carries the "Most popular" highlight — the
-                middle tier is the natural conversion sweet spot for
-                growing small businesses (unlimited items + events +
-                AR + exports without the Pro price tag). */}
             <PricingTile
               name="Growth"
               price="$49"
               priceSub="/month"
+              eligibility="$50k–$500k/year revenue"
               features={[
-                "Unlimited items",
-                "Events + mileage tracking",
-                "AR + invoice follow-ups",
-                "CSV/PDF exports",
+                "Everything in Maker",
+                "Priority email support",
+                "Free onboarding session",
+                "Faster turnaround on tickets",
               ]}
               ctaLabel="Start with Growth"
-              highlighted
+              highlighted={false}
             />
-            {/* Sub-session 32 marketing refresh: Pro tile re-led
-                with the new Phase 12/13 features (COGS, gross
-                margin, Schedule-C P&L). Integration list updated
-                from "Shopify" → "Shopify · Wix · Square" since
-                Wix + Square shipped in Phase 10 / Phase 11. */}
             <PricingTile
               name="Pro"
-              price="$89"
+              price="$99"
               priceSub="/month"
+              eligibility="$500k+/year revenue"
               features={[
                 "Everything in Growth",
-                "Shopify · Wix · Square integrations",
-                "Per-SKU COGS + gross margin",
-                "Live stock counts + receive history",
-                "Schedule-C P&L with audit trail",
-                "Receipt vault with private storage",
-                "White-glove onboarding call",
+                "Same-day support",
+                "Custom onboarding session",
+                "Quarterly check-ins",
+                "White-glove migration help",
               ]}
               ctaLabel="Start with Pro"
               highlighted={false}
             />
           </div>
 
+          {/* What's included — single source of truth that reinforces
+              the "every tier" promise. Visible reminder that the
+              tile lists aren't gating anything; they're just summary
+              labels. */}
+          <div className="mt-8 bg-white border border-slate-200 rounded-xl p-5 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 m-0 mb-3 text-center">
+              Every tier includes
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm text-slate-700">
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Shopify integration</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Wix integration</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Square integration</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>CSV / XLSX upload</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Per-SKU cost history</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Gross margin tracking</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Live stock counts</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Receipt vault</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Schedule-C P&amp;L</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Events + mileage</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>AR + invoice follow-up</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Audit trail + CPA export</span>
+              </div>
+            </div>
+          </div>
+
           <p className="text-center text-xs text-slate-500 mt-6">
-            All paid tiers start with a 14-day free trial. Cancel
-            anytime — your data exports cleanly to CSV.
+            All tiers start with a 14-day free trial. No credit card
+            required. Cancel anytime — your data exports cleanly to
+            CSV. As your tracked revenue grows, your tier auto-bumps
+            on a calendar-month boundary; no surprise charges.
           </p>
         </div>
       </section>
@@ -337,6 +414,7 @@ function PricingTile({
   name,
   price,
   priceSub,
+  eligibility,
   features,
   ctaLabel,
   highlighted,
@@ -344,6 +422,9 @@ function PricingTile({
   name: string;
   price: string;
   priceSub: string;
+  /** Optional revenue-bracket line shown under the price. Drives
+   *  the "we charge by your size, not by features" story. */
+  eligibility?: string;
   features: string[];
   ctaLabel: string;
   highlighted: boolean;
@@ -371,7 +452,7 @@ function PricingTile({
         {name}
       </h4>
       <div
-        className={`mb-4 ${highlighted ? "text-white" : "text-slate-900"}`}
+        className={`mb-1 ${highlighted ? "text-white" : "text-slate-900"}`}
       >
         <span className="text-3xl font-extrabold">{price}</span>
         <span
@@ -380,6 +461,13 @@ function PricingTile({
           {priceSub}
         </span>
       </div>
+      {eligibility && (
+        <p
+          className={`text-xs m-0 mb-4 ${highlighted ? "text-white/75" : "text-slate-500"}`}
+        >
+          {eligibility}
+        </p>
+      )}
       <ul
         className={`space-y-1.5 m-0 mb-5 p-0 list-none text-sm ${
           highlighted ? "text-white/90" : "text-slate-700"
