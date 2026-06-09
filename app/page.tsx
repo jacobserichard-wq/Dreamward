@@ -110,8 +110,8 @@ export default async function MarketingLandingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <FeatureCard
             icon={"\u{1F4CA}"}
-            title="Real gross margin + live stock"
-            body="Per-SKU cost history with effective-date discipline — change today's wholesale price and old sales keep their old cost, no retroactive rewrites. Stock counts decrement on every sale automatically. Audit trail on every number shows exactly which cost row was used."
+            title="Margin, stock, and recipes for makers"
+            body="Per-SKU cost history with effective-date discipline — change today's price and old sales keep their old cost. Live stock counts decrement on every sale. Define a recipe for any product, log a production run, and watch raw materials draw down automatically."
           />
           <FeatureCard
             icon={"\u{1F4D1}"}

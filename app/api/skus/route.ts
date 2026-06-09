@@ -50,6 +50,8 @@ interface SkuRowDb {
   // warning without a second round trip. NUMERIC since Tier 2 →
   // pg returns it as a string.
   quantity_on_hand: string;
+  // Tier 2: true when the SKU has a recipe (≥1 bom_components row).
+  has_recipe: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -111,6 +113,9 @@ export async function GET(req: NextRequest) {
               COALESCE(sales.sales_count, 0)::int AS sales_count,
               sales.last_sale_date,
               s.quantity_on_hand,
+              EXISTS (
+                SELECT 1 FROM bom_components b WHERE b.parent_sku_id = s.id
+              ) AS has_recipe,
               s.created_at, s.updated_at
          FROM skus s
          LEFT JOIN LATERAL (
@@ -163,6 +168,7 @@ export async function GET(req: NextRequest) {
         salesCount: r.sales_count,
         lastSaleDate: r.last_sale_date,
         quantityOnHand: Number(r.quantity_on_hand),
+        hasRecipe: r.has_recipe,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),

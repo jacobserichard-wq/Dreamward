@@ -43,6 +43,8 @@ interface SkuRow {
   lastSaleDate: string | null;
   // Sub-session 33 Tier 1 commit 4: stock badge in the list view.
   quantityOnHand: number;
+  // Tier 2: has a recipe (bill of materials) → shows a 🧪 chip.
+  hasRecipe: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -329,14 +331,16 @@ export default function SkusPage() {
           subtitle="Product cost catalog — powers your COGS + per-channel gross margin reports"
         />
 
-        <SectionTip id="skus" title="Set costs to unlock gross margin">
-          SKUs appear here automatically when a connected store syncs
-          orders — or add them manually / by paste. Click a SKU to set
-          its <strong>cost history</strong>: enter what you pay per unit
-          and the date that cost took effect. Raised a price? Add a new
-          cost row with a future date instead of editing the old one —
-          that keeps your past margins accurate. Stock counts live on
-          each SKU too.
+        <SectionTip id="skus" title="Costs, stock, and recipes live here">
+          SKUs appear automatically when a connected store syncs orders —
+          or add them manually / by paste. Click a SKU to set its{" "}
+          <strong>cost history</strong> (what you pay per unit + the date
+          it took effect — raised a price? add a new dated row, don&apos;t
+          edit the old one). Each SKU also tracks <strong>stock</strong>,
+          and for makers, a <strong>recipe</strong>: define what a product
+          is made of, then log a production run to draw down materials
+          automatically. The {"\u{1F9EA}"} icon marks products that have a
+          recipe.
         </SectionTip>
 
         {error && (
@@ -539,7 +543,18 @@ export default function SkusPage() {
                         {s.code}
                       </td>
                       <td className="py-3 px-4 text-slate-900">
-                        {s.name}
+                        <span className="inline-flex items-center gap-1.5">
+                          {s.name}
+                          {s.hasRecipe && (
+                            <span
+                              title="Has a recipe (bill of materials)"
+                              className="text-[10px]"
+                              aria-label="Has a recipe"
+                            >
+                              {"\u{1F9EA}"}
+                            </span>
+                          )}
+                        </span>
                         {s.description && (
                           <p className="text-xs text-slate-500 m-0 mt-0.5">
                             {s.description}

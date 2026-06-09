@@ -243,12 +243,22 @@ export default function GettingStartedGuide() {
           <p>
             <strong>Tracking stock on hand.</strong> Each SKU also tracks
             how many units you have in stock. Click &ldquo;+ Receive
-            stock&rdquo; on the SKU detail page to record a shipment, a
-            production run, or your starting count when first setting up.
-            Every sale auto-decrements stock as it flows in from Shopify,
-            Wix, or Square — you&apos;ll see a running history of every
-            adjustment with a balance-after column so you can trace exactly
-            how the current count got there.
+            stock&rdquo; on the SKU detail page to record a shipment or
+            your starting count. Every sale auto-decrements stock as it
+            flows in from Shopify, Wix, or Square — you&apos;ll see a
+            running history of every adjustment with a balance-after column
+            so you can trace exactly how the current count got there.
+          </p>
+          <p>
+            <strong>For makers — recipes &amp; production runs.</strong> If
+            you build your products from raw materials, define a{" "}
+            <strong>recipe</strong> on the SKU detail page: list each
+            ingredient (another SKU) and how much goes into one finished
+            unit. Then when you make a batch, click &ldquo;+ Log production
+            run&rdquo; — FlowWork adds the finished goods to stock and draws
+            down the raw materials automatically. A &ldquo;can make ~N&rdquo;
+            readout tells you how many more you can build with the materials
+            you have on hand.
           </p>
           <Callout variant="tip">
             The stock badge on the SKU list page is color-coded:{" "}

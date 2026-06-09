@@ -189,7 +189,7 @@ export default function CraftyBaseComparePage() {
               theirHeading="Crafty Base"
               theirCopy="On lower tiers, an Etsy sale does NOT auto-deduct raw materials — you must log a manual &ldquo;Manufacturing Run.&rdquo; Square in-person sales sync as generic &ldquo;Custom Amount&rdquo; line items with no SKU — &ldquo;Crafty Base cannot automatically deduct the correct materials, throwing off stock levels.&rdquo;"
               ourHeading="FlowWork"
-              ourCopy="Real-time webhook sync from Shopify, Wix, and Square. Square &ldquo;Custom Amount&rdquo; items are first-class — map them once by name, future sales auto-resolve. Per-SKU COGS computes automatically, no Manufacturing Run needed. Finished-goods stock auto-decrements on every sale; raw-material bill-of-materials deduction is on the roadmap."
+              ourCopy="Real-time webhook sync from Shopify, Wix, and Square. Square &ldquo;Custom Amount&rdquo; items are first-class — map them once by name, future sales auto-resolve. Per-SKU COGS computes automatically. Define a recipe (bill of materials) for any product, then log a production run — finished stock goes up, raw materials draw down automatically, cleanly separated from sales. No fragile &ldquo;Manufacturing Run&rdquo; that throws off your counts."
             />
 
             <CompareSection
