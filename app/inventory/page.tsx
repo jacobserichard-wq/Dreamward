@@ -233,7 +233,7 @@ export default function InventoryPage() {
           current cost — the number your CPA needs for ending inventory at
           tax time. Set a <strong>reorder point</strong> on any SKU and it
           shows up under <strong>Low</strong> when it drops to that level.
-          The <strong>Can&apos;t make</strong> banner flags finished
+          The <strong>Can&apos;t make</strong>{" "}banner flags finished
           products you&apos;re out of materials for.
         </SectionTip>
 
