@@ -113,7 +113,7 @@ export default async function MarketingLandingPage() {
           <FeatureCard
             icon={"\u{1F6D2}"}
             title="Sync every revenue source"
-            body="Real-time webhook sync from Shopify, Wix, and Square. Line items flow into per-product margin automatically. Gmail label sweep + CSV/XLSX upload cover everything else."
+            body="Real-time webhook sync from Shopify, Wix, and Square. Line items flow into per-product margin automatically. CSV/XLSX upload covers market days, Venmo/Zelle, and anything else without a connected source."
           />
           <FeatureCard
             icon={"\u{1F4CE}"}
@@ -161,8 +161,8 @@ export default async function MarketingLandingPage() {
         </div>
         <p className="text-center text-xs text-slate-500 mt-6">
           <strong className="text-slate-700">Also supported:</strong>{" "}
-          Gmail label sweep · CSV/XLSX from QuickBooks/Stripe/anything ·
-          Manual entry
+          CSV/XLSX from QuickBooks/Stripe/anything · Manual entry with
+          drag-drop receipt attachments
           <br />
           <span className="text-slate-400">
             <strong className="text-slate-500">Coming next:</strong> Etsy
@@ -258,7 +258,7 @@ export default async function MarketingLandingPage() {
                 "Per-SKU COGS + gross margin",
                 "Live stock counts + receive history",
                 "Schedule-C P&L with audit trail",
-                "Gmail auto-fetch + receipt vault",
+                "Receipt vault with private storage",
                 "White-glove onboarding call",
               ]}
               ctaLabel="Start with Pro"
