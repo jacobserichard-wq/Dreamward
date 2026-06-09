@@ -348,29 +348,28 @@ export default function SkuForm({
 
               {/* Unit of measure — Tier 2. How this SKU's stock is
                   counted. "each" for whole items (jars, candles),
-                  "oz"/"g"/"ml"/"ft" for materials sold by weight or
-                  length. Shows next to quantities everywhere. */}
+                  weight/length units for materials. A real <select>
+                  so the dropdown reliably opens on click. */}
               <Field label="Unit of measure" htmlFor="sku-unit">
-                <input
+                <select
                   id="sku-unit"
-                  type="text"
-                  list="sku-unit-options"
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   disabled={saving}
-                  placeholder="each"
-                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
-                />
-                <datalist id="sku-unit-options">
-                  <option value="each" />
-                  <option value="oz" />
-                  <option value="g" />
-                  <option value="lb" />
-                  <option value="ml" />
-                  <option value="L" />
-                  <option value="ft" />
-                  <option value="in" />
-                </datalist>
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                >
+                  <option value="each">each (whole items)</option>
+                  <option value="oz">oz — ounces</option>
+                  <option value="g">g — grams</option>
+                  <option value="lb">lb — pounds</option>
+                  <option value="kg">kg — kilograms</option>
+                  <option value="ml">ml — milliliters</option>
+                  <option value="L">L — liters</option>
+                  <option value="ft">ft — feet</option>
+                  <option value="in">in — inches</option>
+                  <option value="yd">yd — yards</option>
+                  <option value="pcs">pcs — pieces</option>
+                </select>
               </Field>
 
               <p className="text-xs text-slate-500 m-0">

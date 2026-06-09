@@ -382,25 +382,24 @@ export default function RecipeSection({
                       <label className="block text-xs font-medium text-slate-600 mb-1">
                         Unit
                       </label>
-                      <input
-                        type="text"
-                        list="recipe-unit-options"
+                      <select
                         value={newUnit}
                         onChange={(e) => setNewUnit(e.target.value)}
                         disabled={saving}
-                        placeholder="oz"
                         className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
-                      />
-                      <datalist id="recipe-unit-options">
-                        <option value="each" />
-                        <option value="oz" />
-                        <option value="g" />
-                        <option value="lb" />
-                        <option value="ml" />
-                        <option value="L" />
-                        <option value="ft" />
-                        <option value="in" />
-                      </datalist>
+                      >
+                        <option value="each">each</option>
+                        <option value="oz">oz</option>
+                        <option value="g">g</option>
+                        <option value="lb">lb</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="L">L</option>
+                        <option value="ft">ft</option>
+                        <option value="in">in</option>
+                        <option value="yd">yd</option>
+                        <option value="pcs">pcs</option>
+                      </select>
                     </div>
                     <div className="w-24">
                       <label className="block text-xs font-medium text-slate-600 mb-1">
