@@ -44,6 +44,7 @@ interface SkuRowDb {
   // the detail page can show the running stock count without a
   // second round trip. NUMERIC since Tier 2 → pg returns a string.
   quantity_on_hand: string;
+  unit: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +67,7 @@ async function loadEnrichedSku(
             COALESCE(sales.sales_count, 0)::int AS sales_count,
             sales.last_sale_date,
             s.quantity_on_hand,
+            s.unit,
             s.created_at, s.updated_at
        FROM skus s
        LEFT JOIN LATERAL (
@@ -100,6 +102,7 @@ function serializeSku(row: SkuRowDb) {
     salesCount: row.sales_count,
     lastSaleDate: row.last_sale_date,
     quantityOnHand: Number(row.quantity_on_hand),
+    unit: row.unit,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

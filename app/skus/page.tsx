@@ -45,6 +45,8 @@ interface SkuRow {
   quantityOnHand: number;
   // Tier 2: has a recipe (bill of materials) → shows a 🧪 chip.
   hasRecipe: boolean;
+  // Tier 2: unit of measure (each, oz, ...) shown next to stock.
+  unit: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -577,6 +579,11 @@ export default function SkusPage() {
                         }
                       >
                         {s.quantityOnHand.toLocaleString()}
+                        {s.unit && s.unit !== "each" && (
+                          <span className="text-[11px] font-normal text-slate-400 ml-1">
+                            {s.unit}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right text-slate-600 tabular-nums whitespace-nowrap">
                         {s.salesCount > 0 ? s.salesCount : "—"}

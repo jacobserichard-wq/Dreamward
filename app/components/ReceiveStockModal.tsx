@@ -20,6 +20,9 @@ import { useEffect, useState } from "react";
 import Spinner from "./Spinner";
 
 export interface ReceiveStockModalProps {
+  /** Unit of measure for the SKU (each, oz, ...). Shown next to
+   *  quantities. */
+  unit?: string;
   open: boolean;
   skuId: number;
   skuCode: string;
@@ -35,9 +38,14 @@ export default function ReceiveStockModal({
   skuCode,
   skuName,
   currentQuantity,
+  unit,
   onClose,
   onSaved,
 }: ReceiveStockModalProps) {
+  // "each" reads naturally as unit/units; a real measure (oz, g)
+  // shows verbatim.
+  const unitLabel = (n: number) =>
+    unit && unit !== "each" ? unit : n === 1 ? "unit" : "units";
   const [quantity, setQuantity] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -136,7 +144,7 @@ export default function ReceiveStockModal({
             <span className="font-semibold text-slate-700">
               {currentQuantity.toLocaleString()}
             </span>{" "}
-            {currentQuantity === 1 ? "unit" : "units"}
+            {unitLabel(currentQuantity)}
           </p>
         </div>
 
@@ -172,7 +180,7 @@ export default function ReceiveStockModal({
             <span className="font-semibold text-slate-700">
               {projectedTotal.toLocaleString()}
             </span>{" "}
-            {projectedTotal === 1 ? "unit" : "units"}.
+            {unitLabel(projectedTotal)}.
           </p>
         )}
 

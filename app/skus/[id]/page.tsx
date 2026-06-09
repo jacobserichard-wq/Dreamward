@@ -53,6 +53,8 @@ interface SkuRow {
   // Drives the Stock section + the Receive Stock modal's current
   // count display.
   quantityOnHand: number;
+  // Tier 2: unit of measure (each, oz, ...).
+  unit: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -703,7 +705,11 @@ export default function SkuDetailPage() {
               {sku.quantityOnHand.toLocaleString()}
             </span>
             <span className="text-sm text-slate-500">
-              {sku.quantityOnHand === 1 ? "unit" : "units"}
+              {sku.unit && sku.unit !== "each"
+                ? sku.unit
+                : sku.quantityOnHand === 1
+                  ? "unit"
+                  : "units"}
             </span>
             {sku.quantityOnHand < 0 && (
               <span className="text-xs text-red-600 ml-2">
@@ -1178,6 +1184,7 @@ export default function SkuDetailPage() {
           skuCode={sku.code}
           skuName={sku.name}
           currentQuantity={sku.quantityOnHand}
+          unit={sku.unit}
           onClose={() => setReceiveOpen(false)}
           onSaved={(newQty) => {
             // Patch local state so the UI reflects the new total

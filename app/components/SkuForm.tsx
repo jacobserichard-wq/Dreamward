@@ -29,6 +29,9 @@ export interface SkuFormSubmit {
   description: string | null;
   cost: number;
   effectiveDate: string;
+  /** Unit of measure — "each", "oz", "g", "ft", etc. Display-only
+   *  label shown next to quantities. Tier 2. */
+  unit: string;
 }
 
 /** Subset of SkuFormSubmit that the edit path actually mutates.
@@ -89,6 +92,7 @@ export default function SkuForm({
   const [description, setDescription] = useState("");
   const [cost, setCost] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(todayIso());
+  const [unit, setUnit] = useState("each");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +117,7 @@ export default function SkuForm({
       setDescription("");
       setCost("");
       setEffectiveDate(todayIso());
+      setUnit("each");
     }
     setError(null);
   }, [open, editing]);
@@ -188,6 +193,7 @@ export default function SkuForm({
         description: description.trim() || null,
         cost: costNum,
         effectiveDate,
+        unit: unit.trim() || "each",
       });
       // Parent closes the modal on success.
     } catch (err) {
@@ -339,9 +345,39 @@ export default function SkuForm({
                   />
                 </Field>
               </div>
+
+              {/* Unit of measure — Tier 2. How this SKU's stock is
+                  counted. "each" for whole items (jars, candles),
+                  "oz"/"g"/"ml"/"ft" for materials sold by weight or
+                  length. Shows next to quantities everywhere. */}
+              <Field label="Unit of measure" htmlFor="sku-unit">
+                <input
+                  id="sku-unit"
+                  type="text"
+                  list="sku-unit-options"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  disabled={saving}
+                  placeholder="each"
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                />
+                <datalist id="sku-unit-options">
+                  <option value="each" />
+                  <option value="oz" />
+                  <option value="g" />
+                  <option value="lb" />
+                  <option value="ml" />
+                  <option value="L" />
+                  <option value="ft" />
+                  <option value="in" />
+                </datalist>
+              </Field>
+
               <p className="text-xs text-slate-500 m-0">
                 Backdate the effective date if you want this cost to
-                apply to historical sales already in FlowWork.
+                apply to historical sales already in FlowWork. Use{" "}
+                <strong>each</strong> for whole items, or a measure like{" "}
+                <strong>oz</strong> for materials.
               </p>
             </>
           )}

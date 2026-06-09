@@ -52,6 +52,7 @@ interface SkuRowDb {
   quantity_on_hand: string;
   // Tier 2: true when the SKU has a recipe (≥1 bom_components row).
   has_recipe: boolean;
+  unit: string;
   created_at: string;
   updated_at: string;
 }
@@ -116,6 +117,7 @@ export async function GET(req: NextRequest) {
               EXISTS (
                 SELECT 1 FROM bom_components b WHERE b.parent_sku_id = s.id
               ) AS has_recipe,
+              s.unit,
               s.created_at, s.updated_at
          FROM skus s
          LEFT JOIN LATERAL (
@@ -169,6 +171,7 @@ export async function GET(req: NextRequest) {
         lastSaleDate: r.last_sale_date,
         quantityOnHand: Number(r.quantity_on_hand),
         hasRecipe: r.has_recipe,
+        unit: r.unit,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),
@@ -205,6 +208,7 @@ interface CreateSkuBody {
   description?: unknown;
   cost?: unknown;
   effectiveDate?: unknown;
+  unit?: unknown;
 }
 
 function isNonEmptyString(v: unknown): v is string {
@@ -283,6 +287,12 @@ export async function POST(req: NextRequest) {
         ? body.description.trim()
         : null;
     const effectiveDate = body.effectiveDate;
+    // Tier 2: unit of measure. Defaults to "each" when omitted or
+    // blank. Capped to keep the label sane.
+    const unit =
+      typeof body.unit === "string" && body.unit.trim().length > 0
+        ? body.unit.trim().slice(0, 16)
+        : "each";
 
     // ── Transactional create ────────────────────────────────────
     const dbClient = await pool.connect();
@@ -290,10 +300,10 @@ export async function POST(req: NextRequest) {
       await dbClient.query("BEGIN");
 
       const skuInsert = await dbClient.query<{ id: number }>(
-        `INSERT INTO skus (client_id, code, name, description)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO skus (client_id, code, name, description, unit)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [client.id, code, name, description]
+        [client.id, code, name, description, unit]
       );
       const skuId = skuInsert.rows[0].id;
 
@@ -320,6 +330,9 @@ export async function POST(req: NextRequest) {
           costEffectiveDate: effectiveDate,
           salesCount: 0,
           lastSaleDate: null,
+          quantityOnHand: 0,
+          hasRecipe: false,
+          unit,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
