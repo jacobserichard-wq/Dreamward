@@ -61,6 +61,13 @@ export default function RecipeSection({
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
+  // "Create new material" sub-mode — make the ingredient SKU inline
+  // instead of bouncing out to the catalog.
+  const [createMode, setCreateMode] = useState(false);
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newUnit, setNewUnit] = useState("each");
+
   const loadRecipe = useCallback(async () => {
     try {
       const res = await fetch(`/api/skus/${skuId}/bom`);
@@ -132,6 +139,78 @@ export default function RecipeSection({
       setPickedSkuId("");
       setQtyPerUnit("");
       setAdding(false);
+      await loadRecipe();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Create a brand-new material SKU, then add it to this recipe — in
+  // one action, so the user never leaves the page. Cost defaults to 0
+  // (settable later on the material's own detail page).
+  const handleCreateAndAdd = async () => {
+    const code = newCode.trim();
+    const name = newName.trim();
+    const quantityPerUnit = Number(qtyPerUnit);
+    if (!code) {
+      setError("Enter a code for the new material.");
+      return;
+    }
+    if (!name) {
+      setError("Enter a name for the new material.");
+      return;
+    }
+    if (!Number.isFinite(quantityPerUnit) || quantityPerUnit <= 0) {
+      setError("Enter a positive quantity per unit.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      // 1. Create the material SKU.
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const createRes = await fetch("/api/skus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          name,
+          unit: newUnit.trim() || "each",
+          cost: 0,
+          effectiveDate: todayIso,
+        }),
+      });
+      if (!createRes.ok) {
+        const body = await createRes.json().catch(() => ({}));
+        setError(body.error || `Couldn't create material (HTTP ${createRes.status})`);
+        return;
+      }
+      const created = (await createRes.json()) as { sku: { id: number } };
+
+      // 2. Add it as a component of this recipe.
+      const bomRes = await fetch(`/api/skus/${skuId}/bom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          componentSkuId: created.sku.id,
+          quantityPerUnit,
+        }),
+      });
+      if (!bomRes.ok) {
+        const body = await bomRes.json().catch(() => ({}));
+        setError(body.error || `Material created but couldn't add to recipe (HTTP ${bomRes.status})`);
+        return;
+      }
+
+      // Reset + refresh. Invalidate the cached picker list so the
+      // new material shows if the user switches back to "pick".
+      setNewCode("");
+      setNewName("");
+      setNewUnit("each");
+      setQtyPerUnit("");
+      setCreateMode(false);
+      setAdding(false);
+      setSkuOptions([]);
       await loadRecipe();
     } finally {
       setSaving(false);
@@ -255,68 +334,7 @@ export default function RecipeSection({
 
             {/* Add component */}
             <div className="border-t border-slate-100 p-4">
-              {adding ? (
-                <div className="flex items-end gap-2 flex-wrap">
-                  <div className="flex-1 min-w-[180px]">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Component
-                    </label>
-                    <select
-                      value={pickedSkuId}
-                      onChange={(e) => {
-                        setPickedSkuId(e.target.value);
-                        setError(null);
-                      }}
-                      disabled={saving}
-                      className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
-                    >
-                      <option value="">— pick a SKU —</option>
-                      {pickable.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.code} · {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-28">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Qty per unit
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={qtyPerUnit}
-                      onChange={(e) => {
-                        setQtyPerUnit(e.target.value);
-                        setError(null);
-                      }}
-                      disabled={saving}
-                      placeholder="e.g. 4"
-                      className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={saving}
-                    className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
-                  >
-                    {saving && <Spinner size={12} color="white" />}
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdding(false);
-                      setError(null);
-                    }}
-                    disabled={saving}
-                    className="py-2 px-3 text-sm text-slate-600 border border-slate-300 rounded-lg cursor-pointer disabled:opacity-40 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+              {!adding ? (
                 <button
                   type="button"
                   onClick={openAddForm}
@@ -324,6 +342,201 @@ export default function RecipeSection({
                 >
                   + Add component
                 </button>
+              ) : createMode ? (
+                // ── Create a new material inline ──────────────────
+                <div>
+                  <div className="flex items-end gap-2 flex-wrap mb-2">
+                    <div className="w-24">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Code
+                      </label>
+                      <input
+                        type="text"
+                        value={newCode}
+                        onChange={(e) => {
+                          setNewCode(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={saving}
+                        placeholder="WAX"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Material name
+                      </label>
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => {
+                          setNewName(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={saving}
+                        placeholder="Soy wax"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Unit
+                      </label>
+                      <input
+                        type="text"
+                        list="recipe-unit-options"
+                        value={newUnit}
+                        onChange={(e) => setNewUnit(e.target.value)}
+                        disabled={saving}
+                        placeholder="oz"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      />
+                      <datalist id="recipe-unit-options">
+                        <option value="each" />
+                        <option value="oz" />
+                        <option value="g" />
+                        <option value="lb" />
+                        <option value="ml" />
+                        <option value="L" />
+                        <option value="ft" />
+                        <option value="in" />
+                      </datalist>
+                    </div>
+                    <div className="w-24">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Qty per unit
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={qtyPerUnit}
+                        onChange={(e) => {
+                          setQtyPerUnit(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={saving}
+                        placeholder="4"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCreateAndAdd}
+                      disabled={saving}
+                      className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      {saving && <Spinner size={12} color="white" />}
+                      Create &amp; add
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateMode(false);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                      className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      {"\u{2190}"} Pick an existing SKU instead
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdding(false);
+                        setCreateMode(false);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                      className="text-slate-500 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 m-0 mt-2">
+                    Creates a new material SKU and adds it to this recipe.
+                    Set its cost + stock later on the material&apos;s own
+                    page.
+                  </p>
+                </div>
+              ) : (
+                // ── Pick an existing SKU ──────────────────────────
+                <div>
+                  <div className="flex items-end gap-2 flex-wrap mb-2">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Component
+                      </label>
+                      <select
+                        value={pickedSkuId}
+                        onChange={(e) => {
+                          setPickedSkuId(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={saving}
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      >
+                        <option value="">— pick a SKU —</option>
+                        {pickable.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.code} · {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-28">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Qty per unit
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={qtyPerUnit}
+                        onChange={(e) => {
+                          setQtyPerUnit(e.target.value);
+                          setError(null);
+                        }}
+                        disabled={saving}
+                        placeholder="e.g. 4"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAdd}
+                      disabled={saving}
+                      className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      {saving && <Spinner size={12} color="white" />}
+                      Add
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateMode(true);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                      className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      + Create a new material instead
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdding(false);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                      className="text-slate-500 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </>
