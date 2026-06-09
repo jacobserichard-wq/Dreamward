@@ -135,13 +135,13 @@ export default function CraftyBaseComparePage() {
                 feature="Schedule-C P&L for tax handoff"
                 them="Behind Indie+ paid tier"
                 themBad
-                us="Included on the standard Pro plan"
+                us="Included on every tier — even $10 Dream"
               />
               <ComparisonRow
                 feature="Profit & loss report"
                 them="Locked on the base tier"
                 themBad
-                us="Included on every paid tier"
+                us="Included on every tier"
               />
               <ComparisonRow
                 feature="Receipt attachments on expenses"
@@ -214,21 +214,70 @@ export default function CraftyBaseComparePage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing — the philosophical difference, not just the
+          numbers. Crafty Base gates features by tier; FlowWork
+          gates nothing. This is the section that converts. */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
         <div className="text-center mb-8">
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2">
-            Pricing transparency
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
+            Built for people. Priced for people.
+          </span>
+          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2 mt-3">
+            They gate features. We don&apos;t.
           </h3>
-          <p className="text-sm text-slate-600 max-w-2xl mx-auto m-0">
-            Crafty Base&apos;s Profit &amp; Loss Report, advanced
-            auto-manufacturing, and material lot tracking are gated
-            behind Indie+ ($59/mo) and Business ($129/mo) tiers.
-            FlowWork includes the equivalent features in the standard
-            Pro tier ($89/mo) and ships gross-margin reporting on
-            Growth ($49/mo).
+          <p className="text-sm text-slate-600 max-w-2xl mx-auto m-0 leading-relaxed">
+            Crafty Base locks Profit &amp; Loss reports,
+            auto-manufacturing, and lot tracking behind Indie+
+            ($59/mo) and Business ($129/mo) tiers — pay more to
+            unlock what you already need. FlowWork includes{" "}
+            <strong>every feature on every tier</strong>. You pay by
+            your business size, starting at $10/mo, and your tier
+            adjusts automatically as you grow.
           </p>
         </div>
+
+        {/* Side-by-side pricing-philosophy cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+            <p className="text-sm font-bold text-slate-900 m-0 mb-2">
+              Crafty Base
+            </p>
+            <ul className="m-0 p-0 list-none space-y-1.5 text-[13px] text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="text-red-400 mt-0.5">{"\u{2717}"}</span>
+                <span>P&amp;L report gated behind Indie+ ($59/mo)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-400 mt-0.5">{"\u{2717}"}</span>
+                <span>Lot tracking gated behind Business ($129/mo)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-400 mt-0.5">{"\u{2717}"}</span>
+                <span>Pay more to unlock features you need</span>
+              </li>
+            </ul>
+          </div>
+          <div className="bg-white border-2 border-emerald-300 rounded-xl p-5">
+            <p className="text-sm font-bold text-slate-900 m-0 mb-2">
+              FlowWork
+            </p>
+            <ul className="m-0 p-0 list-none space-y-1.5 text-[13px] text-slate-700">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Every feature on every tier — from $10/mo</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Priced by business size, not feature gates</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span>Tier auto-adjusts as you grow — no upsell calls</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div className="flex justify-center">
           <Link
             href="/#pricing"

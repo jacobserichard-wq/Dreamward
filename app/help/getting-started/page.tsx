@@ -203,10 +203,10 @@ export default function GettingStartedGuide() {
         <Section id="cogs-setup" title="4. Set up SKUs and cost history">
           <p>
             This is the section that makes FlowWork worth paying for. Open the{" "}
-            <strong>COGS</strong> link in the header (Pro tier required). The
-            page lists every SKU it has seen from your connected stores. Each
-            row needs two things to produce gross margin: a cost, and an
-            effective date.
+            <strong>COGS</strong> link in the header (included on every
+            plan). The page lists every SKU it has seen from your connected
+            stores. Each row needs two things to produce gross margin: a
+            cost, and an effective date.
           </p>
           <p>
             Click a SKU to open its detail page. You&apos;ll see a{" "}
@@ -408,7 +408,7 @@ export default function GettingStartedGuide() {
             Integrations for Shopify, etc.) filtered to that channel.
           </p>
           <p>
-            <strong>COGS &amp; Gross Margin</strong> (Pro tier) is the bottom
+            <strong>COGS &amp; Gross Margin</strong> is the bottom
             section. It shows the last 30 days of mapped line items, grouped
             by SKU, with Revenue / COGS / Gross Margin per row. This is where
             the cost history you set in section 4 pays off — you can see
@@ -426,8 +426,8 @@ export default function GettingStartedGuide() {
         <Section id="schedule-c-report" title="9. Generate your Schedule-C report">
           <p>
             Open <Link href="/reports" className="text-blue-600 no-underline hover:underline">Reports</Link>{" "}
-            (Pro tier). Pick a year, click &ldquo;Generate.&rdquo; You get a
-            true Schedule-C-formatted P&amp;L:
+            (included on every plan). Pick a year, click &ldquo;Generate.&rdquo;
+            You get a true Schedule-C-formatted P&amp;L:
           </p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Revenue (by channel)</li>
