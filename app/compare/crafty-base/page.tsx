@@ -280,7 +280,7 @@ export default function CraftyBaseComparePage() {
 
         <div className="flex justify-center">
           <Link
-            href="/#pricing"
+            href="/pricing"
             className="inline-block py-2.5 px-6 rounded-lg bg-blue-500 text-white text-sm font-semibold no-underline hover:bg-blue-600"
           >
             See FlowWork plans &rarr;

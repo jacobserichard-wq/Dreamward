@@ -54,12 +54,20 @@ export default async function MarketingLandingPage() {
           <h1 className="m-0 text-xl sm:text-2xl font-bold">
             <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> FlowWork
           </h1>
-          <Link
-            href="/signin"
-            className="text-sm text-white/80 hover:text-white no-underline"
-          >
-            Sign in
-          </Link>
+          <div className="flex items-center gap-4 sm:gap-5">
+            <Link
+              href="/pricing"
+              className="text-sm text-white/80 hover:text-white no-underline"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/signin"
+              className="text-sm text-white/80 hover:text-white no-underline"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
 
         {/* Hero. Sub-session 32 marketing refresh: leads with the
