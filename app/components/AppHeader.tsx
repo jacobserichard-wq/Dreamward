@@ -152,6 +152,15 @@ export default function AppHeader({
           </Link>
           {paying && (
             <Link
+              href="/skus"
+              className={NAV_LINK}
+              title="Your product catalog — costs, stock, and recipes"
+            >
+              SKUs
+            </Link>
+          )}
+          {paying && (
+            <Link
               href="/cogs"
               className={NAV_LINK}
               title="Cost of goods sold + gross margin per channel and per SKU"
