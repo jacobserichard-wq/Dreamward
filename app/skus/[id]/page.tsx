@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 import ErrorBanner from "../../components/ErrorBanner";
 import Spinner from "../../components/Spinner";
 import SkuForm, {
@@ -514,6 +515,7 @@ export default function SkuDetailPage() {
   if (!Number.isFinite(skuId)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/skus"
@@ -529,6 +531,7 @@ export default function SkuDetailPage() {
   if (forbidden) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/skus"
@@ -555,6 +558,7 @@ export default function SkuDetailPage() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/skus"
@@ -570,6 +574,7 @@ export default function SkuDetailPage() {
   if (loading || !data) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">Loading SKU…</p>
         </div>

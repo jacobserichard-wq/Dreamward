@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 import { apiFetch } from "@/lib/apiFetch";
 import { TIER_DISPLAY, type PaidPlanName } from "@/lib/plans";
 
@@ -183,6 +184,7 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

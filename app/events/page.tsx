@@ -8,6 +8,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import EventHistoryList, { type EventSummary } from "../components/EventHistoryList";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import SectionTip from "../components/SectionTip";
+import AppHeader from "../components/AppHeader";
 import { isPayingTier } from "@/lib/plans";
 
 export default function EventsPage() {
@@ -133,6 +134,7 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

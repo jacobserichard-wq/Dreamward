@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import Spinner from "../components/Spinner";
+import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import ConfirmModal from "../components/ConfirmModal";
@@ -807,170 +807,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Header */}
-      <header className="bg-gradient-to-br from-slate-800 to-slate-700 text-white px-4 sm:px-8 py-6">
-        <div className="max-w-[1200px] mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="m-0 text-2xl sm:text-[28px] font-bold">
-              <span className="text-2xl">{"⚡"}</span> FlowWork
-            </h1>
-            <p className="mt-1 mb-0 mx-0 text-white/70 text-sm hidden sm:block">Accounting Automation</p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {clientInfo && (
-              <a
-                href="/billing"
-                className="bg-white/15 text-white px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-semibold uppercase tracking-wider no-underline cursor-pointer"
-              >
-                {clientInfo.plan}
-              </a>
-            )}
-            {/* Sub-session 32 polish: Upload action surfaced in the
-                header. The CSV/XLSX upload UI also lives on the
-                Emails tab, but burying a primary action two clicks
-                deep (Dashboard → Emails tab → Upload button) hides
-                a core feature. Same handleUpload callback the
-                Emails-tab button uses — state + review modal wire
-                through identically. */}
-            <label
-              className={`bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 inline-flex items-center gap-1 m-0 ${
-                uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:text-white"
-              }`}
-              title="Upload a CSV, TSV, or XLSX file"
-            >
-              {uploading ? <Spinner size={11} color="white" /> : <span>{"\u{1F4C1}"}</span>}
-              {uploading ? "Uploading..." : "Upload"}
-              <input
-                type="file"
-                accept=".csv,.tsv,.xlsx"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleUpload(f);
-                  e.target.value = "";
-                }}
-                disabled={uploading}
-              />
-            </label>
-            {/* Template download sits next to Upload so discovery
-                happens BEFORE upload, not after a failed parse.
-                Subtle styling — small, parenthesized, no icon — so
-                it reads as a helper link rather than another nav
-                item. The file lives in public/templates/ (commit
-                06e1aa4) and downloads via the native `download`
-                attribute, no server round-trip. */}
-            <a
-              href="/templates/flowwork-sales-template.csv"
-              download="flowwork-sales-template.csv"
-              className="bg-transparent text-white/50 text-[11px] sm:text-xs no-underline px-1 py-1.5 hover:text-white/80"
-              title="Download the CSV template with example rows"
-            >
-              (template)
-            </a>
-            <Link
-              href="/events"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-            >
-              Events
-            </Link>
-            {/* Phase 9.3: new Expenses page (money OUT — vendor bills,
-                subscriptions, supplies). Sits before AR in the
-                financial-flow grouping so the "what does my business
-                cost" surface comes before "what's owed to me". */}
-            <Link
-              href="/expenses"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-            >
-              Expenses
-            </Link>
-            {/* Phase 9.3 rename: "Invoices" → "AR" for clarity. The
-                /invoices page tracks Accounts Receivable (invoices YOU
-                sent to YOUR customers), not vendor bills you received.
-                The new "Expenses" link above handles the money-out
-                side that "Invoices" was confusingly suggesting. */}
-            <Link
-              href="/invoices"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-              title="Accounts Receivable — customer invoices awaiting payment"
-            >
-              AR
-            </Link>
-            {/* Phase 12f: COGS gross-margin dashboard. Sub-session 33:
-                available on every paying tier (was Pro-only), so the
-                nav link shows for all paying tiers — otherwise Maker/
-                Growth users have access but no way to reach it. */}
-            {isPayingTier(clientInfo?.plan) && (
-              <Link
-                href="/cogs"
-                className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-                title="Cost of goods sold + gross margin per channel and per SKU"
-              >
-                COGS
-              </Link>
-            )}
-            {/* Phase 7a commit 9: Reports nav link. Sub-session 33:
-                matches the now-feature-flat /reports route — shows for
-                every paying tier. Sits between Invoices and Settings to
-                keep the financial-flow grouping (Events → Invoices →
-                Reports → Settings). */}
-            {isPayingTier(clientInfo?.plan) && (
-              <Link
-                href="/reports"
-                className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-              >
-                Reports
-              </Link>
-            )}
-            {/* Flow-redesign commit 6: Setup checklist nav link.
-                /onboarding is the canonical setup surface now (locked
-                decision #3 removed the dashboard checklist). The link
-                here lets users revisit setup anytime to complete or
-                un-skip items. */}
-            <Link
-              href="/onboarding"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-              title="Open the setup checklist"
-            >
-              Setup
-            </Link>
-            {/* Phase 8b: Integrations nav link. Pro-only (the page
-                itself shows an upgrade card for non-Pro), but rendered
-                for all plans so the option is discoverable + the
-                upgrade message becomes a conversion surface. */}
-            <Link
-              href="/integrations"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-              title="Connect Shopify and other platforms"
-            >
-              Integrations
-            </Link>
-            {/* Sub-session 32: Help hub. Linked from the header
-                so the guide is one click away from anywhere on the
-                dashboard. /help is the canonical entry point for
-                all guides (getting-started + future reference
-                pages). */}
-            <Link
-              href="/help"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-              title="User guides and walkthroughs"
-            >
-              Help
-            </Link>
-            <Link
-              href="/settings"
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
-            >
-              Settings
-            </Link>
-            <button
-              onClick={() => signOut({ callbackUrl: "/signin" })}
-              className="bg-transparent text-white/75 text-[11px] sm:text-[13px] cursor-pointer px-1 py-1.5"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Sub-session 33: header extracted to the shared AppHeader.
+          The dashboard supplies plan + the inline-upload handler so
+          its Upload entry stays a file picker (the CSV review modal
+          lives on this page). */}
+      <AppHeader
+        plan={clientInfo?.plan ?? null}
+        onUploadFile={handleUpload}
+        uploading={uploading}
+      />
 
       {/* Phase 9.2: ActionItemsStrip — pill row showing pending user
           actions (Needs Review count + Overdue $). Auto-hides when

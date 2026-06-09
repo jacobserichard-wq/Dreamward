@@ -27,6 +27,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
@@ -228,6 +229,7 @@ function IntegrationsPageInner() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

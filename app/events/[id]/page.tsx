@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 import Spinner from "../../components/Spinner";
 import ErrorBanner from "../../components/ErrorBanner";
 import { type EventResponse } from "../../components/EventCreateForm";
@@ -574,6 +575,7 @@ export default function EventDetailPage({ params }: PageProps) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">Loading event...</p>
         </div>
@@ -584,6 +586,7 @@ export default function EventDetailPage({ params }: PageProps) {
   if (!event) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/events"

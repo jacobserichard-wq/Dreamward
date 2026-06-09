@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import ChannelTable, {
   type ChannelRow,
@@ -249,6 +250,7 @@ export default function ProfitabilityPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

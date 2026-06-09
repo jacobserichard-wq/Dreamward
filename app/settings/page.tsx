@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 
 const ALL_MODULES = [
   { id: "invoices", label: "Invoices", description: "Track and process vendor invoices from email", icon: "\u{1F4D1}" },
@@ -685,6 +686,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

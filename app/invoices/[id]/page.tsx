@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 import ErrorBanner from "../../components/ErrorBanner";
 import AgingBucketChip from "../../components/AgingBucketChip";
 import PaymentHistoryTable from "../../components/PaymentHistoryTable";
@@ -302,6 +303,7 @@ export default function InvoiceDetailPage({ params }: PageProps) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">
             Loading invoice...
@@ -314,6 +316,7 @@ export default function InvoiceDetailPage({ params }: PageProps) {
   if (!invoice) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/invoices"

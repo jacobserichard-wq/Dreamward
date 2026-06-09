@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
 import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
@@ -319,6 +320,7 @@ export default function SkusPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

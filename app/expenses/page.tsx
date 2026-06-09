@@ -23,6 +23,7 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
+import AppHeader from "../components/AppHeader";
 import ExpenseForm, {
   type ExpenseFormCategory,
   type ExpenseFormEvent,
@@ -387,6 +388,7 @@ export default function ExpensesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

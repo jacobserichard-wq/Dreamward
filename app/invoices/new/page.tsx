@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 import ErrorBanner from "../../components/ErrorBanner";
 import InvoiceCreateForm, {
   type InvoiceSubmitPayload,
@@ -98,6 +99,7 @@ export default function NewInvoicePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[700px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">Loading...</p>
         </div>
@@ -108,6 +110,7 @@ export default function NewInvoicePage() {
   if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
         <div className="max-w-[700px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             backHref="/invoices"
