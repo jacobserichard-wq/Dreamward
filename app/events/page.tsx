@@ -7,6 +7,7 @@ import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import EventHistoryList, { type EventSummary } from "../components/EventHistoryList";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
+import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
 export default function EventsPage() {
@@ -139,6 +140,15 @@ export default function EventsPage() {
           title="Events"
           subtitle="Track market days, fairs, and event sales"
         />
+
+        <SectionTip id="events" title="Logging a market day">
+          Create an event for each market, fair, or pop-up. Add the booth
+          fee and round-trip mileage (we apply the IRS rate automatically)
+          so the day&apos;s true profit is captured. Then log sales: type
+          a one-line total on the event, or upload a CSV and pick this
+          event so every row batch-tags to it. Event revenue + costs roll
+          into your <strong>Markets</strong> channel on the dashboard.
+        </SectionTip>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 

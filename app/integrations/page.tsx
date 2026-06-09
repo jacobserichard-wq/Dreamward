@@ -28,6 +28,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SectionTip from "../components/SectionTip";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
@@ -234,6 +235,16 @@ function IntegrationsPageInner() {
           title="Integrations"
           subtitle="Connect your online store, payment processor, and other revenue sources"
         />
+
+        <SectionTip id="integrations" title="Connect a store to automate everything">
+          Connecting Shopify, Wix, or Square pulls your last 90 days of
+          orders and keeps syncing in real time — no manual uploads. Each
+          order&apos;s line items flow into per-product margin, and your
+          products auto-populate the <strong>SKUs</strong> catalog. Square
+          even imports the costs you&apos;ve already set in its catalog.
+          After connecting, set cost history on your SKUs to see gross
+          margin.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

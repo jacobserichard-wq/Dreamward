@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SectionTip from "../components/SectionTip";
 import CogsAuditTrailModal, {
   type CogsDrillScopeOpts,
 } from "../components/CogsAuditTrailModal";
@@ -246,6 +247,16 @@ export default function CogsPage() {
           title="COGS & gross margin"
           subtitle="Per-period revenue, cost of goods sold, and margin — broken down by channel and by SKU. Click any number for the audit trail."
         />
+
+        <SectionTip id="cogs" title="How gross margin gets calculated">
+          Margin = revenue minus the cost of goods sold. For each sale,
+          FlowWork looks up the SKU&apos;s cost on the date it sold (its
+          effective-dated cost row) — so a price change today never
+          rewrites last month&apos;s margin. If a SKU shows $0 COGS, it
+          has no cost row covering the sale date; add one on the{" "}
+          <strong>SKUs</strong> page. Click any number here to see the
+          exact line items and cost rows behind it.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

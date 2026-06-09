@@ -11,6 +11,7 @@ import ReportMonthlyChart from "../components/ReportMonthlyChart";
 import ReportArSnapshot from "../components/ReportArSnapshot";
 import ScheduleCSummaryPanel from "../components/ScheduleCSummaryPanel";
 import QuarterlyEstimatesPanel from "../components/QuarterlyEstimatesPanel";
+import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 6 of 9, per
@@ -309,6 +310,16 @@ export default function ReportsPage() {
           title="Tax Reports"
           subtitle="Calendar-year summaries for your CPA"
         />
+
+        <SectionTip id="reports" title="One-click handoff to your CPA">
+          Pick a year and FlowWork builds a Schedule-C-formatted P&amp;L —
+          Revenue → COGS → Gross Profit → Operating Expenses → Net. Use{" "}
+          <strong>Download PDF/CSV</strong> or email it straight to your
+          accountant (save their address in Settings). Numbers come only
+          from data FlowWork can see, so enter any out-of-band expenses
+          before tax season. Set your tax bracket in Settings to get
+          quarterly estimate suggestions too.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

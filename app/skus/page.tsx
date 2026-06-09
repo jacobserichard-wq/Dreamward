@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SectionTip from "../components/SectionTip";
 import SkuForm, { type SkuFormSubmit } from "../components/SkuForm";
 import SkuBulkCostModal, {
   type SelectedSkuForCost,
@@ -325,6 +326,16 @@ export default function SkusPage() {
           title="SKUs"
           subtitle="Product cost catalog — powers your COGS + per-channel gross margin reports"
         />
+
+        <SectionTip id="skus" title="Set costs to unlock gross margin">
+          SKUs appear here automatically when a connected store syncs
+          orders — or add them manually / by paste. Click a SKU to set
+          its <strong>cost history</strong>: enter what you pay per unit
+          and the date that cost took effect. Raised a price? Add a new
+          cost row with a future date instead of editing the old one —
+          that keeps your past margins accurate. Stock counts live on
+          each SKU too.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

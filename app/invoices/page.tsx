@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SectionTip from "../components/SectionTip";
 import InvoiceList, {
   type InvoiceListEntry,
   type InvoiceListSummary,
@@ -245,6 +246,15 @@ export default function InvoicesPage() {
           title="Invoices"
           subtitle="Track wholesale invoices and chase overdue payments"
         />
+
+        <SectionTip id="invoices" title="Accounts receivable — money owed to you">
+          This is AR: invoices <em>you</em> sent that are awaiting payment
+          (wholesale, consignment, custom orders). Each one lands in an
+          aging bucket so you can see at a glance what&apos;s current vs.
+          overdue, then send a polite follow-up in one tap. Looking to log
+          a bill you <em>received</em>? That&apos;s an{" "}
+          <strong>Expense</strong>, not an invoice.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

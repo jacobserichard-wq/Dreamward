@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
+import SectionTip from "../components/SectionTip";
 import ExpenseForm, {
   type ExpenseFormCategory,
   type ExpenseFormEvent,
@@ -393,6 +394,15 @@ export default function ExpensesPage() {
           title="Expenses"
           subtitle="Track money out — vendor bills, supplies, subscriptions, mileage"
         />
+
+        <SectionTip id="expenses" title="Log expenses + attach receipts">
+          Add anything your business spends — supplies, packaging, SaaS,
+          rent. The <strong>category</strong> decides whether it counts as
+          Cost of Goods Sold or an Operating Expense on your Schedule-C.
+          Drag a receipt (PDF or photo) onto any expense to file it in the
+          Receipt Vault — your audit defense, organized by year and
+          category. The thumbnail shows up right on the row.
+        </SectionTip>
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
