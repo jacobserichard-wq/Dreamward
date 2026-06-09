@@ -66,6 +66,18 @@ export default function EventsPage() {
     load();
   }, [router, loadEvents]);
 
+  // Deep-link support: /events?new=1 auto-opens the inline create
+  // form. Read from window.location rather than useSearchParams to
+  // avoid forcing a Suspense boundary on this already-client page.
+  // The form still only renders for paying tiers (gated below);
+  // non-paying users on ?new=1 see the upgrade prompt as usual.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      setShowCreateForm(true);
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">

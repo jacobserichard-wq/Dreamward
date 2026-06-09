@@ -88,9 +88,10 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     icon: "\u{1F3EA}",
     comingSoon: false,
     // /events/new isn't a route — events use an inline-create
-     // pattern on /events via the "+ New event" toggle. Send the
-     // zero-state CTA to the list page where that button lives.
-    emptyAddHref: "/events",
+     // pattern on /events via the "+ New event" toggle. ?new=1
+     // auto-opens that form so the zero-state CTA lands the user
+     // directly in the create flow.
+    emptyAddHref: "/events?new=1",
     emptyAddLabel: "Add your first event",
     proGated: false,
     drillHref: "/events",

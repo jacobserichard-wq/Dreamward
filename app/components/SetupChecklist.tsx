@@ -209,7 +209,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       id: "add_first_event",
       label: "Add your first event (market, fair, gig)",
       done: props.hasEvents ?? false,
-      action: { kind: "link", href: "/events" },
+      action: { kind: "link", href: "/events?new=1" },
       buttonLabel: "Open Events",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
