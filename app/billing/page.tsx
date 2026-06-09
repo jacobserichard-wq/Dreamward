@@ -5,6 +5,7 @@ import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import PageHeader from "../components/PageHeader";
 import { apiFetch } from "@/lib/apiFetch";
+import { TIER_DISPLAY, type PaidPlanName } from "@/lib/plans";
 
 interface BillingData {
   plan: string;
@@ -23,36 +24,58 @@ interface BillingData {
   };
 }
 
-const PLAN_DETAILS: Record<string, { name: string; price: string; features: string[] }> = {
-  trial: {
-    name: "Free Trial",
-    price: "$0",
-    features: ["25 items/month", "Expense tracking", "Dashboard"],
-  },
-  starter: {
-    name: "Starter",
-    price: "$19/mo",
-    features: ["100 items/month", "Expense tracking", "Dashboard"],
-  },
-  growth: {
-    name: "Growth",
-    price: "$49/mo",
-    features: ["Unlimited processing", "Events & mileage", "AR follow-up", "CSV/PDF exports"],
-  },
-  pro: {
-    name: "Pro",
-    price: "$89/mo",
-    // Sub-session 33: "10 Gmail accounts" removed while Gmail
-    // ingestion is hidden. Re-add when FEATURES.GMAIL_INGEST
-    // flips back to true.
-    features: ["Unlimited processing", "Live stock counts", "Custom categories", "Tax reports", "Onboarding call"],
-  },
-  canceled: {
-    name: "Canceled",
-    price: "$0",
-    features: ["Dashboard only"],
-  },
+// Sub-session 33 pricing pivot. The billing page now reflects the
+// "Built for people. Priced for people." model: every paying tier
+// gets every feature, tiers differ only by business-size bracket +
+// service level. The tier order matters for the comparison grid +
+// the "is this a downgrade?" check.
+const TIER_ORDER: PaidPlanName[] = ["dream", "maker", "growth", "pro"];
+
+/** Per-tier service-level feature bullets shown on the comparison
+ *  cards. Deliberately NOT product features — those are flat across
+ *  all tiers (see the "every tier includes" note). These bullets
+ *  describe what changes as you move up: support speed + onboarding
+ *  depth. */
+const TIER_SERVICE_FEATURES: Record<PaidPlanName, string[]> = {
+  dream: [
+    "Every product feature",
+    "All integrations",
+    "Standard email support",
+  ],
+  maker: [
+    "Every product feature",
+    "All integrations",
+    "Standard email support",
+  ],
+  growth: [
+    "Everything in Maker",
+    "Priority email support",
+    "Free onboarding session",
+  ],
+  pro: [
+    "Everything in Growth",
+    "Same-day support",
+    "Custom onboarding + quarterly check-ins",
+    "White-glove migration help",
+  ],
 };
+
+/** Display metadata for the non-paid plan states. */
+const STATE_DISPLAY: Record<
+  "trial" | "canceled",
+  { name: string; price: string }
+> = {
+  trial: { name: "Free Trial", price: "$0" },
+  canceled: { name: "Canceled", price: "$0" },
+};
+
+function fmtRevenueBracket(low: number, high: number): string {
+  const fmtK = (n: number) =>
+    n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
+  if (high === Infinity) return `${fmtK(low)}+/year revenue`;
+  if (low === 0) return `Under ${fmtK(high)}/year revenue`;
+  return `${fmtK(low)}–${fmtK(high)}/year revenue`;
+}
 
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingData | null>(null);
@@ -135,7 +158,26 @@ export default function BillingPage() {
     );
   }
 
-  const currentPlan = PLAN_DETAILS[billing.plan] || PLAN_DETAILS.trial;
+  // Resolve display for the current plan. Paid tiers come from
+  // TIER_DISPLAY; trial/canceled from STATE_DISPLAY; anything
+  // unrecognized falls back to trial.
+  const paidTier = TIER_DISPLAY[billing.plan as PaidPlanName];
+  const currentPlanName = paidTier
+    ? paidTier.name
+    : STATE_DISPLAY[billing.plan as "trial" | "canceled"]?.name ??
+      STATE_DISPLAY.trial.name;
+  const currentPlanPrice = paidTier
+    ? `$${paidTier.priceMonthly}/mo`
+    : STATE_DISPLAY[billing.plan as "trial" | "canceled"]?.price ??
+      STATE_DISPLAY.trial.price;
+  const currentPlanBracket = paidTier
+    ? fmtRevenueBracket(paidTier.revenueLow, paidTier.revenueHigh)
+    : null;
+  const currentServiceFeatures = paidTier
+    ? TIER_SERVICE_FEATURES[paidTier.id]
+    : billing.plan === "canceled"
+      ? ["Dashboard only — reactivate to restore full access"]
+      : ["Full access during your 14-day trial"];
   const usagePct = billing.usage.maxItems
     ? Math.min(Math.round((billing.usage.itemsThisMonth / billing.usage.maxItems) * 100), 100)
     : null;
@@ -160,9 +202,14 @@ export default function BillingPage() {
                 Current plan
               </h2>
               <div className="flex items-baseline gap-3">
-                <span className="text-2xl font-bold text-slate-900">{currentPlan.name}</span>
-                <span className="text-lg font-semibold text-slate-500">{currentPlan.price}</span>
+                <span className="text-2xl font-bold text-slate-900">{currentPlanName}</span>
+                <span className="text-lg font-semibold text-slate-500">{currentPlanPrice}</span>
               </div>
+              {currentPlanBracket && (
+                <p className="text-xs text-slate-500 m-0 mt-1">
+                  {currentPlanBracket} · auto-adjusts as you grow
+                </p>
+              )}
             </div>
             {billing.stripeCustomerId && (
               <button
@@ -216,7 +263,7 @@ export default function BillingPage() {
 
           {/* Current features */}
           <div className="flex flex-col gap-2">
-            {currentPlan.features.map((f) => (
+            {currentServiceFeatures.map((f) => (
               <div key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <span className="text-green-600 font-bold text-sm">{"✓"}</span>
                 <span>{f}</span>
@@ -225,23 +272,39 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Plan Comparison */}
-        <h2 className="text-xl font-bold text-slate-900 mb-4">
-          {billing.plan === "canceled" ? "Reactivate your plan" : "Upgrade your plan"}
-        </h2>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4 mb-8">
-          {(["starter", "growth", "pro"] as const).map((planId) => {
-            const plan = PLAN_DETAILS[planId];
-            const isCurrent = billing.plan === planId;
-            const isDowngrade =
-              (billing.plan === "pro" && (planId === "starter" || planId === "growth")) ||
-              (billing.plan === "growth" && planId === "starter");
+        {/* "Every tier includes" reassurance — reinforces the
+            no-feature-gates promise before the comparison grid. */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-sm text-emerald-900">
+          <strong>Every tier includes every feature.</strong> Integrations,
+          COGS, gross margin, live stock, Schedule-C reports, receipt vault —
+          all of it, on every plan. You&apos;re billed by your business size,
+          not by which tools you&apos;re allowed to use. As your tracked
+          revenue grows, your tier auto-adjusts on a calendar-month boundary.
+        </div>
 
-            // Border precedence: featured > current > default. Matches the
-            // original spread-order behavior where planCardFeatured overrode
-            // planCardCurrent.
+        {/* Plan Comparison */}
+        <h2 className="text-xl font-bold text-slate-900 mb-1">
+          {billing.plan === "canceled" ? "Reactivate your plan" : "Choose your tier"}
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Pick the tier that matches your current revenue. We&apos;ll move you
+          up automatically as you grow — no upsell calls.
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4 mb-8">
+          {TIER_ORDER.map((planId) => {
+            const tier = TIER_DISPLAY[planId];
+            const isCurrent = billing.plan === planId;
+            // Downgrade = target tier sits below the current paid tier
+            // in TIER_ORDER. Stripe portal handles proration on
+            // downgrades; checkout handles upgrades + new subs.
+            const currentIdx = TIER_ORDER.indexOf(billing.plan as PaidPlanName);
+            const targetIdx = TIER_ORDER.indexOf(planId);
+            const isDowngrade = currentIdx >= 0 && targetIdx < currentIdx;
+
+            // Maker carries the "Most popular" highlight (the new
+            // conversion sweet spot for solo makers).
             const borderClass =
-              planId === "growth"
+              planId === "maker"
                 ? "border-2 border-violet-500"
                 : isCurrent
                 ? "border-2 border-blue-500"
@@ -252,17 +315,23 @@ export default function BillingPage() {
                 key={planId}
                 className={`bg-white rounded-xl p-6 flex flex-col relative ${borderClass}`}
               >
-                {planId === "growth" && (
+                {planId === "maker" && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-xs font-semibold py-1 px-4 rounded-[20px] whitespace-nowrap">
                     Most popular
                   </div>
                 )}
-                <h3 className="text-xl font-bold text-slate-900 mt-2 mb-1">{plan.name}</h3>
-                <div className="text-3xl font-extrabold text-slate-900 mb-4">{plan.price}</div>
+                <h3 className="text-xl font-bold text-slate-900 mt-2 mb-0.5">{tier.name}</h3>
+                <div className="text-3xl font-extrabold text-slate-900 mb-0.5">
+                  ${tier.priceMonthly}
+                  <span className="text-sm font-medium text-slate-400">/mo</span>
+                </div>
+                <p className="text-xs text-slate-500 m-0 mb-4">
+                  {fmtRevenueBracket(tier.revenueLow, tier.revenueHigh)}
+                </p>
                 <div className="flex flex-col gap-2 mb-5 flex-1">
-                  {plan.features.map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-[13px] text-slate-600">
-                      <span className="text-green-600 font-bold text-sm">{"✓"}</span>
+                  {TIER_SERVICE_FEATURES[planId].map((f) => (
+                    <div key={f} className="flex items-start gap-2 text-[13px] text-slate-600">
+                      <span className="text-green-600 font-bold text-sm mt-0.5">{"✓"}</span>
                       <span>{f}</span>
                     </div>
                   ))}
@@ -280,7 +349,7 @@ export default function BillingPage() {
                     }`}
                   >
                     {actionLoading === "portal" && <Spinner size={14} color="#64748b" />}
-                    {actionLoading === "portal" ? "Opening portal..." : "Manage in portal"}
+                    {actionLoading === "portal" ? "Opening portal..." : "Change in portal"}
                   </button>
                 ) : (
                   <button
@@ -293,7 +362,9 @@ export default function BillingPage() {
                     {actionLoading === planId && <Spinner size={14} color="white" />}
                     {actionLoading === planId
                       ? "Starting checkout..."
-                      : `Upgrade to ${plan.name}`}
+                      : isCurrent
+                        ? "Current plan"
+                        : `Choose ${tier.name}`}
                   </button>
                 )}
               </div>
