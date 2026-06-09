@@ -42,8 +42,8 @@ interface SkuRowDb {
   last_sale_date: string | null;
   // Sub-session 33 Tier 1 commit 3: inventory cache. Surfaced so
   // the detail page can show the running stock count without a
-  // second round trip.
-  quantity_on_hand: number;
+  // second round trip. NUMERIC since Tier 2 → pg returns a string.
+  quantity_on_hand: string;
   created_at: string;
   updated_at: string;
 }
@@ -99,7 +99,7 @@ function serializeSku(row: SkuRowDb) {
     costEffectiveDate: row.cost_effective_date,
     salesCount: row.sales_count,
     lastSaleDate: row.last_sale_date,
-    quantityOnHand: row.quantity_on_hand,
+    quantityOnHand: Number(row.quantity_on_hand),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

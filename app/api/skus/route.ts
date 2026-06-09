@@ -47,8 +47,9 @@ interface SkuRowDb {
   last_sale_date: string | null;
   // Sub-session 33 Tier 1 commit 4: stock cache. Surfaced so the
   // /skus list page can render a per-SKU stock badge + low-stock
-  // warning without a second round trip.
-  quantity_on_hand: number;
+  // warning without a second round trip. NUMERIC since Tier 2 →
+  // pg returns it as a string.
+  quantity_on_hand: string;
   created_at: string;
   updated_at: string;
 }
@@ -161,7 +162,7 @@ export async function GET(req: NextRequest) {
         costEffectiveDate: r.cost_effective_date,
         salesCount: r.sales_count,
         lastSaleDate: r.last_sale_date,
-        quantityOnHand: r.quantity_on_hand,
+        quantityOnHand: Number(r.quantity_on_hand),
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),

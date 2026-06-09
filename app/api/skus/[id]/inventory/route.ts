@@ -87,7 +87,9 @@ export async function POST(
         { status: 400 }
       );
     }
-    const delta = Math.trunc(body.delta);
+    // Tier 2: fractional deltas allowed (delta is NUMERIC). No
+    // truncation — a 0.5-oz receive is valid.
+    const delta = body.delta;
     if (delta === 0) {
       return NextResponse.json(
         { error: "delta must be non-zero" },

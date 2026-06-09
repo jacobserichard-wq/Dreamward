@@ -37,7 +37,9 @@ export type AdjustmentReason =
   | "receive"
   | "manual"
   | "recount"
-  | "correction";
+  | "correction"
+  | "production_in"
+  | "production_out";
 
 /** One row to write to the ledger from a sale event. quantity is
  *  positive — the helper converts to negative delta internally. */
@@ -49,9 +51,7 @@ export interface SaleAdjustmentInput {
    *  line items with matched_sku_id IS NULL before calling. */
   skuId: number;
   /** Units sold. Will be negated and stored as delta. Fractional
-   *  is rejected — inventory_adjustments.delta is INTEGER. Float
-   *  quantities (weighed goods) are rounded toward zero with a
-   *  warning logged; this is rare and acceptable for Tier 1. */
+   *  supported (Tier 2 — delta is NUMERIC) for weighed goods. */
   quantity: number;
 }
 
@@ -75,14 +75,15 @@ export async function recordSaleAdjustments(opts: {
   if (opts.items.length === 0) return 0;
   const db = opts.dbClient ?? pool;
 
-  // Round fractional quantities — see SaleAdjustmentInput.quantity
-  // comment. Math.trunc keeps the sign; abs is applied separately
-  // when computing delta below.
+  // Tier 2: fractional quantities flow through unchanged (delta is
+  // NUMERIC now). Just take the absolute value — the negation to a
+  // decrement happens when we build the delta below. Drop any
+  // non-positive quantities defensively.
   const normalized = opts.items
     .map((it) => ({
       lineItemId: it.lineItemId,
       skuId: it.skuId,
-      quantity: Math.max(1, Math.trunc(Math.abs(it.quantity))),
+      quantity: Math.abs(it.quantity),
     }))
     .filter((it) => it.quantity > 0);
 
@@ -101,7 +102,10 @@ export async function recordSaleAdjustments(opts: {
     })
     .join(",");
 
-  const inserted = await db.query<{ sku_id: number; delta: number }>(
+  // delta comes back as a STRING (pg serializes NUMERIC as text) —
+  // parseFloat before any arithmetic, or "+= row.delta" would
+  // string-concatenate.
+  const inserted = await db.query<{ sku_id: number; delta: string }>(
     `INSERT INTO inventory_adjustments (sku_id, delta, reason, source_line_item_id)
      VALUES ${insertPlaceholders}
      ON CONFLICT (source_line_item_id) WHERE source_line_item_id IS NOT NULL DO NOTHING
@@ -118,7 +122,10 @@ export async function recordSaleAdjustments(opts: {
   // churn on the skus row.
   const perSku = new Map<number, number>();
   for (const row of inserted.rows) {
-    perSku.set(row.sku_id, (perSku.get(row.sku_id) ?? 0) + row.delta);
+    perSku.set(
+      row.sku_id,
+      (perSku.get(row.sku_id) ?? 0) + parseFloat(row.delta)
+    );
   }
 
   for (const [skuId, totalDelta] of perSku) {
@@ -154,7 +161,8 @@ export async function reverseSaleAdjustments(opts: {
 
   // ── 1. Delete the sale adjustments and capture what we removed
   // so we can credit each SKU back by the right amount.
-  const deleted = await db.query<{ sku_id: number; delta: number }>(
+  // delta returns as a STRING (NUMERIC) — parseFloat before math.
+  const deleted = await db.query<{ sku_id: number; delta: string }>(
     `DELETE FROM inventory_adjustments
       WHERE reason = 'sale'
         AND source_line_item_id = ANY($1)
@@ -169,7 +177,10 @@ export async function reverseSaleAdjustments(opts: {
   // adding -delta.
   const perSku = new Map<number, number>();
   for (const row of deleted.rows) {
-    perSku.set(row.sku_id, (perSku.get(row.sku_id) ?? 0) - row.delta);
+    perSku.set(
+      row.sku_id,
+      (perSku.get(row.sku_id) ?? 0) - parseFloat(row.delta)
+    );
   }
 
   for (const [skuId, credit] of perSku) {
@@ -212,7 +223,9 @@ export async function recordManualAdjustment(opts: {
     [opts.skuId, opts.delta, opts.reason, opts.notes ?? null]
   );
 
-  const updated = await db.query<{ quantity_on_hand: number }>(
+  // quantity_on_hand returns as a STRING (NUMERIC) — parse to number
+  // for the caller.
+  const updated = await db.query<{ quantity_on_hand: string }>(
     `UPDATE skus
         SET quantity_on_hand = quantity_on_hand + $1
       WHERE id = $2
@@ -223,5 +236,5 @@ export async function recordManualAdjustment(opts: {
   if (updated.rowCount === 0) {
     throw new Error(`SKU ${opts.skuId} not found`);
   }
-  return updated.rows[0].quantity_on_hand;
+  return parseFloat(updated.rows[0].quantity_on_hand);
 }

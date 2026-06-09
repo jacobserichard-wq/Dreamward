@@ -28,11 +28,12 @@ import { isPayingTier } from "@/lib/plans";
 
 interface AdjustmentRowDb {
   id: number;
-  delta: number;
+  // delta + running_balance are NUMERIC — pg returns them as strings.
+  delta: string;
   reason: string;
   notes: string | null;
   created_at: string;
-  running_balance: number;
+  running_balance: string;
   source_line_item_id: number | null;
 }
 
@@ -96,7 +97,7 @@ export async function GET(
                 SUM(delta) OVER (
                   ORDER BY created_at ASC, id ASC
                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                )::int AS running_balance
+                )::numeric AS running_balance
            FROM inventory_adjustments
           WHERE sku_id = $1
        )
@@ -118,11 +119,11 @@ export async function GET(
     return NextResponse.json({
       adjustments: historyRes.rows.map((r) => ({
         id: r.id,
-        delta: r.delta,
+        delta: parseFloat(r.delta),
         reason: r.reason,
         notes: r.notes,
         sourceLineItemId: r.source_line_item_id,
-        runningBalance: r.running_balance,
+        runningBalance: parseFloat(r.running_balance),
         createdAt: r.created_at,
       })),
       totalCount: totalRes.rows[0]?.n ?? 0,

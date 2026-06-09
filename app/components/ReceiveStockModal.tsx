@@ -63,16 +63,18 @@ export default function ReceiveStockModal({
 
   if (!open) return null;
 
+  // Tier 2: fractional quantities allowed (e.g. 4.5 oz wax). Any
+  // positive finite number is valid.
   const parsed = Number(quantity);
   const isValidQuantity =
     quantity.length > 0 && Number.isFinite(parsed) && parsed > 0;
   const projectedTotal = isValidQuantity
-    ? currentQuantity + Math.trunc(parsed)
+    ? currentQuantity + parsed
     : currentQuantity;
 
   const handleSave = async () => {
     if (!isValidQuantity) {
-      setError("Enter a positive whole number.");
+      setError("Enter a positive number.");
       return;
     }
     setSaving(true);
@@ -82,7 +84,7 @@ export default function ReceiveStockModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          delta: Math.trunc(parsed),
+          delta: parsed,
           reason: "receive",
           notes: notes.trim() || null,
         }),
@@ -153,7 +155,7 @@ export default function ReceiveStockModal({
         <input
           id="receive-qty"
           type="text"
-          inputMode="numeric"
+          inputMode="decimal"
           autoFocus
           value={quantity}
           onChange={(e) => {
