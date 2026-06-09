@@ -3,7 +3,6 @@ import pool from "@/lib/db";
 import {
   sendEmail,
   trialExpiringEmail,
-  proCallReminderEmail,
   cogsDailyDigestEmail,
 } from "@/lib/email";
 import {
@@ -26,7 +25,6 @@ import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 import { reconcileAllTiers, isFirstOfMonthUtc } from "@/lib/revenueTier";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
-const PRO_CALL_REMINDER_DELAY_DAYS = 3;
 
 // Phase 10e: how far back the Wix reconciliation pass looks. 25 hours
 // gives a 1-hour overlap with the previous run so we don't miss
@@ -73,59 +71,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Daily Pro onboarding-call reminder — nudges Pro customers who became
-    // Pro at least PRO_CALL_REMINDER_DELAY_DAYS ago, haven't booked their
-    // call, and haven't already been reminded. Stamps
-    // pro_call_reminder_sent_at AFTER a successful send so a Resend failure
-    // leaves the row eligible for retry on the next run.
-    //
-    // Anchor: clients.created_at (no Pro-upgrade timestamp exists). A
-    // customer who upgraded long after signup has an old created_at and
-    // won't be reminded — accepted MVP behavior.
-    let proRemindersSent = 0;
-    let proReminderErrors = 0;
-    try {
-      const reminderResult = await pool.query<{
-        id: number;
-        email: string;
-        business_name: string | null;
-      }>(
-        `SELECT id, email, business_name
-         FROM clients
-         WHERE plan = 'pro'
-           AND pro_call_booked_at IS NULL
-           AND pro_call_reminder_sent_at IS NULL
-           AND created_at <= NOW() - INTERVAL '${PRO_CALL_REMINDER_DELAY_DAYS} days'`
-      );
-
-      for (const client of reminderResult.rows) {
-        try {
-          const email = proCallReminderEmail(client.business_name ?? "");
-          await sendEmail({ to: client.email, ...email });
-          // Stamp AFTER successful send. A failed send leaves
-          // pro_call_reminder_sent_at NULL → eligible for retry tomorrow.
-          await pool.query(
-            `UPDATE clients
-             SET pro_call_reminder_sent_at = NOW(),
-                 updated_at = NOW()
-             WHERE id = $1`,
-            [client.id]
-          );
-          proRemindersSent++;
-        } catch (err) {
-          proReminderErrors++;
-          console.error(
-            `[cron] pro-call reminder failed for client ${client.id} (${client.email}):`,
-            err
-          );
-        }
-      }
-      console.log(
-        `[cron] pro-call reminders: ${proRemindersSent} sent, ${proReminderErrors} errors`
-      );
-    } catch (err) {
-      console.error("[cron] pro-reminder pass aggregate failure:", err);
-    }
+    // Sub-session 33: the Pro onboarding-call offering was removed,
+    // so the daily "haven't booked your call yet" reminder pass is
+    // retired. The pro_call_* columns + proCallReminderEmail template
+    // remain in place (harmless) but nothing sends them anymore.
 
     // Weekly reclassify pass — only runs on Sundays (UTC). Closes the
     // "mixed-state dashboard" finding fully: customers who never click the
@@ -636,8 +585,6 @@ export async function GET(req: NextRequest) {
       success: true,
       emailsSent: sent,
       emailsFailed: failed,
-      proRemindersSent,
-      proReminderErrors,
       reclassifyClientsProcessed,
       reclassifyItemsTotal,
       reclassifyErrors,

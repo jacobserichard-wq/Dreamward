@@ -19,11 +19,10 @@ export async function POST(req: NextRequest) {
 
     const client = await getSessionClient();
 
-    // Pro tier lands on /welcome-pro for white-glove onboarding (Calendly +
-    // sample data). Dream / Maker / Growth go to the regular dashboard.
-    // Sub-session 33: white-glove remains a Pro-only service perk under
-    // the feature-flat pricing model.
-    const successPath = planId === "pro" ? "/welcome-pro" : "/dashboard";
+    // Sub-session 33: the Pro onboarding-call offering was removed,
+    // so every tier (including Pro) lands on the dashboard after
+    // checkout. The /welcome-pro page + Calendly flow are retired.
+    const successPath = "/dashboard";
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",

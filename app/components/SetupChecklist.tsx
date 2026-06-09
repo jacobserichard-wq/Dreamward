@@ -49,7 +49,6 @@ export interface SetupChecklistProps {
   homeAddressSet: boolean;
   cpaEmailSet: boolean;
   taxBracketSet: boolean;
-  proCallBooked: boolean;
 
   // Derived signals (new for onboarding mode):
   /** True when client.industry + client.business_name are both set. */
@@ -227,18 +226,6 @@ export default function SetupChecklist(props: SetupChecklistProps) {
     },
   ];
 
-  // White-glove item: rendered in its own highlighted section above
-  // the regular list (locked decision #7). Conceptually a checklist
-  // item but rendered separately for visual prominence.
-  const whiteGloveItem: ChecklistItem = {
-    id: "onboarding_call",
-    label: "Book your personal setup call",
-    done: props.proCallBooked,
-    action: { kind: "link", href: "/welcome-pro" },
-    buttonLabel: "Book your call",
-    visibleOn: ["pro"],
-  };
-
   // Apply mode-visibility (default = both modes), plan-visibility,
   // and skip filtering.
   const planVisible = items.filter(
@@ -249,16 +236,8 @@ export default function SetupChecklist(props: SetupChecklistProps) {
   const visible = planVisible.filter((i) => !skipped[i.id]);
   const skippedVisible = planVisible.filter((i) => skipped[i.id]);
 
-  const whiteGloveVisible =
-    mode === "onboarding" &&
-    whiteGloveItem.visibleOn.includes(props.plan) &&
-    !skipped[whiteGloveItem.id];
-
-  // Total visible count INCLUDING white-glove for the progress denominator.
-  const totalVisible = visible.length + (whiteGloveVisible ? 1 : 0);
-  const doneCount =
-    visible.filter((i) => i.done).length +
-    (whiteGloveVisible && whiteGloveItem.done ? 1 : 0);
+  const totalVisible = visible.length;
+  const doneCount = visible.filter((i) => i.done).length;
 
   // Dashboard self-hide: nothing left or all done. Onboarding mode
   // renders an "All set" card instead (no auto-hide).
@@ -342,43 +321,6 @@ export default function SetupChecklist(props: SetupChecklistProps) {
           style={{ width: `${percent}%` }}
         />
       </div>
-
-      {/* White-glove highlighted section (onboarding + pro only) */}
-      {whiteGloveVisible && !whiteGloveItem.done && (
-        <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white rounded-lg p-5 mb-5">
-          <div className="flex justify-between items-start gap-3 flex-wrap mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{"\u{1F3AF}"}</span>
-              <span className="bg-amber-400 text-amber-950 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
-                Included with Pro
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => props.onSkip?.(whiteGloveItem.id)}
-              title="Skip the setup call"
-              className="text-xs text-white/70 hover:text-white cursor-pointer bg-transparent border-0"
-            >
-              Skip
-            </button>
-          </div>
-          <h3 className="text-lg font-bold m-0 mb-1">
-            Book your personal setup call
-          </h3>
-          <p className="text-sm text-white/90 m-0 mb-4 leading-relaxed">
-            A FlowWork team member walks you through connecting your store,
-            mapping your SKUs for gross-margin tracking, and your CPA
-            handoff — personally, in 30 minutes. Pro also includes same-day
-            priority support.
-          </p>
-          <Link
-            href={whiteGloveItem.action.kind === "link" ? whiteGloveItem.action.href : "/welcome-pro"}
-            className="inline-block py-2 px-5 rounded-lg bg-white text-violet-700 hover:bg-slate-100 text-sm font-semibold no-underline cursor-pointer"
-          >
-            {whiteGloveItem.buttonLabel} {"\u{2192}"}
-          </Link>
-        </div>
-      )}
 
       <ul className="space-y-3 m-0 p-0 list-none">
         {visible.map((item) => (

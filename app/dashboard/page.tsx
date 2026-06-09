@@ -58,19 +58,6 @@ interface ProcessedItem {
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
 type Tab = "emails" | "processed" | "dashboard";
 
-function formatCallDateTime(d: Date): string {
-  const dateStr = d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-  const timeStr = d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${dateStr} at ${timeStr}`;
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -775,21 +762,9 @@ export default function Home() {
     UMBRELLA_VALUES.includes(i.category)
   ).length;
 
-  // Pro onboarding-call banner state. Three cases gated on plan === "pro":
-  //   not booked → "Book your call" prompt (state 1)
-  //   booked, upcoming → "Your call is scheduled for ..." (state 2)
-  //   booked, past → hide entirely (state 3, per design decision)
-  // Replaces the prior welcome_pro_seen gate — visiting the welcome page is
-  // not the same signal as having booked the call.
-  const isPro = clientInfo?.plan === "pro";
-  const proCallScheduledFor: string | null = clientInfo?.proCallScheduledFor ?? null;
-  const proCallBookedAt: string | null = clientInfo?.proCallBookedAt ?? null;
-  const proCallTime = proCallScheduledFor ? new Date(proCallScheduledFor) : null;
-  const proCallIsPast =
-    proCallTime !== null && proCallTime.getTime() <= Date.now();
-  const showBookPrompt = isPro && proCallBookedAt === null;
-  const showCallConfirmation =
-    isPro && proCallBookedAt !== null && proCallTime !== null && !proCallIsPast;
+  // Sub-session 33: the Pro onboarding-call offering was removed.
+  // The dashboard book-your-call prompt + scheduled-call
+  // confirmation banners are gone with it.
 
   const stats = {
     total: processedItems.length,
@@ -1039,36 +1014,6 @@ export default function Home() {
         {successMsg && (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4 text-sm">
             {successMsg}
-          </div>
-        )}
-
-        {/* Pro onboarding-call: confirmation (state 2 — booked, upcoming) */}
-        {showCallConfirmation && proCallTime && (
-          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4 text-sm flex items-center gap-2 flex-wrap">
-            <span className="font-medium">
-              {"\u{2705}"} Your onboarding call is scheduled for {formatCallDateTime(proCallTime)}.
-            </span>
-          </div>
-        )}
-
-        {/* Pro onboarding-call: prompt (state 1 — not yet booked).
-            Flow-redesign commit 6: SetupChecklist moved off the
-            dashboard to /onboarding (locked decision #3); this
-            banner is now unconditional again. The white-glove call
-            also appears as the highlighted top section of the
-            onboarding checklist — duplicate-but-different surfaces
-            for the same action. */}
-        {showBookPrompt && (
-          <div className="bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-500 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
-            <span className="font-medium">
-              {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your personal setup call to get started.
-            </span>
-            <Link
-              href="/welcome-pro"
-              className="px-3.5 py-1.5 rounded-md border border-amber-700 bg-white text-amber-900 text-[13px] font-semibold no-underline cursor-pointer"
-            >
-              Book your call {"→"}
-            </Link>
           </div>
         )}
 

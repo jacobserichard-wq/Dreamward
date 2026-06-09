@@ -473,9 +473,9 @@ export default function GettingStartedGuide() {
               quietly losing money. Raise their prices or stop making them.
             </li>
             <li>
-              <strong>Book your white-glove onboarding call</strong> if you
-              haven&apos;t — Pro tier includes one. We&apos;ll go through your
-              real data live and answer anything this guide didn&apos;t cover.
+              <strong>Reach out if you get stuck</strong> — email support
+              anytime. Growth and Pro tiers get priority response times if
+              you need answers fast.
             </li>
             <li>
               <strong>Explore the reference guides</strong> back on the{" "}

@@ -309,7 +309,6 @@ export default function OnboardingPage() {
             preferences.taxBracket !== undefined &&
             preferences.taxBracket !== null
           }
-          proCallBooked={clientInfo.proCallBookedAt !== null}
           industrySet={industrySet}
           hasEvents={eventCount > 0}
           hasInvoices={invoiceCount > 0}
