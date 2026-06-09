@@ -125,26 +125,6 @@ export function trialExpiringEmail(businessName: string, daysLeft: number) {
   };
 }
 
-export function proCallReminderEmail(businessName: string) {
-  return {
-    subject: "Book your FlowWork Pro onboarding call",
-    html: `
-      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px;">
-        <h1 style="font-size: 24px; color: #0f172a; margin: 0 0 16px;">Your Pro onboarding call is waiting</h1>
-        <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 24px;">
-          Hey ${businessName || "there"}, your FlowWork Pro plan includes a complimentary 30-minute onboarding call —
-          we'll configure FlowWork around your specific workflow, accounting software, and tax situation.
-        </p>
-        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">
-          Pick a time that works — we'll send a calendar invite with the meeting link.
-        </p>
-        <a href="${baseUrl}/welcome-pro" style="display: inline-block; padding: 12px 28px; background: #d97706; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Book your call</a>
-        <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">Questions? Just reply to this email.</p>
-      </div>
-    `,
-  };
-}
-
 export function paymentFailedEmail(businessName: string) {
   return {
     subject: "FlowWork: Payment failed - action needed",

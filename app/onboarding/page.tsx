@@ -36,8 +36,6 @@ interface ClientInfo {
   plan: Plan;
   businessName: string | null;
   industry: string | null;
-  proCallBookedAt: string | null;
-  proCallScheduledFor: string | null;
 }
 
 interface SettingsResponse {
