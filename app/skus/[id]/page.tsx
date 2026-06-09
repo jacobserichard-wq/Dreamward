@@ -36,6 +36,7 @@ import SkuForm, {
 import ConfirmModal from "../../components/ConfirmModal";
 import ReceiveStockModal from "../../components/ReceiveStockModal";
 import RecipeSection from "../../components/RecipeSection";
+import ProductionSection from "../../components/ProductionSection";
 
 interface SkuRow {
   id: number;
@@ -178,6 +179,10 @@ export default function SkuDetailPage() {
   const [stockHistory, setStockHistory] = useState<InventoryHistoryRow[]>([]);
   const [stockHistoryTotal, setStockHistoryTotal] = useState<number>(0);
   const [stockHistoryLoading, setStockHistoryLoading] = useState(false);
+
+  // ── Tier 2: cross-section refresh. Bumped after a production run
+  // so the Recipe section (component stock + "can make N") reloads.
+  const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
 
   // ── Cost deletion state (which row is being deleted) ─────────
   const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
@@ -802,7 +807,26 @@ export default function SkuDetailPage() {
         {/* Recipe (bill of materials) — Tier 2. Defines what this
             product is made of so production runs can draw down
             materials. */}
-        <RecipeSection skuId={sku.id} skuCode={sku.code} />
+        <RecipeSection
+          skuId={sku.id}
+          skuCode={sku.code}
+          refreshKey={inventoryRefreshKey}
+        />
+
+        {/* Production runs — Tier 2. "I made a batch" → adds finished
+            stock + deducts the recipe's materials. onChanged refreshes
+            the finished-stock count (loadDetail) + the recipe section
+            (refreshKey bump). */}
+        <ProductionSection
+          skuId={sku.id}
+          skuCode={sku.code}
+          skuName={sku.name}
+          onChanged={() => {
+            void loadDetail();
+            void loadStockHistory();
+            setInventoryRefreshKey((k) => k + 1);
+          }}
+        />
 
         {/* Cost history */}
         <section className="mb-6">

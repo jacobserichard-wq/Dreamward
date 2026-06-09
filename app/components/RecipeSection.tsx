@@ -38,9 +38,16 @@ export interface RecipeSectionProps {
   skuId: number;
   /** The finished SKU's own code — excluded from the picker. */
   skuCode: string;
+  /** Bumped by the parent after a production run so the component
+   *  stock + "can make N" readout reload. */
+  refreshKey?: number;
 }
 
-export default function RecipeSection({ skuId, skuCode }: RecipeSectionProps) {
+export default function RecipeSection({
+  skuId,
+  skuCode,
+  refreshKey,
+}: RecipeSectionProps) {
   const [components, setComponents] = useState<RecipeComponent[]>([]);
   const [canMake, setCanMake] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,7 +84,10 @@ export default function RecipeSection({ skuId, skuCode }: RecipeSectionProps) {
 
   useEffect(() => {
     loadRecipe();
-  }, [loadRecipe]);
+    // refreshKey in deps: a production run elsewhere changed
+    // component stock, so reload the "in stock" + "can make N" data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadRecipe, refreshKey]);
 
   // Lazy-load the SKU catalog the first time the add form opens.
   const openAddForm = async () => {
