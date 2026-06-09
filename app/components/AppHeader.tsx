@@ -161,6 +161,15 @@ export default function AppHeader({
           )}
           {paying && (
             <Link
+              href="/inventory"
+              className={NAV_LINK}
+              title="Stock levels, value, and reorder alerts"
+            >
+              Inventory
+            </Link>
+          )}
+          {paying && (
+            <Link
               href="/cogs"
               className={NAV_LINK}
               title="Cost of goods sold + gross margin per channel and per SKU"
