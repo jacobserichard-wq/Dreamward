@@ -488,6 +488,14 @@ export default function GettingStartedGuide() {
               you need answers fast.
             </li>
             <li>
+              <strong>Check the Inventory page</strong> — see total stock
+              value, what&apos;s running low, and which products you&apos;re
+              out of materials for, all in one place. Set a reorder point on
+              any SKU and it flags when stock drops to that level. Your
+              inventory value flows into the ending-inventory line on your
+              tax reports.
+            </li>
+            <li>
               <strong>Explore the reference guides</strong> back on the{" "}
               <Link href="/help" className="text-blue-600 no-underline hover:underline">Help hub</Link>{" "}
               for deeper dives into each section (most are still being

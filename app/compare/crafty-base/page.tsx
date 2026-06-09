@@ -149,6 +149,12 @@ export default function CraftyBaseComparePage() {
                 them2
                 us="Drag-drop on every expense, private storage"
               />
+              <ComparisonRow
+                feature="Inventory value for your taxes (Form 1125-A)"
+                them="Not surfaced for tax handoff"
+                them2
+                us="Beginning + ending inventory on your Schedule-C report"
+              />
             </tbody>
           </table>
         </div>
