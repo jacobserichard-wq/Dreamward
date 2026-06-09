@@ -232,7 +232,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
   // item but rendered separately for visual prominence.
   const whiteGloveItem: ChecklistItem = {
     id: "onboarding_call",
-    label: "Book your white-glove onboarding call",
+    label: "Book your personal setup call",
     done: props.proCallBooked,
     action: { kind: "link", href: "/welcome-pro" },
     buttonLabel: "Book your call",
@@ -350,26 +350,26 @@ export default function SetupChecklist(props: SetupChecklistProps) {
             <div className="flex items-center gap-2">
               <span className="text-2xl">{"\u{1F3AF}"}</span>
               <span className="bg-amber-400 text-amber-950 text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
-                Free — included with Pro
+                Included with Pro
               </span>
             </div>
             <button
               type="button"
               onClick={() => props.onSkip?.(whiteGloveItem.id)}
-              title="Skip the onboarding call"
+              title="Skip the setup call"
               className="text-xs text-white/70 hover:text-white cursor-pointer bg-transparent border-0"
             >
               Skip
             </button>
           </div>
           <h3 className="text-lg font-bold m-0 mb-1">
-            Book your white-glove onboarding call
+            Book your personal setup call
           </h3>
           <p className="text-sm text-white/90 m-0 mb-4 leading-relaxed">
-            A FlowWork team member walks you through Gmail setup, label
-            filters, your first CSV import, and your CPA handoff —
-            personally, in 30 minutes. The fastest way to get the most
-            out of your Pro tier.
+            A FlowWork team member walks you through connecting your store,
+            mapping your SKUs for gross-margin tracking, and your CPA
+            handoff — personally, in 30 minutes. Pro also includes same-day
+            priority support.
           </p>
           <Link
             href={whiteGloveItem.action.kind === "link" ? whiteGloveItem.action.href : "/welcome-pro"}

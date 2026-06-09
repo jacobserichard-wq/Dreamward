@@ -104,14 +104,14 @@ export default function WelcomeProPage() {
           Welcome to FlowWork Pro{businessName ? `, ${businessName}` : ""}!
         </h1>
         <p className="text-lg text-white/85 mx-auto max-w-[640px] leading-normal m-0">
-          Your white-glove onboarding starts now. Book a 30-minute call with our team
+          Your personal Pro setup starts now. Book a 30-minute call with our team
           to get every feature dialed in for your business.
         </p>
       </div>
 
       <div className="max-w-[1100px] mx-auto pt-12 px-4 pb-16 sm:px-8 sm:pb-20">
         <section className="mb-14">
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">Your white-glove benefits</h2>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Your Pro benefits</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white py-6 px-5 rounded-xl border border-slate-200">
               <div className="text-3xl mb-3">{"\u{1F4DE}"}</div>

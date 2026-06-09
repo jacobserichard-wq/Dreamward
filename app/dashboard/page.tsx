@@ -1061,7 +1061,7 @@ export default function Home() {
         {showBookPrompt && (
           <div className="bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-500 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
             <span className="font-medium">
-              {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your white-glove onboarding call to get started.
+              {"\u{1F3AF}"} <strong>Welcome to Pro!</strong> Book your personal setup call to get started.
             </span>
             <Link
               href="/welcome-pro"
