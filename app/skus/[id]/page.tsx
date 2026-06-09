@@ -111,6 +111,16 @@ const REASON_LABELS: Record<InventoryHistoryRow["reason"], string> = {
   correction: "Correction",
 };
 
+// Manual adjustments can be reversed individually from the stock
+// history. Sale + production rows can't (they're undone via their
+// own flows), so no Reverse button shows on them.
+const REVERSIBLE_REASONS = new Set([
+  "receive",
+  "manual",
+  "recount",
+  "correction",
+]);
+
 function fmtMoney(n: number, currency: string): string {
   const sym = currency === "USD" || !currency ? "$" : `${currency} `;
   return `${sym}${n.toLocaleString("en-US", {
@@ -185,6 +195,9 @@ export default function SkuDetailPage() {
   // ── Tier 2: cross-section refresh. Bumped after a production run
   // so the Recipe section (component stock + "can make N") reloads.
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
+
+  // Which stock-history adjustment is being reversed (spinner state).
+  const [reversingAdjId, setReversingAdjId] = useState<number | null>(null);
 
   // ── Cost deletion state (which row is being deleted) ─────────
   const [deletingCostId, setDeletingCostId] = useState<number | null>(null);
@@ -262,6 +275,37 @@ export default function SkuDetailPage() {
       setStockHistoryLoading(false);
     }
   }, [skuId]);
+
+  // Reverse a manual stock adjustment (fat-fingered receive, etc.).
+  // Refreshes the Stock section + history after.
+  const reverseAdjustment = useCallback(
+    async (adjId: number) => {
+      if (
+        !window.confirm(
+          "Reverse this stock adjustment? It removes the change from your on-hand count."
+        )
+      ) {
+        return;
+      }
+      setReversingAdjId(adjId);
+      try {
+        const res = await fetch(`/api/skus/${skuId}/inventory/${adjId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || `HTTP ${res.status}`);
+          return;
+        }
+        await loadDetail();
+        await loadStockHistory();
+        setInventoryRefreshKey((k) => k + 1);
+      } finally {
+        setReversingAdjId(null);
+      }
+    },
+    [skuId, loadDetail, loadStockHistory]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -760,13 +804,14 @@ export default function SkuDetailPage() {
                       Balance after
                     </th>
                     <th className="text-left py-2.5 px-4 font-medium">Notes</th>
+                    <th className="w-16" />
                   </tr>
                 </thead>
                 <tbody>
                   {stockHistoryLoading && stockHistory.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="py-6 text-center text-slate-400 text-xs"
                       >
                         Loading...
@@ -800,6 +845,23 @@ export default function SkuDetailPage() {
                         <td className="py-2.5 px-4 text-slate-500 text-xs">
                           {adj.notes ?? (
                             <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-3 text-right">
+                          {/* Manual adjustments (receive/manual/recount/
+                              correction) can be reversed here. Sale +
+                              production rows can't — they're undone via
+                              their own flows. */}
+                          {REVERSIBLE_REASONS.has(adj.reason) && (
+                            <button
+                              type="button"
+                              onClick={() => reverseAdjustment(adj.id)}
+                              disabled={reversingAdjId === adj.id}
+                              title="Reverse this adjustment"
+                              className="text-[11px] text-slate-400 hover:text-red-600 cursor-pointer bg-transparent border-0 disabled:cursor-wait"
+                            >
+                              {reversingAdjId === adj.id ? "..." : "Reverse"}
+                            </button>
                           )}
                         </td>
                       </tr>
