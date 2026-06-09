@@ -257,9 +257,8 @@ export default async function MarketingLandingPage() {
               eligibility="$50k–$500k/year revenue"
               features={[
                 "Everything in Maker",
-                "Priority email support",
-                "Free onboarding session",
-                "Faster turnaround on tickets",
+                "Priority support",
+                "Faster response times",
               ]}
               ctaLabel="Start with Growth"
               highlighted={false}
@@ -271,10 +270,8 @@ export default async function MarketingLandingPage() {
               eligibility="$500k+/year revenue"
               features={[
                 "Everything in Growth",
-                "Same-day support",
-                "Custom onboarding session",
-                "Quarterly check-ins",
-                "White-glove migration help",
+                "Same-day priority support",
+                "Dedicated support contact",
               ]}
               ctaLabel="Start with Pro"
               highlighted={false}

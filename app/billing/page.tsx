@@ -49,14 +49,13 @@ const TIER_SERVICE_FEATURES: Record<PaidPlanName, string[]> = {
   ],
   growth: [
     "Everything in Maker",
-    "Priority email support",
-    "Free onboarding session",
+    "Priority support",
+    "Faster response times",
   ],
   pro: [
     "Everything in Growth",
-    "Same-day support",
-    "Custom onboarding + quarterly check-ins",
-    "White-glove migration help",
+    "Same-day priority support",
+    "Dedicated support contact",
   ],
 };
 

@@ -10,9 +10,10 @@
 // product's actual value without paying $89/mo.
 //
 // New model: Dream / Maker / Growth / Pro all list every module.
-// Service-level perks (priority support, white-glove onboarding,
-// quarterly check-ins) are the only Pro-tier extras. Trial keeps
-// 14-day full access; Canceled retains read-only dashboard.
+// Support speed is the only tier differentiator: standard email
+// (Dream/Maker) -> priority (Growth) -> same-day priority +
+// dedicated contact (Pro). Trial keeps 14-day full access;
+// Canceled retains read-only dashboard.
 //
 // Revenue thresholds drive automatic tier switching via a monthly
 // cron job (lib/revenueTier.ts). Customer never picks a tier
@@ -80,14 +81,14 @@ export const PLAN_FEATURES = {
     maxItemsPerMonth: Infinity,
     modules: [...ALL_MODULES] as string[],
     labels: [] as string[],
-    /** Priority email + free onboarding session */
+    /** Priority support — faster response times */
     serviceTier: "priority" as const,
   },
   pro: {
     maxItemsPerMonth: Infinity,
     modules: [...ALL_MODULES] as string[],
     labels: ["Invoices", "AR Follow Up", "Expenses"] as string[],
-    /** Same-day support + custom onboarding + quarterly check-ins */
+    /** Same-day priority support + dedicated support contact */
     serviceTier: "premium" as const,
   },
   canceled: {
@@ -190,7 +191,7 @@ export const TIER_DISPLAY: Record<PaidPlanName, {
     priceMonthly: 99,
     revenueLow: 500_000,
     revenueHigh: Infinity,
-    tagline: "For established businesses that need white-glove service.",
+    tagline: "For established businesses that need same-day priority support.",
     serviceTier: "premium",
   },
 };
