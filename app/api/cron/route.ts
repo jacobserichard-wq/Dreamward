@@ -23,6 +23,7 @@ import {
   refreshAccessToken as squareRefreshAccessToken,
 } from "@/lib/square";
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
+import { reconcileAllTiers, isFirstOfMonthUtc } from "@/lib/revenueTier";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 const PRO_CALL_REMINDER_DELAY_DAYS = 3;
@@ -590,6 +591,47 @@ export async function GET(req: NextRequest) {
       console.error("[cron] COGS digest pass aggregate failure:", err);
     }
 
+    // ── Tier reconciliation pass (Sub-session 33 commit 8) ───────
+    // Revenue-based auto-tier-switching. Only fires on the 1st of
+    // the month (the calendar-month boundary the marketing copy
+    // promises). The cron runs daily, so the guard keeps this to
+    // once per month. Each client is reconciled independently; the
+    // engine no-ops for clients with no active Stripe subscription
+    // (the common case today — sandbox, no real subs), so this is
+    // safe to ship before there's a live subscription to test.
+    let tierScanned = 0;
+    let tierSwitched = 0;
+    let tierSkipped = 0;
+    let tierErrors = 0;
+    try {
+      if (isFirstOfMonthUtc(new Date())) {
+        const summary = await reconcileAllTiers();
+        tierScanned = summary.scanned;
+        tierSwitched = summary.switched;
+        tierSkipped = summary.skipped;
+        tierErrors = summary.errors;
+        // Log the would-switch cases (skipped-no-subscription) so we
+        // can see the engine working before real subs exist.
+        for (const r of summary.results) {
+          if (r.action === "switched") {
+            console.log(
+              `[cron] tier switch: client ${r.clientId} ${r.previousPlan} -> ${r.targetPlan} ($${r.trailingRevenue.toFixed(0)} trailing revenue)`
+            );
+          } else if (r.action === "skipped-no-subscription") {
+            console.log(
+              `[cron] tier would-switch (no sub): client ${r.clientId} ${r.detail}`
+            );
+          } else if (r.action === "error") {
+            console.error(
+              `[cron] tier reconcile error: client ${r.clientId} ${r.detail}`
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[cron] tier reconciliation pass failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -608,6 +650,10 @@ export async function GET(req: NextRequest) {
       cogsDigestsSent,
       cogsDigestsSkipped,
       cogsDigestErrors,
+      tierScanned,
+      tierSwitched,
+      tierSkipped,
+      tierErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);
