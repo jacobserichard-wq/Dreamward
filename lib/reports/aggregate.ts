@@ -22,6 +22,7 @@
 import pool from "../db";
 import { getCategoriesForIndustry, type Industry } from "../categories";
 import { computeQuarterlyEstimate, DEFAULT_TAX_BRACKET } from "../quarterly";
+import { getInventoryValuation } from "../inventory/valuation";
 
 // Synthetic category names for surfaces that don't have one. These appear
 // in byCategory.income alongside real category names.
@@ -119,6 +120,10 @@ export interface AnnualSummary {
   // doesn't apply (zero or negative YTD profit — nothing to set aside).
   // UI/PDF render the panel only when this is non-null.
   quarterlyEstimate: import("../quarterly").QuarterlyEstimate | null;
+  // Inventory page feature: beginning + ending inventory value for
+  // Form 1125-A (Cost of Goods Sold). From inventory_snapshots, with
+  // a live fallback for the current year's ending.
+  inventoryValuation: import("../inventory/valuation").InventoryValuation;
 }
 
 // pg row shapes exported for the sibling renderers (csv.ts uses
@@ -633,6 +638,15 @@ export async function annualSummary(opts: {
   const invoicesIssued = Number(arCounts?.invoices_issued ?? 0);
   const invoicesPaid = Number(arCounts?.invoices_paid ?? 0);
 
+  // Inventory valuation for Form 1125-A (beginning + ending
+  // inventory). Reads inventory_snapshots; live fallback for the
+  // current year's ending.
+  const inventoryValuation = await getInventoryValuation({
+    clientId,
+    year,
+    currentYear,
+  });
+
   return {
     year,
     generatedAt: new Date().toISOString(),
@@ -683,5 +697,6 @@ export async function annualSummary(opts: {
       amountCollected: arCollected,
       outstandingAsOfYearEnd,
     },
+    inventoryValuation,
   };
 }

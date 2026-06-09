@@ -457,6 +457,31 @@ export function AnnualPdfDocument({
           </View>
         )}
 
+        {/* Inventory valuation — Form 1125-A beginning + ending
+            inventory. Only when we have an ending value. */}
+        {summary.inventoryValuation.ending !== null && (
+          <View style={styles.section} wrap={false}>
+            <Text style={styles.sectionTitle}>Inventory (Form 1125-A)</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Beginning inventory</Text>
+              <Text style={styles.summaryValue}>
+                {summary.inventoryValuation.beginning !== null
+                  ? fmtUsd(summary.inventoryValuation.beginning)
+                  : "—"}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                Ending inventory
+                {summary.inventoryValuation.endingIsLive ? " (current)" : ""}
+              </Text>
+              <Text style={styles.summaryValue}>
+                {fmtUsd(summary.inventoryValuation.ending)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Notes — fixed disclaimers + conditional honesty notices.
             Conditional logic mirrors the on-screen /reports page so
             the PDF + screen never lie relative to each other. */}

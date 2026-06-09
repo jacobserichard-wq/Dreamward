@@ -18,6 +18,7 @@
 import pool from "../db";
 import { csvRow } from "../csv";
 import type { Industry } from "../categories";
+import { getInventoryValuation } from "../inventory/valuation";
 import {
   buildClassifier,
   buildScheduleCMap,
@@ -429,6 +430,47 @@ export async function renderAnnualCsvBody(opts: {
       "",
     ])
   );
+
+  // Inventory valuation for Form 1125-A (beginning + ending
+  // inventory). Computed from inventory_snapshots; live ending for
+  // the current year.
+  const inventoryValuation = await getInventoryValuation({
+    clientId,
+    year,
+    currentYear: new Date().getUTCFullYear(),
+  });
+  if (inventoryValuation.beginning !== null) {
+    summarySection.push(
+      csvRow([
+        "Summary",
+        eoy,
+        "Beginning inventory",
+        "",
+        "Form 1125-A — inventory value at start of year",
+        "",
+        "",
+        formatMoney2(inventoryValuation.beginning),
+        "",
+      ])
+    );
+  }
+  if (inventoryValuation.ending !== null) {
+    summarySection.push(
+      csvRow([
+        "Summary",
+        eoy,
+        "Ending inventory",
+        "",
+        inventoryValuation.endingIsLive
+          ? "Form 1125-A — current inventory value (live)"
+          : "Form 1125-A — inventory value at year end",
+        "",
+        "",
+        formatMoney2(inventoryValuation.ending),
+        "",
+      ])
+    );
+  }
 
   // Phase 7c ScheduleC Summary section. Roll up expense totals by IRS
   // Schedule C line via the shared buildScheduleCSummary helper. One

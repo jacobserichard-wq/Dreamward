@@ -23,6 +23,7 @@ import {
 } from "@/lib/square";
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 import { reconcileAllTiers, isFirstOfMonthUtc } from "@/lib/revenueTier";
+import { recordInventorySnapshot } from "@/lib/inventory/valuation";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 
@@ -581,6 +582,40 @@ export async function GET(req: NextRequest) {
       console.error("[cron] tier reconciliation pass failure:", err);
     }
 
+    // ── Inventory valuation snapshot pass ────────────────────────
+    // On the 1st of the month, record each paying client's total
+    // inventory value into inventory_snapshots. Builds the history
+    // that Schedule-C beginning/ending inventory reads from.
+    // Idempotent per (client, date) — safe to re-run.
+    let snapshotsRecorded = 0;
+    let snapshotErrors = 0;
+    try {
+      if (isFirstOfMonthUtc(new Date())) {
+        const today = new Date().toISOString().slice(0, 10);
+        const payingClients = await pool.query<{ id: number }>(
+          `SELECT id FROM clients
+            WHERE plan IN ('trial', 'dream', 'maker', 'growth', 'pro')`
+        );
+        for (const c of payingClients.rows) {
+          try {
+            await recordInventorySnapshot(c.id, today);
+            snapshotsRecorded++;
+          } catch (err) {
+            snapshotErrors++;
+            console.error(
+              `[cron] inventory snapshot failed for client ${c.id}:`,
+              err
+            );
+          }
+        }
+        console.log(
+          `[cron] inventory snapshots: ${snapshotsRecorded} recorded, ${snapshotErrors} errors`
+        );
+      }
+    } catch (err) {
+      console.error("[cron] inventory snapshot pass failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -601,6 +636,8 @@ export async function GET(req: NextRequest) {
       tierSwitched,
       tierSkipped,
       tierErrors,
+      snapshotsRecorded,
+      snapshotErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);

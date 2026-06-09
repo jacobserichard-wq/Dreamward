@@ -109,6 +109,11 @@ interface AnnualSummaryResponse {
     amountCollected: number;
     outstandingAsOfYearEnd: number;
   };
+  inventoryValuation: {
+    beginning: number | null;
+    ending: number | null;
+    endingIsLive: boolean;
+  };
 }
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
@@ -488,6 +493,61 @@ export default function ReportsPage() {
               amountCollected={summary.ar.amountCollected}
               outstandingAsOfYearEnd={summary.ar.outstandingAsOfYearEnd}
             />
+
+            {/* Inventory valuation — Form 1125-A beginning + ending
+                inventory. Only shown when we have at least an ending
+                value (a snapshot or live). */}
+            {summary.inventoryValuation.ending !== null && (
+              <div className="bg-white border border-slate-200 rounded-xl p-5 mt-6">
+                <h3 className="text-base font-bold text-slate-900 m-0 mb-1">
+                  Inventory (Form 1125-A)
+                </h3>
+                <p className="text-xs text-slate-500 m-0 mb-4">
+                  Stock value for your Cost of Goods Sold. Beginning + ending
+                  inventory help your CPA reconcile COGS on Schedule C.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500 m-0 mb-1">
+                      Beginning inventory
+                    </p>
+                    <p className="text-xl font-bold text-slate-900 m-0 tabular-nums">
+                      {summary.inventoryValuation.beginning !== null
+                        ? `$${summary.inventoryValuation.beginning.toLocaleString(
+                            "en-US",
+                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                          )}`
+                        : "—"}
+                    </p>
+                    {summary.inventoryValuation.beginning === null && (
+                      <p className="text-[11px] text-slate-400 m-0 mt-0.5">
+                        No prior-year snapshot yet
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500 m-0 mb-1">
+                      Ending inventory
+                    </p>
+                    <p className="text-xl font-bold text-slate-900 m-0 tabular-nums">
+                      {`$${summary.inventoryValuation.ending.toLocaleString(
+                        "en-US",
+                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                      )}`}
+                    </p>
+                    {summary.inventoryValuation.endingIsLive && (
+                      <p className="text-[11px] text-slate-400 m-0 mt-0.5">
+                        Current value (live)
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 m-0 mt-3">
+                  Not tax advice — verify with your CPA. Inventory accounting
+                  rules vary by business.
+                </p>
+              </div>
+            )}
 
             <div className="text-xs text-slate-500 mt-8 pb-4 border-t border-slate-200 pt-3">
               <p className="m-0 mb-1">
