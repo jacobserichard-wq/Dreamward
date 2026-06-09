@@ -22,6 +22,7 @@ import UpcomingEventsCard, {
 } from "../components/UpcomingEventsCard";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
+import { FEATURES } from "@/lib/features";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -993,9 +994,14 @@ export default function Home() {
         loading={!clientInfo}
       />
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs. Sub-session 33: Emails tab filtered out
+          when FEATURES.GMAIL_INGEST is false. Tab type stays
+          intact so the rest of the component still typechecks. */}
       <nav className="flex bg-white border-b border-slate-200 px-4 sm:px-8 max-w-[1200px] mx-auto">
-        {(["emails", "processed", "dashboard"] as Tab[]).map((tab) => (
+        {(FEATURES.GMAIL_INGEST
+          ? (["emails", "processed", "dashboard"] as Tab[])
+          : (["processed", "dashboard"] as Tab[])
+        ).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -1103,8 +1109,11 @@ export default function Home() {
             </div>
           )}
 
-        {/* ── EMAILS TAB ── */}
-        {activeTab === "emails" && (
+        {/* ── EMAILS TAB ──
+            Sub-session 33: gated behind FEATURES.GMAIL_INGEST. When
+            the flag is off, this whole block is dead code in render
+            (preserved for fast re-enable). */}
+        {FEATURES.GMAIL_INGEST && activeTab === "emails" && (
           <>
             {/* Sub-session 24 follow-up commit 2: Pro-only upgrade card.
                 After the backend Pro-gate (commit 1) non-Pro plans get
@@ -1779,12 +1788,12 @@ export default function Home() {
                     grid (Upload + Add manually); Pro users see all 3. */}
                 <div
                   className={`grid grid-cols-1 gap-3 max-w-2xl mx-auto ${
-                    clientInfo?.plan === "pro"
+                    clientInfo?.plan === "pro" && FEATURES.GMAIL_INGEST
                       ? "sm:grid-cols-3"
                       : "sm:grid-cols-2"
                   }`}
                 >
-                  {clientInfo?.plan === "pro" && (
+                  {clientInfo?.plan === "pro" && FEATURES.GMAIL_INGEST && (
                     <button
                       type="button"
                       onClick={() => setActiveTab("emails")}
@@ -1799,19 +1808,54 @@ export default function Home() {
                       </div>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("emails")}
-                    className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-left cursor-pointer hover:bg-emerald-100 transition-colors"
-                  >
-                    <div className="text-2xl mb-1.5">{"\u{1F4C1}"}</div>
-                    <div className="text-sm font-semibold text-slate-900 mb-1">
-                      Upload a file
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      CSV, TSV, or XLSX export from your accounting tool.
-                    </div>
-                  </button>
+                  {/* Sub-session 33: when Gmail is hidden, "Upload a
+                      file" CTA wraps a hidden file input directly so
+                      clicking it opens the picker (matches the
+                      header Upload button pattern). When Gmail is
+                      enabled, the original Emails-tab-switch
+                      behavior is preserved. */}
+                  {FEATURES.GMAIL_INGEST ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("emails")}
+                      className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-left cursor-pointer hover:bg-emerald-100 transition-colors"
+                    >
+                      <div className="text-2xl mb-1.5">{"\u{1F4C1}"}</div>
+                      <div className="text-sm font-semibold text-slate-900 mb-1">
+                        Upload a file
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        CSV, TSV, or XLSX export from your accounting tool.
+                      </div>
+                    </button>
+                  ) : (
+                    <label
+                      className={`bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-left transition-colors block m-0 ${
+                        uploading
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer hover:bg-emerald-100"
+                      }`}
+                    >
+                      <div className="text-2xl mb-1.5">{"\u{1F4C1}"}</div>
+                      <div className="text-sm font-semibold text-slate-900 mb-1">
+                        {uploading ? "Uploading..." : "Upload a file"}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        CSV, TSV, or XLSX export from your accounting tool.
+                      </div>
+                      <input
+                        type="file"
+                        accept=".csv,.tsv,.xlsx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUpload(f);
+                          e.target.value = "";
+                        }}
+                        disabled={uploading}
+                      />
+                    </label>
+                  )}
                   <Link
                     href="/invoices/new"
                     className="bg-violet-50 border border-violet-200 rounded-lg p-4 text-left cursor-pointer hover:bg-violet-100 transition-colors no-underline block"

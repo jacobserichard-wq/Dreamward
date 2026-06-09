@@ -10,6 +10,7 @@ import InvoiceList, {
   type InvoiceListSummary,
 } from "../components/InvoiceList";
 import FetchFromGmailModal from "../components/FetchFromGmailModal";
+import { FEATURES } from "@/lib/features";
 import type { AgingBucket } from "@/lib/aging";
 
 // Phase 6 list surface. Mirrors the events-page pattern (commit-3 era
@@ -272,14 +273,19 @@ export default function InvoicesPage() {
             {/* Phase 6.5 commit 7: Fetch from Gmail button — Growth+
                 only (matches the API guard). Hidden on starter, but
                 starter already gets the upgrade-prompt screen at the
-                top of the file. */}
-            <button
-              type="button"
-              onClick={() => setFetchModalOpen(true)}
-              className="py-2.5 px-5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50"
-            >
-              {"\u{1F4E5}"} Fetch from Gmail
-            </button>
+                top of the file.
+                Sub-session 33: gated behind FEATURES.GMAIL_INGEST so
+                the button + modal disappear while we evaluate
+                whether to keep the feature. */}
+            {FEATURES.GMAIL_INGEST && (
+              <button
+                type="button"
+                onClick={() => setFetchModalOpen(true)}
+                className="py-2.5 px-5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50"
+              >
+                {"\u{1F4E5}"} Fetch from Gmail
+              </button>
+            )}
             <Link
               href="/invoices/new"
               className="py-2.5 px-6 rounded-lg border-0 bg-blue-500 text-white text-sm font-semibold no-underline cursor-pointer"
@@ -310,7 +316,11 @@ export default function InvoicesPage() {
             onFetch resolves with the API response; the modal owns
             the busy/result/error states. After fetch lands, parent
             reloads the list + auto-toggles the review filter on so
-            the new rows are immediately visible. */}
+            the new rows are immediately visible.
+            Sub-session 33: gated behind FEATURES.GMAIL_INGEST so
+            no stray code path can open it while the feature is
+            hidden. */}
+        {FEATURES.GMAIL_INGEST && (
         <FetchFromGmailModal
           open={fetchModalOpen}
           onClose={() => setFetchModalOpen(false)}
@@ -333,6 +343,7 @@ export default function InvoicesPage() {
             return data;
           }}
         />
+        )}
       </div>
     </div>
   );

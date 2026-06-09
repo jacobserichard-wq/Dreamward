@@ -42,7 +42,10 @@ const PLAN_DETAILS: Record<string, { name: string; price: string; features: stri
   pro: {
     name: "Pro",
     price: "$89/mo",
-    features: ["10 Gmail accounts", "Unlimited processing", "Custom categories", "Tax reports", "Onboarding call"],
+    // Sub-session 33: "10 Gmail accounts" removed while Gmail
+    // ingestion is hidden. Re-add when FEATURES.GMAIL_INGEST
+    // flips back to true.
+    features: ["Unlimited processing", "Live stock counts", "Custom categories", "Tax reports", "Onboarding call"],
   },
   canceled: {
     name: "Canceled",

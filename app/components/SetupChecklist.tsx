@@ -32,6 +32,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { FEATURES } from "@/lib/features";
 
 type ChecklistMode = "dashboard" | "onboarding";
 
@@ -150,14 +151,22 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       modes: ["onboarding"],           // dashboard never asks this
     },
     // ── Existing items ─────────────────────────────────────────────
-    {
-      id: "gmail",
-      label: "Connect Gmail to auto-pull invoices",
-      done: props.gmailConnected,
-      action: { kind: "signIn" },
-      buttonLabel: "Connect",
-      visibleOn: ["pro"],
-    },
+    // Sub-session 33: Gmail item omitted entirely when
+    // FEATURES.GMAIL_INGEST is false. Spread-conditional keeps the
+    // array literal clean and re-enables instantly when the flag
+    // flips back to true.
+    ...(FEATURES.GMAIL_INGEST
+      ? [
+          {
+            id: "gmail" as const,
+            label: "Connect Gmail to auto-pull invoices",
+            done: props.gmailConnected,
+            action: { kind: "signIn" as const },
+            buttonLabel: "Connect",
+            visibleOn: ["pro" as const],
+          },
+        ]
+      : []),
     {
       id: "upload",
       label: "Upload your first file or process an email",
