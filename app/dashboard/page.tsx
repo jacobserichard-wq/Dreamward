@@ -58,6 +58,19 @@ interface ProcessedItem {
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
 type Tab = "emails" | "processed" | "dashboard";
 
+// Sub-session 33: status-button metadata for the Processed-tab
+// cards. icon + short label + hover tooltip so the four status
+// buttons are self-explanatory instead of a row of bare emoji.
+const STATUS_BUTTON_META: Record<
+  "pending" | "paid" | "overdue" | "needs_review",
+  { icon: string; label: string; title: string }
+> = {
+  pending: { icon: "⌛", label: "Pending", title: "Pending — awaiting payment" },
+  paid: { icon: "✅", label: "Paid", title: "Paid — money received, archive from inbox" },
+  overdue: { icon: "\u{1F6A8}", label: "Overdue", title: "Overdue — past due date, needs follow-up" },
+  needs_review: { icon: "\u{1F440}", label: "Review", title: "Needs review — something looks off, check later" },
+};
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -1507,35 +1520,46 @@ export default function Home() {
                     {/* Summary */}
                     <p className="pt-2 px-5 pb-3 text-xs text-slate-500 leading-normal m-0">{item.summary}</p>
 
-                    {/* Status actions */}
-                    <div className="flex gap-1 pt-2 px-4 pb-3 border-t border-slate-100">
-                      {(["pending", "paid", "overdue", "needs_review"] as const).map((s) => {
-                        const isUpdating = updatingStatus.has(item.id);
-                        const isActive = item.status === s;
-                        return (
-                          <button
-                            key={s}
-                            onClick={() => updateStatus(item.id, s)}
-                            disabled={isUpdating}
-                            className={`flex-1 p-1.5 border rounded-md cursor-pointer text-base transition-all duration-150 inline-flex items-center justify-center disabled:opacity-60 disabled:cursor-wait ${
-                              isActive
-                                ? "bg-slate-100 border-slate-400"
-                                : "bg-white border-slate-200"
-                            }`}
-                          >
-                            {isUpdating && isActive ? (
-                              <Spinner size={14} color="#475569" />
-                            ) : (
-                              <>
-                                {s === "pending" && "⌛"}
-                                {s === "paid" && "✅"}
-                                {s === "overdue" && "\u{1F6A8}"}
-                                {s === "needs_review" && "\u{1F440}"}
-                              </>
-                            )}
-                          </button>
-                        );
-                      })}
+                    {/* Status actions. Sub-session 33: each button
+                        carries a title tooltip + the row has a small
+                        "Set status" label so the four icons aren't a
+                        guessing game. */}
+                    <div className="pt-2 px-4 pb-3 border-t border-slate-100">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400 m-0 mb-1.5">
+                        Set status
+                      </p>
+                      <div className="flex gap-1">
+                        {(["pending", "paid", "overdue", "needs_review"] as const).map((s) => {
+                          const isUpdating = updatingStatus.has(item.id);
+                          const isActive = item.status === s;
+                          const meta = STATUS_BUTTON_META[s];
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => updateStatus(item.id, s)}
+                              disabled={isUpdating}
+                              title={meta.title}
+                              aria-label={meta.title}
+                              className={`flex-1 px-1 py-1.5 border rounded-md cursor-pointer transition-all duration-150 inline-flex flex-col items-center justify-center gap-0.5 disabled:opacity-60 disabled:cursor-wait ${
+                                isActive
+                                  ? "bg-slate-100 border-slate-400"
+                                  : "bg-white border-slate-200"
+                              }`}
+                            >
+                              {isUpdating && isActive ? (
+                                <Spinner size={14} color="#475569" />
+                              ) : (
+                                <>
+                                  <span className="text-base leading-none">{meta.icon}</span>
+                                  <span className="text-[9px] text-slate-500 leading-none">
+                                    {meta.label}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div className="px-4 pb-3 text-right">
                       <button
