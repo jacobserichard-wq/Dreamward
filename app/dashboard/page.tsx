@@ -907,11 +907,11 @@ export default function Home() {
             >
               AR
             </Link>
-            {/* Phase 12f: COGS gross-margin dashboard. Pro-only.
-                Sits just before Reports since it IS a report
-                conceptually but lives outside the broader /reports
-                surface (which is invoicing-focused). */}
-            {clientInfo?.plan === "pro" && (
+            {/* Phase 12f: COGS gross-margin dashboard. Sub-session 33:
+                available on every paying tier (was Pro-only), so the
+                nav link shows for all paying tiers — otherwise Maker/
+                Growth users have access but no way to reach it. */}
+            {isPayingTier(clientInfo?.plan) && (
               <Link
                 href="/cogs"
                 className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
@@ -920,11 +920,12 @@ export default function Home() {
                 COGS
               </Link>
             )}
-            {/* Phase 7a commit 9: Reports nav link. Pro-only — matches the
-                /reports route plan-gate. Sits between Invoices and Settings
-                to keep the financial-flow grouping (Events → Invoices →
+            {/* Phase 7a commit 9: Reports nav link. Sub-session 33:
+                matches the now-feature-flat /reports route — shows for
+                every paying tier. Sits between Invoices and Settings to
+                keep the financial-flow grouping (Events → Invoices →
                 Reports → Settings). */}
-            {clientInfo?.plan === "pro" && (
+            {isPayingTier(clientInfo?.plan) && (
               <Link
                 href="/reports"
                 className="bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5"
@@ -1252,12 +1253,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Event auto-coding selector — Growth+/Pro/trial only. Drives
-                handleUpload's batch eventId (or leaves /api/upload to do
-                per-row date matching in commit 7). */}
-            {(clientInfo?.plan === "trial" ||
-              clientInfo?.plan === "growth" ||
-              clientInfo?.plan === "pro") && (
+            {/* Event auto-coding selector. Sub-session 33: every
+                paying tier gets Events, so this shows for all paying
+                tiers. Drives handleUpload's batch eventId (or leaves
+                /api/upload to do per-row date matching). */}
+            {isPayingTier(clientInfo?.plan) && (
               <div className="mb-5 flex items-center gap-3 flex-wrap">
                 <label
                   htmlFor="upload-event-select"
@@ -1732,7 +1732,7 @@ export default function Home() {
                   )}
                   collapsedChannels={collapsedChannels}
                   onToggleCollapse={toggleChannelCollapse}
-                  isPro={clientInfo?.plan === "pro"}
+                  isPro={isPayingTier(clientInfo?.plan)}
                 />
               ) : (
                 <div className="bg-white rounded-xl border border-slate-200 p-5">

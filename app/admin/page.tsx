@@ -69,7 +69,13 @@ export default function AdminPage() {
   }
 
   const totalRevenue = clients.reduce((sum, c) => {
-    const prices: Record<string, number> = { starter: 19, growth: 49, pro: 89 };
+    // Sub-session 33 pricing pivot: Dream/Maker/Growth/Pro tiers.
+    const prices: Record<string, number> = {
+      dream: 10,
+      maker: 19,
+      growth: 49,
+      pro: 99,
+    };
     return sum + (prices[c.plan] || 0);
   }, 0);
 
@@ -104,7 +110,10 @@ export default function AdminPage() {
           </div>
           <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
             <div className="text-3xl font-extrabold text-slate-900">
-              {(planCounts.starter || 0) + (planCounts.growth || 0) + (planCounts.pro || 0)}
+              {(planCounts.dream || 0) +
+                (planCounts.maker || 0) +
+                (planCounts.growth || 0) +
+                (planCounts.pro || 0)}
             </div>
             <div className="text-[13px] text-slate-500 mt-1">Paying</div>
           </div>

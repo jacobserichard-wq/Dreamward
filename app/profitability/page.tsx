@@ -17,6 +17,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import ChannelTable, {
   type ChannelRow,
 } from "../components/ChannelTable";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 5 commit 7: portfolio profitability dashboard. Reads
 // /api/profitability for portfolio aggregates, monthly trends, and
@@ -129,9 +130,10 @@ export default function ProfitabilityPage() {
         return;
       }
       if (res.status === 403) {
-        // Render the upgrade prompt below; fetch /api/client to confirm plan
-        // so the prompt's "Starter" badge is accurate.
-        setPlan("starter");
+        // 403 = non-paying (canceled) user. Sentinel "canceled"
+        // drives the upgrade-prompt branch below. Under the
+        // feature-flat model every paying tier reaches the content.
+        setPlan("canceled");
         return;
       }
       if (!res.ok) {
@@ -194,7 +196,7 @@ export default function ProfitabilityPage() {
     );
   }
 
-  if (plan === "starter") {
+  if (plan !== null && !isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
@@ -206,11 +208,12 @@ export default function ProfitabilityPage() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} Profitability is a Growth-and-Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed">
-              Upgrade to Growth ($49/mo) to see per-event P&L, monthly profit trends,
-              and your best- and worst-performing markets.
+              Start your subscription — from $10/mo — to see per-event P&L,
+              monthly profit trends, and your best- and worst-performing
+              markets. Included on every tier.
             </p>
             <Link
               href="/billing"
@@ -346,7 +349,7 @@ export default function ProfitabilityPage() {
                 onToggleCollapse={() => {
                   /* no-op on this page */
                 }}
-                isPro={plan === "pro"}
+                isPro={isPayingTier(plan)}
                 variant="full"
               />
             ) : (

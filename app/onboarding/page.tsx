@@ -30,7 +30,7 @@ import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
 import { apiFetch } from "@/lib/apiFetch";
 
-type Plan = "trial" | "starter" | "growth" | "pro";
+type Plan = "trial" | "dream" | "maker" | "growth" | "pro";
 
 interface ClientInfo {
   plan: Plan;

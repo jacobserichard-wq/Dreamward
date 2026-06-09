@@ -8,6 +8,7 @@ import ErrorBanner from "../../components/ErrorBanner";
 import InvoiceCreateForm, {
   type InvoiceSubmitPayload,
 } from "../../components/InvoiceCreateForm";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 6 manual invoice entry. Mirror events-page conventions for
 // plan-gating + loading + error handling. On successful POST, redirects
@@ -47,7 +48,7 @@ export default function NewInvoicePage() {
         setPlan(clientData.plan);
 
         // Starter sees upgrade prompt; no need to fetch existing customers.
-        if (clientData.plan === "starter") return;
+        if (!isPayingTier(clientData.plan)) return;
 
         // Fetch existing customer names for the autocomplete datalist.
         // Soft-fail: if the list endpoint errors, the form still works
@@ -104,7 +105,7 @@ export default function NewInvoicePage() {
     );
   }
 
-  if (plan === "starter") {
+  if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[700px] mx-auto py-8 px-4 sm:px-6">
@@ -115,10 +116,11 @@ export default function NewInvoicePage() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} AR Aging is a Growth-and-Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed">
-              Upgrade to Growth ($49/mo) to start tracking invoices.
+              Start your subscription — from $10/mo — to start tracking
+              invoices. AR is included on every tier.
             </p>
             <Link
               href="/billing"

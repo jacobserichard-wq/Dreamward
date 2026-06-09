@@ -152,7 +152,7 @@ function ChannelCard({
     channel.proGated && !isPro ? "/billing" : channel.emptyAddHref;
   const ctaLabel =
     channel.proGated && !isPro
-      ? `Upgrade to Pro to add ${channel.label}`
+      ? `Subscribe to add ${channel.label}`
       : channel.emptyAddLabel;
 
   const barWidth =

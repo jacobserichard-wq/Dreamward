@@ -9,6 +9,7 @@ import {
 } from "@/lib/categories";
 import { matchEventByDate } from "@/lib/eventMatch";
 import { parseXlsx } from "@/lib/xlsx";
+import { isPayingTier } from "@/lib/plans";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,15 +24,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    // Phase 3 sub-session 17: batch event id (optional). Per design §6,
-    // Starter clients can't use Events at all — silently ignore any
-    // eventId they send rather than 403'ing the upload (uploads still
-    // work, just without auto-coding).
-    const isStarterGated = client.plan === "starter";
+    // Phase 3 sub-session 17: batch event id (optional). Originally
+    // Starter clients couldn't use Events. Sub-session 33 pricing
+    // pivot: every paying tier gets Events, so the gate now only
+    // excludes non-paying (canceled) users — silently ignore any
+    // eventId they send rather than 403'ing the upload (uploads
+    // still work, just without auto-coding).
+    const eventsGated = !isPayingTier(client.plan);
     let batchEventId: number | null = null;
     const rawEventId = formData.get("eventId");
     if (
-      !isStarterGated &&
+      !eventsGated &&
       typeof rawEventId === "string" &&
       rawEventId.trim() !== ""
     ) {
@@ -223,13 +226,13 @@ Other Accounting Software:
     }
 
     // Phase 3 sub-session 17: auto-code each row to an event.
-    //   - Starter plan: skip entirely; every row.event_id = null.
+    //   - Non-paying (canceled): skip entirely; every row.event_id = null.
     //   - batchEventId set: every row gets it (user picked from dropdown).
     //   - Otherwise: per-row matchEventByDate against the row's due_date.
     //     Zero matches → null; exactly one → that event id; 2+ overlapping
     //     events → null (user resolves in the review modal — design §8.8).
     for (const row of mappedRows) {
-      if (isStarterGated) {
+      if (eventsGated) {
         row.event_id = null;
         continue;
       }

@@ -37,7 +37,7 @@ import { FEATURES } from "@/lib/features";
 type ChecklistMode = "dashboard" | "onboarding";
 
 export interface SetupChecklistProps {
-  plan: "trial" | "starter" | "growth" | "pro";
+  plan: "trial" | "dream" | "maker" | "growth" | "pro";
   /** Rendering mode. Defaults "dashboard" to preserve backward compat
    *  with the existing call site (commit 7 of the prior UX arc). */
   mode?: ChecklistMode;
@@ -98,7 +98,7 @@ interface ChecklistItem {
     | { kind: "linkHash"; href: string }
     | { kind: "form" };
   buttonLabel: string;
-  visibleOn: Array<"trial" | "starter" | "growth" | "pro">;
+  visibleOn: Array<"trial" | "dream" | "maker" | "growth" | "pro">;
   skippable?: boolean;
   /** Modes where this item should render. Defaults to both. The
    *  business-info form item only makes sense on the onboarding
@@ -146,7 +146,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.industrySet ?? false,
       action: { kind: "form" },
       buttonLabel: "Save",
-      visibleOn: ["trial", "starter", "growth", "pro"],
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
       skippable: false,                // locked decision #6 — required
       modes: ["onboarding"],           // dashboard never asks this
     },
@@ -173,7 +173,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.hasRealProcessedItems,
       action: { kind: "upload" },
       buttonLabel: "Upload",
-      visibleOn: ["trial", "starter", "growth", "pro"],
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
     {
       id: "home_address",
@@ -181,7 +181,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.homeAddressSet,
       action: { kind: "link", href: "/settings" },
       buttonLabel: "Open Settings",
-      visibleOn: ["trial", "starter", "growth", "pro"],
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
     // ── New items (commit 4): event + invoice. Only meaningful on
     //    plans where those modules exist (growth + pro). ────────────
@@ -207,7 +207,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: !props.hasSampleItems,
       action: { kind: "clearSample" },
       buttonLabel: "Clear",
-      visibleOn: ["starter", "growth", "pro"],
+      visibleOn: ["dream", "maker", "growth", "pro"],
     },
     {
       id: "cpa_email",

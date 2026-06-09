@@ -20,8 +20,10 @@ export async function POST(req: NextRequest) {
     const client = await getSessionClient();
 
     // Pro tier lands on /welcome-pro for white-glove onboarding (Calendly +
-    // sample data). Starter and Growth go to the regular dashboard.
-    const successPath = planId === "pro" ? "/welcome-pro" : "/";
+    // sample data). Dream / Maker / Growth go to the regular dashboard.
+    // Sub-session 33: white-glove remains a Pro-only service perk under
+    // the feature-flat pricing model.
+    const successPath = planId === "pro" ? "/welcome-pro" : "/dashboard";
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -33,7 +35,10 @@ export async function POST(req: NextRequest) {
         metadata: { clientId: String(client.id) },
       },
       success_url: `${process.env.NEXTAUTH_URL}${successPath}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXTAUTH_URL}/pricing`,
+      // Cancel returns to /billing (the page the checkout launched
+      // from). The old /pricing target 404'd — that route never
+      // existed.
+      cancel_url: `${process.env.NEXTAUTH_URL}/billing`,
       metadata: { clientId: String(client.id) },
     });
 

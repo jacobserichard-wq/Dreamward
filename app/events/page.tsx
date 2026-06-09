@@ -7,6 +7,7 @@ import PageHeader from "../components/PageHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import EventHistoryList, { type EventSummary } from "../components/EventHistoryList";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
+import { isPayingTier } from "@/lib/plans";
 
 export default function EventsPage() {
   const router = useRouter();
@@ -50,8 +51,10 @@ export default function EventsPage() {
         const clientData = await clientRes.json();
         setPlan(clientData.plan);
 
-        // Starter sees the upgrade prompt, not the list.
-        if (clientData.plan === "starter") return;
+        // Non-paying users see the upgrade prompt, not the list.
+        // Under the feature-flat model, every paying tier gets
+        // events — only canceled/non-subscribed users are gated.
+        if (!isPayingTier(clientData.plan)) return;
 
         await loadEvents();
       } catch (err) {
@@ -73,7 +76,7 @@ export default function EventsPage() {
     );
   }
 
-  if (plan === "starter") {
+  if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
@@ -85,11 +88,12 @@ export default function EventsPage() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} Events is a Growth-and-Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed">
-              Upgrade to Growth ($49/mo) to track market events, log per-event sales,
-              and auto-code uploaded transactions to the right event.
+              Start your subscription — from $10/mo — to track market events,
+              log per-event sales, and auto-code uploaded transactions to the
+              right event. Events are included on every tier.
             </p>
             <Link
               href="/billing"

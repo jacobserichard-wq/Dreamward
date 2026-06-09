@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import pool, { saveProcessedItem } from "@/lib/db";
 import { deriveStorageChannel } from "@/lib/profitability/channels";
+import { isPayingTier } from "@/lib/plans";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,12 +21,12 @@ export async function POST(req: NextRequest) {
     // client and the CsvReviewModal dropdown (commit 8) only lists this
     // client's events. But the request body is user-controllable, so
     // batch-verify here too before inserting — any row.event_id that
-    // doesn't belong to this client is silently nulled out. Starter
-    // clients have event_id nulled regardless (Events is plan-gated;
-    // design §6).
-    const isStarterGated = client.plan === "starter";
+    // doesn't belong to this client is silently nulled out.
+    // Sub-session 33 pricing pivot: every paying tier gets Events,
+    // so only non-paying (canceled) users have event_id nulled.
+    const eventsGated = !isPayingTier(client.plan);
     const validEventIds = new Set<number>();
-    if (!isStarterGated) {
+    if (!eventsGated) {
       const distinctEventIds = new Set<number>();
       for (const row of rows) {
         if (
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     const results = [];
     for (const row of rows) {
       const eventId =
-        !isStarterGated && validEventIds.has(row.event_id)
+        !eventsGated && validEventIds.has(row.event_id)
           ? row.event_id
           : null;
       // Sub-session 32 polish: pre-derive the channel from category

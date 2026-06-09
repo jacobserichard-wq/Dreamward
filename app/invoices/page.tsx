@@ -11,6 +11,7 @@ import InvoiceList, {
 } from "../components/InvoiceList";
 import FetchFromGmailModal from "../components/FetchFromGmailModal";
 import { FEATURES } from "@/lib/features";
+import { isPayingTier } from "@/lib/plans";
 import type { AgingBucket } from "@/lib/aging";
 
 // Phase 6 list surface. Mirrors the events-page pattern (commit-3 era
@@ -77,7 +78,7 @@ export default function InvoicesPage() {
         setPlan(clientData.plan);
 
         // Starter sees the upgrade prompt, not the list (mirrors events).
-        if (clientData.plan === "starter") return;
+        if (!isPayingTier(clientData.plan)) return;
 
         await loadInvoices();
       } catch (err) {
@@ -177,7 +178,7 @@ export default function InvoicesPage() {
     );
   }
 
-  if (plan === "starter") {
+  if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
@@ -189,12 +190,12 @@ export default function InvoicesPage() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} AR Aging is a Growth-and-Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed">
-              Upgrade to Growth ($49/mo) to track wholesale and consignment
-              invoices, see aging buckets at a glance, and send polite
-              follow-ups in one tap.
+              Start your subscription — from $10/mo — to track wholesale and
+              consignment invoices, see aging buckets at a glance, and send
+              polite follow-ups in one tap. AR is included on every tier.
             </p>
             <Link
               href="/billing"
