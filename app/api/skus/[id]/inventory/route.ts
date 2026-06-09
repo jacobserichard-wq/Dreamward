@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { recordManualAdjustment } from "@/lib/inventory/adjustments";
 import pool from "@/lib/db";
+import { isPayingTier } from "@/lib/plans";
 
 interface PostBody {
   delta?: unknown;
@@ -58,9 +59,9 @@ export async function POST(
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "Inventory adjustments are a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

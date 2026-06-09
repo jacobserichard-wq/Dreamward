@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { computeRoundTripMiles } from "@/lib/distance";
+import { isPayingTier } from "@/lib/plans";
 
 // Events row shape as returned by Postgres.
 // NUMERIC columns come back as strings from pg by default — serialize to
@@ -110,7 +111,7 @@ function isNonEmptyString(v: unknown): v is string {
 // Growth-and-Pro feature per the pricing table. Starter clients hit 403
 // here regardless of UI gating — never rely on the UI alone.
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 export async function GET() {

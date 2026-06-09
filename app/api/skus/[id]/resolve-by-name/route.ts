@@ -37,6 +37,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 const VALID_PLATFORMS = new Set(["shopify", "wix", "square"]);
 
@@ -61,9 +62,9 @@ export async function POST(
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "SKU catalog is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

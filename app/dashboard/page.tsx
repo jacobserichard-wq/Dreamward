@@ -23,6 +23,7 @@ import UpcomingEventsCard, {
 import { apiFetch } from "@/lib/apiFetch";
 import { AGING_BUCKETS_ORDERED, isOverdue, type AgingBucket } from "@/lib/aging";
 import { FEATURES } from "@/lib/features";
+import { isPayingTier } from "@/lib/plans";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export default function Home() {
   // as "no events available" silently.
   useEffect(() => {
     const plan = clientInfo?.plan;
-    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    if (!isPayingTier(plan)) return;
     let cancelled = false;
     async function loadEvents() {
       try {
@@ -223,7 +224,7 @@ export default function Home() {
   // 1000 covers every realistic vendor caseload).
   useEffect(() => {
     const plan = clientInfo?.plan;
-    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    if (!isPayingTier(plan)) return;
     let cancelled = false;
     async function loadAr() {
       try {
@@ -283,7 +284,7 @@ export default function Home() {
   // Both are plan-gated (growth+pro+trial); skip for excluded plans.
   useEffect(() => {
     const plan = clientInfo?.plan;
-    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    if (!isPayingTier(plan)) return;
     let cancelled = false;
     async function loadCollapsedPref() {
       try {
@@ -371,7 +372,7 @@ export default function Home() {
   // query param). Year defaults to current; YTD picker in commit 6.
   useEffect(() => {
     const plan = clientInfo?.plan;
-    if (plan !== "trial" && plan !== "growth" && plan !== "pro") return;
+    if (!isPayingTier(plan)) return;
     let cancelled = false;
     async function loadChannels() {
       try {

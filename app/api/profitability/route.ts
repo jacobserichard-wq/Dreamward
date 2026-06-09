@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { getCategoriesForIndustry, type Industry } from "@/lib/categories";
 import { loadOperatingRateFromPrefs } from "@/lib/mileageRates";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 5 commit 5: /api/profitability. Server-side P&L computation per
 // the design spec §1 model:
@@ -26,7 +27,7 @@ import { loadOperatingRateFromPrefs } from "@/lib/mileageRates";
 // have it subtracted from revenue as if it were an expense.
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 // Phase 1 umbrella values predating the type-tagged taxonomy. The

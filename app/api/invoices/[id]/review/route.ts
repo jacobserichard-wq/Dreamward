@@ -24,9 +24,10 @@ import {
   dismissInvoice,
   InvoiceNotFoundError,
 } from "@/lib/invoices";
+import { isPayingTier } from "@/lib/plans";
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 interface ReviewBody {

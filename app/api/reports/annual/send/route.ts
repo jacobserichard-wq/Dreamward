@@ -4,6 +4,7 @@ import { getSessionClient } from "@/lib/getClient";
 import { renderAnnualCsvBody, renderAnnualPdf, annualSummary } from "@/lib/reports";
 import { sendEmail, cpaAnnualSummaryEmail } from "@/lib/email";
 import type { Industry } from "@/lib/categories";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 8 of 9, per
 // session-notes/phase-7a-tax-reports-design.md §5.
@@ -32,7 +33,7 @@ interface SettingsPrefRow {
 }
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "pro";
+  return isPayingTier(plan);
 }
 
 function parseYear(raw: string | null, defaultYear: number): number | null {

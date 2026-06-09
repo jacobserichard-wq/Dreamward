@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { annualSummary } from "@/lib/reports";
 import type { Industry } from "@/lib/categories";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 2 of 9, per
 // session-notes/phase-7a-tax-reports-design.md §5.
@@ -19,7 +20,7 @@ import type { Industry } from "@/lib/categories";
 // the /reports UI page renders the upgrade prompt instead.
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "pro";
+  return isPayingTier(plan);
 }
 
 // Year validation: integer, 2020 ≤ year ≤ currentYear. The 2020 floor

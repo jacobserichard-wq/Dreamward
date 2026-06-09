@@ -16,6 +16,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 import { listCatalog, refreshAccessToken } from "@/lib/square";
+import { isPayingTier } from "@/lib/plans";
 
 const TOKEN_REFRESH_THRESHOLD_MS = 60 * 60 * 1000; // 1h headroom
 
@@ -39,7 +40,7 @@ export async function GET() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "SKU catalog import is a Pro feature." },
         { status: 403 }

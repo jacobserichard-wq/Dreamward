@@ -22,6 +22,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb } from "@/lib/crypto";
 import { revokeAccessToken } from "@/lib/square";
+import { isPayingTier } from "@/lib/plans";
 
 interface SquareConnectionRow {
   access_token_ciphertext: Buffer;
@@ -38,7 +39,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Square integration is a Pro feature." },
         { status: 403 }

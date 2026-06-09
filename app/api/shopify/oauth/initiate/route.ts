@@ -27,6 +27,7 @@ import {
   normalizeShopDomain,
   buildAuthorizeUrl,
 } from "@/lib/shopify";
+import { isPayingTier } from "@/lib/plans";
 
 // Cookie name for the CSRF state token. Read by the callback route.
 // Short TTL since the OAuth flow takes seconds, not minutes.
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         {
           error:

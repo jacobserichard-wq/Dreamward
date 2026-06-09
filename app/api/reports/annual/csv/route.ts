@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { renderAnnualCsvBody } from "@/lib/reports";
 import type { Industry } from "@/lib/categories";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 4, refactored in
 // commit 8 to delegate CSV body assembly to lib/reports.renderAnnualCsvBody
@@ -10,7 +11,7 @@ import type { Industry } from "@/lib/categories";
 // headers.
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "pro";
+  return isPayingTier(plan);
 }
 
 function parseYear(raw: string | null, defaultYear: number): number | null {

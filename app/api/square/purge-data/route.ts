@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 export async function POST() {
   try {
@@ -21,7 +22,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Square integration is a Pro feature." },
         { status: 403 }

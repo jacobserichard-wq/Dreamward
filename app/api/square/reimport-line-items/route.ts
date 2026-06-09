@@ -33,6 +33,7 @@ import {
   extractSquareLineItems,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
+import { isPayingTier } from "@/lib/plans";
 
 const TIME_BUDGET_MS = 50_000;
 const TOKEN_REFRESH_THRESHOLD_MS = 60 * 60 * 1000;
@@ -67,9 +68,9 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "SKU catalog is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

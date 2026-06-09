@@ -8,6 +8,7 @@ import {
   type InvoiceStatus,
 } from "@/lib/invoices";
 import { computeAgingBucket, isOverdue } from "@/lib/aging";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 6 (AR Aging & Follow-ups). Designed in
 // session-notes/phase-6-ar-design.md §6.
@@ -56,7 +57,7 @@ function isValidEmail(v: unknown): v is string {
 }
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 function parseInvoiceId(rawId: string): number | null {

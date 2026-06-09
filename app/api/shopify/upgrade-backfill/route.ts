@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 // Default price if env var not set (locked design decision 4.7 = $99)
 const DEFAULT_PRICE_CENTS = 9900;
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Shopify integration is a Pro feature." },
         { status: 403 }

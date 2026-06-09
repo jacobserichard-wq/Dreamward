@@ -29,6 +29,7 @@ import {
   getSquareEnvironment,
 } from "@/lib/square";
 import { encryptForDb } from "@/lib/crypto";
+import { isPayingTier } from "@/lib/plans";
 
 const STATE_COOKIE_NAME = "square_oauth_state";
 
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
     url.searchParams.set("callbackUrl", "/integrations");
     return NextResponse.redirect(url);
   }
-  if (client.plan !== "pro") {
+  if (!isPayingTier(client.plan)) {
     return redirectWithError(
       req,
       "Square integration is a Pro feature. Upgrade to connect."

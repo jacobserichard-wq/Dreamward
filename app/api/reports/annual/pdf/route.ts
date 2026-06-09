@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { renderAnnualPdf } from "@/lib/reports";
 import type { Industry } from "@/lib/categories";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 7b (PDF Export for Annual Tax Reports) commit 4 of 7, per
 // session-notes/phase-7b-pdf-export-design.md §5.
@@ -18,7 +19,7 @@ import type { Industry } from "@/lib/categories";
 // /api/reports/* routes from Phase 7a.
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "pro";
+  return isPayingTier(plan);
 }
 
 function parseYear(raw: string | null, defaultYear: number): number | null {

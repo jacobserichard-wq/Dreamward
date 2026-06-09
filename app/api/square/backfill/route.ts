@@ -22,6 +22,7 @@ import {
   extractSquareLineItems,
 } from "@/lib/square";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
+import { isPayingTier } from "@/lib/plans";
 
 // Vercel Pro 60s limit, 10s headroom for the final UPDATE.
 const TIME_BUDGET_MS = 50_000;
@@ -57,7 +58,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Square integration is a Pro feature." },
         { status: 403 }

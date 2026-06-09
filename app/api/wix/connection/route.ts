@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 interface WixConnectionRow {
   instance_id: string;
@@ -43,7 +44,7 @@ export async function GET() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         {
           error:

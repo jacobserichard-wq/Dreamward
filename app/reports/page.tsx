@@ -11,6 +11,7 @@ import ReportMonthlyChart from "../components/ReportMonthlyChart";
 import ReportArSnapshot from "../components/ReportArSnapshot";
 import ScheduleCSummaryPanel from "../components/ScheduleCSummaryPanel";
 import QuarterlyEstimatesPanel from "../components/QuarterlyEstimatesPanel";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 6 of 9, per
 // session-notes/phase-7a-tax-reports-design.md §7.
@@ -192,7 +193,7 @@ export default function ReportsPage() {
         }
         const clientData = await clientRes.json();
         setPlan(clientData.plan);
-        if (clientData.plan === "pro") {
+        if (isPayingTier(clientData.plan)) {
           // Fire the settings fetch + the initial-year report in
           // parallel. Settings determines the Send-to-CPA button
           // enabled state; the report fills the page body.
@@ -268,7 +269,7 @@ export default function ReportsPage() {
     );
   }
 
-  if (plan !== "pro") {
+  if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
@@ -280,12 +281,12 @@ export default function ReportsPage() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} Tax Reports are a Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed">
-              Upgrade to Pro ($89/mo) to generate annual summaries, export
+              Start your subscription to generate annual summaries, export
               CSVs for your CPA, and send polished handoff emails — all in
-              one click.
+              one click. Every paid tier includes tax reports.
             </p>
             <Link
               href="/billing"

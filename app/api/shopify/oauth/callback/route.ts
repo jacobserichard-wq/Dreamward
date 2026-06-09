@@ -42,6 +42,7 @@ import {
   SHOPIFY_WEBHOOK_TOPICS,
 } from "@/lib/shopify";
 import { encryptForDb } from "@/lib/crypto";
+import { isPayingTier } from "@/lib/plans";
 
 const STATE_COOKIE_NAME = "shopify_oauth_state";
 
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     url.searchParams.set("callbackUrl", "/integrations");
     return NextResponse.redirect(url);
   }
-  if (client.plan !== "pro") {
+  if (!isPayingTier(client.plan)) {
     return redirectWithError(
       req,
       "Shopify integration is a Pro feature. Upgrade to connect a store."

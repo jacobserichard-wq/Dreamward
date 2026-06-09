@@ -42,6 +42,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { fetchSiteDisplayName, mintAccessToken, wixGet } from "@/lib/wix";
+import { isPayingTier } from "@/lib/plans";
 
 // UUID v4-ish pattern (Wix uses standard 8-4-4-4-12 UUIDs for instance IDs)
 const UUID_RE =
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   if (!client) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  if (client.plan !== "pro") {
+  if (!isPayingTier(client.plan)) {
     return NextResponse.json(
       { error: "Wix integration is a Pro feature." },
       { status: 403 }

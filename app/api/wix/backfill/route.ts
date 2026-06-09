@@ -35,6 +35,7 @@ import {
   type WixOrder,
 } from "@/lib/wix";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
+import { isPayingTier } from "@/lib/plans";
 
 // Vercel Pro = 60s hard limit; leaving 10s headroom for final
 // UPDATE + response serialization. Same as Shopify backfill.
@@ -58,7 +59,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Wix integration is a Pro feature." },
         { status: 403 }

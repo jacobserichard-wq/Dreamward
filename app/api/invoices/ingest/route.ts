@@ -32,10 +32,11 @@ import {
   INVOICE_CONFIDENCE_THRESHOLD,
   type EmailMessageForExtraction,
 } from "@/lib/invoiceIngest";
+import { isPayingTier } from "@/lib/plans";
 
 // Plan gate — mirrors /api/invoices (Growth+ with trial preview).
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 // Cap on Anthropic batch size. The extraction prompt scales linearly

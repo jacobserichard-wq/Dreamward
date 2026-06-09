@@ -1,0 +1,58 @@
+Pricing pivot: feature unlock across 57 files (commit 3 of 8)
+
+The heart of the strategic shift. Every product feature that was
+gated behind Pro is now available to every paying tier
+(Dream / Maker / Growth / Pro) plus the 14-day Trial. The only
+remaining Pro-only surfaces are service-level: the white-glove
+onboarding flow + the Pro onboarding-call banner. Anything that
+delivers product value — COGS, integrations, reports, SKUs,
+inventory, line-item ingest, profitability — now answers to a
+single semantic helper instead of a hard-coded Pro string check.
+
+The mechanic:
+  - lib/plans.ts: isPayingTier(plan) returns true for trial,
+    dream, maker, growth, pro (everything except canceled +
+    null). Single source of truth for "this user can use the
+    product."
+  - 50 API routes had `if (client.plan !== "pro")` replaced with
+    `if (!isPayingTier(client.plan))`. Error message updated from
+    "X is a Pro feature." to "This feature requires an active
+    subscription." — the new gate fires only for canceled users,
+    so the message reflects reality.
+  - 7 helper functions had `return plan === "growth" || plan ===
+    "pro" || plan === "trial"` collapsed to `return isPayingTier(plan)`.
+    Identical behavior, semantic naming.
+  - 4 reports routes had `return plan === "pro"` (stricter Pro-only
+    gate from Phase 7a) opened up — reports are exactly the
+    differentiator that should NOT be Pro-only under the new
+    positioning.
+  - 4 dashboard.tsx functional gates updated for trial+paying.
+  - app/integrations + app/reports upgrade-prompt copy reframed:
+    "Pro feature" -> "Active subscription required" + "Every paid
+    tier includes [feature]" to match the new pricing voice.
+
+What stays Pro-only (correctly):
+  - app/welcome-pro/page.tsx — Pro welcome flow + white-glove call
+  - app/dashboard/page.tsx onboarding-call banner cluster (Pro
+    service: same-day support + custom onboarding + quarterly
+    check-ins)
+  - app/api/gmail/route.ts + app/api/process/route.ts +
+    app/help/gmail-setup/page.tsx — Gmail-related, already
+    gated by FEATURES.GMAIL_INGEST anyway
+  - app/billing/page.tsx downgrade-flow logic — addressed in
+    commit 5 (billing page rewrite)
+  - app/profitability/page.tsx isPro prop — visited in commit 5
+
+Implementation note: a throwaway Node codemod did the bulk
+transform (53 of 57 files). Initial run inserted the import
+inside multi-line import destructures; fixed by tracking the line
+ending `from "..."` rather than the opening `import {`. Script
+was deleted after the sweep. Remaining 7 files (reports routes
+with `isPlanAllowed` helpers, integrations + reports UI pages,
+dashboard's trial-or-paying gates) edited by hand.
+
+Verification: npx tsc --noEmit clean. Manual smoke-test deferred
+to post-deploy (the visible behavioral surface is "previously-403
+endpoints now return 200 for trial/dream/maker/growth users").
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>

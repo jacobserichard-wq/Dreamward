@@ -31,6 +31,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
+import { isPayingTier } from "@/lib/plans";
 
 interface ClientInfo {
   plan: string;
@@ -190,8 +191,10 @@ function IntegrationsPageInner() {
     );
   }
 
-  // Non-Pro: upgrade card (mirrors /reports pattern from Phase 7a)
-  if (plan !== "pro") {
+  // Non-paying: upgrade card. Under the new "everyone gets every
+  // feature" pricing, this only fires for canceled/non-subscribed
+  // users since trial / dream / maker / growth / pro all qualify.
+  if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
@@ -203,7 +206,7 @@ function IntegrationsPageInner() {
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
             <p className="text-base font-medium text-amber-900 m-0 mb-2">
-              {"\u{1F512}"} Integrations are a Pro feature
+              {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
               Upgrade to Pro ($89/mo) to connect Shopify, Wix, or

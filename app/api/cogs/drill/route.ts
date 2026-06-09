@@ -34,6 +34,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 type Scope = "totals" | "channel" | "sku" | "unmatched";
 
@@ -70,9 +71,9 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "COGS reporting is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

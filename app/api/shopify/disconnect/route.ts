@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb } from "@/lib/crypto";
+import { isPayingTier } from "@/lib/plans";
 
 interface ShopifyConnectionRow {
   shop_domain: string;
@@ -46,7 +47,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         {
           error:

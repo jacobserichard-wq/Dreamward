@@ -28,6 +28,7 @@ import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb } from "@/lib/crypto";
 import { extractShopifyLineItems, type ShopifyOrder } from "@/lib/shopify";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
+import { isPayingTier } from "@/lib/plans";
 
 const TIME_BUDGET_MS = 50_000;
 
@@ -79,9 +80,9 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "SKU catalog is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

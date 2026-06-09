@@ -26,6 +26,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 // ---------------------------------------------------------------------
 // PATCH — edit the cost amount or notes in place
@@ -123,9 +124,9 @@ export async function PATCH(
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "SKU catalog is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }
@@ -271,9 +272,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "SKU catalog is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

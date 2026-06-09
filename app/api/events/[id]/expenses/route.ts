@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool, { saveProcessedItem } from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 5 §3: manual per-event expense. Inserts a processed_items row
 // with source='manual' + event_id set. The `manual` source value has
@@ -39,7 +40,7 @@ function isNonEmptyString(v: unknown): v is string {
 }
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 function parseEventId(rawId: string): number | null {

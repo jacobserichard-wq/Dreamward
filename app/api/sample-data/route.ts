@@ -3,6 +3,7 @@ import { getSessionClient } from "@/lib/getClient";
 import { saveProcessedItem } from "@/lib/db";
 import pool from "@/lib/db";
 import { getSampleData } from "@/lib/sampleData";
+import { isPayingTier } from "@/lib/plans";
 
 export async function POST() {
   try {
@@ -10,7 +11,7 @@ export async function POST() {
     if (!client) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json({ error: "Pro plan required" }, { status: 403 });
     }
 

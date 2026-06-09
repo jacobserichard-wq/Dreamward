@@ -4,6 +4,7 @@ import { getSessionClient } from "@/lib/getClient";
 import { sendEmail, arReminderEmail } from "@/lib/email";
 import { computeAgingBucket, isOverdue } from "@/lib/aging";
 import type { InvoiceRow } from "@/lib/invoices";
+import { isPayingTier } from "@/lib/plans";
 
 // Phase 6 (AR Aging & Follow-ups). Designed in
 // session-notes/phase-6-ar-design.md §6 + §7.
@@ -27,7 +28,7 @@ import type { InvoiceRow } from "@/lib/invoices";
 // and the cost (one extra reminder) is bounded.
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 function parsePositiveInt(rawId: string): number | null {

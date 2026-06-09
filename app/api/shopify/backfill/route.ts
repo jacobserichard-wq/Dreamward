@@ -40,6 +40,7 @@ import {
   type ShopifyOrder,
 } from "@/lib/shopify";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
+import { isPayingTier } from "@/lib/plans";
 
 // Free-tier cap (locked design decision 4.7). Configurable via env
 // var so we can A/B-test without a deploy. Default 30,000.
@@ -71,7 +72,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "Shopify integration is a Pro feature." },
         { status: 403 }

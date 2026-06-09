@@ -24,6 +24,7 @@ import {
   computeMarginByChannel,
   computeMarginBySku,
 } from "@/lib/cogs/compute";
+import { isPayingTier } from "@/lib/plans";
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,9 +35,9 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
-        { error: "COGS reporting is a Pro feature." },
+        { error: "This feature requires an active subscription." },
         { status: 403 }
       );
     }

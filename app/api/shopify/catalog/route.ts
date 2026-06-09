@@ -16,6 +16,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb } from "@/lib/crypto";
 import { listCatalog } from "@/lib/shopify";
+import { isPayingTier } from "@/lib/plans";
 
 interface ShopifyConnRow {
   shop_domain: string;
@@ -33,7 +34,7 @@ export async function GET() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "SKU catalog import is a Pro feature." },
         { status: 403 }

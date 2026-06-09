@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSessionClient } from "@/lib/getClient";
 import { buildOauthAuthorizeUrl } from "@/lib/square";
+import { isPayingTier } from "@/lib/plans";
 
 const STATE_COOKIE_NAME = "square_oauth_state";
 const STATE_COOKIE_MAX_AGE_SECONDS = 600; // 10 minutes
@@ -29,7 +30,7 @@ export async function POST() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         {
           error:

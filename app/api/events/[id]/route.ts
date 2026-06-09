@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { computeRoundTripMiles } from "@/lib/distance";
+import { isPayingTier } from "@/lib/plans";
 
 interface EventRow {
   id: number;
@@ -128,7 +129,7 @@ function isNonEmptyString(v: unknown): v is string {
 }
 
 function isPlanAllowed(plan: string | null | undefined): boolean {
-  return plan === "growth" || plan === "pro" || plan === "trial";
+  return isPayingTier(plan);
 }
 
 function parseEventId(rawId: string): number | null {

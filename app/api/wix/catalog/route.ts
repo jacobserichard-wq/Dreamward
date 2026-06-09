@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { listCatalog, mintAccessToken } from "@/lib/wix";
+import { isPayingTier } from "@/lib/plans";
 
 interface WixConnRow {
   instance_id: string;
@@ -29,7 +30,7 @@ export async function GET() {
         { status: 401 }
       );
     }
-    if (client.plan !== "pro") {
+    if (!isPayingTier(client.plan)) {
       return NextResponse.json(
         { error: "SKU catalog import is a Pro feature." },
         { status: 403 }
