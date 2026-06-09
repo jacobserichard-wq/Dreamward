@@ -45,7 +45,6 @@ export interface SetupChecklistProps {
   // Derived signals (existing):
   gmailConnected: boolean;
   hasRealProcessedItems: boolean;
-  hasSampleItems: boolean;
   homeAddressSet: boolean;
   cpaEmailSet: boolean;
   taxBracketSet: boolean;
@@ -57,6 +56,13 @@ export interface SetupChecklistProps {
   hasEvents?: boolean;
   /** True when the user has at least one invoice row. */
   hasInvoices?: boolean;
+  /** Sub-session 33: true when the SKU catalog has at least one
+   *  SKU — the signal that the product-tracking flow has started
+   *  (a store synced line items, or the user added SKUs manually). */
+  hasSku?: boolean;
+  /** Sub-session 33: true when at least one SKU has a cost-history
+   *  row — the action that turns SKUs into gross-margin tracking. */
+  hasCostedSku?: boolean;
 
   // Form state for the inline business-info item (onboarding mode):
   businessName?: string;
@@ -166,12 +172,53 @@ export default function SetupChecklist(props: SetupChecklistProps) {
           },
         ]
       : []),
+    // ── COGS onboarding (Sub-session 33). The gross-margin story is
+    //    the headline value prop, so it gets first-class onboarding
+    //    presence. "Connect your store" populates the SKU catalog
+    //    automatically; "Add product costs" turns those SKUs into
+    //    gross-margin tracking. Both skippable — market-only sellers
+    //    without an online store can skip the store-connect step. ──
+    {
+      id: "connect_store",
+      label: "Connect your store (Shopify, Wix, or Square)",
+      done: props.hasSku ?? false,
+      action: { kind: "link", href: "/integrations" },
+      buttonLabel: "Connect",
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
+    },
+    {
+      id: "setup_cogs",
+      label: "Add costs to your products to unlock gross margin",
+      done: props.hasCostedSku ?? false,
+      action: { kind: "link", href: "/skus" },
+      buttonLabel: "Open SKUs",
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
+    },
     {
       id: "upload",
-      label: "Upload your first file or process an email",
+      label: "Upload a file or add your first transaction",
       done: props.hasRealProcessedItems,
       action: { kind: "upload" },
       buttonLabel: "Upload",
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
+    },
+    // ── Event + invoice. Sub-session 33: opened to every paying
+    //    tier (was growth/pro) since the pricing pivot put events +
+    //    AR on every plan. ───────────────────────────────────────
+    {
+      id: "add_first_event",
+      label: "Add your first event (market, fair, gig)",
+      done: props.hasEvents ?? false,
+      action: { kind: "link", href: "/events" },
+      buttonLabel: "Open Events",
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
+    },
+    {
+      id: "add_first_invoice",
+      label: "Add your first invoice (AR follow-up)",
+      done: props.hasInvoices ?? false,
+      action: { kind: "link", href: "/invoices" },
+      buttonLabel: "Open Invoices",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
     {
@@ -182,39 +229,15 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       buttonLabel: "Open Settings",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
-    // ── New items (commit 4): event + invoice. Only meaningful on
-    //    plans where those modules exist (growth + pro). ────────────
-    {
-      id: "add_first_event",
-      label: "Add your first event (market, fair, gig)",
-      done: props.hasEvents ?? false,
-      action: { kind: "link", href: "/events" },
-      buttonLabel: "Open Events",
-      visibleOn: ["growth", "pro"],
-    },
-    {
-      id: "add_first_invoice",
-      label: "Add your first invoice (AR follow-up)",
-      done: props.hasInvoices ?? false,
-      action: { kind: "link", href: "/invoices" },
-      buttonLabel: "Open Invoices",
-      visibleOn: ["growth", "pro"],
-    },
-    {
-      id: "sample_cleared",
-      label: "Clear the sample data when you're ready",
-      done: !props.hasSampleItems,
-      action: { kind: "clearSample" },
-      buttonLabel: "Clear",
-      visibleOn: ["dream", "maker", "growth", "pro"],
-    },
+    // Sub-session 33: CPA email + tax bracket opened to every paying
+    // tier (were pro-only) since reports are now on every plan.
     {
       id: "cpa_email",
       label: "Set your CPA's email for one-click handoff",
       done: props.cpaEmailSet,
       action: { kind: "link", href: "/settings" },
       buttonLabel: "Open Settings",
-      visibleOn: ["pro"],
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
     {
       id: "tax_bracket",
@@ -222,7 +245,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       done: props.taxBracketSet,
       action: { kind: "link", href: "/settings" },
       buttonLabel: "Open Settings",
-      visibleOn: ["pro"],
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
   ];
 

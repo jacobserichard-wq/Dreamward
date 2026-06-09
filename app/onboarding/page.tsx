@@ -48,7 +48,6 @@ interface SettingsResponse {
 }
 
 interface ItemSummary {
-  hasSample: boolean;
   hasReal: boolean;
   hasGmail: boolean;
 }
@@ -63,12 +62,13 @@ export default function OnboardingPage() {
   const [homeAddress, setHomeAddress] = useState<string>("");
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
   const [itemSummary, setItemSummary] = useState<ItemSummary>({
-    hasSample: false,
     hasReal: false,
     hasGmail: false,
   });
   const [eventCount, setEventCount] = useState(0);
   const [invoiceCount, setInvoiceCount] = useState(0);
+  const [hasSku, setHasSku] = useState(false);
+  const [hasCostedSku, setHasCostedSku] = useState(false);
 
   // Skip flow state.
   const [pendingSkipId, setPendingSkipId] = useState<string | null>(null);
@@ -79,13 +79,14 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clientRes, settingsRes, itemsRes, eventsRes, invoicesRes] =
+      const [clientRes, settingsRes, itemsRes, eventsRes, invoicesRes, skusRes] =
         await Promise.allSettled([
           fetch("/api/client"),
           fetch("/api/settings"),
           fetch("/api/items"),
           fetch("/api/events"),
           fetch("/api/invoices?limit=1"),
+          fetch("/api/skus"),
         ]);
 
       // /api/client — required; bail to /signin if unauthenticated
@@ -114,7 +115,6 @@ export default function OnboardingPage() {
         };
         const items = Array.isArray(data.items) ? data.items : [];
         setItemSummary({
-          hasSample: items.some((i) => i.source === "sample"),
           hasReal: items.some((i) => i.source !== "sample"),
           hasGmail: items.some(
             (i) => i.source === "gmail" || i.source === "email"
@@ -136,6 +136,20 @@ export default function OnboardingPage() {
         setInvoiceCount(
           Array.isArray(data.invoices) ? data.invoices.length : 0
         );
+      }
+
+      // Sub-session 33: SKU signals drive the two COGS-onboarding
+      // steps. hasSku = catalog populated (store synced or manual);
+      // hasCostedSku = at least one SKU has a cost row (gross-margin
+      // tracking active). /api/skus 403s for non-paying tiers — the
+      // allSettled + .ok guard means that just leaves both false.
+      if (skusRes.status === "fulfilled" && skusRes.value.ok) {
+        const data = (await skusRes.value.json()) as {
+          skus?: Array<{ currentCost: number | null }>;
+        };
+        const skus = Array.isArray(data.skus) ? data.skus : [];
+        setHasSku(skus.length > 0);
+        setHasCostedSku(skus.some((s) => s.currentCost != null));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load setup data");
@@ -302,7 +316,6 @@ export default function OnboardingPage() {
           plan={clientInfo.plan}
           gmailConnected={itemSummary.hasGmail}
           hasRealProcessedItems={itemSummary.hasReal}
-          hasSampleItems={itemSummary.hasSample}
           homeAddressSet={homeAddress.trim().length > 0}
           cpaEmailSet={cpaEmailSet}
           taxBracketSet={
@@ -312,6 +325,8 @@ export default function OnboardingPage() {
           industrySet={industrySet}
           hasEvents={eventCount > 0}
           hasInvoices={invoiceCount > 0}
+          hasSku={hasSku}
+          hasCostedSku={hasCostedSku}
           businessName={clientInfo.businessName ?? ""}
           industry={clientInfo.industry ?? ""}
           skipped={skipped as Record<string, string>}
