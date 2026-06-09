@@ -35,6 +35,7 @@ import SkuForm, {
 } from "../../components/SkuForm";
 import ConfirmModal from "../../components/ConfirmModal";
 import ReceiveStockModal from "../../components/ReceiveStockModal";
+import RecipeSection from "../../components/RecipeSection";
 
 interface SkuRow {
   id: number;
@@ -797,6 +798,11 @@ export default function SkuDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Recipe (bill of materials) — Tier 2. Defines what this
+            product is made of so production runs can draw down
+            materials. */}
+        <RecipeSection skuId={sku.id} skuCode={sku.code} />
 
         {/* Cost history */}
         <section className="mb-6">
