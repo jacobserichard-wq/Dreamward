@@ -596,7 +596,7 @@ export default function SkuDetailPage() {
           />
           <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
             <p className="text-base font-medium text-slate-700 m-0 mb-4">
-              SKU catalog is part of FlowWork Pro.
+              SKU catalog is part of Dreamward Pro.
             </p>
             <Link
               href="/upgrade"

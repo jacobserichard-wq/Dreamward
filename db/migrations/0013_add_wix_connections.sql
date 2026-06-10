@@ -3,7 +3,7 @@
 -- commit 1 of ~5 in 10a.
 --
 -- One new table (wix_connections) holding the encrypted OAuth
--- tokens per FlowWork client + sync state + backfill bookkeeping.
+-- tokens per Dreamward client + sync state + backfill bookkeeping.
 -- Mirrors the Phase 8 shopify_connections schema with a few Wix-
 -- specific differences:
 --
@@ -22,10 +22,10 @@
 --     now that we have multi-integration tokens; renaming would
 --     require a key-rotation script. Defer to a future sub-session
 --     when we add Etsy/Square.)
---   - UNIQUE(client_id) enforces "one Wix site per FlowWork client"
+--   - UNIQUE(client_id) enforces "one Wix site per Dreamward client"
 --     in v1 (multi-site is v2; matches Phase 8 decision 4.2).
 --   - UNIQUE(instance_id) prevents the same Wix site from being
---     connected to two FlowWork accounts simultaneously.
+--     connected to two Dreamward accounts simultaneously.
 --   - Plan gating: NOT enforced at DB layer. API routes will gate
 --     on client.plan === 'pro' (matches Shopify Pro-gating).
 --
@@ -83,9 +83,9 @@ CREATE TABLE IF NOT EXISTS wix_connections (
 
   updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- v1: one Wix site per FlowWork client (matches Phase 8 / Shopify pattern)
+  -- v1: one Wix site per Dreamward client (matches Phase 8 / Shopify pattern)
   UNIQUE (client_id),
-  -- Same Wix site can't be connected to two FlowWork accounts
+  -- Same Wix site can't be connected to two Dreamward accounts
   UNIQUE (instance_id)
 );
 

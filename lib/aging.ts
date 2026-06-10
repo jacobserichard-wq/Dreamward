@@ -6,7 +6,7 @@
 // Buckets are derived, not stored — per phase-6-ar-design.md §1 #7,
 // bucket boundaries are policy that may change (some businesses use
 // 15/30/60/90 instead of 30/60/90+). Storing would require a daily
-// cron sweep; computing in JS per-row is sub-millisecond at FlowWork
+// cron sweep; computing in JS per-row is sub-millisecond at Dreamward
 // scale (small vendors, hundreds of invoices each).
 
 export type AgingBucket =

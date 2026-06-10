@@ -2,9 +2,9 @@
 
 **Last updated: May 5, 2026**
 
-FlowWork ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use FlowWork at flowworks.it.com (the "Service"). By using the Service, you agree to this policy.
+Dreamward ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use Dreamward at godreamward.com (the "Service"). By using the Service, you agree to this policy.
 
-FlowWork is operated by Richard Jacobsen, an individual sole proprietor based in Cedar Lake, Indiana, USA. For privacy questions, contact jacobse.richard@gmail.com.
+Dreamward is operated by Richard Jacobsen, an individual sole proprietor based in Cedar Lake, Indiana, USA. For privacy questions, contact jacobse.richard@gmail.com.
 
 ---
 
@@ -24,21 +24,21 @@ We do not collect Social Security numbers, government IDs, biometric data, geolo
 
 ## 2. How we use Google user data
 
-FlowWork's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+Dreamward's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
 We request the following Google OAuth scopes:
 
-- **`openid`**, **`email`**, and **`profile`** — to identify you and create your FlowWork account.
+- **`openid`**, **`email`**, and **`profile`** — to identify you and create your Dreamward account.
 - **`https://www.googleapis.com/auth/gmail.readonly`** — to read the content of email messages in your Gmail account. This is a "Restricted" scope under Google's classification.
 - **`https://www.googleapis.com/auth/gmail.labels`** — to view and manage Gmail labels (used to identify which emails you have designated for processing).
 
-**What the Gmail scope grants vs. how FlowWork uses it.** The `gmail.readonly` scope is broad: it grants FlowWork's servers the technical ability to read any message in your Gmail account. We disclose this honestly because Google requires us to request the scope at this level — Gmail does not currently offer a narrower production scope that would let us read only labeled messages while still accessing message bodies.
+**What the Gmail scope grants vs. how Dreamward uses it.** The `gmail.readonly` scope is broad: it grants Dreamward's servers the technical ability to read any message in your Gmail account. We disclose this honestly because Google requires us to request the scope at this level — Gmail does not currently offer a narrower production scope that would let us read only labeled messages while still accessing message bodies.
 
-In practice, FlowWork's application code only reads messages that match the Gmail labels you configure (by default: Invoices, Expenses, AR, or whatever labels you select during onboarding). We do not retrieve, store, display, or process messages outside those labels. We do not maintain copies of your full inbox. The broader technical access is not used, not logged, and not retained beyond the duration of the labeled-message fetch.
+In practice, Dreamward's application code only reads messages that match the Gmail labels you configure (by default: Invoices, Expenses, AR, or whatever labels you select during onboarding). We do not retrieve, store, display, or process messages outside those labels. We do not maintain copies of your full inbox. The broader technical access is not used, not logged, and not retained beyond the duration of the labeled-message fetch.
 
-If you would prefer not to grant this level of access, you should not connect your Gmail account to FlowWork. CSV upload remains available as an alternative for users who do not want to link their Gmail.
+If you would prefer not to grant this level of access, you should not connect your Gmail account to Dreamward. CSV upload remains available as an alternative for users who do not want to link their Gmail.
 
-We use Gmail data **only** to provide the user-facing accounting automation features of FlowWork. Specifically:
+We use Gmail data **only** to provide the user-facing accounting automation features of Dreamward. Specifically:
 
 - We do **not** sell Gmail data to anyone.
 - We do **not** use Gmail data for advertising or marketing.
@@ -46,7 +46,7 @@ We use Gmail data **only** to provide the user-facing accounting automation feat
 - We do **not** use Gmail data to train, fine-tune, or develop generalized AI or machine learning models. (Anthropic's Claude API, which we use to extract structured data from your emails, does not train on API inputs by default.)
 - We do **not** transfer Gmail data to third parties except subprocessors essential to providing the Service (described in Section 5).
 
-You can revoke FlowWork's access to your Google account at any time at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+You can revoke Dreamward's access to your Google account at any time at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
 ---
 
@@ -54,7 +54,7 @@ You can revoke FlowWork's access to your Google account at any time at [myaccoun
 
 We use the information we collect to:
 
-- Create and manage your FlowWork account
+- Create and manage your Dreamward account
 - Read and process emails you have labeled, to extract invoice/receipt data using AI
 - Display your processed data in dashboards, reports, and exports
 - Process payments through Stripe
@@ -69,7 +69,7 @@ We do not use your information for advertising, profiling, or any purpose unrela
 
 ## 4. AI processing of your data
 
-FlowWork uses Anthropic's Claude API to read the content of emails and CSV uploads and extract structured information (vendor name, amount, due date, category). When this happens:
+Dreamward uses Anthropic's Claude API to read the content of emails and CSV uploads and extract structured information (vendor name, amount, due date, category). When this happens:
 
 - Email content is sent to Anthropic's servers in real time.
 - Anthropic does **not** train its AI models on data submitted through its API, per Anthropic's published commercial terms.
@@ -82,7 +82,7 @@ If you do not want your emails processed by an AI model, do not connect your Gma
 
 ## 5. Subprocessors and third parties
 
-We share information with the following service providers who help us operate FlowWork. Each is bound by data protection terms and uses your data only to provide their service to us:
+We share information with the following service providers who help us operate Dreamward. Each is bound by data protection terms and uses your data only to provide their service to us:
 
 | Service | What they receive | Purpose |
 |---|---|---|
@@ -135,7 +135,7 @@ To exercise any of these rights, email **jacobse.richard@gmail.com** with your r
 
 If you are a California resident, you have additional rights under the CCPA, including the right to know what personal information we have collected and the right to opt out of any "sale" of personal information (we do not sell personal information).
 
-If you are in the EEA or UK, you have rights under GDPR including data portability and the right to object to processing. The legal basis for our processing is your consent and the performance of the contract you enter when subscribing to FlowWork.
+If you are in the EEA or UK, you have rights under GDPR including data portability and the right to object to processing. The legal basis for our processing is your consent and the performance of the contract you enter when subscribing to Dreamward.
 
 ---
 
@@ -143,7 +143,7 @@ If you are in the EEA or UK, you have rights under GDPR including data portabili
 
 We protect your data with industry-standard measures:
 
-- All connections to FlowWork are encrypted with TLS.
+- All connections to Dreamward are encrypted with TLS.
 - Database contents are encrypted at rest.
 - OAuth tokens are encrypted with NextAuth's session encryption.
 - Access to production systems is limited to authorized personnel (currently the founder).
@@ -155,7 +155,7 @@ No system is perfectly secure. If a data breach affects you, we will notify you 
 
 ## 10. Children's privacy
 
-FlowWork is not directed to children under 13, and we do not knowingly collect information from anyone under 13. If you believe we have collected information from a child, contact us and we will delete it.
+Dreamward is not directed to children under 13, and we do not knowingly collect information from anyone under 13. If you believe we have collected information from a child, contact us and we will delete it.
 
 ---
 
@@ -180,4 +180,4 @@ For privacy questions, requests, or concerns:
 
 ---
 
-*This Privacy Policy applies only to FlowWork at flowworks.it.com. Linked services have their own privacy policies.*
+*This Privacy Policy applies only to Dreamward at godreamward.com. Linked services have their own privacy policies.*

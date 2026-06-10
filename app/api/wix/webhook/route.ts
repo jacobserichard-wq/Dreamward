@@ -8,7 +8,7 @@
 // Subscribe in Wix Dev Center → Develop → Webhooks → Create Webhook:
 //   - Event category: eCommerce (or Stores, depending on Wix's
 //     labeling) → "Order Created" / "Order Paid" / etc.
-//   - Callback URL: https://flowworks.it.com/api/wix/webhook
+//   - Callback URL: https://godreamward.com/api/wix/webhook
 //   - Public Key: already in WIX_WEBHOOK_PUBLIC_KEY env var
 //
 // Flow per delivery:
@@ -20,7 +20,7 @@
 //   3. Extract eventType + instanceId from envelope
 //   4. Look up wix_connections row by instance_id (404-equivalent
 //      → log + 200; could be a webhook for an instance bound to a
-//      different FlowWork account or one we don't track)
+//      different Dreamward account or one we don't track)
 //   5. Route by event type:
 //      - Order created/paid/updated → parse order from data field
 //        + upsert into processed_items
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
   if (!conn) {
     // Webhook for an instance we don't track. Could be a merchant
-    // who installed the app but never linked it to FlowWork, or
+    // who installed the app but never linked it to Dreamward, or
     // someone else's install we shouldn't have heard about.
     console.log(
       `Wix webhook: event=${eventType} instance=${instanceId} ` +

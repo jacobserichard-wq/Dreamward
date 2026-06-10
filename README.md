@@ -1,10 +1,10 @@
-# FlowWork
+# Dreamward
 
 **AI-powered accounting automation for small businesses.**
 
-FlowWork ingests invoices and receipts from Gmail or CSV uploads, uses Claude to extract structured data + categorize transactions, tracks revenue + expenses + mileage across events, manages wholesale/consignment invoices with one-tap follow-up reminders, and generates annual tax summaries you can hand to your CPA — all in one place.
+Dreamward ingests invoices and receipts from Gmail or CSV uploads, uses Claude to extract structured data + categorize transactions, tracks revenue + expenses + mileage across events, manages wholesale/consignment invoices with one-tap follow-up reminders, and generates annual tax summaries you can hand to your CPA — all in one place.
 
-Live at **[flowworks.it.com](https://flowworks.it.com)**.
+Live at **[godreamward.com](https://godreamward.com)**.
 
 ---
 
@@ -24,7 +24,7 @@ Small-business operators who outgrew spreadsheets but don't want QuickBooks's co
 
 ## What it does
 
-**Smart intake.** Connect Gmail → FlowWork auto-fetches invoices and receipts by label. Or upload a CSV from Square, Stripe, QuickBooks, Xero, or Wave — Claude figures out the column mapping automatically. Duplicate detection prevents double-processing.
+**Smart intake.** Connect Gmail → Dreamward auto-fetches invoices and receipts by label. Or upload a CSV from Square, Stripe, QuickBooks, Xero, or Wave — Claude figures out the column mapping automatically. Duplicate detection prevents double-processing.
 
 **AI extraction + classification.** Claude reads each document and extracts vendor, amount, due date, invoice number, plus a categorization tied to your industry's taxonomy (~87 categories across 11 industries).
 
@@ -38,11 +38,14 @@ Small-business operators who outgrew spreadsheets but don't want QuickBooks's co
 
 ## Pricing
 
-| Plan | Price | Auth | Key features |
-|---|---|---|---|
-| **Starter** | $19/mo | Email magic-link | 100 items/month, CSV upload, dashboard |
-| **Growth** | $49/mo | Email magic-link | Unlimited items, events, mileage, AR aging, exports |
-| **Pro** | $89/mo | Google sign-in + Gmail | Multi-account, custom categories, tax reports, Gmail auto-fetch, white-glove onboarding |
+"Built for people. Priced for people." Every paying tier gets every product feature — tiers are sized by your business's annual revenue, with automatic monthly tier reconciliation.
+
+| Plan | Price | For businesses with annual revenue |
+|---|---|---|
+| **Dream** | $10/mo | under $5k |
+| **Maker** | $19/mo | $5k–$50k |
+| **Growth** | $49/mo | $50k–$500k |
+| **Pro** | $99/mo | $500k+ |
 
 14-day free trial on all tiers. No credit card required.
 
@@ -60,7 +63,7 @@ Small-business operators who outgrew spreadsheets but don't want QuickBooks's co
 - **Maps:** Google Maps Distance Matrix (event mileage)
 - **PDF:** @react-pdf/renderer (tax report generation)
 - **Charts:** Recharts (profitability dashboard)
-- **Hosting:** Vercel (custom domain `flowworks.it.com`, Vercel Cron for daily/weekly jobs)
+- **Hosting:** Vercel (custom domain `godreamward.com`, Vercel Cron for daily/weekly jobs)
 - **Booking:** Calendly (Pro onboarding calls)
 
 ---
@@ -76,7 +79,7 @@ Small-business operators who outgrew spreadsheets but don't want QuickBooks's co
 ```bash
 # 1. Clone + install
 git clone <this-repo>
-cd flowwork
+cd dreamward
 npm install
 
 # 2. Copy the env template and fill in real values

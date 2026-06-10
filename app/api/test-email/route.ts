@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 // Must match lib/email.ts FROM_EMAIL exactly so this test reproduces
 // production conditions (display-name format, not bare address).
-const FROM_EMAIL = "FlowWork <hello@flowworks.it.com>";
+const FROM_EMAIL = "Dreamward <hello@godreamward.com>";
 const TEST_TO = "jacobse.richard@gmail.com";
 
 export async function GET() {
@@ -28,7 +28,7 @@ export async function GET() {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: TEST_TO,
-        subject: "FlowWork Test Email",
+        subject: "Dreamward Test Email",
         html: "<p>If you see this, Resend is working from the deployed Vercel function.</p>",
       }),
     });

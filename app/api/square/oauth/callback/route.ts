@@ -10,7 +10,7 @@
 //
 // Flow:
 //   1. CSRF: verify state cookie matches state query param
-//   2. Verify FlowWork session + Pro plan
+//   2. Verify Dreamward session + Pro plan
 //   3. Exchange code → access_token + refresh_token + merchant_id
 //   4. Encrypt BOTH tokens (access has 30-day expiry, refresh
 //      90-day; both rotate over time and live in DB)
@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
     const friendly = msg.includes("square_connections_client_id_key")
       ? "You already have a Square account connected. Disconnect the existing one before connecting a new account."
       : msg.includes("merchant_id")
-        ? "This Square account is already connected to a different FlowWork account."
+        ? "This Square account is already connected to a different Dreamward account."
         : "Couldn't save the Square connection. Please try again.";
     return redirectWithError(req, friendly);
   }

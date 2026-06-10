@@ -21,7 +21,7 @@ import { isPayingTier } from "@/lib/plans";
 //      figures
 //   4. base64-encode the CSV, attach to a cpaAnnualSummaryEmail
 //   5. sendEmail with Reply-To = client.email so the CPA's reply
-//      threads back to the user, not to FlowWork support
+//      threads back to the user, not to Dreamward support
 //
 // No DB writes (no "last sent" tracking in v1 — reports are
 // idempotent; the user can re-send any time).
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
       typeof client.business_name === "string" &&
       client.business_name.trim().length > 0
         ? client.business_name.trim()
-        : "FlowWork user";
+        : "Dreamward user";
     // Best-effort first-name extraction from the user's email local-part
     // for the signoff. The clients table has email + business_name; no
     // separate first/last name fields in v1, so we make do.

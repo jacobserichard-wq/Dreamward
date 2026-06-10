@@ -28,7 +28,7 @@ function SignInContent() {
         <div className="inline-flex items-center gap-2.5 mb-2">
           <span className="text-3xl">{"⚡"}</span>
           <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            FlowWork
+            Dreamward
           </span>
         </div>
         <p className="text-[15px] text-slate-500 mb-8">Sign in to continue</p>

@@ -34,7 +34,7 @@ const ETSY_AUTHORIZE_URL = "https://www.etsy.com/oauth/connect";
 const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 
 /** Scopes: receipts/transactions for sales import; listings for the
- *  catalog pull. Both read-only — FlowWork never writes to a shop. */
+ *  catalog pull. Both read-only — Dreamward never writes to a shop. */
 export const ETSY_SCOPES = ["transactions_r", "listings_r"] as const;
 
 export function getEtsyApiKey(): string {
@@ -200,7 +200,7 @@ interface EtsyShopResponse {
 }
 
 /** Resolve the authorizing user's shop (id + display name). Throws
- *  when the account has no shop — FlowWork needs a seller account. */
+ *  when the account has no shop — Dreamward needs a seller account. */
 export async function fetchShopIdentity(
   accessToken: string
 ): Promise<{ shopId: string; shopName: string | null }> {

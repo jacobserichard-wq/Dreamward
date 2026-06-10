@@ -216,7 +216,7 @@ export default function CogsPage() {
           />
           <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
             <p className="text-base font-medium text-slate-700 m-0 mb-4">
-              Gross margin reporting is part of FlowWork Pro.
+              Gross margin reporting is part of Dreamward Pro.
             </p>
             <Link
               href="/upgrade"
@@ -248,7 +248,7 @@ export default function CogsPage() {
 
         <SectionTip id="cogs" title="How gross margin gets calculated">
           Margin = revenue minus the cost of goods sold. For each sale,
-          FlowWork looks up the SKU&apos;s cost on the date it sold (its
+          Dreamward looks up the SKU&apos;s cost on the date it sold (its
           effective-dated cost row) — so a price change today never
           rewrites last month&apos;s margin. If a SKU shows $0 COGS, it
           has no cost row covering the sale date; add one on the{" "}
@@ -353,7 +353,7 @@ export default function CogsPage() {
                 </p>
                 <p className="text-xs m-0 text-amber-800">
                   These contribute to revenue but not COGS — your margin
-                  reading is incomplete until they&apos;re mapped to FlowWork
+                  reading is incomplete until they&apos;re mapped to Dreamward
                   SKUs.{" "}
                   <Link
                     href="/skus/unmatched"

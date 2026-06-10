@@ -9,7 +9,7 @@
 //   - One row PER LISTING, not per variation. Receipt transactions
 //     carry listing_id as the alias key (see mapTransactionsToLineItems
 //     in lib/etsy.ts), so a listing's variations all resolve to the
-//     same FlowWork SKU. The first variation SKU is surfaced as the
+//     same Dreamward SKU. The first variation SKU is surfaced as the
 //     suggested code.
 //   - cost is always null — Etsy's API exposes the retail price,
 //     never the merchant's cost. The bulk-import preview lets the
@@ -150,7 +150,7 @@ export async function GET() {
       rows,
       ...(truncated
         ? {
-            warning: `Showing your first ${rows.length.toLocaleString()} active listings — your shop has more. Email hello@flowworks.it.com and we'll raise the limit for you.`,
+            warning: `Showing your first ${rows.length.toLocaleString()} active listings — your shop has more. Email hello@godreamward.com and we'll raise the limit for you.`,
           }
         : {}),
     });

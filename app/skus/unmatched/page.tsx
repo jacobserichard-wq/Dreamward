@@ -247,7 +247,7 @@ export default function UnmatchedPage() {
           />
           <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
             <p className="text-base font-medium text-slate-700 m-0 mb-4">
-              SKU catalog is part of FlowWork Pro.
+              SKU catalog is part of Dreamward Pro.
             </p>
             <Link
               href="/upgrade"
@@ -269,7 +269,7 @@ export default function UnmatchedPage() {
           backHref="/skus"
           backLabel="SKUs"
           title="Unmatched items"
-          subtitle="Every line item we couldn't auto-resolve to a FlowWork SKU. Mapping one here lights up COGS on every historical sale of that item — instantly."
+          subtitle="Every line item we couldn't auto-resolve to a Dreamward SKU. Mapping one here lights up COGS on every historical sale of that item — instantly."
         />
 
         {error && (
@@ -365,7 +365,7 @@ export default function UnmatchedPage() {
             <p className="text-sm text-slate-500 m-0 mb-4 max-w-md mx-auto">
               {activePlatform
                 ? `No unmatched ${platformMeta(activePlatform).label} items right now. Clear the filter to see other platforms.`
-                : "Every line item across all your connected platforms is mapped to a FlowWork SKU. New sales will appear here if they bring in items we haven't seen before."}
+                : "Every line item across all your connected platforms is mapped to a Dreamward SKU. New sales will appear here if they bring in items we haven't seen before."}
             </p>
             <Link
               href="/skus"

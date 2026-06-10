@@ -1,7 +1,7 @@
 -- scripts/wipe-client-data.sql
 --
 -- Sub-session 24: ops utility for wiping a single client's data from
--- FlowWork end-to-end. Used to:
+-- Dreamward end-to-end. Used to:
 --   - Test the signup/onboarding flow as a true first-time user
 --     (delete your dev account, re-sign-up to walk through the redesign)
 --   - Honor a customer's right-to-erasure request (GDPR / CCPA)

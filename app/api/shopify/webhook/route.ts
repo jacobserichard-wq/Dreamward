@@ -4,7 +4,7 @@
 //
 // PUBLIC endpoint that receives Shopify webhook POSTs. NO session
 // auth (Shopify doesn't send a session cookie); security comes from
-// HMAC-SHA256 signature verification against the FlowWork app
+// HMAC-SHA256 signature verification against the Dreamward app
 // client secret.
 //
 // proxy.ts intentionally EXCLUDES /api/shopify/webhook from the
@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing headers" }, { status: 400 });
   }
 
-  // ── 4. Map shop → FlowWork client ────────────────────────────
+  // ── 4. Map shop → Dreamward client ────────────────────────────
   // shop_domain is UNIQUE in shopify_connections, so at most one
-  // row matches. If none matches, the FlowWork connection was
+  // row matches. If none matches, the Dreamward connection was
   // disconnected but Shopify hasn't processed the webhook deletion
   // yet — silently 200 (idempotent, no work to do).
   const lookup = await pool.query<ShopifyConnectionLookup>(

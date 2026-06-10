@@ -13,7 +13,7 @@
 //      browser
 //
 // The actual token exchange happens at the callback route (commit 5)
-// after Shopify redirects the merchant back to FlowWork.
+// after Shopify redirects the merchant back to Dreamward.
 //
 // Why POST + JSON body (not GET + redirect): we want to verify Pro
 // status server-side BEFORE issuing the redirect, and we want the
@@ -43,7 +43,7 @@ const STATE_COOKIE_MAX_AGE_SECONDS = 600; // 10 minutes — generous for slow me
 function callbackUrl(): string {
   return (
     process.env.SHOPIFY_OAUTH_CALLBACK_URL ||
-    "https://flowworks.it.com/api/shopify/oauth/callback"
+    "https://godreamward.com/api/shopify/oauth/callback"
   );
 }
 

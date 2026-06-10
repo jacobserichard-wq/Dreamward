@@ -160,7 +160,7 @@ export function AnnualPdfDocument({
       <Page size="LETTER" style={styles.page}>
         {/* Header — brand + year tag */}
         <View style={styles.header}>
-          <Text style={styles.brand}>FlowWork</Text>
+          <Text style={styles.brand}>Dreamward</Text>
           <Text style={styles.yearTag}>Tax Year {summary.year}</Text>
         </View>
         <Text style={styles.title}>{businessName}</Text>
@@ -492,7 +492,7 @@ export function AnnualPdfDocument({
           </Text>
           <Text style={styles.notesItem}>
             • Deductibility marker (D) on expense rows = federally
-            tax-deductible per the FlowWork category taxonomy. Confirm
+            tax-deductible per the Dreamward category taxonomy. Confirm
             with your CPA — timing and Section 179 elections may affect.
           </Text>
           <Text style={styles.notesItem}>
@@ -525,7 +525,7 @@ export function AnnualPdfDocument({
           {s.unknownAmount > 0 && (
             <Text style={styles.notesItem}>
               • {fmtUsd(s.unknownAmount)} in transactions had unclassified
-              categories — excluded from totals. See the FlowWork dashboard
+              categories — excluded from totals. See the Dreamward dashboard
               to categorize.
             </Text>
           )}
@@ -536,7 +536,7 @@ export function AnnualPdfDocument({
             on-screen footer. */}
         <View style={styles.footer}>
           <Text>
-            Generated {generatedAt} from FlowWork. Verify against source
+            Generated {generatedAt} from Dreamward. Verify against source
             documents before filing.
           </Text>
         </View>

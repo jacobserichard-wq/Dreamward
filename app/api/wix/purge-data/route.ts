@@ -9,7 +9,7 @@
 // Disconnect = "stop syncing new orders, but keep my historical
 // reports intact" (locked decision 4.8 mirroring Shopify Phase 8b).
 //
-// Purge = "I want the Wix-imported orders GONE from my FlowWork
+// Purge = "I want the Wix-imported orders GONE from my Dreamward
 // reports too". Different intent, different UX, separate destructive
 // op. Surfaced as a second button in the card (under Disconnect)
 // with a stronger ConfirmModal warning.

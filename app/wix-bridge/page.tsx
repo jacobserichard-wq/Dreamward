@@ -6,9 +6,9 @@
 // ─────────────────────────────────────────────────────────────────
 // How Wix calls this page:
 // ─────────────────────────────────────────────────────────────────
-// When a merchant clicks the FlowWork widget in their Wix dashboard,
+// When a merchant clicks the Dreamward widget in their Wix dashboard,
 // Wix loads:
-//     https://flowworks.it.com/wix-bridge?instance=<JWT>
+//     https://godreamward.com/wix-bridge?instance=<JWT>
 // where <JWT> is a Wix-signed token containing the instance info.
 // Per Wix docs:
 //   - param name is "instance"
@@ -18,20 +18,20 @@
 // We decode the JWT client-side (no signature verify — that happens
 // server-side in /api/wix/bind via mintAccessToken which calls Wix's
 // own API). Extract the instanceId UUID, then provide a button that
-// opens FlowWork in a new tab with the UUID as a query param.
+// opens Dreamward in a new tab with the UUID as a query param.
 //
 // ─────────────────────────────────────────────────────────────────
 // Why a "open in new tab" button instead of binding directly:
 // ─────────────────────────────────────────────────────────────────
-// This iframe is third-party from FlowWork's perspective (loaded by
+// This iframe is third-party from Dreamward's perspective (loaded by
 // manage.wix.com). NextAuth session cookies aren't reliably available
 // in third-party iframe contexts due to browser cookie restrictions.
 // So we punt: the iframe just shows a "click here" button → opens
-// flowworks.it.com/integrations in a new tab where FlowWork is
+// godreamward.com/integrations in a new tab where Dreamward is
 // first-party + has full session + does the bind via /api/wix/bind.
 //
 // Public route — must NOT be added to proxy.ts auth matcher. The
-// iframe has no FlowWork session by design.
+// iframe has no Dreamward session by design.
 //
 // Headers in next.config.ts allow this route to be embedded by
 // manage.wix.com (CSP frame-ancestors).
@@ -106,9 +106,9 @@ function decodeWixInstanceToken(token: string): DecodedInstance | null {
 
 function WixBridgeInner() {
   const params = useSearchParams();
-  const [hostOrigin, setHostOrigin] = useState("https://flowworks.it.com");
+  const [hostOrigin, setHostOrigin] = useState("https://godreamward.com");
 
-  // Determine FlowWork's origin so the "Open" button works in dev too.
+  // Determine Dreamward's origin so the "Open" button works in dev too.
   useEffect(() => {
     if (typeof window !== "undefined") {
       setHostOrigin(window.location.origin);
@@ -155,7 +155,7 @@ function WixBridgeInner() {
     return (
       <PageFrame>
         <h1 className="text-base font-bold text-slate-900 m-0 mb-2">
-          {"\u{1F3D7}\u{FE0F}"} FlowWork
+          {"\u{1F3D7}\u{FE0F}"} Dreamward
         </h1>
         <p className="text-sm text-slate-700 m-0 mb-2">
           This page is meant to load inside your Wix dashboard.
@@ -168,7 +168,7 @@ function WixBridgeInner() {
             rel="noopener noreferrer"
             className="text-blue-600 hover:underline"
           >
-            flowworks.it.com
+            godreamward.com
           </a>{" "}
           directly to manage your account.
         </p>
@@ -187,10 +187,10 @@ function WixBridgeInner() {
           This might be a temporary issue. Try refreshing this page, or
           contact{" "}
           <a
-            href="mailto:hello@flowworks.it.com"
+            href="mailto:hello@godreamward.com"
             className="text-blue-600 hover:underline"
           >
-            hello@flowworks.it.com
+            hello@godreamward.com
           </a>{" "}
           if it keeps happening.
         </p>
@@ -206,7 +206,7 @@ function WixBridgeInner() {
       </h1>
       <p className="text-sm text-slate-700 m-0 mb-4 leading-relaxed">
         Click the button below to finish connecting your Wix site to
-        FlowWork. You&apos;ll need to be signed in with your FlowWork
+        Dreamward. You&apos;ll need to be signed in with your Dreamward
         Pro account.
       </p>
       <a
@@ -215,10 +215,10 @@ function WixBridgeInner() {
         rel="noopener noreferrer"
         className="inline-block py-2.5 px-5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold no-underline cursor-pointer"
       >
-        Open FlowWork to finish connecting →
+        Open Dreamward to finish connecting →
       </a>
       <p className="text-xs text-slate-400 m-0 mt-3">
-        Don&apos;t have a FlowWork account?{" "}
+        Don&apos;t have a Dreamward account?{" "}
         <a
           href={`${hostOrigin}/signin`}
           target="_blank"

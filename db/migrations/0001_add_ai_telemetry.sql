@@ -25,7 +25,7 @@
 -- (or SELECT column_name FROM information_schema.columns WHERE table_name
 -- = 'processed_items';)
 --
--- This is the first checked-in migration for FlowWork. Future schema
+-- This is the first checked-in migration for Dreamward. Future schema
 -- changes should append numbered files in this directory (0002_..., etc.)
 -- and be applied to Railway before the code that depends on them deploys.
 

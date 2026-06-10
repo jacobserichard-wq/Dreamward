@@ -39,8 +39,8 @@ export async function renderAnnualPdf(opts: {
       industry: opts.industry,
     }));
 
-  const businessName = opts.businessName?.trim() || "FlowWork user";
+  const businessName = opts.businessName?.trim() || "Dreamward user";
   const buffer = await renderAnnualPdfBuffer(summary, businessName);
-  const filename = `flowwork-${csvBusinessSlug(opts.businessName)}-${opts.year}.pdf`;
+  const filename = `dreamward-${csvBusinessSlug(opts.businessName)}-${opts.year}.pdf`;
   return { buffer, filename };
 }

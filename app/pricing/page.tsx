@@ -57,7 +57,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do you decide which tier I'm on?",
-    a: "By your business size, measured as your trailing-12-month revenue tracked through FlowWork. Under $5k/year is Dream, $5k–$50k is Maker, $50k–$500k is Growth, $500k+ is Pro. You pick a starting tier when you sign up, and we move you up automatically as you grow.",
+    a: "By your business size, measured as your trailing-12-month revenue tracked through Dreamward. Under $5k/year is Dream, $5k–$50k is Maker, $50k–$500k is Growth, $500k+ is Pro. You pick a starting tier when you sign up, and we move you up automatically as you grow.",
   },
   {
     q: "What happens when my revenue grows past a threshold?",
@@ -91,7 +91,7 @@ export default function PricingPage() {
       <header className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
           <Link href="/" className="m-0 text-xl sm:text-2xl font-bold text-white no-underline">
-            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> FlowWork
+            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> Dreamward
           </Link>
           <Link
             href="/signin"

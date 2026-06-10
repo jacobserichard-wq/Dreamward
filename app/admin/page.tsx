@@ -89,7 +89,7 @@ export default function AdminPage() {
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"
-          backLabel="FlowWork"
+          backLabel="Dreamward"
           title={<>{"\u{1F6E0}️"} Admin Dashboard</>}
           subtitle={`${clients.length} total clients`}
         />

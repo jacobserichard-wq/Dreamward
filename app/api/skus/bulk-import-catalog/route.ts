@@ -2,7 +2,7 @@
 //
 // Phase 12e commit 1. POST endpoint that takes a user-curated
 // list of catalog rows (the merchant edited the codes/costs in
-// the preview) and writes them as new FlowWork SKUs + initial
+// the preview) and writes them as new Dreamward SKUs + initial
 // sku_cost_history rows + sku_aliases (with retroactive resolve).
 //
 // POST /api/skus/bulk-import-catalog
@@ -11,7 +11,7 @@
 //     effectiveDate: 'YYYY-MM-DD',
 //     rows: Array<{
 //       externalId: string,    // platform-side alias key
-//       code: string,          // FlowWork SKU code
+//       code: string,          // Dreamward SKU code
 //       name: string,
 //       cost?: number,         // default 0
 //       externalSku?: string,  // platform-side SKU code (display only)

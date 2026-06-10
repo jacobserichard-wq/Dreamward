@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
             currency: "usd",
             unit_amount: priceCents,
             product_data: {
-              name: "FlowWork — Unlimited Shopify backfill",
+              name: "Dreamward — Unlimited Shopify backfill",
               description: `Unlocks unlimited historical order import for ${conn.shop_domain}`,
             },
           },

@@ -4,7 +4,7 @@ interface PageHeaderProps {
    *  global AppHeader omit it (the nav already covers navigation);
    *  detail pages + public pages keep it. */
   backHref?: string;
-  /** label after the arrow (e.g., "FlowWork", "Admin") — the arrow is rendered internally */
+  /** label after the arrow (e.g., "Dreamward", "Admin") — the arrow is rendered internally */
   backLabel?: string;
   /** the page's h1 — string for plain text, ReactNode for headings with emoji prefixes */
   title: React.ReactNode;

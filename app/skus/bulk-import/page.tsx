@@ -6,7 +6,7 @@
 //
 // Anti-Crafty: Crafty Base requires per-row data entry through
 // multiple tabs/screens. We let the merchant populate their
-// entire FlowWork catalog from an existing platform catalog in
+// entire Dreamward catalog from an existing platform catalog in
 // one click + a preview pass.
 
 "use client";
@@ -33,7 +33,7 @@ interface CatalogRow {
 interface EditableRow extends CatalogRow {
   /** Stable client-side row key. */
   rowKey: string;
-  /** User-editable FlowWork SKU code. Suggested from sku ?? externalId. */
+  /** User-editable Dreamward SKU code. Suggested from sku ?? externalId. */
   code: string;
   /** User-editable cost. Pre-filled from platform when available. */
   costEdit: string;
@@ -96,7 +96,7 @@ function platformMeta(p: Platform): {
   }
 }
 
-/** Suggest a FlowWork SKU code from the platform-side data. Uses
+/** Suggest a Dreamward SKU code from the platform-side data. Uses
  *  the platform SKU when present, else last 12 chars of the
  *  external id (UUIDs/numeric ids look ugly but unique). */
 function suggestCode(row: CatalogRow): string {
@@ -264,7 +264,7 @@ export default function BulkImportPage() {
           />
           <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
             <p className="text-base font-medium text-slate-700 m-0 mb-4">
-              Catalog bulk-import is part of FlowWork Pro.
+              Catalog bulk-import is part of Dreamward Pro.
             </p>
             <Link
               href="/upgrade"
@@ -329,7 +329,7 @@ export default function BulkImportPage() {
             </p>
             <p className="text-sm text-slate-500 m-0 mb-4 max-w-md mx-auto">
               We&apos;ll fetch every product variant from your connected
-              {" "}{meta.label} store. Nothing is written to your FlowWork
+              {" "}{meta.label} store. Nothing is written to your Dreamward
               catalog until you click Import.
             </p>
             <button

@@ -1,7 +1,7 @@
 // app/components/SkuForm.tsx
 //
 // Phase 12b commit 2 of 4. Modal form for creating a new SKU
-// in the FlowWork catalog. Mirrors the ExpenseForm scaffolding
+// in the Dreamward catalog. Mirrors the ExpenseForm scaffolding
 // (overlay, Esc handler, Field helper, Spinner-in-button) but
 // trimmed to a tighter field set:
 //
@@ -432,7 +432,7 @@ export default function SkuForm({
 
               <p className="text-xs text-slate-500 m-0">
                 Backdate the effective date if you want this cost to
-                apply to historical sales already in FlowWork. Use{" "}
+                apply to historical sales already in Dreamward. Use{" "}
                 <strong>each</strong> for whole items, or a measure like{" "}
                 <strong>oz</strong> for materials. Don&apos;t know the
                 cost yet? Enter <strong>0</strong> — you can add the real

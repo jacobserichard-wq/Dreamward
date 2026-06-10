@@ -25,7 +25,7 @@ import AppHeader from "../../components/AppHeader";
 export const metadata = {
   title: "Getting started",
   description:
-    "A complete walkthrough of FlowWork — from your first sign-in to generating a Schedule-C P&L for your accountant.",
+    "A complete walkthrough of Dreamward — from your first sign-in to generating a Schedule-C P&L for your accountant.",
 };
 
 interface SectionProps {
@@ -77,7 +77,7 @@ export default function GettingStartedGuide() {
         <PageHeader
           backHref="/help"
           backLabel="Help"
-          title="Getting started with FlowWork"
+          title="Getting started with Dreamward"
           subtitle="A complete walkthrough from sign-in to generating your first Schedule-C P&L. About 15 minutes end-to-end."
         />
 
@@ -87,7 +87,7 @@ export default function GettingStartedGuide() {
             On this page
           </h2>
           <ol className="m-0 pl-5 space-y-1.5 text-sm">
-            <li><a href="#what-flowwork-is" className="text-blue-600 no-underline hover:underline">What FlowWork is (and what it isn&apos;t)</a></li>
+            <li><a href="#what-dreamward-is" className="text-blue-600 no-underline hover:underline">What Dreamward is (and what it isn&apos;t)</a></li>
             <li><a href="#pick-your-path" className="text-blue-600 no-underline hover:underline">Pick your starting path</a></li>
             <li><a href="#connect-revenue-source" className="text-blue-600 no-underline hover:underline">Connect your first revenue source</a></li>
             <li><a href="#cogs-setup" className="text-blue-600 no-underline hover:underline">Set up SKUs and cost history</a></li>
@@ -100,12 +100,12 @@ export default function GettingStartedGuide() {
           </ol>
         </nav>
 
-        <Section id="what-flowwork-is" title="1. What FlowWork is (and what it isn&apos;t)">
+        <Section id="what-dreamward-is" title="1. What Dreamward is (and what it isn&apos;t)">
           <p>
-            FlowWork is gross-margin tracking and Schedule-C P&amp;L for small
+            Dreamward is gross-margin tracking and Schedule-C P&amp;L for small
             businesses that have outgrown spreadsheets. You connect the places
             your money actually moves — Shopify, Wix, Square, Etsy, your event
-            markets, your manual receipts — and FlowWork tells you what every
+            markets, your manual receipts — and Dreamward tells you what every
             sale was really worth after the cost of goods, and what your
             accountant needs at tax time.
           </p>
@@ -118,7 +118,7 @@ export default function GettingStartedGuide() {
             question without making you re-enter every order by hand.
           </p>
           <Callout variant="info">
-            FlowWork keeps your historical margins honest. If you raise a
+            Dreamward keeps your historical margins honest. If you raise a
             wholesale price today, last month&apos;s sales keep their old cost
             — they don&apos;t get retroactively rewritten the way most
             accounting tools handle a cost change. That&apos;s the
@@ -129,7 +129,7 @@ export default function GettingStartedGuide() {
 
         <Section id="pick-your-path" title="2. Pick your starting path">
           <p>
-            FlowWork works for several kinds of small business. The path you
+            Dreamward works for several kinds of small business. The path you
             take through this guide depends on what you actually sell:
           </p>
           <ul className="list-disc pl-6 space-y-2">
@@ -167,12 +167,12 @@ export default function GettingStartedGuide() {
             Open <Link href="/integrations" className="text-blue-600 no-underline hover:underline">Integrations</Link>{" "}
             from the header nav. You&apos;ll see cards for Shopify, Wix,
             Square, and Etsy. Click &ldquo;Connect&rdquo; on the one you use.
-            Each integration walks through an OAuth handoff — FlowWork
+            Each integration walks through an OAuth handoff — Dreamward
             redirects you to the platform, you authorize, they redirect you
             back.
           </p>
           <p>
-            Once connected, FlowWork does two things in the background:
+            Once connected, Dreamward does two things in the background:
           </p>
           <ol className="list-decimal pl-6 space-y-2">
             <li>
@@ -184,7 +184,7 @@ export default function GettingStartedGuide() {
             <li>
               <strong>Keeps it synced.</strong> Shopify, Wix, and Square send
               real-time webhooks — every new order, refund, or fulfillment
-              event hits FlowWork within seconds. Etsy doesn&apos;t offer
+              event hits Dreamward within seconds. Etsy doesn&apos;t offer
               webhooks, so Etsy shops reconcile automatically once a day
               instead. Either way, you don&apos;t click &ldquo;sync.&rdquo;
             </li>
@@ -207,7 +207,7 @@ export default function GettingStartedGuide() {
 
         <Section id="cogs-setup" title="4. Set up SKUs and cost history">
           <p>
-            This is the section that makes FlowWork worth paying for. Open the{" "}
+            This is the section that makes Dreamward worth paying for. Open the{" "}
             <strong>COGS</strong> link in the header (included on every
             plan). The page lists every SKU it has seen from your connected
             stores. Each row needs two things to produce gross margin: a
@@ -238,7 +238,7 @@ export default function GettingStartedGuide() {
             work down.
           </p>
           <p>
-            <strong>Editing a past cost?</strong> FlowWork warns you. Any
+            <strong>Editing a past cost?</strong> Dreamward warns you. Any
             change to a cost row dated in the past will silently rewrite the
             margin on every sale that used it — so you have to explicitly
             confirm you meant to do that. If you&apos;re fixing a typo, fine.
@@ -260,7 +260,7 @@ export default function GettingStartedGuide() {
             <strong>recipe</strong> on the SKU detail page: list each
             ingredient (another SKU) and how much goes into one finished
             unit. Then when you make a batch, click &ldquo;+ Log production
-            run&rdquo; — FlowWork adds the finished goods to stock and draws
+            run&rdquo; — Dreamward adds the finished goods to stock and draws
             down the raw materials automatically. A &ldquo;can make ~N&rdquo;
             readout tells you how many more you can build with the materials
             you have on hand.
@@ -284,7 +284,7 @@ export default function GettingStartedGuide() {
           <p>
             Selling at events is different from selling online — you don&apos;t
             have a webhook stream. You have a cash drawer, a Square reader, a
-            Venmo handle, and a notebook. FlowWork handles this through the{" "}
+            Venmo handle, and a notebook. Dreamward handles this through the{" "}
             <strong>Events</strong> page.
           </p>
           <p>
@@ -295,7 +295,7 @@ export default function GettingStartedGuide() {
             <li><strong>Name</strong> (&ldquo;Sunday farmer&apos;s market&rdquo;)</li>
             <li><strong>Date</strong></li>
             <li><strong>Booth fee</strong> (auto-counted as a Markets channel expense)</li>
-            <li><strong>Mileage</strong> (round-trip distance — FlowWork applies the current IRS rate automatically)</li>
+            <li><strong>Mileage</strong> (round-trip distance — Dreamward applies the current IRS rate automatically)</li>
           </ul>
           <p>
             Now you have an event to tag sales to. Two ways to log the day&apos;s
@@ -318,7 +318,7 @@ export default function GettingStartedGuide() {
           <Callout variant="tip">
             Download the{" "}
             <a
-              href="/templates/flowwork-sales-template.csv"
+              href="/templates/dreamward-sales-template.csv"
               className="text-blue-600 no-underline hover:underline"
             >
               CSV template
@@ -340,7 +340,7 @@ export default function GettingStartedGuide() {
             Click &ldquo;+ New expense&rdquo; and fill in vendor, amount, date,
             and category. The category determines whether this is a Cost of
             Goods Sold expense (raw materials, inventory) or an Operating
-            Expense (rent, SaaS, marketing). FlowWork tags COGS categories
+            Expense (rent, SaaS, marketing). Dreamward tags COGS categories
             automatically based on your industry preferences — Schedule-C will
             split them correctly.
           </p>
@@ -349,7 +349,7 @@ export default function GettingStartedGuide() {
             drag-drop file area. Drop in the PDF, JPG, or PNG. It uploads to a
             private storage bucket (encrypted at rest, only visible to you) and
             attaches to the expense permanently. This is your audit defense —
-            the IRS wants a receipt for any expense over $75, and FlowWork
+            the IRS wants a receipt for any expense over $75, and Dreamward
             keeps them organized by year and category so you can find one in
             seconds.
           </p>
@@ -367,7 +367,7 @@ export default function GettingStartedGuide() {
             The <strong>Processed</strong> tab on the Dashboard is your work
             queue. Anything that came in from a connected store, a CSV upload,
             or manual entry lands here in card form until you&apos;ve told
-            FlowWork what to do with it.
+            Dreamward what to do with it.
           </p>
           <p>Each card has four status buttons at the bottom:</p>
           <ul className="list-disc pl-6 space-y-1">
@@ -389,7 +389,7 @@ export default function GettingStartedGuide() {
             Each card also shows a <strong>Channel</strong> row — Shopify,
             Wix, Square, Markets, Wholesale, Service work, or Uncategorized.
             That tag determines which Dashboard rollup the row contributes to.
-            If FlowWork guessed wrong (or couldn&apos;t guess), click the
+            If Dreamward guessed wrong (or couldn&apos;t guess), click the
             pencil icon next to the channel name and pick the right one. Your
             selection sticks across re-imports.
           </p>
@@ -462,10 +462,10 @@ export default function GettingStartedGuide() {
           <ul className="list-disc pl-6 space-y-1">
             <li><strong>Download PDF</strong> — formatted for printing or emailing</li>
             <li><strong>Download CSV</strong> — for spreadsheets, or to import into your CPA&apos;s tax software</li>
-            <li><strong>Email to your accountant</strong> — enter their email, FlowWork sends both files with a short cover note from your business name</li>
+            <li><strong>Email to your accountant</strong> — enter their email, Dreamward sends both files with a short cover note from your business name</li>
           </ul>
           <Callout variant="info">
-            The report only includes data FlowWork can see. If you have
+            The report only includes data Dreamward can see. If you have
             expenses you paid out of a personal account that never made it
             into the Expenses page, they won&apos;t appear. Spend an hour
             before tax season scanning your bank statements and entering any
@@ -510,7 +510,7 @@ export default function GettingStartedGuide() {
           <p>
             Stuck on something this guide didn&apos;t answer?{" "}
             <a
-              href="mailto:support@flowworks.it.com"
+              href="mailto:support@godreamward.com"
               className="text-blue-600 no-underline hover:underline"
             >
               Email support

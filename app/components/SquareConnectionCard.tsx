@@ -298,7 +298,7 @@ export default function SquareConnectionCard() {
                         day: "numeric",
                       })
                     : "soon"}
-                  . FlowWork normally refreshes this automatically — if
+                  . Dreamward normally refreshes this automatically — if
                   the indicator persists, disconnect and reconnect to
                   reset the cycle.
                 </p>
@@ -463,7 +463,7 @@ export default function SquareConnectionCard() {
       <ConfirmModal
         open={confirmPurge}
         title="Delete all Square data?"
-        message="This permanently removes every payment imported from Square from your FlowWork reports. This cannot be undone. Your Square connection stays active — disconnect separately if you want to stop syncing too."
+        message="This permanently removes every payment imported from Square from your Dreamward reports. This cannot be undone. Your Square connection stays active — disconnect separately if you want to stop syncing too."
         confirmLabel="Delete all Square data"
         danger
         busy={purging}

@@ -288,7 +288,7 @@ export default function EtsyConnectionCard() {
               <div className="text-xs text-slate-500 inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 New orders sync automatically once a day. Etsy
-                doesn&apos;t offer instant webhooks, so FlowWork
+                doesn&apos;t offer instant webhooks, so Dreamward
                 reconciles your shop every morning.
               </div>
             )}
@@ -402,7 +402,7 @@ export default function EtsyConnectionCard() {
       <ConfirmModal
         open={confirmDisconnect}
         title="Disconnect Etsy?"
-        message="This stops new orders from syncing. Your historical Etsy data stays in your reports, and you can reconnect any time. To fully revoke FlowWork's access on Etsy's side too, visit Etsy → Account settings → Privacy → Apps."
+        message="This stops new orders from syncing. Your historical Etsy data stays in your reports, and you can reconnect any time. To fully revoke Dreamward's access on Etsy's side too, visit Etsy → Account settings → Privacy → Apps."
         confirmLabel="Disconnect"
         danger
         busy={disconnecting}
@@ -413,7 +413,7 @@ export default function EtsyConnectionCard() {
       <ConfirmModal
         open={confirmPurge}
         title="Delete all Etsy data?"
-        message="This permanently removes every order imported from Etsy from your FlowWork reports. This cannot be undone. Your Etsy connection stays active — disconnect separately if you want to stop syncing too."
+        message="This permanently removes every order imported from Etsy from your Dreamward reports. This cannot be undone. Your Etsy connection stays active — disconnect separately if you want to stop syncing too."
         confirmLabel="Delete all Etsy data"
         danger
         busy={purging}

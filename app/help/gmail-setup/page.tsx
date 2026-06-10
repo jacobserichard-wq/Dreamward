@@ -73,9 +73,9 @@ export default function GmailSetupGuidePage() {
       <div className="max-w-[820px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"
-          backLabel="FlowWork"
+          backLabel="Dreamward"
           title="Gmail label setup"
-          subtitle="Get FlowWork pulling invoices and expenses from your inbox in 5 minutes."
+          subtitle="Get Dreamward pulling invoices and expenses from your inbox in 5 minutes."
         />
 
         {/* Pro-required banner for non-Pro users. Renders only after
@@ -91,7 +91,7 @@ export default function GmailSetupGuidePage() {
               <p className="text-sm m-0 mb-3">
                 You can preview the setup steps below to see what the
                 workflow looks like, but you&apos;ll need to upgrade to Pro
-                ($89/mo) to actually connect Gmail and run fetches.
+                ($99/mo) to actually connect Gmail and run fetches.
               </p>
               <Link
                 href="/billing"
@@ -109,7 +109,7 @@ export default function GmailSetupGuidePage() {
           title="Create three labels in your Gmail account"
         >
           <p className="text-sm text-slate-600 mb-3">
-            FlowWork looks for these exact label names in your Gmail.
+            Dreamward looks for these exact label names in your Gmail.
             They&apos;re case-sensitive and must be top-level (not
             nested under another label).
           </p>
@@ -162,7 +162,7 @@ export default function GmailSetupGuidePage() {
                   has:attachment invoice
                 </code>
                 ), select the matching emails, click the Labels icon
-                in the toolbar, and apply the right FlowWork label.
+                in the toolbar, and apply the right Dreamward label.
               </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-lg p-4">
@@ -176,7 +176,7 @@ export default function GmailSetupGuidePage() {
                   from:billing@*
                 </code>
                 ), then in &quot;Apply the label&quot; pick the right
-                FlowWork label. Future emails get labeled automatically.
+                Dreamward label. Future emails get labeled automatically.
               </p>
             </div>
           </div>
@@ -193,7 +193,7 @@ export default function GmailSetupGuidePage() {
         {/* ── STEP 3 ── */}
         <Section
           number={3}
-          title="Pull labeled emails into FlowWork"
+          title="Pull labeled emails into Dreamward"
         >
           <p className="text-sm text-slate-600 mb-3">
             Once your labels exist and have at least one email in
@@ -201,12 +201,12 @@ export default function GmailSetupGuidePage() {
           </p>
           <ol className="bg-white border border-slate-200 rounded-lg p-4 m-0 pl-6 space-y-2 text-sm text-slate-700">
             <li>
-              In FlowWork, go to <strong>Home</strong> →{" "}
+              In Dreamward, go to <strong>Home</strong> →{" "}
               <strong>Emails tab</strong>. You&apos;ll see one pill per
               label (Invoices, AR Follow Up, Expenses).
             </li>
             <li>
-              Click a label pill. FlowWork fetches the most recent
+              Click a label pill. Dreamward fetches the most recent
               emails carrying that label and shows them in a list.
             </li>
             <li>
@@ -249,7 +249,7 @@ export default function GmailSetupGuidePage() {
               a={
                 <>
                   Make sure you&apos;ve signed in with Google (top-
-                  right → Sign in). FlowWork requests Gmail-readonly
+                  right → Sign in). Dreamward requests Gmail-readonly
                   access at sign-in time — if you skipped that consent
                   screen, sign out and sign back in.
                 </>
@@ -261,7 +261,7 @@ export default function GmailSetupGuidePage() {
                 <>
                   Anthropic API hiccup, usually transient. Wait a
                   minute and try again. If it keeps failing, the
-                  emails are still safely labeled in Gmail — FlowWork
+                  emails are still safely labeled in Gmail — Dreamward
                   will pick them up on the next successful run.
                 </>
               }
@@ -270,12 +270,12 @@ export default function GmailSetupGuidePage() {
               q="Can I use my own custom labels?"
               a={
                 <>
-                  Not in v1 — FlowWork only looks for{" "}
+                  Not in v1 — Dreamward only looks for{" "}
                   <code>Invoices</code>, <code>AR Follow Up</code>, and{" "}
                   <code>Expenses</code>. If you have an existing label
                   taxonomy, the cleanest path is to add a Gmail filter
                   that copies (not moves) matching emails into a
-                  FlowWork label too.
+                  Dreamward label too.
                 </>
               }
             />
@@ -287,7 +287,7 @@ export default function GmailSetupGuidePage() {
             href="/dashboard"
             className="text-sm text-blue-600 hover:underline"
           >
-            {"\u{2190}"} Back to FlowWork
+            {"\u{2190}"} Back to Dreamward
           </Link>
         </div>
       </div>

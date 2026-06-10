@@ -11,7 +11,7 @@
 //
 // Flow:
 //   1. CSRF: state cookie matches the round-tripped state param
-//   2. FlowWork session + paying-tier gate
+//   2. Dreamward session + paying-tier gate
 //   3. Exchange code + verifier → access (1h) + refresh (90d) tokens
 //   4. Resolve the shop (users/me → shop id + display name)
 //   5. Encrypt both tokens (AES-256-GCM, lib/crypto)

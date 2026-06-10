@@ -1,7 +1,7 @@
 // app/api/skus/[id]/resolve-by-name/route.ts
 //
 // Phase 12d commit 3 of 5. Resolves Square POS "Custom Amount"
-// line items (external_item_id IS NULL) to a FlowWork SKU by
+// line items (external_item_id IS NULL) to a Dreamward SKU by
 // direct UPDATE on processed_item_line_items where the display
 // name matches.
 //

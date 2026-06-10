@@ -6,7 +6,7 @@
 //
 // Subscribe in Square Developer Dashboard → Webhooks → Add
 // Subscription:
-//   - URL: https://flowworks.it.com/api/square/webhook
+//   - URL: https://godreamward.com/api/square/webhook
 //   - API Version: 2025-04-16 (matches our lib/square Square-Version)
 //   - Event types: payment.created, payment.updated
 //   - Signature key: copy from the subscription details + add to
@@ -45,7 +45,7 @@ import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 function notificationUrl(): string {
   return (
     process.env.SQUARE_WEBHOOK_NOTIFICATION_URL ||
-    "https://flowworks.it.com/api/square/webhook"
+    "https://godreamward.com/api/square/webhook"
   );
 }
 
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
   // ── 4. Look up our binding ──────────────────────────────────
   // Match on (merchant_id, environment) since the unique key in
   // square_connections is (merchant_id, environment) — a single
-  // FlowWork user can have both sandbox + prod connected.
+  // Dreamward user can have both sandbox + prod connected.
   const environment = getSquareEnvironment();
   let conn: SquareConnectionLookupRow | null = null;
   try {

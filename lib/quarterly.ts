@@ -132,7 +132,7 @@ export function computeQuarterlyEstimate(opts: QuarterlyInputs): QuarterlyEstima
 // Default tax bracket assumption if no preferences override. 22% income
 // + 14.13% self-employment effective = 36.13% total. Per design §1 #3.
 // 22% is the federal bracket median for single-filer $44k-$100k taxable
-// income (the FlowWork target customer band).
+// income (the Dreamward target customer band).
 export const DEFAULT_TAX_BRACKET = {
   incomePct: 22,
   sePct: 14.13,

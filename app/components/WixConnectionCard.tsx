@@ -12,13 +12,13 @@
 // vendor consent screen" flow we control. Installation happens
 // on Wix's side — merchant clicks an install link, Wix shows the
 // consent screen with our pre-configured permissions, merchant
-// approves, and Wix then sends them BACK to FlowWork via the
+// approves, and Wix then sends them BACK to Dreamward via the
 // post-install redirect endpoint (/api/wix/installed/redirect)
 // which does the actual binding of client_id ↔ instance_id.
 //
 // So this card's Connect UX is just "click here to start the
 // install flow on Wix" — opens the install URL in a new tab so
-// the merchant doesn't lose their FlowWork session. While the
+// the merchant doesn't lose their Dreamward session. While the
 // tab is open, we poll /api/wix/connection every few seconds so
 // when the merchant lands back here we re-render as Connected
 // without requiring a manual page refresh.
@@ -494,7 +494,7 @@ export default function WixConnectionCard() {
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <div>
               <p className="text-xs text-slate-600 mb-2.5 leading-relaxed">
-                Click below to install FlowWork on your Wix site. You&apos;ll
+                Click below to install Dreamward on your Wix site. You&apos;ll
                 pick the site, approve permissions, and then Wix will send
                 you back here automatically.
               </p>
@@ -533,7 +533,7 @@ export default function WixConnectionCard() {
                 </summary>
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    If you already installed FlowWork on a Wix site and the
+                    If you already installed Dreamward on a Wix site and the
                     automatic connection didn&apos;t happen, paste your{" "}
                     <strong>Wix App Instance ID</strong> below. Find it in
                     your Wix dashboard:{" "}
@@ -546,7 +546,7 @@ export default function WixConnectionCard() {
                       Wix Sites
                     </a>{" "}
                     → click your site → <em>Manage Apps</em> → click
-                    FlowWork → the UUID in the URL or app details.
+                    Dreamward → the UUID in the URL or app details.
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     <input
@@ -594,7 +594,7 @@ export default function WixConnectionCard() {
       <ConfirmModal
         open={confirmPurge}
         title="Delete all Wix data?"
-        message="This permanently removes every order imported from Wix from your FlowWork reports. This cannot be undone. Your Wix connection stays active — disconnect separately if you want to stop syncing too."
+        message="This permanently removes every order imported from Wix from your Dreamward reports. This cannot be undone. Your Wix connection stays active — disconnect separately if you want to stop syncing too."
         confirmLabel="Delete all Wix data"
         danger
         busy={purging}

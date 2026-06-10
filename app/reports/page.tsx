@@ -315,11 +315,11 @@ export default function ReportsPage() {
         />
 
         <SectionTip id="reports" title="One-click handoff to your CPA">
-          Pick a year and FlowWork builds a Schedule-C-formatted P&amp;L —
+          Pick a year and Dreamward builds a Schedule-C-formatted P&amp;L —
           Revenue → COGS → Gross Profit → Operating Expenses → Net. Use{" "}
           <strong>Download PDF/CSV</strong> or email it straight to your
           accountant (save their address in Settings). Numbers come only
-          from data FlowWork can see, so enter any out-of-band expenses
+          from data Dreamward can see, so enter any out-of-band expenses
           before tax season. Set your tax bracket in Settings to get
           quarterly estimate suggestions too.
         </SectionTip>
@@ -549,7 +549,7 @@ export default function ReportsPage() {
               <p className="m-0 mb-1">
                 <strong>Cash-basis report.</strong> Income counted when
                 received; expenses counted when paid. Generated{" "}
-                {formatGeneratedAt(summary.generatedAt)} from your FlowWork
+                {formatGeneratedAt(summary.generatedAt)} from your Dreamward
                 records.
               </p>
               <p className="m-0 text-slate-400">

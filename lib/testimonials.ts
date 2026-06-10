@@ -14,7 +14,7 @@
 // To add one: append an object below, commit, deploy. That's it.
 //
 //   {
-//     quote: "FlowWork finally told me which products actually make money.",
+//     quote: "Dreamward finally told me which products actually make money.",
 //     name: "Jane Doe",
 //     business: "Willow & Wax Candle Co.",
 //     location: "Indianapolis, IN",

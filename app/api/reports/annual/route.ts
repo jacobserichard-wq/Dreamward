@@ -24,7 +24,7 @@ function isPlanAllowed(plan: string | null | undefined): boolean {
 }
 
 // Year validation: integer, 2020 ≤ year ≤ currentYear. The 2020 floor
-// is the audit-§6.3 sanity floor (FlowWork didn't exist before that);
+// is the audit-§6.3 sanity floor (Dreamward didn't exist before that);
 // the ceiling is "no future years" (reports are retrospective).
 function parseYear(raw: string | null, defaultYear: number): number | null {
   if (raw == null || raw === "") return defaultYear;

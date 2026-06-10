@@ -16,7 +16,7 @@
 // Sandbox vs Production: Square offers a first-class sandbox env
 // with separate API base URLs + separate credentials. Toggled via
 // SQUARE_ENVIRONMENT env var (defaults to 'production'). Connection
-// rows store which env they belong to so a single FlowWork user
+// rows store which env they belong to so a single Dreamward user
 // can have both connected during dev without collisions.
 //
 // Token lifecycle:
@@ -102,7 +102,7 @@ function loadWebhookSignatureKey(): string {
  *     line-item data; Orders do.
  *   - ITEMS_READ — Square's catalog including the `cost` field
  *     merchants can set per item variation. Lets us auto-suggest
- *     SKU→cost matches when the merchant builds their FlowWork
+ *     SKU→cost matches when the merchant builds their Dreamward
  *     SKU catalog.
  *
  * See session-notes/phase-12-cogs-design.md for the full COGS plan.
@@ -664,7 +664,7 @@ export async function getOrder(opts: {
 // Square's catalog is a tree of ITEM -> ITEM_VARIATION objects. A
 // single item ("Coffee Beans") can have many variations ("1lb",
 // "5lb"). For COGS purposes the VARIATION is the unit we map (one
-// FlowWork SKU per variation), since variations are what line items
+// Dreamward SKU per variation), since variations are what line items
 // reference via line_item.catalog_object_id.
 //
 // The Catalog List endpoint returns a flat list of CatalogObject
@@ -705,7 +705,7 @@ interface SquareCatalogListResponse {
   errors?: Array<{ category?: string; code?: string; detail?: string }>;
 }
 
-/** Flattened, FlowWork-friendly shape returned by listCatalog. */
+/** Flattened, Dreamward-friendly shape returned by listCatalog. */
 export interface SquareCatalogVariation {
   /** Variation id (the catalog_object_id that line items reference,
    *  i.e., what gets stored as sku_aliases.external_id). */
@@ -715,7 +715,7 @@ export interface SquareCatalogVariation {
   /** "Parent Item Name (Variation Name)" if distinct, else just the
    *  parent name. */
   displayName: string;
-  /** Platform-side SKU code. Used to suggest the FlowWork code. */
+  /** Platform-side SKU code. Used to suggest the Dreamward code. */
   sku: string | null;
   /** Per-unit cost in dollars (or main currency unit). Null when
    *  Square doesn't expose one. */

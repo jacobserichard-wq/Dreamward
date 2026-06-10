@@ -227,7 +227,7 @@ export default function Home() {
   // Plan-gated on trial/growth/pro (matches /api/invoices isPlanAllowed).
   // Soft-fail: dashboard renders without the AR card if the endpoint
   // errors. Limit 1000 to maximize summary accuracy across all invoices
-  // (the API computes summary over the limited rows; at FlowWork scale
+  // (the API computes summary over the limited rows; at Dreamward scale
   // 1000 covers every realistic vendor caseload).
   useEffect(() => {
     const plan = clientInfo?.plan;
@@ -896,8 +896,8 @@ export default function Home() {
               <strong>{"\u{1F4C1}"} Upload</strong> button in the top bar —
               or{" "}
               <a
-                href="/templates/flowwork-sales-template.csv"
-                download="flowwork-sales-template.csv"
+                href="/templates/dreamward-sales-template.csv"
+                download="dreamward-sales-template.csv"
                 className="font-medium underline"
               >
                 download the template
@@ -973,7 +973,7 @@ export default function Home() {
                   Gmail auto-fetch is a Pro feature
                 </h3>
                 <p className="text-sm text-amber-800 m-0 mb-5 max-w-md mx-auto leading-relaxed">
-                  Upgrade to Pro ($89/mo) to pull invoices, receipts,
+                  Upgrade to Pro ($99/mo) to pull invoices, receipts,
                   and AR follow-ups directly from your Gmail labels — no
                   manual uploads. We extract structured data with AI and
                   categorize each item automatically.
@@ -1153,8 +1153,8 @@ export default function Home() {
                 every row.
               </div>
               <a
-                href="/templates/flowwork-sales-template.csv"
-                download="flowwork-sales-template.csv"
+                href="/templates/dreamward-sales-template.csv"
+                download="dreamward-sales-template.csv"
                 className="text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap font-medium"
               >
                 {"\u{2B07}\u{FE0F}"} Download CSV template
@@ -1640,7 +1640,7 @@ export default function Home() {
                   Add your first transaction
                 </h3>
                 <p className="text-sm text-slate-500 m-0 mb-6 max-w-md mx-auto">
-                  FlowWork starts populating this dashboard the moment
+                  Dreamward starts populating this dashboard the moment
                   you add real data. Pick whichever path fits your
                   workflow.
                 </p>
@@ -1772,7 +1772,7 @@ export default function Home() {
         <ConfirmModal
           open={confirmClearOpen}
           title="Clear all sample data?"
-          message="This deletes the example transactions FlowWork seeded for your industry. You can't undo this, but your real data is untouched."
+          message="This deletes the example transactions Dreamward seeded for your industry. You can't undo this, but your real data is untouched."
           confirmLabel="Clear sample data"
           danger
           busy={clearingSample}

@@ -29,7 +29,7 @@
 //   Returns: { expense: ExpenseRow }
 //
 // Plan gating: all signed-in plans (trial/starter/growth/pro). Expense
-// tracking is the most basic FlowWork capability — no upsell needed.
+// tracking is the most basic Dreamward capability — no upsell needed.
 
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";

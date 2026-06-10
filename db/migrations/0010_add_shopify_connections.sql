@@ -4,7 +4,7 @@
 -- commit 1 of (5 in 8a + ~15 across the rest of Phase 8).
 --
 -- One new table (shopify_connections) holding the encrypted access
--- token per FlowWork client + sync state + backfill bookkeeping +
+-- token per Dreamward client + sync state + backfill bookkeeping +
 -- the $99 paid-upgrade marker.
 --
 -- One additive column on processed_items (source_ref_id) + a partial
@@ -17,10 +17,10 @@
 --     16-byte auth tag. All BYTEA so we store raw bytes (no hex /
 --     base64 round-trips). Encryption key lives in
 --     SHOPIFY_TOKEN_ENCRYPTION_KEY env var. See lib/crypto.ts (commit 2).
---   - UNIQUE(client_id) enforces "one Shopify store per FlowWork
+--   - UNIQUE(client_id) enforces "one Shopify store per Dreamward
 --     client" (design §1 decision 4.2 / v1 scope). Multi-store is v2.
 --   - UNIQUE(shop_domain) prevents the same Shopify store from being
---     connected to two different FlowWork accounts simultaneously
+--     connected to two different Dreamward accounts simultaneously
 --     (would cause double-counted revenue).
 --   - webhook_subscription_ids is the array of Shopify webhook IDs
 --     we registered at connect time; the disconnect flow (commit 8b)
@@ -94,9 +94,9 @@ CREATE TABLE IF NOT EXISTS shopify_connections (
 
   updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- v1: one Shopify store per FlowWork client (locked decision 4.2)
+  -- v1: one Shopify store per Dreamward client (locked decision 4.2)
   UNIQUE (client_id),
-  -- Same Shopify store can't be connected to two FlowWork accounts
+  -- Same Shopify store can't be connected to two Dreamward accounts
   UNIQUE (shop_domain)
 );
 

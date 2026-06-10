@@ -27,11 +27,11 @@ import SignInButton from "./components/SignInButton";
 import { TESTIMONIALS } from "@/lib/testimonials";
 
 export const metadata = {
-  title: "FlowWork — Gross margin tracking + Schedule-C P&L for small business",
+  title: "Dreamward — Gross margin tracking + Schedule-C P&L for small business",
   description:
     "Track real gross margin per product across Shopify, Wix, Square, and Etsy. Effective-date COGS — your historical margins never silently rewrite when a cost changes today. Schedule-C-ready P&L for your CPA, receipts attached.",
   openGraph: {
-    title: "FlowWork — Gross margin tracking that doesn't lie",
+    title: "Dreamward — Gross margin tracking that doesn't lie",
     description:
       "Per-SKU COGS, per-channel margin, audit-trail on every number, Schedule-C P&L. Built for makers + small business who outgrew spreadsheets but don't need a $500/mo ERP.",
     type: "website",
@@ -40,7 +40,7 @@ export const metadata = {
 
 export default async function MarketingLandingPage() {
   // Locked decision #8: server-side auth check + redirect.
-  // Bookmarks pointing at flowworks.it.com/ keep working — logged-in
+  // Bookmarks pointing at godreamward.com/ keep working — logged-in
   // users never see the marketing page after their first session.
   const session = await getServerSession(authOptions);
   if (session) {
@@ -53,7 +53,7 @@ export default async function MarketingLandingPage() {
       <header className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
           <h1 className="m-0 text-xl sm:text-2xl font-bold">
-            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> FlowWork
+            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> Dreamward
           </h1>
           <div className="flex items-center gap-4 sm:gap-5">
             <Link
@@ -87,7 +87,7 @@ export default async function MarketingLandingPage() {
             Real gross margin. Per product. Per channel. Per period.
           </p>
           <p className="text-base text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
-            FlowWork tracks the actual cost behind every sale — so when
+            Dreamward tracks the actual cost behind every sale — so when
             wholesale prices change, your historical margins{" "}
             <em>stay historical</em>. Built for makers + small businesses
             who outgrew spreadsheets but don&apos;t need a $500/month ERP.
@@ -229,7 +229,7 @@ export default async function MarketingLandingPage() {
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-full px-4 py-2 no-underline hover:border-slate-400 hover:text-slate-900"
           >
             <span>{"\u{2696}\u{FE0F}"}</span>
-            <span>How FlowWork compares to Crafty Base</span>
+            <span>How Dreamward compares to Crafty Base</span>
             <span className="text-slate-400">{"\u{2192}"}</span>
           </Link>
         </div>
@@ -406,7 +406,7 @@ export default async function MarketingLandingPage() {
           Terms
         </Link>
         <p className="m-0 mt-2">
-          {"\u{00A9}"} {new Date().getFullYear()} FlowWork
+          {"\u{00A9}"} {new Date().getFullYear()} Dreamward
         </p>
       </footer>
     </div>

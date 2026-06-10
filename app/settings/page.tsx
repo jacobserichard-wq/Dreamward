@@ -1008,7 +1008,7 @@ export default function SettingsPage() {
             <h2 className="text-lg font-bold text-slate-900 mb-1">Your home address</h2>
             <p className="text-sm text-slate-500 m-0">
               Used to calculate driving mileage for each of your events.
-              FlowWork sends this to Google Maps to look up distances — saved on your account, not shared elsewhere.
+              Dreamward sends this to Google Maps to look up distances — saved on your account, not shared elsewhere.
             </p>
           </div>
 
@@ -1063,7 +1063,7 @@ export default function SettingsPage() {
               The standard rate the IRS publishes each year for business
               driving. <strong>Used for tax surfaces only</strong>:
               Schedule C mileage deduction on the Annual Report + quarterly
-              tax estimates. For day-to-day profitability views, FlowWork
+              tax estimates. For day-to-day profitability views, Dreamward
               uses the Operating rate below (gas ÷ MPG — the actual
               cash cost of driving).
             </p>
@@ -1249,7 +1249,7 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-3 m-0">
               <strong>Note:</strong> Operating rate is just gas — it
               doesn&apos;t cover maintenance, insurance, or depreciation.
-              For your Schedule C deduction, FlowWork uses the IRS
+              For your Schedule C deduction, Dreamward uses the IRS
               standard rate above ($0.70/mi covers all those things).
               Both are correct for their purpose.
             </p>
@@ -1265,7 +1265,7 @@ export default function SettingsPage() {
           <div className="mb-5">
             <h2 className="text-lg font-bold text-slate-900 mb-1">CPA Handoff</h2>
             <p className="text-sm text-slate-500 m-0">
-              The email FlowWork sends your annual summary to when you click
+              The email Dreamward sends your annual summary to when you click
               {" "}<strong>Send to CPA</strong> on the Tax Reports page. Your
               own email goes on Reply-To so your CPA can reply directly to you.
             </p>

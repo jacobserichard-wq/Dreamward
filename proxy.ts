@@ -20,7 +20,7 @@
 //   /api/cron          — invoked by Vercel Cron with Bearer ${CRON_SECRET}
 //   /api/stripe/webhook — invoked by Stripe with stripe-signature header
 //   /api/shopify/oauth/callback — Shopify redirects merchants here after
-//                                 they install the FlowWork app. No
+//                                 they install the Dreamward app. No
 //                                 NextAuth session at the moment of the
 //                                 hit (Shopify is the referrer); the route
 //                                 itself checks session + CSRF state +
@@ -34,7 +34,7 @@
 //   /api/square/webhook — Phase 11d, Square POSTs payment events with
 //                         X-Square-HmacSHA256-Signature header.
 //   /api/wix/installed — Wix POSTs the app-installed webhook here
-//                        after a merchant installs FlowWork on their
+//                        after a merchant installs Dreamward on their
 //                        Wix site. JWT-signed (signature verification
 //                        is TODO — Wix's public key isn't exposed in
 //                        Custom Apps' Dev Center UI). Route does a

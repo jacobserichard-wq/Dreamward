@@ -1,6 +1,6 @@
 -- 0016_add_square_connections.sql
 -- Phase 11a (Square Integration). One new table holding encrypted
--- Square OAuth tokens per FlowWork client + sync state + backfill
+-- Square OAuth tokens per Dreamward client + sync state + backfill
 -- bookkeeping.
 --
 -- Mirrors shopify_connections (migration 0010) and the post-pivot
@@ -82,17 +82,17 @@ CREATE TABLE IF NOT EXISTS square_connections (
 
   -- Environment switch. 'sandbox' for Square's dev sandbox,
   -- 'production' for real money. Stored per-connection so a single
-  -- FlowWork user can switch between dev + prod accounts during
+  -- Dreamward user can switch between dev + prod accounts during
   -- development without UNIQUE collisions.
   environment                     TEXT NOT NULL DEFAULT 'production',
 
   updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- v1: one Square account per FlowWork client (matches Shopify +
+  -- v1: one Square account per Dreamward client (matches Shopify +
   -- Wix patterns from earlier phases)
   UNIQUE (client_id),
 
-  -- Same Square merchant can't be connected to two FlowWork
+  -- Same Square merchant can't be connected to two Dreamward
   -- accounts. environment is part of the unique key so a single
   -- merchant_id can exist once in sandbox AND once in production
   -- (rare but legal — same business has both a sandbox app

@@ -1,7 +1,7 @@
 // app/api/skus/route.ts
 //
 // Phase 12b commit 1 of 4. GET endpoint for the new /skus surface
-// — the FlowWork SKU catalog management page.
+// — the Dreamward SKU catalog management page.
 //
 // GET /api/skus
 //   Query params:

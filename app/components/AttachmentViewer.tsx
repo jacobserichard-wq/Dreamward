@@ -189,7 +189,7 @@ export default function AttachmentViewer({
         </div>
         <p className="text-xs text-slate-500 m-0 mb-4">
           Receipts stay private to your account. Bytes proxy through
-          FlowWork; the underlying blob storage is signed-URL gated.
+          Dreamward; the underlying blob storage is signed-URL gated.
         </p>
 
         {error && (

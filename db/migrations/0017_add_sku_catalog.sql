@@ -1,6 +1,6 @@
 -- 0017_add_sku_catalog.sql
 -- Phase 12a (COGS System — SKU catalog layer). Three new tables
--- that together model the FlowWork SKU registry:
+-- that together model the Dreamward SKU registry:
 --
 --   skus              — one row per merchant-defined SKU.
 --                       The "stock keeping unit" the merchant
@@ -15,10 +15,10 @@
 --
 --   sku_aliases       — mapping from external platform identifiers
 --                       (Shopify variant ID, Wix product ID, Square
---                       catalog item variation ID) to a FlowWork SKU.
---                       One FlowWork SKU can have many aliases
+--                       catalog item variation ID) to a Dreamward SKU.
+--                       One Dreamward SKU can have many aliases
 --                       (same product sold across platforms); each
---                       external ID belongs to at most one FlowWork
+--                       external ID belongs to at most one Dreamward
 --                       SKU (enforced by UNIQUE (platform, external_id)).
 --
 -- The next migration (0018) adds processed_item_line_items —
@@ -94,21 +94,21 @@ CREATE INDEX IF NOT EXISTS idx_sku_cost_history_sku_date
   ON sku_cost_history (sku_id, effective_date DESC);
 
 -- ── sku_aliases ───────────────────────────────────────────────
--- Maps a platform-side identifier to a FlowWork SKU. external_id
+-- Maps a platform-side identifier to a Dreamward SKU. external_id
 -- is whatever stable identifier the platform issues for the item
 -- variation:
 --   - Shopify: variant ID (numeric, but stored as TEXT for
---     consistency with the rest of the FlowWork schema)
+--     consistency with the rest of the Dreamward schema)
 --   - Wix:     catalogReference.catalogItemId (UUID)
 --   - Square:  catalog_object_id of the item variation
 --
 -- external_sku is the platform-side SKU code (display string)
 -- when the platform exposes one — handy for the bulk-import UI
--- to show "Shopify SKU CB1" next to "FlowWork SKU CB1" so the
--- merchant can confirm the match without leaving FlowWork.
+-- to show "Shopify SKU CB1" next to "Dreamward SKU CB1" so the
+-- merchant can confirm the match without leaving Dreamward.
 --
 -- UNIQUE (platform, external_id) — one external item maps to
--- exactly one FlowWork SKU. Trying to remap requires deleting
+-- exactly one Dreamward SKU. Trying to remap requires deleting
 -- the old alias first.
 CREATE TABLE IF NOT EXISTS sku_aliases (
   id            INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,

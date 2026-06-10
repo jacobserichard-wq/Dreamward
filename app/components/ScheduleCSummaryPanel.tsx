@@ -97,7 +97,7 @@ export default function ScheduleCSummaryPanel({
       </div>
 
       <p className="text-[11px] text-slate-400 mt-3 mb-0">
-        Mapping is based on FlowWork&apos;s default category-to-line table.
+        Mapping is based on Dreamward&apos;s default category-to-line table.
         Unusual situations (Section 179, COGS for resellers, mixed-use
         property, etc.) may shift the right line. Always verify with your
         CPA before filing.

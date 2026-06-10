@@ -72,7 +72,7 @@ export default function AppHeader({
       <div className="max-w-[1200px] mx-auto flex justify-between items-center">
         <Link href="/dashboard" className="no-underline text-white">
           <h1 className="m-0 text-2xl sm:text-[28px] font-bold">
-            <span className="text-2xl">{"⚡"}</span> FlowWork
+            <span className="text-2xl">{"⚡"}</span> Dreamward
           </h1>
           <p className="mt-1 mb-0 mx-0 text-white/70 text-sm hidden sm:block">
             Accounting Automation

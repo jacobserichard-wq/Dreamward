@@ -354,7 +354,7 @@ function emptyMonthlyBuckets(year: number) {
 /**
  * Slug a business name for download filenames.
  *   "Acme Bakery" → "acme-bakery"
- *   null/empty → "flowwork"
+ *   null/empty → "dreamward"
  *
  * Shared between csv.ts (CSV filename) and pdf.ts (PDF filename).
  * Kept in aggregate.ts to avoid a csv ↔ pdf import edge.
@@ -363,12 +363,12 @@ function emptyMonthlyBuckets(year: number) {
  * existing imports via the barrel.)
  */
 export function csvBusinessSlug(name: string | null | undefined): string {
-  if (!name) return "flowwork";
+  if (!name) return "dreamward";
   const s = String(name)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return s || "flowwork";
+  return s || "dreamward";
 }
 
 export async function annualSummary(opts: {

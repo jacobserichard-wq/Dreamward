@@ -114,7 +114,7 @@ export default function FetchFromGmailModal({
         <p className="text-sm text-slate-500 mb-5 m-0">
           Scans a Gmail label for invoice emails and creates a row
           for each one. Use <strong>SENT</strong> for invoices you
-          emailed to customers, or set up a <strong>FlowWork-AR</strong>
+          emailed to customers, or set up a <strong>Dreamward-AR</strong>
           {" "}label in Gmail to manually curate.
         </p>
 

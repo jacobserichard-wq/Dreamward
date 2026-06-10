@@ -13,12 +13,12 @@ export default function PolicyDocument({ content }: PolicyDocumentProps) {
           href="/"
           className="text-sm text-blue-600 no-underline inline-block mb-6"
         >
-          {"←"} Back to FlowWork
+          {"←"} Back to Dreamward
         </a>
         <div className="inline-flex items-center gap-2.5 mb-6">
           <span className="text-3xl">{"⚡"}</span>
           <span className="text-[22px] font-extrabold text-slate-900 tracking-tight">
-            FlowWork
+            Dreamward
           </span>
         </div>
         <article className="bg-white rounded-xl border border-slate-200 py-8 px-5 sm:py-10 sm:px-11">
@@ -115,7 +115,7 @@ export default function PolicyDocument({ content }: PolicyDocumentProps) {
           </a>
           <span className="text-slate-300">{"·"}</span>
           <a href="/" className="text-slate-500 no-underline mx-2">
-            FlowWork
+            Dreamward
           </a>
         </div>
       </div>

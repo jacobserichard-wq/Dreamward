@@ -90,9 +90,9 @@ function IntegrationsPageInner() {
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
     // Auto-bind handoff from the Wix Dashboard Extension bridge page
-    // (/wix-bridge). When a merchant clicks "Open FlowWork" in the
+    // (/wix-bridge). When a merchant clicks "Open Dreamward" in the
     // Wix-embedded iframe, they land here with this param + their
-    // FlowWork session. We POST to /api/wix/bind to finish the
+    // Dreamward session. We POST to /api/wix/bind to finish the
     // connection, then show success/failure via the existing
     // banner plumbing.
     const wixBindInstance = params.get("wix_bind_instance");
@@ -223,7 +223,7 @@ function IntegrationsPageInner() {
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
               Subscribe (plans start at $10/mo) to connect Shopify,
               Wix, Square, or Etsy and pull orders + revenue
-              automatically into FlowWork. Coming soon: WooCommerce,
+              automatically into Dreamward. Coming soon: WooCommerce,
               Stripe Connect.
             </p>
             <Link
@@ -311,7 +311,7 @@ function IntegrationsPageInner() {
         <p className="text-xs text-slate-400 mt-8 text-center">
           Want a platform we don&apos;t support yet?{" "}
           <a
-            href="mailto:hello@flowworks.it.com?subject=Integration%20request"
+            href="mailto:hello@godreamward.com?subject=Integration%20request"
             className="text-blue-600 hover:underline"
           >
             Let us know

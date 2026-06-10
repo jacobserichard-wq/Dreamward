@@ -7,7 +7,7 @@
 //
 // This is the key Crafty-Killer feature for the SKU mapping
 // experience: when the merchant maps "Square POS Custom Item 'CB1'"
-// to FlowWork SKU CB1, every historical sale of that item lights
+// to Dreamward SKU CB1, every historical sale of that item lights
 // up COGS instantly — no manual re-sync, no Manufacturing Run,
 // no spreadsheet wrangling.
 //
@@ -29,7 +29,7 @@ import {
 export type AliasPlatform = "shopify" | "wix" | "square" | "etsy";
 
 export interface AliasCreateInput {
-  /** FlowWork SKU id. Must belong to the calling client_id — the
+  /** Dreamward SKU id. Must belong to the calling client_id — the
    *  insert sub-select enforces this. */
   skuId: number;
   platform: AliasPlatform;

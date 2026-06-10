@@ -83,7 +83,7 @@ export function normalizeShopDomain(input: string): string | null {
  *
  * @param shopDomain canonical shop domain (use normalizeShopDomain first)
  * @param state CSRF nonce, 32+ random bytes hex-encoded
- * @param redirectUri the FlowWork callback URL Shopify will redirect to
+ * @param redirectUri the Dreamward callback URL Shopify will redirect to
  * @param scopes which scopes to request (v1: just "read_orders")
  */
 export function buildAuthorizeUrl(opts: {
@@ -557,7 +557,7 @@ interface ShopifyProductsResponse {
   products: ShopifyProductForCatalog[];
 }
 
-/** Flattened, FlowWork-friendly shape returned by listCatalog. */
+/** Flattened, Dreamward-friendly shape returned by listCatalog. */
 export interface ShopifyCatalogVariation {
   /** Variant id (the alias join key — same field that orders'
    *  line_items.variant_id references). */
@@ -660,7 +660,7 @@ export function extractShopifyLineItems(
 // Webhook subscriptions (Phase 8d)
 // ---------------------------------------------------------------------
 
-/** The webhook topics FlowWork subscribes to on connect. Each fires
+/** The webhook topics Dreamward subscribes to on connect. Each fires
  *  a POST to /api/shopify/webhook with the corresponding payload. */
 export const SHOPIFY_WEBHOOK_TOPICS = [
   "orders/create",
@@ -708,7 +708,7 @@ export async function subscribeWebhook(opts: {
 /**
  * Delete a webhook subscription. Best-effort caller — the disconnect
  * route logs failures but doesn't block on them (a webhook to a
- * deleted FlowWork connection is harmless — the receiver 404s on
+ * deleted Dreamward connection is harmless — the receiver 404s on
  * its own client_id lookup).
  */
 export async function unsubscribeWebhook(opts: {

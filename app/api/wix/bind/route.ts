@@ -1,7 +1,7 @@
 // app/api/wix/bind/route.ts
 //
 // Phase 10 manual-binding fallback. POST endpoint that lets a
-// merchant explicitly link a Wix app install to their FlowWork
+// merchant explicitly link a Wix app install to their Dreamward
 // account by pasting the instance ID, when the webhook auto-bind
 // path didn't fire.
 //
@@ -19,9 +19,9 @@
 //
 // Until we go through App Market submission, the manual-binding
 // path is how merchants connect: they install the app on their
-// Wix site, then come back to FlowWork and paste the instance ID.
+// Wix site, then come back to Dreamward and paste the instance ID.
 //
-// Authentication: requires a FlowWork Pro session (proxy.ts
+// Authentication: requires a Dreamward Pro session (proxy.ts
 // matcher). The bind is for the signed-in client only.
 //
 // Validation:
@@ -35,7 +35,7 @@
 //   - UNIQUE(client_id) → this client already has a Wix site
 //     connected. Return 409 with a "disconnect first" message.
 //   - UNIQUE(instance_id) → this Wix site is already bound to a
-//     different FlowWork account. Return 409 with the appropriate
+//     different Dreamward account. Return 409 with the appropriate
 //     message (defensive — shouldn't happen often).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "This Wix site is already connected to a different FlowWork account.",
+            "This Wix site is already connected to a different Dreamward account.",
         },
         { status: 409 }
       );

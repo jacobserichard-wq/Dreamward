@@ -285,8 +285,8 @@ export default function SetupChecklist(props: SetupChecklistProps) {
   // Headings differ by mode (design §5 table).
   const headingTitle =
     mode === "onboarding"
-      ? "Welcome to FlowWork — let's get you set up"
-      : "Get FlowWork running";
+      ? "Welcome to Dreamward — let's get you set up"
+      : "Get Dreamward running";
 
   const handleBizSubmit = async () => {
     if (!props.onSubmitBusinessInfo) return;

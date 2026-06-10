@@ -3,7 +3,7 @@
 // Etsy integration commit 3. Removes the stored connection (and
 // with it the encrypted tokens). Etsy v3 has no server-side token
 // revocation endpoint — the seller can additionally revoke
-// FlowWork's grant under Etsy account settings → Privacy → Apps;
+// Dreamward's grant under Etsy account settings → Privacy → Apps;
 // the disconnect copy in the UI mentions this. Imported
 // processed_items / line items remain (historical data is the
 // merchant's, same policy as the other platforms).

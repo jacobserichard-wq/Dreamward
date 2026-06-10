@@ -3,8 +3,8 @@ import path from "path";
 import PolicyDocument from "../components/PolicyDocument";
 
 export const metadata = {
-  title: "Privacy Policy — FlowWork",
-  description: "How FlowWork collects, uses, and protects your information.",
+  title: "Privacy Policy — Dreamward",
+  description: "How Dreamward collects, uses, and protects your information.",
 };
 
 export default function PrivacyPage() {

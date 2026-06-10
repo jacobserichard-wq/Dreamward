@@ -28,11 +28,11 @@ import Link from "next/link";
 import SignInButton from "../../components/SignInButton";
 
 export const metadata = {
-  title: "FlowWork vs Crafty Base — Real gross margin without the legacy quirks",
+  title: "Dreamward vs Crafty Base — Real gross margin without the legacy quirks",
   description:
-    "Side-by-side comparison of FlowWork and Crafty Base for makers + small-business inventory tracking. Effective-date COGS, audit-trail transparency, one-click bulk updates — what most generic-inventory tools get wrong.",
+    "Side-by-side comparison of Dreamward and Crafty Base for makers + small-business inventory tracking. Effective-date COGS, audit-trail transparency, one-click bulk updates — what most generic-inventory tools get wrong.",
   openGraph: {
-    title: "FlowWork vs Crafty Base",
+    title: "Dreamward vs Crafty Base",
     description:
       "Real gross margin tracking without the historical-data rewrites, opaque costing, and click-heavy onboarding.",
     type: "website",
@@ -46,7 +46,7 @@ export default function CraftyBaseComparePage() {
       <header className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
           <Link href="/" className="m-0 text-xl sm:text-2xl font-bold no-underline text-white">
-            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> FlowWork
+            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> Dreamward
           </Link>
           <Link
             href="/signin"
@@ -61,7 +61,7 @@ export default function CraftyBaseComparePage() {
             Comparison
           </p>
           <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
-            FlowWork vs Crafty Base
+            Dreamward vs Crafty Base
           </h2>
           <p className="text-lg sm:text-xl text-white/85 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
             Same persona — makers, small-batch manufacturers, market
@@ -96,7 +96,7 @@ export default function CraftyBaseComparePage() {
                   Crafty Base
                 </th>
                 <th className="text-left py-3 px-4 font-semibold text-blue-700">
-                  FlowWork
+                  Dreamward
                 </th>
               </tr>
             </thead>
@@ -175,7 +175,7 @@ export default function CraftyBaseComparePage() {
             </h3>
             <p className="text-sm text-slate-600 max-w-2xl mx-auto m-0">
               The four areas Crafty Base users complain about most,
-              and the specific FlowWork features that address each.
+              and the specific Dreamward features that address each.
             </p>
           </div>
 
@@ -185,7 +185,7 @@ export default function CraftyBaseComparePage() {
               title="The data entry nightmare"
               theirHeading="Crafty Base"
               theirCopy="Adding a single raw material means clicking through multiple tabs. Bulk editing is &ldquo;highly prone to formatting errors, often corrupting existing data.&rdquo; Unit-conversion math is &ldquo;math-heavy and frustrating for creative entrepreneurs.&rdquo;"
-              ourHeading="FlowWork"
+              ourHeading="Dreamward"
               ourCopy="Bulk cost update across N selected SKUs in one modal with live old → new preview. Paste-from-spreadsheet (Excel, Google Sheets, Numbers, Airtable) with smart column detection — strict insert-only so it never overwrites existing data."
             />
 
@@ -194,7 +194,7 @@ export default function CraftyBaseComparePage() {
               title="Broken & laggy automation"
               theirHeading="Crafty Base"
               theirCopy="On lower tiers, an Etsy sale does NOT auto-deduct raw materials — you must log a manual &ldquo;Manufacturing Run.&rdquo; Square in-person sales sync as generic &ldquo;Custom Amount&rdquo; line items with no SKU — &ldquo;Crafty Base cannot automatically deduct the correct materials, throwing off stock levels.&rdquo;"
-              ourHeading="FlowWork"
+              ourHeading="Dreamward"
               ourCopy="Real-time webhook sync from Shopify, Wix, and Square — plus native Etsy sync where every sale auto-deducts materials on EVERY plan, no manual &ldquo;Manufacturing Run&rdquo; required. Square &ldquo;Custom Amount&rdquo; items are first-class — map them once by name, future sales auto-resolve. Per-SKU COGS computes automatically. Define a recipe (bill of materials) for any product, then log a production run — finished stock goes up, raw materials draw down automatically, cleanly separated from sales."
             />
 
@@ -203,7 +203,7 @@ export default function CraftyBaseComparePage() {
               title="Outdated, retroactive architecture"
               theirHeading="Crafty Base"
               theirCopy="&ldquo;If you update a recipe today, Crafty Base often applies those changes retroactively to items made six months ago. This alters historical Cost of Goods Sold data and completely ruins past tax reporting.&rdquo;"
-              ourHeading="FlowWork"
+              ourHeading="Dreamward"
               ourCopy="Effective-date discipline: every cost is dated. Sales priced through a cost row keep their cost forever — changing today's price never rewrites your historical margins. If you do edit a past cost, a confirm modal names the count of affected sales so you know exactly what's about to change."
               highlight
             />
@@ -213,7 +213,7 @@ export default function CraftyBaseComparePage() {
               title="Opaque costing, passive alerts"
               theirHeading="Crafty Base"
               theirCopy="&ldquo;When the system calculates the average cost of a material, it does not explicitly show its work. Users report feeling anxious because they have to blindly trust the software's final COGS number without a clear, visual audit trail.&rdquo;"
-              ourHeading="FlowWork"
+              ourHeading="Dreamward"
               ourCopy="Click any cell on the COGS dashboard — the audit modal shows every contributing line item with the exact sku_cost_history row used per sale, its effective date, and per-unit cost. Anyone can re-derive every number in a spreadsheet from what's shown."
             />
           </div>
@@ -221,7 +221,7 @@ export default function CraftyBaseComparePage() {
       </section>
 
       {/* Pricing — the philosophical difference, not just the
-          numbers. Crafty Base gates features by tier; FlowWork
+          numbers. Crafty Base gates features by tier; Dreamward
           gates nothing. This is the section that converts. */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
         <div className="text-center mb-8">
@@ -235,7 +235,7 @@ export default function CraftyBaseComparePage() {
             Crafty Base locks Profit &amp; Loss reports,
             auto-manufacturing, and lot tracking behind Indie+
             ($59/mo) and Business ($129/mo) tiers — pay more to
-            unlock what you already need. FlowWork includes{" "}
+            unlock what you already need. Dreamward includes{" "}
             <strong>every feature on every tier</strong>. You pay by
             your business size, starting at $10/mo, and your tier
             adjusts automatically as you grow.
@@ -265,7 +265,7 @@ export default function CraftyBaseComparePage() {
           </div>
           <div className="bg-white border-2 border-emerald-300 rounded-xl p-5">
             <p className="text-sm font-bold text-slate-900 m-0 mb-2">
-              FlowWork
+              Dreamward
             </p>
             <ul className="m-0 p-0 list-none space-y-1.5 text-[13px] text-slate-700">
               <li className="flex items-start gap-2">
@@ -289,7 +289,7 @@ export default function CraftyBaseComparePage() {
             href="/pricing"
             className="inline-block py-2.5 px-6 rounded-lg bg-blue-500 text-white text-sm font-semibold no-underline hover:bg-blue-600"
           >
-            See FlowWork plans &rarr;
+            See Dreamward plans &rarr;
           </Link>
         </div>
         <p className="text-[11px] text-slate-400 mt-6 text-center">
@@ -331,7 +331,7 @@ export default function CraftyBaseComparePage() {
           Terms
         </Link>
         <p className="m-0 mt-2">
-          {"\u{00A9}"} {new Date().getFullYear()} FlowWork
+          {"\u{00A9}"} {new Date().getFullYear()} Dreamward
         </p>
       </footer>
     </div>

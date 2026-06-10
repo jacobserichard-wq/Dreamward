@@ -218,12 +218,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (matches.length === 0) {
-    // No FlowWork account with this email yet. The merchant may sign
+    // No Dreamward account with this email yet. The merchant may sign
     // up later — at that point we'd need a "look for pending unbound
     // installs for my email" job (not built yet). For now, log + 200.
     console.warn(
       `Wix webhook: unbound install for instance=${instanceId} ` +
-        `email=${normalized} — no FlowWork account matches`
+        `email=${normalized} — no Dreamward account matches`
     );
     return NextResponse.json({ acknowledged: true, action: "unbound_no_match" });
   }

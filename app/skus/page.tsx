@@ -302,7 +302,7 @@ export default function SkusPage() {
           <div className="bg-white rounded-xl border border-slate-200 py-12 px-6 text-center">
             <p className="text-5xl mb-3">{"\u{1F50F}"}</p>
             <p className="text-base font-medium text-slate-700 m-0 mb-1">
-              SKU catalog is part of FlowWork Pro
+              SKU catalog is part of Dreamward Pro
             </p>
             <p className="text-sm text-slate-500 m-0 mb-4 max-w-md mx-auto">
               SKUs power per-product gross-margin reporting across your

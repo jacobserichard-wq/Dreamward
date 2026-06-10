@@ -130,7 +130,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Set up Gmail labels",
     proGated: true,
     drillHref: "/dashboard?tab=processed&filter=gmail",
-    description: "Invoices + receipts forwarded into the FlowWork Gmail label, parsed by AI. Requires the Gmail integration (Pro).",
+    description: "Invoices + receipts forwarded into the Dreamward Gmail label, parsed by AI. Requires the Gmail integration (Pro).",
   },
   {
     // Phase 13 rename: "Uploads" → "Uncategorized". The id

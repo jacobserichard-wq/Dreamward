@@ -25,7 +25,7 @@
 //   → { access_token, expires_in }  (short-lived; ~5 min)
 //
 // We store NO tokens. We store only the per-site instance_id (binding
-// FlowWork's client_id ↔ Wix's instance_id) in wix_connections + mint
+// Dreamward's client_id ↔ Wix's instance_id) in wix_connections + mint
 // fresh tokens on demand. An in-process cache trims minting to roughly
 // once per ~5 min per site.
 //
@@ -36,7 +36,7 @@
 //   2. GET /api/wix/installed/redirect — browser-redirected merchant
 //                                        with instanceId in URL params
 //                                        (uses NextAuth session to
-//                                        bind to a FlowWork client)
+//                                        bind to a Dreamward client)
 //
 // See session-notes/phase-10-wix-architecture-pivot.md for the full
 // architecture decision record + commit-by-commit refactor plan.
@@ -597,7 +597,7 @@ interface WixProductsQueryResponse {
   pagingMetadata?: { cursors?: { next?: string | null } };
 }
 
-/** Flattened, FlowWork-friendly shape returned by listCatalog.
+/** Flattened, Dreamward-friendly shape returned by listCatalog.
  *  Single-variant products produce one row; multi-variant products
  *  produce one row per variant. */
 export interface WixCatalogVariation {

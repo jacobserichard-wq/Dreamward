@@ -333,7 +333,7 @@ export default function OnboardingPage() {
             href="/dashboard"
             className="text-sm text-slate-500 hover:text-slate-700 no-underline inline-flex items-center gap-1"
           >
-            {"\u{2190}"} <span>FlowWork</span>
+            {"\u{2190}"} <span>Dreamward</span>
           </Link>
         </div>
 

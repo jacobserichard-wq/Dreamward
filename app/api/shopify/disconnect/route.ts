@@ -9,7 +9,7 @@
 //   3. Iterates webhook_subscription_ids — DELETEs each subscription
 //      via Shopify's API so they stop being delivered. Best-effort:
 //      logs failures but doesn't block the disconnect (a webhook on
-//      a deleted FlowWork connection is harmless — the receiver
+//      a deleted Dreamward connection is harmless — the receiver
 //      would just 404 on its own client_id lookup).
 //   4. DELETEs the shopify_connections row
 //

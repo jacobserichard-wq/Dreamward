@@ -11,7 +11,7 @@
 // Pro-gated (matches every other /api/wix/* route).
 //
 // No token columns are surfaced or even SELECTed — under the Client
-// Credentials model, FlowWork doesn't store tokens at all (tokens
+// Credentials model, Dreamward doesn't store tokens at all (tokens
 // are minted per-request via lib/wix.mintAccessToken).
 
 import { NextResponse } from "next/server";

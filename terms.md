@@ -2,17 +2,17 @@
 
 **Last updated: May 5, 2026**
 
-These Terms of Service ("Terms") govern your access to and use of FlowWork at flowworks.it.com (the "Service"), operated by Richard Jacobsen, a sole proprietor based in Cedar Lake, Indiana, USA ("FlowWork," "we," "us," or "our"). By creating an account or using the Service, you agree to these Terms.
+These Terms of Service ("Terms") govern your access to and use of Dreamward at godreamward.com (the "Service"), operated by Richard Jacobsen, a sole proprietor based in Cedar Lake, Indiana, USA ("Dreamward," "we," "us," or "our"). By creating an account or using the Service, you agree to these Terms.
 
 If you do not agree to these Terms, do not use the Service.
 
 ---
 
-## 1. What FlowWork does
+## 1. What Dreamward does
 
-FlowWork is an AI-powered accounting automation tool. It connects to your Gmail account, reads emails you have labeled (such as invoices, receipts, or expenses), and uses AI to extract structured financial data — vendor, amount, due date, category, and similar fields. It also accepts CSV uploads for bulk data import. FlowWork displays your data in dashboards, reports, and exports for use in your own accounting and tax workflows.
+Dreamward is an AI-powered accounting automation tool. It connects to your Gmail account, reads emails you have labeled (such as invoices, receipts, or expenses), and uses AI to extract structured financial data — vendor, amount, due date, category, and similar fields. It also accepts CSV uploads for bulk data import. Dreamward displays your data in dashboards, reports, and exports for use in your own accounting and tax workflows.
 
-**FlowWork is not an accounting firm.** We do not provide accounting, bookkeeping, tax, financial, legal, or investment advice. You are responsible for verifying the accuracy of all data extracted by the Service before using it for tax filing, financial reporting, or any other regulated purpose. We strongly recommend reviewing AI-extracted data before relying on it.
+**Dreamward is not an accounting firm.** We do not provide accounting, bookkeeping, tax, financial, legal, or investment advice. You are responsible for verifying the accuracy of all data extracted by the Service before using it for tax filing, financial reporting, or any other regulated purpose. We strongly recommend reviewing AI-extracted data before relying on it.
 
 ---
 
@@ -24,7 +24,7 @@ You are responsible for:
 
 - Maintaining the confidentiality of your Google account and any other credentials used to access the Service
 - All activity that occurs under your account
-- Ensuring that the email content you process through FlowWork does not violate the rights of others, applicable laws, or third-party agreements
+- Ensuring that the email content you process through Dreamward does not violate the rights of others, applicable laws, or third-party agreements
 
 If you suspect unauthorized access to your account, contact us immediately at jacobse.richard@gmail.com.
 
@@ -32,7 +32,7 @@ If you suspect unauthorized access to your account, contact us immediately at ja
 
 ## 3. Subscriptions and billing
 
-The Service is offered on a subscription basis with three tiers: Starter ($19/month), Growth ($49/month), and Pro ($89/month). Pricing and feature lists are at flowworks.it.com.
+The Service is offered on a subscription basis with four tiers: Dream ($10/month), Maker ($19/month), Growth ($49/month), and Pro ($99/month). Every tier includes every product feature; tiers are sized by your business annual revenue. Pricing and feature lists are at godreamward.com.
 
 **Free trial.** New accounts begin with a 14-day free trial. No payment method is required to start the trial. At the end of the trial, you may subscribe to a paid plan or your access will be limited.
 
@@ -73,9 +73,9 @@ We reserve the right to suspend or terminate accounts that violate these terms. 
 
 **Your data is yours.** You retain all rights to the email content, CSV uploads, and other data you submit to the Service. By using the Service, you grant us a limited, non-exclusive license to access, process, and display that data solely for the purpose of providing the Service to you.
 
-**We are not your data custodian.** You are responsible for maintaining your own backups of important financial data. While we maintain the Service with reasonable care (Section 9), you should not rely on FlowWork as your sole record of financial information.
+**We are not your data custodian.** You are responsible for maintaining your own backups of important financial data. While we maintain the Service with reasonable care (Section 9), you should not rely on Dreamward as your sole record of financial information.
 
-**Our software is ours.** The FlowWork name, logo, software, designs, and documentation are owned by Richard Jacobsen and protected by copyright, trademark, and other intellectual property laws. These Terms do not grant you any ownership rights to FlowWork itself.
+**Our software is ours.** The Dreamward name, logo, software, designs, and documentation are owned by Richard Jacobsen and protected by copyright, trademark, and other intellectual property laws. These Terms do not grant you any ownership rights to Dreamward itself.
 
 **Feedback.** If you send us suggestions, ideas, or feedback about the Service, you grant us a perpetual, royalty-free license to use that feedback to improve the Service, with no obligation to compensate or credit you.
 
@@ -83,7 +83,7 @@ We reserve the right to suspend or terminate accounts that violate these terms. 
 
 ## 7. Third-party services
 
-FlowWork integrates with services operated by third parties, including Google (Gmail), Stripe, Anthropic, Vercel, Railway, Resend, and Calendly. Your use of these services through FlowWork is subject to those companies' terms and privacy policies. We are not responsible for the practices, availability, or content of third-party services.
+Dreamward integrates with services operated by third parties, including Google (Gmail), Stripe, Anthropic, Vercel, Railway, Resend, and Calendly. Your use of these services through Dreamward is subject to those companies' terms and privacy policies. We are not responsible for the practices, availability, or content of third-party services.
 
 If a third-party service we depend on becomes unavailable or changes its terms, we may modify the Service to adapt, including discontinuing affected features.
 
@@ -100,7 +100,7 @@ We specifically do **not** warrant:
 - That the Service will be available at all times or free from errors
 - That data submitted to the Service will not be lost (despite our reasonable security measures)
 
-**FlowWork does not provide tax, legal, accounting, or financial advice.** Use the Service as a productivity tool, and consult a qualified professional before making decisions based on the data it produces.
+**Dreamward does not provide tax, legal, accounting, or financial advice.** Use the Service as a productivity tool, and consult a qualified professional before making decisions based on the data it produces.
 
 ---
 
@@ -116,7 +116,7 @@ To the fullest extent permitted by law:
 
 ## 10. Indemnification
 
-You agree to defend, indemnify, and hold harmless Richard Jacobsen and FlowWork from any claims, liabilities, damages, losses, or expenses (including reasonable attorneys' fees) arising from (a) your use or misuse of the Service, (b) your violation of these Terms, or (c) your violation of any third-party right (including intellectual property, privacy, or data protection rights) through your use of the Service.
+You agree to defend, indemnify, and hold harmless Richard Jacobsen and Dreamward from any claims, liabilities, damages, losses, or expenses (including reasonable attorneys' fees) arising from (a) your use or misuse of the Service, (b) your violation of these Terms, or (c) your violation of any third-party right (including intellectual property, privacy, or data protection rights) through your use of the Service.
 
 ---
 

@@ -30,7 +30,7 @@
 -- webhook to use new Stripe products. Any active subscription
 -- created against the OLD Starter Stripe product keeps billing
 -- $19/mo against that product — the rename here only affects what
--- FlowWork calls the plan internally. Stripe migration to the new
+-- Dreamward calls the plan internally. Stripe migration to the new
 -- Maker product happens lazily on next subscription cycle or via
 -- a one-time admin sweep later.
 

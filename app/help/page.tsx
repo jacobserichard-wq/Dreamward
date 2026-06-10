@@ -17,7 +17,7 @@ import AppHeader from "../components/AppHeader";
 export const metadata = {
   title: "Help & guides",
   description:
-    "Step-by-step walkthroughs for every part of FlowWork — getting started, COGS, events, reports, and more.",
+    "Step-by-step walkthroughs for every part of Dreamward — getting started, COGS, events, reports, and more.",
 };
 
 interface GuideCardProps {
@@ -76,7 +76,7 @@ export default function HelpHubPage() {
           backHref="/dashboard"
           backLabel="Dashboard"
           title="Help & guides"
-          subtitle="Step-by-step walkthroughs for every part of FlowWork. Stuck? Start with the getting-started guide below."
+          subtitle="Step-by-step walkthroughs for every part of Dreamward. Stuck? Start with the getting-started guide below."
         />
 
         {/* Featured */}
@@ -86,7 +86,7 @@ export default function HelpHubPage() {
           </h2>
           <GuideCard
             href="/help/getting-started"
-            title="Getting started with FlowWork"
+            title="Getting started with Dreamward"
             description="A complete walkthrough from your first sign-in to generating a Schedule-C P&L for your accountant. About 15 minutes to read end-to-end."
             badge="popular"
           />
@@ -144,7 +144,7 @@ export default function HelpHubPage() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link
-              href="/templates/flowwork-sales-template.csv"
+              href="/templates/dreamward-sales-template.csv"
               className="block bg-white rounded-lg border border-slate-200 p-4 no-underline hover:border-slate-400"
             >
               <div className="text-sm font-semibold text-slate-900 mb-1">
@@ -182,7 +182,7 @@ export default function HelpHubPage() {
         <p className="text-center text-xs text-slate-400 mt-12">
           Can&apos;t find what you need?{" "}
           <a
-            href="mailto:support@flowworks.it.com"
+            href="mailto:support@godreamward.com"
             className="text-blue-600 no-underline hover:underline"
           >
             Email support

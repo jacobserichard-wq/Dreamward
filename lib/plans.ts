@@ -17,7 +17,7 @@
 //
 // Revenue thresholds drive automatic tier switching via a monthly
 // cron job (lib/revenueTier.ts). Customer never picks a tier
-// manually; they sign up, FlowWork places them on Dream by default,
+// manually; they sign up, Dreamward places them on Dream by default,
 // then bumps them up as their tracked revenue crosses thresholds.
 
 /** Maximum annual revenue (USD) covered by each tier. Set to
