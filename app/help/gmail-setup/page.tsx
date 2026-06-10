@@ -19,15 +19,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PageHeader from "../../components/PageHeader";
+import { FEATURES } from "@/lib/features";
 
 interface ClientInfo {
   plan: string;
 }
 
 export default function GmailSetupGuidePage() {
+  const router = useRouter();
   const [plan, setPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Fable-5 audit: Gmail ingestion is hidden behind the feature
+  // flag — a guide for a feature the user can't reach only
+  // confuses. Redirect to the Help hub while the flag is off; the
+  // page comes back automatically if GMAIL_INGEST flips to true.
+  useEffect(() => {
+    if (!FEATURES.GMAIL_INGEST) {
+      router.replace("/help");
+    }
+  }, [router]);
 
   useEffect(() => {
     async function load() {
@@ -49,6 +62,9 @@ export default function GmailSetupGuidePage() {
   }, []);
 
   const isPro = plan === "pro";
+
+  // While the redirect (flag off) is in flight, render nothing.
+  if (!FEATURES.GMAIL_INGEST) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">

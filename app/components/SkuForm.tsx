@@ -376,7 +376,9 @@ export default function SkuForm({
                 Backdate the effective date if you want this cost to
                 apply to historical sales already in FlowWork. Use{" "}
                 <strong>each</strong> for whole items, or a measure like{" "}
-                <strong>oz</strong> for materials.
+                <strong>oz</strong> for materials. Don&apos;t know the
+                cost yet? Enter <strong>0</strong> — you can add the real
+                cost later from the SKU&apos;s page.
               </p>
             </>
           )}
