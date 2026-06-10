@@ -60,6 +60,12 @@ export interface SetupChecklistProps {
    *  SKU — the signal that the product-tracking flow has started
    *  (a store synced line items, or the user added SKUs manually). */
   hasSku?: boolean;
+  /** Fable-5 audit fix: true when any platform integration
+   *  (Shopify / Square / Wix) is actually connected. Drives the
+   *  connect_store step — hasSku was the wrong signal (connecting
+   *  a store doesn't create SKUs, and a manually-created SKU
+   *  shouldn't tick the step). */
+  storeConnected?: boolean;
   /** Sub-session 33: true when at least one SKU has a cost-history
    *  row — the action that turns SKUs into gross-margin tracking. */
   hasCostedSku?: boolean;
@@ -181,7 +187,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
     {
       id: "connect_store",
       label: "Connect your store (Shopify, Wix, or Square)",
-      done: props.hasSku ?? false,
+      done: props.storeConnected ?? false,
       action: { kind: "link", href: "/integrations" },
       buttonLabel: "Connect",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],

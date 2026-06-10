@@ -438,6 +438,10 @@ function PricingTile({
   // OAuth flow (→ Trial by default). Users upgrade to their chosen
   // tier from /billing after signing in. ctaLabel varies for
   // intent-tracking via PostHog/etc later; behavior identical today.
+  //
+  // Fable-5 audit fix: route through ?callbackUrl=/onboarding so
+  // pricing-tile signups get the guided setup, matching the hero
+  // CTA. Previously they landed on a bare /dashboard.
   return (
     <div
       className={`relative rounded-xl p-6 ${
@@ -490,7 +494,7 @@ function PricingTile({
         ))}
       </ul>
       <Link
-        href="/signin"
+        href="/signin?callbackUrl=/onboarding"
         className={`block text-center py-2 px-4 rounded-lg text-sm font-semibold no-underline cursor-pointer ${
           highlighted
             ? "bg-white text-blue-700 hover:bg-slate-100"

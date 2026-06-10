@@ -168,7 +168,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/signin"
+                  href="/signin?callbackUrl=/onboarding"
                   className={`block text-center py-2 px-4 rounded-lg text-sm font-semibold no-underline cursor-pointer ${
                     highlighted
                       ? "bg-white text-blue-700 hover:bg-slate-100"

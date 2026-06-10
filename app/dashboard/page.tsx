@@ -1252,7 +1252,14 @@ export default function Home() {
               return processedItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F4CB}"}</p>
-                <p>No processed items yet. Fetch emails and click Process with AI.</p>
+                <p>
+                  Nothing here yet — upload a CSV with the {"\u{1F4C1}"}{" "}
+                  Upload button above, or connect a store on the{" "}
+                  <Link href="/integrations" className="text-blue-600 hover:underline">
+                    Integrations
+                  </Link>{" "}
+                  page to start pulling in sales.
+                </p>
               </div>
             ) : visibleItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">

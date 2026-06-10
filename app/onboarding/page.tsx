@@ -67,6 +67,7 @@ export default function OnboardingPage() {
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [hasSku, setHasSku] = useState(false);
   const [hasCostedSku, setHasCostedSku] = useState(false);
+  const [storeConnected, setStoreConnected] = useState(false);
 
   // Skip flow state.
   const [pendingSkipId, setPendingSkipId] = useState<string | null>(null);
@@ -77,15 +78,31 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clientRes, settingsRes, itemsRes, eventsRes, invoicesRes, skusRes] =
-        await Promise.allSettled([
-          fetch("/api/client"),
-          fetch("/api/settings"),
-          fetch("/api/items"),
-          fetch("/api/events"),
-          fetch("/api/invoices?limit=1"),
-          fetch("/api/skus"),
-        ]);
+      const [
+        clientRes,
+        settingsRes,
+        itemsRes,
+        eventsRes,
+        invoicesRes,
+        skusRes,
+        shopifyRes,
+        squareRes,
+        wixRes,
+      ] = await Promise.allSettled([
+        fetch("/api/client"),
+        fetch("/api/settings"),
+        fetch("/api/items"),
+        fetch("/api/events"),
+        fetch("/api/invoices?limit=1"),
+        fetch("/api/skus"),
+        // Fable-5 audit fix: the "Connect your store" checklist step
+        // keys off real connection status, not hasSku (connecting a
+        // store doesn't create SKUs, and a manual SKU shouldn't tick
+        // the step). All three endpoints return { connected: bool }.
+        fetch("/api/shopify/connection"),
+        fetch("/api/square/connection"),
+        fetch("/api/wix/connection"),
+      ]);
 
       // /api/client — required; bail to /signin if unauthenticated
       if (clientRes.status === "fulfilled" && clientRes.value.ok) {
@@ -149,6 +166,19 @@ export default function OnboardingPage() {
         setHasSku(skus.length > 0);
         setHasCostedSku(skus.some((s) => s.currentCost != null));
       }
+
+      // Any of the three platform connections counts as "store
+      // connected". Failed fetches just leave it false.
+      let connected = false;
+      for (const res of [shopifyRes, squareRes, wixRes]) {
+        if (res.status === "fulfilled" && res.value.ok) {
+          const data = (await res.value.json().catch(() => null)) as {
+            connected?: boolean;
+          } | null;
+          if (data?.connected) connected = true;
+        }
+      }
+      setStoreConnected(connected);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load setup data");
     } finally {
@@ -325,6 +355,7 @@ export default function OnboardingPage() {
           hasInvoices={invoiceCount > 0}
           hasSku={hasSku}
           hasCostedSku={hasCostedSku}
+          storeConnected={storeConnected}
           businessName={clientInfo.businessName ?? ""}
           industry={clientInfo.industry ?? ""}
           skipped={skipped as Record<string, string>}
