@@ -132,27 +132,51 @@ export default function UpcomingEventsCard({
           </div>
         ) : (
           <ul className="space-y-2 m-0 p-0 list-none">
-            {visible.map((ev) => (
-              <li key={ev.id}>
-                <Link
-                  href={`/events/${ev.id}`}
-                  className="block border border-slate-200 hover:border-slate-300 rounded-lg p-2.5 no-underline transition-colors"
-                >
-                  <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <span className="text-sm font-semibold text-slate-900 truncate">
-                      {ev.name}
-                    </span>
-                    <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                      {daysUntilLabel(ev.startDate)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {"\u{1F4C5}"} {fmtDateRange(ev.startDate, ev.endDate)}
-                    {ev.venue ? ` · ${ev.venue}` : ""}
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {visible.map((ev) => {
+              const isToday = daysUntilLabel(ev.startDate) === "Today";
+              return (
+                <li key={ev.id}>
+                  <Link
+                    href={`/events/${ev.id}`}
+                    className={`block border rounded-lg p-2.5 no-underline transition-colors ${
+                      isToday
+                        ? "border-emerald-300 bg-emerald-50/50 hover:border-emerald-400"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                      <span className="text-sm font-semibold text-slate-900 truncate">
+                        {ev.name}
+                      </span>
+                      <span
+                        className={`text-[11px] whitespace-nowrap ${
+                          isToday
+                            ? "text-emerald-700 font-semibold"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {daysUntilLabel(ev.startDate)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {"\u{1F4C5}"} {fmtDateRange(ev.startDate, ev.endDate)}
+                      {ev.venue ? ` · ${ev.venue}` : ""}
+                    </div>
+                  </Link>
+                  {/* Market-day entry: today's event gets the live
+                      logging CTA right where the vendor will look
+                      first thing in the morning. */}
+                  {isToday && (
+                    <Link
+                      href="/market-day"
+                      className="block text-center mt-1.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold no-underline"
+                    >
+                      {"\u{1F3EA}"} Open Market Day mode {"\u{2192}"}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
             {hasMore && (
               <li className="text-center pt-1">
                 <Link

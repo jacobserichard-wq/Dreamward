@@ -135,6 +135,13 @@ export default function AppHeader({
           <Link href="/events" className={NAV_LINK}>
             Events
           </Link>
+          {/* Market-day mode: phone-first booth sale logging. Gated
+              like the other paying-tier surfaces. */}
+          {paying && (
+            <Link href="/market-day" className={NAV_LINK}>
+              Market Day
+            </Link>
+          )}
           <Link href="/expenses" className={NAV_LINK}>
             Expenses
           </Link>
