@@ -26,7 +26,7 @@ import {
   reverseSaleAdjustments,
 } from "@/lib/inventory/adjustments";
 
-export type AliasPlatform = "shopify" | "wix" | "square";
+export type AliasPlatform = "shopify" | "wix" | "square" | "etsy";
 
 export interface AliasCreateInput {
   /** FlowWork SKU id. Must belong to the calling client_id — the

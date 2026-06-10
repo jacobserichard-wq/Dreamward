@@ -147,14 +147,16 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     description: "Catch-all for transactions that don't fit any other channel. Mostly CSV-uploaded rows without an obvious tag — review periodically to re-tag.",
   },
   {
+    // Live as of the Etsy integration (June 2026) — the #1
+    // competitive gap closed. Was comingSoon since Phase 9.1.
     id: "etsy",
     label: "Etsy",
     icon: "\u{1F3F7}\u{FE0F}",
-    comingSoon: true,
-    emptyAddHref: null,
-    emptyAddLabel: null,
-    proGated: false,
-    drillHref: null,
+    comingSoon: false,
+    emptyAddHref: "/integrations",
+    emptyAddLabel: "Connect Etsy",
+    proGated: true,
+    drillHref: "/dashboard?tab=processed",
   },
   {
     id: "square",
@@ -346,6 +348,7 @@ function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
   if (row.source === "shopify") return "shopify";
   if (row.source === "wix") return "wix";
   if (row.source === "square") return "square";
+  if (row.source === "etsy") return "etsy";
   if (row.source === "gmail" || row.source === "email") return "gmail";
   if (row.event_id !== null) return "markets";
   if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
@@ -378,6 +381,7 @@ function classifyExpenseRow(row: ChannelTxnRow): ChannelId | null {
   if (row.source === "shopify") return "shopify";
   if (row.source === "wix") return "wix";
   if (row.source === "square") return "square";
+  if (row.source === "etsy") return "etsy";
   return null;
 }
 

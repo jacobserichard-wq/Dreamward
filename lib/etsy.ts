@@ -269,21 +269,24 @@ interface EtsyReceiptsResponse {
 
 export const ETSY_RECEIPTS_PAGE_SIZE = 100;
 
-/** One page of receipts, newest first. `minCreated` (unix seconds)
- *  bounds the reconciliation lookback; `offset` drives the chunked
- *  backfill. Returns the page plus the total count so callers can
- *  decide whether to continue. */
+/** One page of receipts. `minCreated` (unix seconds) bounds the
+ *  reconciliation lookback; `offset` drives the chunked backfill.
+ *  Backfills sort ASCENDING (oldest first) so offsets stay stable
+ *  while new orders arrive mid-backfill; the cron lookback sorts
+ *  DESCENDING (newest first). Returns the page plus the total
+ *  count so callers can decide whether to continue. */
 export async function fetchReceiptsPage(opts: {
   accessToken: string;
   shopId: string;
   offset?: number;
   minCreated?: number;
+  sortOrder?: "asc" | "desc";
 }): Promise<{ receipts: EtsyReceipt[]; totalCount: number }> {
   const searchParams: Record<string, string> = {
     limit: String(ETSY_RECEIPTS_PAGE_SIZE),
     offset: String(opts.offset ?? 0),
     sort_on: "created",
-    sort_order: "desc",
+    sort_order: opts.sortOrder ?? "desc",
   };
   if (opts.minCreated) {
     searchParams.min_created = String(opts.minCreated);

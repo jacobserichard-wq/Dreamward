@@ -60,7 +60,7 @@ export interface InternalLineItem {
 
 /** Platform tag used for sku_aliases JOIN + the platform column on
  *  processed_item_line_items. */
-export type LineItemPlatform = "shopify" | "wix" | "square";
+export type LineItemPlatform = "shopify" | "wix" | "square" | "etsy";
 
 /**
  * Bulk-insert a batch of line items for a single parent
