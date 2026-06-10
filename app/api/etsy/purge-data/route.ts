@@ -5,22 +5,19 @@
 // signed-in client. Mirrors /api/square/purge-data — see
 // /api/wix/purge-data for the original design rationale.
 //
-// Line items cascade with the parent rows (0018 ON DELETE CASCADE).
-// KNOWN GAP shared with the Square/Wix purges: inventory
-// sale-adjustment ledger rows survive with source_line_item_id
-// nulled (0020 ON DELETE SET NULL), so stock stays decremented by
-// the purged sales. Merchants can fix counts with a recount on the
-// inventory page. A cross-platform inventory-aware purge is queued
-// as follow-up work — fixing it for Etsy alone would just make the
-// platforms inconsistent.
+// Inventory-aware via lib/purgePlatformData: line items cascade
+// with the parent rows (0018 ON DELETE CASCADE), and their sale
+// adjustments are reversed first so stock credits back — the
+// SET NULL gap that originally shipped here is closed for all
+// platforms by the shared helper.
 //
 // Separate from /api/etsy/disconnect by design — disconnect
 // preserves historical data; purge removes it.
 
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { purgePlatformData } from "@/lib/purgePlatformData";
 
 export async function POST() {
   try {
@@ -38,15 +35,13 @@ export async function POST() {
       );
     }
 
-    const result = await pool.query(
-      `DELETE FROM processed_items
-        WHERE client_id = $1 AND source = 'etsy'`,
-      [client.id]
-    );
-
-    const deleted = result.rowCount ?? 0;
+    const { deleted, adjustmentsReversed } = await purgePlatformData({
+      clientId: client.id,
+      source: "etsy",
+    });
     console.log(
-      `Etsy purge: deleted ${deleted} processed_items for client_id=${client.id}`
+      `Etsy purge: deleted ${deleted} processed_items, reversed ` +
+        `${adjustmentsReversed} stock adjustments for client_id=${client.id}`
     );
 
     return NextResponse.json({ deleted });

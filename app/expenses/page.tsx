@@ -547,10 +547,27 @@ export default function ExpensesPage() {
                         {e.category || "—"}
                       </td>
                       <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span>{ch.icon}</span>
-                          <span>{ch.label}</span>
-                        </span>
+                        {/* Markets drill-down: an event-linked expense
+                            links straight to its event's P&L page.
+                            stopPropagation keeps the row's edit-on-click
+                            from also firing. */}
+                        {e.eventId !== null ? (
+                          <Link
+                            href={`/events/${e.eventId}`}
+                            onClick={(ev) => ev.stopPropagation()}
+                            title="View this event's P&L"
+                            className="inline-flex items-center gap-1.5 text-blue-600 no-underline hover:underline"
+                          >
+                            <span>{ch.icon}</span>
+                            <span>{ch.label}</span>
+                            <span aria-hidden>{"\u{2192}"}</span>
+                          </Link>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span>{ch.icon}</span>
+                            <span>{ch.label}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
                         {fmtUsd(e.amount)}

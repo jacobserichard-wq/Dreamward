@@ -27,9 +27,9 @@
 // with the matcher.
 
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { purgePlatformData } from "@/lib/purgePlatformData";
 
 export async function POST() {
   try {
@@ -47,19 +47,16 @@ export async function POST() {
       );
     }
 
-    // Single-statement delete — no need to load anything first.
-    // The DB's foreign-key constraints (if any) would error if a
-    // row was referenced elsewhere; processed_items has no FK in
-    // our schema so this is a clean cascade-free delete.
-    const result = await pool.query(
-      `DELETE FROM processed_items
-        WHERE client_id = $1 AND source = 'wix'`,
-      [client.id]
-    );
-
-    const deleted = result.rowCount ?? 0;
+    // Inventory-aware purge (lib/purgePlatformData): reverses the
+    // sale adjustments under the doomed rows so stock credits back,
+    // then deletes — all in one transaction.
+    const { deleted, adjustmentsReversed } = await purgePlatformData({
+      clientId: client.id,
+      source: "wix",
+    });
     console.log(
-      `Wix purge: deleted ${deleted} processed_items for client_id=${client.id}`
+      `Wix purge: deleted ${deleted} processed_items, reversed ` +
+        `${adjustmentsReversed} stock adjustments for client_id=${client.id}`
     );
 
     return NextResponse.json({ deleted });
