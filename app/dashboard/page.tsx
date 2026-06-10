@@ -87,6 +87,13 @@ export default function Home() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // ?upload=1 (from the onboarding checklist's Upload step) shows a
+  // hint pointing at the nav's Upload button.
+  const [showUploadHint, setShowUploadHint] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upload") === "1") setShowUploadHint(true);
+  }, []);
   const [clientInfo, setClientInfo] = useState<any>(null);
   const router = useRouter();
 
@@ -861,7 +868,10 @@ export default function Home() {
                 {")"}
               </>
             )}
-            {tab === "dashboard" && "\u{1F4CA} Dashboard"}
+            {/* Fable-5 audit: a tab named "Dashboard" inside the
+                dashboard page is semantically muddy — "Overview"
+                says what it is. Tab id stays "dashboard". */}
+            {tab === "dashboard" && "\u{1F4CA} Overview"}
           </button>
         ))}
       </nav>
@@ -872,6 +882,36 @@ export default function Home() {
         {successMsg && (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4 text-sm">
             {successMsg}
+          </div>
+        )}
+
+        {/* ?upload=1 hint — shown when the onboarding checklist's
+            Upload step routed here. Browsers won't let us open the
+            file picker without a user gesture, so we point at the
+            nav button instead of leaving the click feeling dead. */}
+        {showUploadHint && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg mb-4 text-sm flex justify-between items-center gap-3 flex-wrap">
+            <span>
+              {"\u{2B06}\u{FE0F}"} Pick your CSV or XLSX with the{" "}
+              <strong>{"\u{1F4C1}"} Upload</strong> button in the top bar —
+              or{" "}
+              <a
+                href="/templates/flowwork-sales-template.csv"
+                download="flowwork-sales-template.csv"
+                className="font-medium underline"
+              >
+                download the template
+              </a>{" "}
+              first to see the expected columns.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowUploadHint(false)}
+              aria-label="Dismiss"
+              className="text-blue-400 hover:text-blue-700 cursor-pointer bg-transparent border-0"
+            >
+              {"\u{2715}"}
+            </button>
           </div>
         )}
 

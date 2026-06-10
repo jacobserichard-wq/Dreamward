@@ -369,8 +369,10 @@ export default function OnboardingPage() {
             router.push("/dashboard");
           }}
           onUploadClick={() => {
-            // Same pattern — file input lives on the dashboard.
-            router.push("/dashboard");
+            // The file input lives on the dashboard. ?upload=1 makes
+            // the dashboard show a "pick your file up here" hint so
+            // the click doesn't feel like a dead end (Fable-5 audit).
+            router.push("/dashboard?upload=1");
           }}
           onSkip={handleRequestSkip}
           onUnskip={handleUnskip}

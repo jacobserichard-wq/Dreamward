@@ -128,15 +128,10 @@ export default function AppHeader({
             </Link>
           )}
 
-          <a
-            href="/templates/flowwork-sales-template.csv"
-            download="flowwork-sales-template.csv"
-            className="bg-transparent text-white/50 text-[11px] sm:text-xs no-underline px-1 py-1.5 hover:text-white/80"
-            title="Download the CSV template with example rows"
-          >
-            (template)
-          </a>
-
+          {/* Fable-5 audit: the "(template)" nav link read like a bug
+              as global chrome. The CSV template is still linked from
+              the dashboard upload hint, the Help hub, the
+              getting-started guide, and the SKUs tip. */}
           <Link href="/events" className={NAV_LINK}>
             Events
           </Link>

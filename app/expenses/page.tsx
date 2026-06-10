@@ -391,8 +391,6 @@ export default function ExpensesPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="Expenses"
           subtitle="Track money out — vendor bills, supplies, subscriptions, mileage"
         />

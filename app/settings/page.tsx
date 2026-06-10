@@ -689,8 +689,6 @@ export default function SettingsPage() {
       <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="Settings"
           subtitle="Manage your modules and preferences"
         />

@@ -296,8 +296,6 @@ export default function SkusPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            backHref="/dashboard"
-            backLabel="FlowWork"
             title="SKUs"
             subtitle="Product cost tracking — Pro feature"
           />
@@ -327,8 +325,6 @@ export default function SkusPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="SKUs"
           subtitle="Product cost catalog — powers your COGS + per-channel gross margin reports"
         />

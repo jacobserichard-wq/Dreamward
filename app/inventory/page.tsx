@@ -183,8 +183,6 @@ export default function InventoryPage() {
         <AppHeader />
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            backHref="/dashboard"
-            backLabel="FlowWork"
             title="Inventory"
             subtitle="Stock levels, value, and reorder alerts"
           />
@@ -222,8 +220,6 @@ export default function InventoryPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="Inventory"
           subtitle="Stock levels, value, and reorder alerts across every SKU"
         />

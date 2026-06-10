@@ -187,8 +187,6 @@ export default function BillingPage() {
       <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="Billing & Plan"
           subtitle={billing.email}
         />

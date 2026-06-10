@@ -211,8 +211,6 @@ export default function CogsPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            backHref="/dashboard"
-            backLabel="FlowWork"
             title="COGS"
             subtitle="Pro feature"
           />
@@ -244,8 +242,6 @@ export default function CogsPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          backHref="/dashboard"
-          backLabel="FlowWork"
           title="COGS & gross margin"
           subtitle="Per-period revenue, cost of goods sold, and margin — broken down by channel and by SKU. Click any number for the audit trail."
         />
