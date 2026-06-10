@@ -1,6 +1,6 @@
 # FlowWork Product Roadmap
 
-**Small Business Edition** | Updated May 25, 2026
+**Small Business Edition** | Updated June 9, 2026
 
 **9 Phases** · **60+ Tasks** · **18 Weeks** · **Phases 0 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 6.5 / 7 / 8 SHIPPED** · **Phase 1.6 IN PROGRESS (OAuth submission paused — CASA decision)** · **Phase 1.7: Tier 1 + Tier 2 complete; Tier 3 (admin tooling) pending** · **Phase 8 SHIPPED (Shopify integration — OAuth + token encryption + connect/disconnect UI + backfill with $99 unlimited upgrade + webhooks + cron + landing page command-center pivot)** · **Phase 9.1 SHIPPED (Channel Profitability — canonical 9-channel dashboard surface + /profitability "By Channel" tab + per-user collapse persistence + overhead allocation toggle, repositions FlowWork from "bookkeeping software" to "decision-support command center")**
 
@@ -493,13 +493,16 @@ Market vendors & craft sellers · Freelancers & consultants · Small landscaping
 
 ## Pricing
 
-| Plan | Price | Auth | Data input | Key Features |
-|---|---|---|---|---|
-| **Starter** | $19/mo | Email magic-link | CSV upload | Up to 100 items/month, any CSV format, expense tracking, dashboard |
-| **Growth** | $49/mo | Email magic-link | CSV upload | Unlimited processing, events, mileage, AR, exports |
-| **Pro** | $89/mo | Google sign-in | Gmail auto-fetch + CSV | Multi-account, custom categories, tax reports, white-glove onboarding, **Gmail auto-fetch** |
+**"Built for people. Priced for people."** — strategic pivot, June 2026 (sub-session 33). Feature-flat pricing: every paying tier gets every product feature. Tiers are sized by the customer's annual revenue, with revenue-based auto tier-switching reconciled monthly by cron. Service tiers differ only in support speed.
 
-All tiers include a 14-day free trial. CSV upload supports Square, Stripe, QuickBooks, Xero, and Wave exports. Gmail integration is exclusive to Pro tier and counts toward Google OAuth's 100-user testing cap until CASA verification completes.
+| Plan | Price | For businesses with annual revenue |
+|---|---|---|
+| **Dream** | $10/mo | under $5k |
+| **Maker** | $19/mo | $5k–$50k |
+| **Growth** | $49/mo | $50k–$500k |
+| **Pro** | $99/mo | $500k+ |
+
+All tiers include a 14-day free trial (no credit card). Stripe price IDs are env-backed (`STRIPE_PRICE_ID_DREAM/MAKER/GROWTH/PRO`); legacy starter/growth/pro priceIds still resolve via fallback for grandfathered subscriptions. The old tiered-auth model (Gmail Pro-only gate) is superseded — Gmail ingest is behind the `FEATURES.GMAIL_INGEST` feature flag (currently off) pending the keep-or-kill decision.
 
 ---
 
@@ -546,7 +549,11 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 **Phase 9.3 (Expenses page + channel tagging) shipped**: Closes the "Invoices" vs "Expenses" mental-model gap — the existing `/invoices` route was AR (customer invoices YOU sent), but the label hit most solo founders as "bills I received." Net adds a dedicated expense-tracking workflow + clarifies the nav. Migration `0011_add_processed_items_channel.sql` adds `processed_items.channel TEXT` (nullable) with partial unique-style index + backfills existing rows from event_id/source signals so rollup totals don't shift. `lib/profitability/channels.ts` classifier updated to honor explicit `row.channel` over derivation (priority 0). New `GET + POST /api/expenses` route handles expense-kind processed_items with channel/event filters + creation with server-side category-kind validation + tenant-scoped event_id checks. New `ExpenseForm` modal component (vendor / amount / date / category / channel dropdown / conditional event picker that appears when channel='markets' / notes). New `/expenses` page with channel filter chips (per-channel counts), $ summary header, table view with date / vendor / category / channel / amount columns, contextual empty states, and a "Looking for customer invoices? → AR" footer pointer for users who clicked the wrong nav link. Top nav rewrite: "Invoices" relabeled to "AR" (route + AR functionality unchanged), new "Expenses" link inserted before AR. Plus mileage-rate dual-system (Operating rate gas÷MPG used for /profitability + dashboard channel math; IRS rate preserved for /reports + Schedule C deduction math) and `/profitability` By-Event tab tweaks (Total Miles tile replaced with Profit Margin %, monthly trend chart row hides when <2 data points) — both shipped in the same sub-session.
 
-**Recommended next coding session:** Phase 9.4 candidates — trend dashboards (channel revenue over time), cash flow forecast (project next 60 days from trends), per-product profitability (requires Shopify product.cost API), or per-customer profitability. Also queued: Phase 8e (Shopify cron + data purge — the last unshipped sub-phase of Phase 8), affiliate links wiring once Shopify Affiliate Program approves the `.it.com` domain (currently blocked by their URL validator). UX Tier 3 follow-ups documented in `audit-ux-firstrun.md` §3 also remain available. Smaller polish queue: expense edit/delete (currently /expenses is create-only via the modal — re-uses existing /api/items for edits but no UI yet), per-row drill-down to event detail when clicking a Markets-channel expense.
+**Etsy integration (June 2026, sub-session 34) shipped**: closes the #1 competitive gap vs Crafty Base identified in the competitive ranking. Six commits: `lib/etsy.ts` typed v3 client (OAuth 2.0 + mandatory PKCE S256, 1-hour access / 90-day rotating refresh tokens via `ensureFreshToken`, receipts with NESTED transactions, Money `{amount, divisor}` mapping); migrations `0024`+`0025` for `etsy_connections` (AES-256-GCM 3-part token blobs, backfill cursor); OAuth initiate/callback/connection/disconnect routes (state + verifier in 10-min httpOnly cookies, UPSERT for re-auth); chunked resumable backfill (ascending offset, full history, line-item fanout, cross-source dedup); cron reconciliation pass (Etsy v1 has NO webhooks — the daily cron IS the ongoing sync, 25h lookback via `min_created`, fans line items unlike the Square pass, token refresh doubles as the 90-day keep-alive); user-facing layer (`EtsyConnectionCard` with client-driven backfill loop, `/api/etsy/catalog` + Etsy tab on `/skus/bulk-import`, `/api/etsy/purge-data`, channel registry flip from coming-soon, marketing/docs updates). User-side: Etsy app approval (~24–48h) + commercial access review pending; live OAuth test once approved.
+
+**Inventory + pricing pivot (June 2026, sub-session 33) shipped**: Tier 1 stock tracking (`quantity_on_hand` NUMERIC(14,4), `inventory_adjustments` ledger with sale/receive/recount/correction reasons, auto-decrement on matched sales, reverse buttons), Tier 2 recipes/BOM + production runs (finished stock up, raw materials down, "can make N"), `/inventory` page (value on hand, reorder points, stock health), Form 1125-A valuation in Schedule-C reports via monthly `inventory_snapshots` cron. Pricing pivot per the Pricing section above, including the 57-file `isPayingTier` sweep and Stripe sandbox products. Gmail ingest hidden behind `FEATURES.GMAIL_INGEST=false`; Google OAuth scope minimized to `openid email`.
+
+**Recommended next coding session:** Etsy live OAuth test once the app is approved, then candidates — mobile-first market-day mode + testimonials (both from the competitive analysis), rename + domain change (scoped in `session-notes/scope-rename-and-domain.md`), Tier 3 inventory (lot tracking / FIFO), roll-up costing (recipe cost auto-updates from ingredient costs), Phase 9.4 trend dashboards / cash-flow forecast, Etsy webhooks if Etsy ever ships them. Smaller polish queue: expense edit/delete (currently /expenses is create-only via the modal), per-row drill-down to event detail when clicking a Markets-channel expense, cross-platform inventory-aware purge (purge routes leave stock decremented by deleted sales — `ON DELETE SET NULL` on the adjustments ledger).
 
 ---
 

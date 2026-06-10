@@ -7,7 +7,7 @@
 //
 // POST /api/skus/bulk-import-catalog
 //   Body: {
-//     platform: 'shopify' | 'wix' | 'square',
+//     platform: 'shopify' | 'wix' | 'square' | 'etsy',
 //     effectiveDate: 'YYYY-MM-DD',
 //     rows: Array<{
 //       externalId: string,    // platform-side alias key
@@ -68,7 +68,7 @@ interface PerRowResult {
   error?: string;
 }
 
-const VALID_PLATFORMS = new Set(["shopify", "wix", "square"]);
+const VALID_PLATFORMS = new Set(["shopify", "wix", "square", "etsy"]);
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;

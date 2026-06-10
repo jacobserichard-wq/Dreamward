@@ -110,7 +110,7 @@ export default function HelpHubPage() {
             />
             <GuideCard
               href="/help/integrations"
-              title="Connecting Shopify, Wix, and Square"
+              title="Connecting Shopify, Wix, Square, and Etsy"
               description="OAuth setup, what data each integration pulls, how line items become per-SKU COGS, and what to do when an order looks wrong."
               badge="coming-soon"
             />

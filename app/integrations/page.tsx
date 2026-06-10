@@ -3,8 +3,8 @@
 // Phase 8b commit 3 of 3 (commit 9 of Phase 8 overall).
 //
 // /integrations — the user-facing hub for connecting external
-// platforms. v1 lists Shopify + Wix (live) + placeholder cards for
-// upcoming platforms (Etsy, Square, WooCommerce) so users see the
+// platforms. Live: Shopify, Wix, Square, Etsy. Placeholder cards
+// for upcoming platforms (WooCommerce, Stripe Connect) signal the
 // roadmap.
 //
 // Pro-gated (matches every other /api/shopify/* + /api/wix/* route
@@ -30,6 +30,7 @@ import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
+import EtsyConnectionCard from "../components/EtsyConnectionCard";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
@@ -82,6 +83,10 @@ function IntegrationsPageInner() {
     const site = params.get("site");
     const connectedSquare = params.get("connected_square");
     const merchant = params.get("merchant");
+    // Etsy's callback redirects with connected_etsy=1&shop=<shopName>.
+    // The shop param is shared with Shopify's flow, but Shopify also
+    // sets connected=1 — the branch order below keeps them apart.
+    const connectedEtsy = params.get("connected_etsy");
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
     // Auto-bind handoff from the Wix Dashboard Extension bridge page
@@ -94,6 +99,12 @@ function IntegrationsPageInner() {
 
     if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
+    } else if (connectedEtsy === "1") {
+      setSuccessMsg(
+        shop
+          ? `Connected to ${shop}! Importing your order history now…`
+          : "Etsy shop connected! Importing your order history now…"
+      );
     } else if (connectedSquare === "1") {
       setSuccessMsg(
         merchant ? `Connected to ${merchant}!` : "Square account connected!"
@@ -147,6 +158,7 @@ function IntegrationsPageInner() {
 
     if (
       connected ||
+      connectedEtsy ||
       connectedSquare ||
       connectedWix ||
       errParam ||
@@ -209,9 +221,10 @@ function IntegrationsPageInner() {
               {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
-              Upgrade to Pro ($89/mo) to connect Shopify, Wix, or
-              Square and pull orders + revenue automatically into
-              FlowWork. Coming soon: Etsy, WooCommerce, Stripe Connect.
+              Subscribe (plans start at $10/mo) to connect Shopify,
+              Wix, Square, or Etsy and pull orders + revenue
+              automatically into FlowWork. Coming soon: WooCommerce,
+              Stripe Connect.
             </p>
             <Link
               href="/billing"
@@ -235,8 +248,8 @@ function IntegrationsPageInner() {
         />
 
         <SectionTip id="integrations" title="Connect a store to automate everything">
-          Connecting Shopify, Wix, or Square pulls your last 90 days of
-          orders and keeps syncing in real time — no manual uploads. Each
+          Connecting Shopify, Wix, Square, or Etsy pulls in your order
+          history and keeps it synced — no manual uploads. Each
           order&apos;s line items flow into per-product margin, and your
           products auto-populate the <strong>SKUs</strong> catalog. Square
           even imports the costs you&apos;ve already set in its catalog.
@@ -270,6 +283,7 @@ function IntegrationsPageInner() {
             <ShopifyConnectionCard />
             <WixConnectionCard />
             <SquareConnectionCard />
+            <EtsyConnectionCard />
           </div>
         </div>
 
@@ -281,11 +295,6 @@ function IntegrationsPageInner() {
             Coming soon
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <ComingSoonCard
-              icon={"\u{1F3F7}\u{FE0F}"}
-              name="Etsy"
-              subtitle="Sync orders + listing fees + shop payments"
-            />
             <ComingSoonCard
               icon={"\u{1F6D2}"}
               name="WooCommerce"

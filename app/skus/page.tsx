@@ -404,7 +404,7 @@ export default function SkusPage() {
             <Link
               href="/skus/bulk-import"
               className="py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5 no-underline"
-              title="Pull SKUs from a connected store (Square, Shopify, Wix)"
+              title="Pull SKUs from a connected store (Square, Shopify, Wix, Etsy)"
             >
               <span>{"\u{1F4E5}"}</span> Pull from a store
             </Link>
@@ -468,8 +468,8 @@ export default function SkusPage() {
             </p>
             <p className="text-sm text-slate-500 m-0 mb-4 max-w-md mx-auto">
               Add a SKU to track its cost across all your connected stores.
-              The line items on every Shopify, Wix, and Square sale will
-              automatically tie back to it for gross-margin reports.
+              The line items on every Shopify, Wix, Square, and Etsy sale
+              will automatically tie back to it for gross-margin reports.
             </p>
             <button
               type="button"

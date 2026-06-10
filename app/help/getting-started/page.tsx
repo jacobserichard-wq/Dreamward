@@ -102,7 +102,7 @@ export default function GettingStartedGuide() {
           <p>
             FlowWork is gross-margin tracking and Schedule-C P&amp;L for small
             businesses that have outgrown spreadsheets. You connect the places
-            your money actually moves — Shopify, Wix, Square, your event
+            your money actually moves — Shopify, Wix, Square, Etsy, your event
             markets, your manual receipts — and FlowWork tells you what every
             sale was really worth after the cost of goods, and what your
             accountant needs at tax time.
@@ -132,9 +132,10 @@ export default function GettingStartedGuide() {
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <strong>Online seller</strong> (Shopify, Wix, or Square Online):
-              start by connecting your store — line items pull automatically
-              and per-SKU margin appears once you set cost history.
+              <strong>Online seller</strong> (Shopify, Wix, Square Online, or
+              Etsy): start by connecting your store — line items pull
+              automatically and per-SKU margin appears once you set cost
+              history.
             </li>
             <li>
               <strong>Market or event vendor</strong> (booth at the farmer&apos;s
@@ -162,32 +163,34 @@ export default function GettingStartedGuide() {
         <Section id="connect-revenue-source" title="3. Connect your first revenue source">
           <p>
             Open <Link href="/integrations" className="text-blue-600 no-underline hover:underline">Integrations</Link>{" "}
-            from the header nav. You&apos;ll see cards for Shopify, Wix, and
-            Square. Click &ldquo;Connect&rdquo; on the one you use. Each
-            integration walks through an OAuth handoff — FlowWork redirects you
-            to the platform, you authorize, they redirect you back.
+            from the header nav. You&apos;ll see cards for Shopify, Wix,
+            Square, and Etsy. Click &ldquo;Connect&rdquo; on the one you use.
+            Each integration walks through an OAuth handoff — FlowWork
+            redirects you to the platform, you authorize, they redirect you
+            back.
           </p>
           <p>
             Once connected, FlowWork does two things in the background:
           </p>
           <ol className="list-decimal pl-6 space-y-2">
             <li>
-              <strong>Backfills your last 90 days of orders.</strong> You can
-              extend that window from the integration card if you want more
-              history. The backfill runs server-side — close the tab if you
-              want, it&apos;ll keep going.
+              <strong>Backfills your order history.</strong> Etsy pulls your
+              full history; Shopify, Wix, and Square start with the last 90
+              days, extendable from the integration card. The backfill runs
+              server-side — close the tab if you want, it&apos;ll keep going.
             </li>
             <li>
-              <strong>Subscribes to real-time webhooks.</strong> Every new
-              order, refund, or fulfillment event hits FlowWork within a few
-              seconds of happening on the platform. You don&apos;t click
-              &ldquo;sync&rdquo; — it&apos;s already in sync.
+              <strong>Keeps it synced.</strong> Shopify, Wix, and Square send
+              real-time webhooks — every new order, refund, or fulfillment
+              event hits FlowWork within seconds. Etsy doesn&apos;t offer
+              webhooks, so Etsy shops reconcile automatically once a day
+              instead. Either way, you don&apos;t click &ldquo;sync.&rdquo;
             </li>
           </ol>
           <Callout variant="info">
-            Each platform pulls slightly different data. Shopify and Wix give
-            you line items by SKU, which is what powers per-product margin.
-            Square gives you line items too, and pulls{" "}
+            Each platform pulls slightly different data. Shopify, Wix, and
+            Etsy give you line items by SKU, which is what powers per-product
+            margin. Square gives you line items too, and pulls{" "}
             <code className="bg-slate-100 px-1.5 py-0.5 rounded text-sm">default_unit_cost</code>{" "}
             straight from your Square catalog — meaning if you set costs in
             Square, you don&apos;t have to re-enter them here.
@@ -245,7 +248,7 @@ export default function GettingStartedGuide() {
             how many units you have in stock. Click &ldquo;+ Receive
             stock&rdquo; on the SKU detail page to record a shipment or
             your starting count. Every sale auto-decrements stock as it
-            flows in from Shopify, Wix, or Square — you&apos;ll see a
+            flows in from Shopify, Wix, Square, or Etsy — you&apos;ll see a
             running history of every adjustment with a balance-after column
             so you can trace exactly how the current count got there.
           </p>

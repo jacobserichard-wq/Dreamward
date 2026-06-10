@@ -1,7 +1,7 @@
 // app/skus/bulk-import/page.tsx
 //
 // Phase 12e commit 2 of 2. The catalog bulk-import surface.
-// Three tabs (Square / Shopify / Wix) → pull the connected
+// Four tabs (Square / Shopify / Wix / Etsy) → pull the connected
 // platform's catalog → edit codes/costs in preview → import.
 //
 // Anti-Crafty: Crafty Base requires per-row data entry through
@@ -18,7 +18,7 @@ import PageHeader from "../../components/PageHeader";
 import ErrorBanner from "../../components/ErrorBanner";
 import Spinner from "../../components/Spinner";
 
-type Platform = "square" | "shopify" | "wix";
+type Platform = "square" | "shopify" | "wix" | "etsy";
 
 interface CatalogRow {
   externalId: string;
@@ -83,6 +83,14 @@ function platformMeta(p: Platform): {
         color: "text-blue-700 bg-blue-50 border-blue-200",
         notes:
           "Wix doesn't expose cost via the public Catalog API — fill costs in below.",
+      };
+    case "etsy":
+      return {
+        label: "Etsy",
+        icon: "\u{1F3F7}\u{FE0F}",
+        color: "text-orange-700 bg-orange-50 border-orange-200",
+        notes:
+          "Etsy doesn't expose your costs — fill them in below. Listings import as one SKU each; variations within a listing share it.",
       };
   }
 }
@@ -149,7 +157,14 @@ export default function BulkImportPage() {
         setError(body.error || `HTTP ${res.status}`);
         return;
       }
-      const data = (await res.json()) as { rows: CatalogRow[] };
+      const data = (await res.json()) as {
+        rows: CatalogRow[];
+        warning?: string;
+      };
+      // Non-blocking caveat from the catalog endpoint (e.g., the
+      // Etsy route's page cap tripped on an enormous shop). Reuses
+      // the dismissable error banner — the rows below it are real.
+      if (data.warning) setError(data.warning);
       const editable: EditableRow[] = data.rows.map((r, idx) => ({
         ...r,
         rowKey: `${platform}-${r.externalId}-${idx}`,
@@ -270,7 +285,7 @@ export default function BulkImportPage() {
           backHref="/skus"
           backLabel="SKUs"
           title="Bulk import from a connected store"
-          subtitle="Pull every product variant from Square, Shopify, or Wix in one click — edit codes and costs in the preview, then commit. Already-mapped items skip cleanly."
+          subtitle="Pull every product from Square, Shopify, Wix, or Etsy in one click — edit codes and costs in the preview, then commit. Already-mapped items skip cleanly."
         />
 
         {error && (
@@ -279,7 +294,7 @@ export default function BulkImportPage() {
 
         {/* Platform tabs */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          {(["square", "shopify", "wix"] as const).map((p) => {
+          {(["square", "shopify", "wix", "etsy"] as const).map((p) => {
             const m = platformMeta(p);
             return (
               <button

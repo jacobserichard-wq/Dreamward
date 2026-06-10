@@ -28,7 +28,7 @@ import SignInButton from "./components/SignInButton";
 export const metadata = {
   title: "FlowWork — Gross margin tracking + Schedule-C P&L for small business",
   description:
-    "Track real gross margin per product across Shopify, Wix, and Square. Effective-date COGS — your historical margins never silently rewrite when a cost changes today. Schedule-C-ready P&L for your CPA, receipts attached.",
+    "Track real gross margin per product across Shopify, Wix, Square, and Etsy. Effective-date COGS — your historical margins never silently rewrite when a cost changes today. Schedule-C-ready P&L for your CPA, receipts attached.",
   openGraph: {
     title: "FlowWork — Gross margin tracking that doesn't lie",
     description:
@@ -121,7 +121,7 @@ export default async function MarketingLandingPage() {
           <FeatureCard
             icon={"\u{1F6D2}"}
             title="Sync every revenue source"
-            body="Real-time webhook sync from Shopify, Wix, and Square. Line items flow into per-product margin automatically. CSV/XLSX upload covers market days, Venmo/Zelle, and anything else without a connected source."
+            body="Real-time webhook sync from Shopify, Wix, and Square, plus daily Etsy shop sync. Line items flow into per-product margin automatically. CSV/XLSX upload covers market days, Venmo/Zelle, and anything else without a connected source."
           />
           <FeatureCard
             icon={"\u{1F4CE}"}
@@ -145,7 +145,7 @@ export default async function MarketingLandingPage() {
             One ledger for every channel.
           </p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <ChannelCard
             icon={"\u{1F6D2}"}
             label="Shopify"
@@ -162,6 +162,11 @@ export default async function MarketingLandingPage() {
             blurb="POS + online payments with line-item COGS"
           />
           <ChannelCard
+            icon={"\u{1F3F7}\u{FE0F}"}
+            label="Etsy"
+            blurb="Shop orders + listing line items, synced daily"
+          />
+          <ChannelCard
             icon={"\u{1F697}"}
             label="Events"
             blurb="Markets, fairs, pop-ups with auto-mileage"
@@ -173,8 +178,8 @@ export default async function MarketingLandingPage() {
           drag-drop receipt attachments
           <br />
           <span className="text-slate-400">
-            <strong className="text-slate-500">Coming next:</strong> Etsy
-            · WooCommerce · Stripe Connect
+            <strong className="text-slate-500">Coming next:</strong>{" "}
+            WooCommerce · Stripe Connect
           </span>
         </p>
 

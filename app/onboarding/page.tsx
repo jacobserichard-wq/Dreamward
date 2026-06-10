@@ -88,6 +88,7 @@ export default function OnboardingPage() {
         shopifyRes,
         squareRes,
         wixRes,
+        etsyRes,
       ] = await Promise.allSettled([
         fetch("/api/client"),
         fetch("/api/settings"),
@@ -98,10 +99,11 @@ export default function OnboardingPage() {
         // Fable-5 audit fix: the "Connect your store" checklist step
         // keys off real connection status, not hasSku (connecting a
         // store doesn't create SKUs, and a manual SKU shouldn't tick
-        // the step). All three endpoints return { connected: bool }.
+        // the step). All four endpoints return { connected: bool }.
         fetch("/api/shopify/connection"),
         fetch("/api/square/connection"),
         fetch("/api/wix/connection"),
+        fetch("/api/etsy/connection"),
       ]);
 
       // /api/client — required; bail to /signin if unauthenticated
@@ -167,10 +169,10 @@ export default function OnboardingPage() {
         setHasCostedSku(skus.some((s) => s.currentCost != null));
       }
 
-      // Any of the three platform connections counts as "store
+      // Any of the four platform connections counts as "store
       // connected". Failed fetches just leave it false.
       let connected = false;
-      for (const res of [shopifyRes, squareRes, wixRes]) {
+      for (const res of [shopifyRes, squareRes, wixRes, etsyRes]) {
         if (res.status === "fulfilled" && res.value.ok) {
           const data = (await res.value.json().catch(() => null)) as {
             connected?: boolean;
