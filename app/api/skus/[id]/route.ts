@@ -45,6 +45,10 @@ interface SkuRowDb {
   // second round trip. NUMERIC since Tier 2 → pg returns a string.
   quantity_on_hand: string;
   unit: string;
+  // Market-day mode (migration 0026): what the customer pays at the
+  // booth. Distinct from cost history (what the merchant pays).
+  // NUMERIC → string from pg, nullable.
+  default_sell_price: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +72,7 @@ async function loadEnrichedSku(
             sales.last_sale_date,
             s.quantity_on_hand,
             s.unit,
+            s.default_sell_price,
             s.created_at, s.updated_at
        FROM skus s
        LEFT JOIN LATERAL (
@@ -103,6 +108,10 @@ function serializeSku(row: SkuRowDb) {
     lastSaleDate: row.last_sale_date,
     quantityOnHand: Number(row.quantity_on_hand),
     unit: row.unit,
+    defaultSellPrice:
+      row.default_sell_price != null
+        ? Number(row.default_sell_price)
+        : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -256,6 +265,7 @@ interface PatchSkuBody {
   description?: unknown;
   active?: unknown;
   reorderPoint?: unknown;
+  defaultSellPrice?: unknown;
 }
 
 export async function PATCH(
@@ -340,6 +350,25 @@ export async function PATCH(
       }
       updates.push(`reorder_point = $${p++}`);
       values.push(rp);
+    }
+
+    // Market-day mode: the booth selling price. Positive number to
+    // set, null to clear. Persisted from the /market-day tile prompt
+    // and editable from the SKU detail page.
+    if (body.defaultSellPrice !== undefined) {
+      if (body.defaultSellPrice === null) {
+        updates.push(`default_sell_price = NULL`);
+      } else {
+        const price = Number(body.defaultSellPrice);
+        if (!Number.isFinite(price) || price <= 0) {
+          return NextResponse.json(
+            { error: "defaultSellPrice must be a positive number or null" },
+            { status: 400 }
+          );
+        }
+        updates.push(`default_sell_price = $${p++}`);
+        values.push(price);
+      }
     }
 
     if (updates.length === 0) {
