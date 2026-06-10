@@ -24,6 +24,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
+import { TESTIMONIALS } from "@/lib/testimonials";
 
 export const metadata = {
   title: "FlowWork — Gross margin tracking + Schedule-C P&L for small business",
@@ -182,6 +183,41 @@ export default async function MarketingLandingPage() {
             WooCommerce · Stripe Connect
           </span>
         </p>
+
+        {/* Testimonials — renders ONLY when lib/testimonials.ts has
+            real quotes (house rule: never fabricated). Positioned
+            above the compare pill + pricing so social proof lands
+            before the price tag. While the array is empty this whole
+            block is invisible. */}
+        {TESTIMONIALS.length > 0 && (
+          <div className="mt-12">
+            <h3 className="text-center text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-8">
+              From people building their dream
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {TESTIMONIALS.map((t, i) => (
+                <figure
+                  key={i}
+                  className="bg-white border border-slate-200 rounded-xl p-5 m-0 flex flex-col"
+                >
+                  <blockquote className="text-sm text-slate-700 leading-relaxed m-0 mb-4 flex-1">
+                    {"\u{201C}"}
+                    {t.quote}
+                    {"\u{201D}"}
+                  </blockquote>
+                  <figcaption className="text-xs">
+                    <span className="font-semibold text-slate-900 block">
+                      {t.name}
+                    </span>
+                    <span className="text-slate-500">
+                      {[t.business, t.location].filter(Boolean).join(" · ")}
+                    </span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sub-session 32 marketing commit 2: link to the head-to-head
             page. Positioned right above pricing — visitors comparing
