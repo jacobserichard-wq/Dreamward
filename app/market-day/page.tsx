@@ -66,6 +66,10 @@ interface MarketDayData {
   sales: SaleRow[];
   total: number;
   skus: SkuTile[];
+  /** Raw materials (recipe-ingredient-only SKUs with no booth
+   *  price) the API kept off the grid. Surfaced so the hiding is
+   *  never silent. */
+  hiddenMaterials: number;
 }
 
 /** The vendor's local calendar date — NOT UTC. */
@@ -606,6 +610,19 @@ export default function MarketDayPage() {
                   catalog
                 </Link>
                 . You can still log sales with the Custom tile above.
+              </p>
+            )}
+
+            {data.hiddenMaterials > 0 && (
+              <p className="text-[11px] text-slate-400 mt-3 mb-0">
+                {data.hiddenMaterials} raw material
+                {data.hiddenMaterials === 1 ? "" : "s"} (recipe
+                ingredients without a booth price) hidden. To sell one
+                directly, set its booth price from{" "}
+                <Link href="/skus" className="text-blue-600 hover:underline">
+                  its SKU page
+                </Link>
+                .
               </p>
             )}
 

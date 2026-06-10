@@ -174,6 +174,15 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Tap-grid SKUs ─────────────────────────────────────────────
+    // Raw-material hide rule (Jacob, June 9): a SKU that is ONLY a
+    // recipe ingredient — used as a bom_components component, with
+    // no recipe of its own, and no booth price — isn't something
+    // you ring up at a table, so it stays off the grid. Setting a
+    // booth price on its SKU page (e.g., selling soy wax by the
+    // pound) brings it back. A component that has its OWN recipe
+    // (a candle inside a gift basket) stays visible either way.
+    // The flag is computed here and filtered in JS so the response
+    // can report hiddenMaterials instead of hiding silently.
     const skusRes = await pool.query<{
       id: number;
       code: string;
@@ -181,13 +190,26 @@ export async function GET(req: NextRequest) {
       default_sell_price: string | null;
       quantity_on_hand: string;
       unit: string;
+      is_hidden_material: boolean;
     }>(
-      `SELECT id, code, name, default_sell_price, quantity_on_hand, unit
-         FROM skus
-        WHERE client_id = $1 AND active = TRUE
-        ORDER BY name ASC`,
+      `SELECT s.id, s.code, s.name, s.default_sell_price,
+              s.quantity_on_hand, s.unit,
+              (s.default_sell_price IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM bom_components bc
+                  WHERE bc.component_sku_id = s.id
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM bom_components bp
+                  WHERE bp.parent_sku_id = s.id
+               )) AS is_hidden_material
+         FROM skus s
+        WHERE s.client_id = $1 AND s.active = TRUE
+        ORDER BY s.name ASC`,
       [client.id]
     );
+    const visibleSkus = skusRes.rows.filter((s) => !s.is_hidden_material);
+    const hiddenMaterials = skusRes.rows.length - visibleSkus.length;
 
     return NextResponse.json({
       events: candidates,
@@ -195,7 +217,7 @@ export async function GET(req: NextRequest) {
       parent,
       sales,
       total: parent?.amount ?? 0,
-      skus: skusRes.rows.map((s) => ({
+      skus: visibleSkus.map((s) => ({
         id: s.id,
         code: s.code,
         name: s.name,
@@ -204,6 +226,7 @@ export async function GET(req: NextRequest) {
         quantityOnHand: Number(s.quantity_on_hand),
         unit: s.unit,
       })),
+      hiddenMaterials,
     });
   } catch (err) {
     console.error("Market-day GET error:", err);

@@ -42,6 +42,9 @@ export interface SkuFormSubmit {
 export interface SkuFormEditSubmit {
   name: string;
   description: string | null;
+  /** Market-day booth price. null clears it (and re-hides a raw
+   *  material from the /market-day grid). */
+  defaultSellPrice: number | null;
 }
 
 export interface SkuFormEditing {
@@ -50,6 +53,7 @@ export interface SkuFormEditing {
   name: string;
   description: string | null;
   active: boolean;
+  defaultSellPrice: number | null;
 }
 
 export interface SkuFormProps {
@@ -93,6 +97,8 @@ export default function SkuForm({
   const [cost, setCost] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(todayIso());
   const [unit, setUnit] = useState("each");
+  // Edit mode only — the booth selling price for /market-day.
+  const [sellPrice, setSellPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +117,11 @@ export default function SkuForm({
       setDescription(editing.description ?? "");
       setCost("");
       setEffectiveDate(todayIso());
+      setSellPrice(
+        editing.defaultSellPrice !== null
+          ? String(editing.defaultSellPrice)
+          : ""
+      );
     } else {
       setCode("");
       setName("");
@@ -145,16 +156,26 @@ export default function SkuForm({
     }
 
     if (isEdit) {
-      // Edit path — only name + description are mutable.
+      // Edit path — name, description, and booth price are mutable.
       if (!onSaveEdit) {
         setError("Edit handler missing (internal bug).");
         return;
+      }
+      let sellPriceNum: number | null = null;
+      const sellCleaned = sellPrice.replace(/[$,\s]/g, "");
+      if (sellCleaned.length > 0) {
+        sellPriceNum = Number(sellCleaned);
+        if (!Number.isFinite(sellPriceNum) || sellPriceNum <= 0) {
+          setError("Booth price must be a positive number (or blank).");
+          return;
+        }
       }
       setSaving(true);
       try {
         await onSaveEdit({
           name: trimmedName,
           description: description.trim() || null,
+          defaultSellPrice: sellPriceNum,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't save SKU");
@@ -306,6 +327,43 @@ export default function SkuForm({
               className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 resize-y"
             />
           </Field>
+
+          {/* Booth price — edit mode only. What the customer pays
+              at a market table; drives the /market-day tap grid.
+              Distinct from cost history (what YOU pay). Blank =
+              not sold directly; raw materials stay hidden from
+              the market grid. */}
+          {isEdit && (
+            <Field
+              label="Booth price (optional)"
+              htmlFor="sku-sell-price"
+            >
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                  {"$"}
+                </span>
+                <input
+                  id="sku-sell-price"
+                  type="text"
+                  inputMode="decimal"
+                  value={sellPrice}
+                  onChange={(e) => {
+                    setSellPrice(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="0.00"
+                  disabled={saving}
+                  className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                />
+              </div>
+              <p className="text-xs text-slate-500 m-0 mt-1">
+                What customers pay at a market booth — powers the
+                Market Day tap grid. Leave blank if you don&apos;t
+                sell this item directly (recipe ingredients stay
+                hidden from the grid).
+              </p>
+            </Field>
+          )}
 
           {/* Cost + Effective date — create mode only. Edit mode
               hides these to enforce "add a new cost row" via the

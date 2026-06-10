@@ -55,6 +55,9 @@ interface SkuRow {
   quantityOnHand: number;
   // Tier 2: unit of measure (each, oz, ...).
   unit: string;
+  // Market-day mode (0026): booth selling price. null = not set;
+  // unpriced raw materials hide from the /market-day tap grid.
+  defaultSellPrice: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1175,6 +1178,7 @@ export default function SkuDetailPage() {
           name: sku.name,
           description: sku.description,
           active: sku.active,
+          defaultSellPrice: sku.defaultSellPrice,
         }}
         onSave={async () => {
           // Unreachable in edit mode — onSaveEdit is what runs.
