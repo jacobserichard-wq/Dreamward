@@ -24,6 +24,13 @@ import {
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 import { reconcileAllTiers, isFirstOfMonthUtc } from "@/lib/revenueTier";
 import { recordInventorySnapshot } from "@/lib/inventory/valuation";
+import {
+  ensureFreshToken as etsyEnsureFreshToken,
+  fetchReceiptsPage as etsyFetchReceiptsPage,
+  mapReceiptToProcessedItem as etsyMapReceipt,
+  mapTransactionsToLineItems as etsyMapLineItems,
+} from "@/lib/etsy";
+import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 
@@ -36,6 +43,13 @@ const WIX_RECONCILE_LOOKBACK_HOURS = 25;
 // Phase 11e: same lookback semantics for Square.
 const SQUARE_RECONCILE_LOOKBACK_HOURS = 25;
 const SQUARE_TOKEN_REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+// Etsy integration: same 25h lookback. Unlike Shopify/Wix/Square,
+// Etsy v1 has NO webhooks — this cron pass IS the ongoing sync, so
+// (also unlike the Square pass) it fans line items for fresh rows.
+// A side benefit of running daily: each pass refreshes the token
+// pair, keeping the 90-day refresh token alive for idle shops.
+const ETSY_RECONCILE_LOOKBACK_HOURS = 25;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -450,6 +464,190 @@ export async function GET(req: NextRequest) {
       console.error("[cron] Square reconcile pass aggregate failure:", err);
     }
 
+    // ── Etsy reconciliation pass ─────────────────────────────────
+    // Etsy v1 has NO webhooks — this daily pass IS the ongoing sync.
+    // Two deltas from the Square pass above:
+    //   1. Line items are fanned for fresh rows (RETURNING + fanout)
+    //      since no webhook will ever do it.
+    //   2. ensureFreshToken effectively refreshes every run (access
+    //      tokens live 1 hour) — which doubles as the keep-alive for
+    //      the 90-day rotating refresh token.
+    let etsyConnectionsScanned = 0;
+    let etsyReceiptsUpserted = 0;
+    let etsyReconcileErrors = 0;
+    try {
+      const minCreated = Math.floor(
+        (Date.now() - ETSY_RECONCILE_LOOKBACK_HOURS * 3600_000) / 1000
+      );
+
+      const etsyConnsResult = await pool.query<{
+        id: number;
+        client_id: number;
+        shop_id: string;
+        access_token_ciphertext: Buffer;
+        access_token_iv: Buffer;
+        access_token_auth_tag: Buffer;
+        access_token_expires_at: string;
+        refresh_token_ciphertext: Buffer;
+        refresh_token_iv: Buffer;
+        refresh_token_auth_tag: Buffer;
+      }>(
+        `SELECT id, client_id, shop_id,
+                access_token_ciphertext, access_token_iv, access_token_auth_tag,
+                access_token_expires_at,
+                refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag
+           FROM etsy_connections
+          WHERE backfill_done = TRUE`
+      );
+
+      for (const conn of etsyConnsResult.rows) {
+        etsyConnectionsScanned++;
+        try {
+          const fresh = await etsyEnsureFreshToken({
+            accessToken: decryptFromDb({
+              ciphertext: conn.access_token_ciphertext,
+              iv: conn.access_token_iv,
+              authTag: conn.access_token_auth_tag,
+            }),
+            refreshToken: decryptFromDb({
+              ciphertext: conn.refresh_token_ciphertext,
+              iv: conn.refresh_token_iv,
+              authTag: conn.refresh_token_auth_tag,
+            }),
+            expiresAt: new Date(conn.access_token_expires_at),
+          });
+          const accessToken = fresh.accessToken;
+          if (fresh.rotated) {
+            const a = encryptForDb(fresh.rotated.access_token);
+            const r = encryptForDb(fresh.rotated.refresh_token);
+            await pool.query(
+              `UPDATE etsy_connections
+                  SET access_token_ciphertext = $1, access_token_iv = $2,
+                      access_token_auth_tag = $3,
+                      access_token_expires_at = NOW() + ($4 || ' seconds')::interval,
+                      refresh_token_ciphertext = $5, refresh_token_iv = $6,
+                      refresh_token_auth_tag = $7,
+                      refresh_token_obtained_at = NOW(),
+                      updated_at = NOW()
+                WHERE id = $8`,
+              [
+                a.ciphertext,
+                a.iv,
+                a.authTag,
+                String(fresh.rotated.expires_in),
+                r.ciphertext,
+                r.iv,
+                r.authTag,
+                conn.id,
+              ]
+            );
+          }
+
+          // Last 25h of receipts, newest first. min_created is a
+          // native Etsy filter — one page (100) covers any realistic
+          // daily volume for a maker shop.
+          const page = await etsyFetchReceiptsPage({
+            accessToken,
+            shopId: conn.shop_id,
+            minCreated,
+            sortOrder: "desc",
+          });
+          if (page.receipts.length === 0) continue;
+
+          const rows = page.receipts.map(etsyMapReceipt);
+          const fieldsPerRow = 13;
+          const values: unknown[] = [];
+          const placeholders = rows
+            .map((r) => {
+              const base = values.length;
+              values.push(
+                r.vendor,
+                r.invoice_number,
+                r.amount,
+                r.due_date,
+                r.status,
+                r.category,
+                r.source,
+                r.source_ref_id,
+                r.channel,
+                r.confidence,
+                r.summary,
+                JSON.stringify(r.extracted_data),
+                conn.client_id
+              );
+              return (
+                "(" +
+                Array.from(
+                  { length: fieldsPerRow },
+                  (_, j) => `$${base + j + 1}`
+                ).join(",") +
+                ")"
+              );
+            })
+            .join(",");
+
+          const insertRes = await pool.query<{
+            id: number;
+            source_ref_id: string;
+          }>(
+            `INSERT INTO processed_items (
+               vendor, invoice_number, amount, due_date, status,
+               category, source, source_ref_id, channel, confidence,
+               summary, extracted_data, client_id
+             ) VALUES ${placeholders}
+             ON CONFLICT (client_id, source, source_ref_id)
+               WHERE source_ref_id IS NOT NULL
+             DO NOTHING
+             RETURNING id, source_ref_id`,
+            values
+          );
+
+          if (insertRes.rowCount && insertRes.rowCount > 0) {
+            const receiptByRef = new Map(
+              page.receipts.map((r) => [String(r.receipt_id), r])
+            );
+            const parents = insertRes.rows.flatMap((row) => {
+              const receipt = receiptByRef.get(row.source_ref_id);
+              if (!receipt) return [];
+              const items = etsyMapLineItems(receipt);
+              if (items.length === 0) return [];
+              return [
+                {
+                  parentId: row.id,
+                  soldAt: new Date(receipt.create_timestamp * 1000)
+                    .toISOString()
+                    .slice(0, 10),
+                  items,
+                },
+              ];
+            });
+            if (parents.length > 0) {
+              await bulkInsertLineItemsAcrossParents({
+                clientId: conn.client_id,
+                platform: "etsy",
+                parents,
+              });
+            }
+            etsyReceiptsUpserted += insertRes.rowCount;
+          }
+        } catch (err) {
+          etsyReconcileErrors++;
+          console.error(
+            `[cron] Etsy reconcile failed for connection ${conn.id} ` +
+              `(client_id=${conn.client_id}):`,
+            err
+          );
+        }
+      }
+
+      console.log(
+        `[cron] Etsy reconcile: ${etsyReceiptsUpserted} receipts upserted ` +
+          `across ${etsyConnectionsScanned} connections, ${etsyReconcileErrors} errors`
+      );
+    } catch (err) {
+      console.error("[cron] Etsy reconcile pass aggregate failure:", err);
+    }
+
     // ── Phase 12g: COGS daily digest emails ────────────────────
     //
     // For every Pro client, compute yesterday's revenue / COGS /
@@ -629,6 +827,9 @@ export async function GET(req: NextRequest) {
       squareConnectionsScanned,
       squarePaymentsUpserted,
       squareReconcileErrors,
+      etsyConnectionsScanned,
+      etsyReceiptsUpserted,
+      etsyReconcileErrors,
       cogsDigestsSent,
       cogsDigestsSkipped,
       cogsDigestErrors,
