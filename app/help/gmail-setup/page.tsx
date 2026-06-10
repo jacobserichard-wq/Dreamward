@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 import { FEATURES } from "@/lib/features";
 
 interface ClientInfo {
@@ -68,6 +69,7 @@ export default function GmailSetupGuidePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[820px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/dashboard"

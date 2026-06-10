@@ -336,6 +336,7 @@ export default function InvoiceDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           backHref="/invoices"

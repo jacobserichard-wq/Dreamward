@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
+import AppHeader from "../components/AppHeader";
 
 export const metadata = {
   title: "Help & guides",
@@ -69,6 +70,7 @@ function GuideCard({ href, title, description, badge }: GuideCardProps) {
 export default function HelpHubPage() {
   return (
     <div className="min-h-screen bg-slate-50">
+      <AppHeader />
       <div className="max-w-[900px] mx-auto px-4 sm:px-8 py-10">
         <PageHeader
           backHref="/dashboard"

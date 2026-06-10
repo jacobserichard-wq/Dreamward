@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import PageHeader from "../../components/PageHeader";
+import AppHeader from "../../components/AppHeader";
 
 export const metadata = {
   title: "Getting started",
@@ -71,6 +72,7 @@ function Callout({
 export default function GettingStartedGuide() {
   return (
     <div className="min-h-screen bg-white">
+      <AppHeader />
       <div className="max-w-[800px] mx-auto px-4 sm:px-8 py-10">
         <PageHeader
           backHref="/help"
