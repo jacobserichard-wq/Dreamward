@@ -558,7 +558,89 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 
 **Market-day mode + testimonials (June 9, 2026, sub-session 35) shipped**: the second competitive-analysis gap closed. `/market-day` is a phone-first booth surface — sticky running day total, tap grid of active SKU tiles (one tap = one sale; first tap on an unpriced SKU prompts once and persists to the new `skus.default_sell_price`, migration `0026`), Custom-sale tile, per-sale Undo. Storage design D1: one running `processed_items` parent per (event, day) (`source='market_day'`, `channel='markets'`, advisory-locked upsert) with one `processed_item_line_items` row per tap, `matched_sku_id` set directly — stock, COGS, event P&L, and the Markets channel all light up through the same pipeline platform sales use; custom sales plug into the existing resolve-by-name mapping. Framing: this is the CASH log — booth card sales already stream in via Square. Entry points: paying-gated nav link + emerald "Open Market Day mode" CTA on today's event in UpcomingEventsCard. Out of scope v1 (parked): offline queue/PWA, payment-method tagging, barcode scan, qty stepper. Testimonials: landing section reads `lib/testimonials.ts` and renders nothing while the array is empty — auto-appears with the first real quote; house rule in the file: no fabricated quotes, ever.
 
-**Recommended next coding session:** Etsy live OAuth test once the app is approved, then candidates — rename + domain change (scoped in `session-notes/scope-rename-and-domain.md`), Tier 3 inventory (lot tracking / FIFO), roll-up costing (recipe cost auto-updates from ingredient costs), Phase 9.4 trend dashboards / cash-flow forecast, market-day v2 (offline queue, qty stepper), Etsy webhooks if Etsy ever ships them. Polish queue (June 9): expense edit/delete turned out to already be shipped (row-click edit + hover delete + PATCH/DELETE with Blob cleanup — the queue entry was stale); event drill-down link added to event-linked expense rows; inventory-aware purge shipped via shared `lib/purgePlatformData.ts` (transaction: reverse sale adjustments → credit stock → delete parents) across Square/Wix/Etsy.
+**Recommended next coding session:** the **Go Live checklist** (section below — launch-blocking items first: Stripe live mode, Google OAuth publish). Rename + domain change SHIPPED June 10 (FlowWork → Dreamward, godreamward.com). Etsy live OAuth test once the app is approved. Post-launch candidates — Tier 3 inventory (lot tracking / FIFO), roll-up costing (recipe cost auto-updates from ingredient costs), Phase 9.4 trend dashboards / cash-flow forecast, market-day v2 (offline queue, qty stepper), Etsy webhooks if Etsy ever ships them. Polish queue (June 9): expense edit/delete turned out to already be shipped (row-click edit + hover delete + PATCH/DELETE with Blob cleanup — the queue entry was stale); event drill-down link added to event-linked expense rows; inventory-aware purge shipped via shared `lib/purgePlatformData.ts` (transaction: reverse sale adjustments → credit stock → delete parents) across Square/Wix/Etsy.
+
+---
+
+## Go Live — Launch Checklist (added June 11, 2026)
+
+Converting the testing-phase setup into a production launch under the
+Dreamward brand. Ordered by dependency — payments and auth first
+(launch-blocking), platforms as their approvals land, marketing last.
+The June 10 rename/domain cutover (godreamward.com) is DONE and is
+the foundation all of this builds on.
+
+### 1. Payments — Stripe live mode (launch-blocking; Jacob ~1–2 hrs)
+- [ ] Activate the live Stripe account: business verification (sole
+      prop, Cedar Lake IN), bank account for payouts, SMS phone
+      verification (sandbox showed "Verify now" pending).
+- [ ] Live-mode business details: Public business name **Dreamward**,
+      statement descriptor **DREAMWARD** (card statements — wrong
+      descriptor = "what's this charge?" disputes).
+- [ ] Recreate the four products/prices in LIVE mode at exactly
+      $10 / $19 / $49 / $99 (sandbox products don't carry over).
+- [ ] Live webhook endpoint `https://godreamward.com/api/stripe/webhook`
+      with the same 4 events (checkout.session.completed +
+      customer.subscription.created/updated/deleted).
+- [ ] Swap Vercel Production env: STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID_DREAM/MAKER/GROWTH/PRO
+      → live values. Keep sandbox keys in Preview env for testing.
+- [ ] End-to-end test with a real card: signup → trial → checkout →
+      plan lands in DB → cancel → refund path.
+
+### 2. Auth — Google OAuth production (launch-blocking; Jacob ~15 min + review)
+- [ ] Google Auth Platform → Audience → **Publish app** (Testing →
+      Production). With only `openid email` scopes this is the
+      cheap no-CASA path; removes the 100-lifetime-user cap.
+- [ ] Note: the uploaded logo may trigger Google's brand
+      verification on publish (days, not weeks). If it stalls
+      launch, remove the logo, publish, re-add later.
+- [ ] Branding already done (June 11): app name Dreamward, all URLs
+      + authorized domain godreamward.com.
+
+### 3. Platform integrations — move off sandbox/dev as approvals land
+- [ ] **Etsy**: app approval + commercial access review pending
+      (applied ~June 9). When approved: live OAuth connect with own
+      shop, full backfill smoke, then listings → SKU import flow.
+      Callback URL already points at godreamward.com.
+- [ ] **Square**: create Production credentials (currently sandbox),
+      swap SQUARE_* env vars, Production webhook subscription at
+      godreamward.com, connect a real Square account.
+- [ ] **Shopify**: dev app works for direct installs. Re-apply to the
+      Shopify Affiliate/Partner program — the old blocker was their
+      URL validator rejecting `.it.com`; godreamward.com clears it.
+- [ ] **Wix**: update app dashboard callback/webhook URLs to
+      godreamward.com next time the Wix integration is touched.
+
+### 4. Data + ops hygiene before first stranger signs up
+- [ ] Wipe test data from production DB (scripts/wipe-client-data.sql
+      per test client) OR keep Jacob's account as the demo shop.
+      Decide which test clients survive.
+- [ ] Railway: confirm backup schedule/retention on the Postgres
+      instance (real customer financial data deserves PITR or at
+      least daily snapshots).
+- [ ] Inbound email: improvmx-vs-resend decision still OPEN — either
+      DNS forwarding (no code) or a Resend receiving webhook route.
+      Replies to hello@godreamward.com bounce until done.
+- [ ] Uptime monitoring on godreamward.com (free tier of any pinger)
+      + Vercel deployment notifications on.
+- [ ] Legal pass: terms.md/privacy.md already renamed + repriced
+      (June 10); re-read once end-to-end before launch.
+
+### 5. Launch marketing (from the June 9 strategy session)
+- [ ] Founding-member offer: first 100 users lock $10/mo forever —
+      landing band + Stripe coupon or grandfathered price.
+- [ ] 5–10 local pilot vendors (NW Indiana markets), free Dream tier
+      for 3 months in exchange for feedback + a testimonial quote —
+      fills lib/testimonials.ts (section auto-appears with first
+      real quote).
+- [ ] "Go dreamward →" CTA pass on the landing page hero.
+- [ ] Community presence: FB craft-fair/farmers-market vendor groups,
+      r/EtsySellers, r/craftfairs — useful-first posts.
+- [ ] Etsy-approval launch moment: announce Etsy sync + the
+      /compare/crafty-base page in Etsy seller communities.
+- [ ] SEO comparison pages: vs-QuickBooks, vs-spreadsheets, plus a
+      shareable "is this market worth it?" calculator.
 
 ---
 
