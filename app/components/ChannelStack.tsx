@@ -30,6 +30,12 @@ export interface ChannelStackProps {
   /** Pro/plan check — drives whether Pro-gated channel CTAs route
    *  to /integrations (Pro user) or /billing (non-Pro). */
   isPro: boolean;
+  /** Channel ids backed by a live integration connection (shopify /
+   *  wix / square / etsy). A connected channel is ALWAYS visible —
+   *  it overrides the collapsed preference — because you always want
+   *  your live store on the dashboard, even before it has sales. It
+   *  also can't be hidden (the collapse-X is suppressed). */
+  connectedChannelIds?: string[];
   /** Optional "Add another channel" footer link. Default true. */
   showAddButton?: boolean;
 }
@@ -49,11 +55,19 @@ export default function ChannelStack({
   collapsedChannels,
   onToggleCollapse,
   isPro,
+  connectedChannelIds = [],
   showAddButton = true,
 }: ChannelStackProps) {
   const collapsed = new Set(collapsedChannels);
-  const visible = channels.filter((c) => !collapsed.has(c.id));
-  const hidden = channels.filter((c) => collapsed.has(c.id));
+  const connected = new Set(connectedChannelIds);
+  // A connected channel is force-visible — it overrides the collapsed
+  // preference so a freshly-connected store can't hide in the expander.
+  const visible = channels.filter(
+    (c) => !collapsed.has(c.id) || connected.has(c.id)
+  );
+  const hidden = channels.filter(
+    (c) => collapsed.has(c.id) && !connected.has(c.id)
+  );
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -77,6 +91,7 @@ export default function ChannelStack({
             channel={ch}
             maxRevenue={maxRevenue}
             isPro={isPro}
+            isConnected={connected.has(ch.id)}
             onCollapse={() => onToggleCollapse(ch.id)}
           />
         ))}
@@ -141,11 +156,15 @@ function ChannelCard({
   channel,
   maxRevenue,
   isPro,
+  isConnected,
   onCollapse,
 }: {
   channel: ChannelRow;
   maxRevenue: number;
   isPro: boolean;
+  /** Backed by a live integration connection — pins the card visible
+   *  and hides the collapse-X. */
+  isConnected: boolean;
   onCollapse: () => void;
 }) {
   const ctaHref =
@@ -204,25 +223,35 @@ function ChannelCard({
                   Pro
                 </span>
               )}
+              {isConnected && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                  Connected
+                </span>
+              )}
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            // stopPropagation so clicking collapse-X doesn't also
-            // trigger the card's drill-down navigation when the
-            // whole card is wrapped in a Link.
-            e.stopPropagation();
-            e.preventDefault();
-            onCollapse();
-          }}
-          title={`Hide ${channel.label}`}
-          aria-label={`Hide ${channel.label}`}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-0 text-sm leading-none flex-shrink-0"
-        >
-          {"\u{00D7}"}
-        </button>
+        {/* Connected channels can't be hidden — they pin to the
+            dashboard so a live store is always in view. */}
+        {!isConnected && (
+          <button
+            type="button"
+            onClick={(e) => {
+              // stopPropagation so clicking collapse-X doesn't also
+              // trigger the card's drill-down navigation when the
+              // whole card is wrapped in a Link.
+              e.stopPropagation();
+              e.preventDefault();
+              onCollapse();
+            }}
+            title={`Hide ${channel.label}`}
+            aria-label={`Hide ${channel.label}`}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-0 text-sm leading-none flex-shrink-0"
+          >
+            {"\u{00D7}"}
+          </button>
+        )}
       </div>
 
       {channel.hasData ? (
@@ -262,6 +291,12 @@ function ChannelCard({
             </div>
           </div>
         </>
+      ) : isConnected ? (
+        // Connected but no sales in this period yet — don't show a
+        // "Connect" CTA (it's already connected); reassure instead.
+        <span className="text-xs text-slate-400">
+          Connected — no sales in this period yet
+        </span>
       ) : (
         <>
           {/* Empty-state CTA */}

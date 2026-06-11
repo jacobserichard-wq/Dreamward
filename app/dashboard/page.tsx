@@ -151,6 +151,11 @@ export default function Home() {
   const [channelYear, setChannelYear] = useState<number>(dashboardCurrentYear);
   const [collapsedChannels, setCollapsedChannels] = useState<string[]>([]);
   const [collapsedChannelsLoaded, setCollapsedChannelsLoaded] = useState(false);
+  // Channel ids backed by a live integration connection. A connected
+  // channel is force-shown in the ChannelStack regardless of the
+  // collapsed preference — your live store always belongs on the
+  // dashboard, even before its first sale.
+  const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
 
   // Load processed items from database
   const loadItems = useCallback(async () => {
@@ -370,6 +375,45 @@ export default function Home() {
       }
     }
     loadCollapsedPref();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan]);
+
+  // Which platform channels are actually connected. Each platform's
+  // /connection endpoint returns { connected: boolean }; a connected
+  // channel pins itself visible in the ChannelStack. Fetched once per
+  // plan load (connection state changes rarely).
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (!isPayingTier(plan)) return;
+    let cancelled = false;
+    async function loadConnected() {
+      const platforms = [
+        { id: "shopify", url: "/api/shopify/connection" },
+        { id: "wix", url: "/api/wix/connection" },
+        { id: "square", url: "/api/square/connection" },
+        { id: "etsy", url: "/api/etsy/connection" },
+      ];
+      const results = await Promise.all(
+        platforms.map(async (p) => {
+          try {
+            const res = await fetch(p.url);
+            if (!res.ok) return null;
+            const data = (await res.json()) as { connected?: boolean };
+            return data.connected === true ? p.id : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (!cancelled) {
+        setConnectedChannels(
+          results.filter((id): id is string => id !== null)
+        );
+      }
+    }
+    loadConnected();
     return () => {
       cancelled = true;
     };
@@ -1594,6 +1638,7 @@ export default function Home() {
                   collapsedChannels={collapsedChannels}
                   onToggleCollapse={toggleChannelCollapse}
                   isPro={isPayingTier(clientInfo?.plan)}
+                  connectedChannelIds={connectedChannels}
                 />
               ) : (
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
