@@ -74,9 +74,6 @@ export default function AppHeader({
           <h1 className="m-0 text-2xl sm:text-[28px] font-bold">
             <span className="text-2xl">{"⚡"}</span> Dreamward
           </h1>
-          <p className="mt-1 mb-0 mx-0 text-white/70 text-sm hidden sm:block">
-            Accounting Automation
-          </p>
         </Link>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
           {plan && (
