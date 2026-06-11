@@ -38,9 +38,15 @@ const ETSY_API_BASE = "https://api.etsy.com/v3";
 const ETSY_AUTHORIZE_URL = "https://www.etsy.com/oauth/connect";
 const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 
-/** Scopes: receipts/transactions for sales import; listings for the
- *  catalog pull. Both read-only — Dreamward never writes to a shop. */
-export const ETSY_SCOPES = ["transactions_r", "listings_r"] as const;
+/** Scopes (all read-only — Dreamward never writes to a shop):
+ *   - shops_r: resolve the shop identity. Etsy requires this even
+ *     for /users/me — without it that first call 403s with
+ *     "requires scope: shops_r", which blocks the whole connect.
+ *   - transactions_r: receipts + nested transactions (sales import).
+ *   - listings_r: the catalog pull.
+ *  NOTE: changing this list means existing connections must
+ *  re-authorize to mint a token carrying the new scope. */
+export const ETSY_SCOPES = ["shops_r", "transactions_r", "listings_r"] as const;
 
 export function getEtsyApiKey(): string {
   const key = process.env.ETSY_API_KEY;
