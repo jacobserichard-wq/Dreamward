@@ -532,6 +532,7 @@ Gmail OAuth + email fetching by label, email history backfill (30–365 days), C
 - Admin tooling for call completion + the "priority support SLA" Option A/B product decision. Needs product judgment before code.
 
 **Documentation / hygiene loose ends:**
+- **Inbound email for hello@/support@godreamward.com** (~15 min, user-side) — flip Resend's "Enable Receiving" toggle on the godreamward.com domain and configure forwarding to Jacob's Gmail. Namecheap's own email forwarding is NOT an option (it conflicts with the Custom MX records Resend sending requires). Until done, replies to transactional emails bounce.
 - **README rewrite** (~30–60 min) — currently `create-next-app` boilerplate.
 - **`.env.example` creation** (~20 min) — 12 distinct env vars to document.
 - **Dependency hygiene sweep** (~30–90 min) — `npm audit` moderate items, Next 16.2.4 → 16.2.6 pin, TS 5→6 + Anthropic SDK majors.
