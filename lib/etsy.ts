@@ -15,8 +15,13 @@
 //     refreshing ROTATES the refresh token. ensureFreshToken wraps
 //     the check so callers never hold a stale token; the caller
 //     persists rotated tokens.
-//   - Every API request needs BOTH headers: `x-api-key: <keystring>`
-//     and `Authorization: Bearer <access token>`.
+//   - Every API request needs BOTH headers: `Authorization: Bearer
+//     <access token>` and `x-api-key: <keystring>:<shared_secret>`.
+//     As of Etsy's Feb 9 2026 enforcement, the x-api-key header MUST
+//     carry the shared secret colon-joined to the keystring — the
+//     keystring alone now 403s with "Shared secret is required in
+//     x-api-key header." OAuth token requests are unaffected (they
+//     pass client_id=keystring in the body, never the header).
 //   - Orders are "receipts"; line items are "transactions" and come
 //     NESTED inside each receipt from getShopReceipts — no second
 //     fetch needed for COGS fanout (nicer than Square, which makes
@@ -44,7 +49,25 @@ export function getEtsyApiKey(): string {
       "ETSY_API_KEY is not set. Create the app at etsy.com/developers and add its keystring to the environment."
     );
   }
-  return key;
+  return key.trim();
+}
+
+export function getEtsySharedSecret(): string {
+  const secret = process.env.ETSY_SHARED_SECRET;
+  if (!secret) {
+    throw new Error(
+      "ETSY_SHARED_SECRET is not set. Copy the shared secret from your app on etsy.com/developers (behind the eye icon) and add it to the environment."
+    );
+  }
+  return secret.trim();
+}
+
+/** The x-api-key header value Etsy requires on every API request
+ *  since Feb 9 2026: keystring and shared secret, colon-joined.
+ *  OAuth token requests do NOT use this — they send client_id in
+ *  the body instead. */
+export function etsyApiKeyHeader(): string {
+  return `${getEtsyApiKey()}:${getEtsySharedSecret()}`;
 }
 
 // ---------------------------------------------------------------------
@@ -174,7 +197,7 @@ export async function etsyGet<T = unknown>(opts: {
   }
   const res = await fetch(url.toString(), {
     headers: {
-      "x-api-key": getEtsyApiKey(),
+      "x-api-key": etsyApiKeyHeader(),
       Authorization: `Bearer ${opts.accessToken}`,
     },
   });
