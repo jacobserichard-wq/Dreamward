@@ -33,7 +33,7 @@ export default function SignInButton({
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl })}
-      className="inline-block py-3 px-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-base font-semibold cursor-pointer border-0 transition-colors"
+      className="inline-block py-3.5 px-9 rounded-full bg-eucalyptus hover:bg-eucalyptus-dark text-cream text-base font-semibold cursor-pointer border-0 transition-colors shadow-sm"
       dangerouslySetInnerHTML={{ __html: label }}
     />
   );

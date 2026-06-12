@@ -48,23 +48,24 @@ export default async function MarketingLandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-oat font-sans text-forest">
       {/* Header band — minimal nav for the public landing */}
-      <header className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+      <header className="border-b border-sand/70">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
-          <h1 className="m-0 text-xl sm:text-2xl font-bold">
-            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> Dreamward
+          <h1 className="m-0 text-xl sm:text-2xl font-semibold font-serif text-forest flex items-center gap-2">
+            <SproutMark className="w-6 h-6 sm:w-7 sm:h-7 text-eucalyptus" />
+            Dreamward
           </h1>
           <div className="flex items-center gap-4 sm:gap-5">
             <Link
               href="/pricing"
-              className="text-sm text-white/80 hover:text-white no-underline"
+              className="text-sm text-bark hover:text-forest no-underline"
             >
               Pricing
             </Link>
             <Link
               href="/signin"
-              className="text-sm text-white/80 hover:text-white no-underline"
+              className="text-sm text-bark hover:text-forest no-underline"
             >
               Sign in
             </Link>
@@ -73,27 +74,26 @@ export default async function MarketingLandingPage() {
 
         {/* Hero. Sub-session 32 marketing refresh: leads with the
             gross-margin + audit-trail differentiation shipped in
-            Phase 12 (COGS) + Phase 13 (Schedule-C P&L). The
-            "mission control" brand line stays — it works whether
-            you're describing channel rollups or per-SKU margin.
-            Sub-copy now anchors on the concrete differentiator
-            (real gross margin, effective-date discipline) instead
-            of the generic "one dashboard" pitch. */}
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-12 sm:pt-20 pb-16 sm:pb-24 text-center">
-          <h2 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 leading-tight">
-            Mission control for your money.
+            Phase 12 (COGS) + Phase 13 (Schedule-C P&L). Sage & Rose
+            redesign: airy warm hero, Fraunces display headline. */}
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
+          <h2 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
+            Built for people.
+            <br />
+            Priced for people.
           </h2>
-          <p className="text-xl sm:text-2xl font-semibold text-white m-0 mb-2 leading-snug">
+          <p className="text-lg sm:text-2xl font-semibold text-eucalyptus-dark m-0 mb-3 leading-snug">
             Real gross margin. Per product. Per channel. Per period.
           </p>
-          <p className="text-base text-white/80 max-w-2xl mx-auto m-0 mb-8 leading-relaxed">
+          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
             Dreamward tracks the actual cost behind every sale — so when
             wholesale prices change, your historical margins{" "}
-            <em>stay historical</em>. Built for makers + small businesses
-            who outgrew spreadsheets but don&apos;t need a $500/month ERP.
+            <em>stay historical</em>. Built for makers and small
+            businesses who outgrew spreadsheets but don&apos;t need a
+            $500/month ERP.
           </p>
-          <SignInButton label="Start your free trial &rarr;" />
-          <p className="text-xs text-white/60 mt-4">
+          <SignInButton label="Go dreamward &rarr;" />
+          <p className="text-xs text-stone mt-4">
             14-day free trial. No credit card required.
           </p>
         </div>
@@ -139,10 +139,10 @@ export default async function MarketingLandingPage() {
           soon list signals roadmap without commitment. */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 pb-12 sm:pb-16">
         <div className="text-center mb-8">
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2">
+          <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
             Where your money moves
           </h3>
-          <p className="text-sm sm:text-base text-slate-600 m-0">
+          <p className="text-sm sm:text-base text-bark m-0">
             One ledger for every channel.
           </p>
         </div>
@@ -173,13 +173,13 @@ export default async function MarketingLandingPage() {
             blurb="Markets, fairs, pop-ups with auto-mileage"
           />
         </div>
-        <p className="text-center text-xs text-slate-500 mt-6">
-          <strong className="text-slate-700">Also supported:</strong>{" "}
+        <p className="text-center text-xs text-bark mt-6">
+          <strong className="text-forest">Also supported:</strong>{" "}
           CSV/XLSX from QuickBooks/Stripe/anything · Manual entry with
           drag-drop receipt attachments
           <br />
-          <span className="text-slate-400">
-            <strong className="text-slate-500">Coming next:</strong>{" "}
+          <span className="text-stone">
+            <strong className="text-bark">Coming next:</strong>{" "}
             WooCommerce · Stripe Connect
           </span>
         </p>
@@ -191,25 +191,25 @@ export default async function MarketingLandingPage() {
             block is invisible. */}
         {TESTIMONIALS.length > 0 && (
           <div className="mt-12">
-            <h3 className="text-center text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-8">
+            <h3 className="text-center font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-8">
               From people building their dream
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {TESTIMONIALS.map((t, i) => (
                 <figure
                   key={i}
-                  className="bg-white border border-slate-200 rounded-xl p-5 m-0 flex flex-col"
+                  className="bg-cream border border-sand rounded-2xl p-5 m-0 flex flex-col"
                 >
-                  <blockquote className="text-sm text-slate-700 leading-relaxed m-0 mb-4 flex-1">
+                  <blockquote className="text-sm text-bark leading-relaxed m-0 mb-4 flex-1">
                     {"\u{201C}"}
                     {t.quote}
                     {"\u{201D}"}
                   </blockquote>
                   <figcaption className="text-xs">
-                    <span className="font-semibold text-slate-900 block">
+                    <span className="font-semibold text-forest block">
                       {t.name}
                     </span>
-                    <span className="text-slate-500">
+                    <span className="text-stone">
                       {[t.business, t.location].filter(Boolean).join(" · ")}
                     </span>
                   </figcaption>
@@ -226,11 +226,11 @@ export default async function MarketingLandingPage() {
         <div className="text-center mt-8">
           <Link
             href="/compare/crafty-base"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-full px-4 py-2 no-underline hover:border-slate-400 hover:text-slate-900"
+            className="inline-flex items-center gap-2 text-sm font-medium text-eucalyptus-dark bg-cream border border-sand rounded-full px-4 py-2 no-underline hover:border-eucalyptus hover:text-forest"
           >
             <span>{"\u{2696}\u{FE0F}"}</span>
             <span>How Dreamward compares to Crafty Base</span>
-            <span className="text-slate-400">{"\u{2192}"}</span>
+            <span className="text-eucalyptus">{"\u{2192}"}</span>
           </Link>
         </div>
       </section>
@@ -244,18 +244,18 @@ export default async function MarketingLandingPage() {
           gate features by tier, coerce upgrades — is what we're
           building against; the pricing tiles + section copy reflect
           that position deliberately. */}
-      <section className="bg-slate-50 py-12 sm:py-20">
+      <section className="bg-eucalyptus-soft/50 border-y border-sand py-12 sm:py-20">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8">
           <div className="text-center mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-dark bg-rose-soft px-3 py-1 rounded-full">
               Built for people. Priced for people.
             </span>
           </div>
           <div className="text-center mb-10">
-            <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-2">
+            <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
               Pricing that grows with you. Not against you.
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 m-0 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-bark m-0 max-w-2xl mx-auto leading-relaxed">
               Every tier includes every feature. We charge based on
               your business size, not which tools you&apos;re allowed
               to use. As your revenue grows, your tier auto-updates —
@@ -331,63 +331,63 @@ export default async function MarketingLandingPage() {
               the "every tier" promise. Visible reminder that the
               tile lists aren't gating anything; they're just summary
               labels. */}
-          <div className="mt-8 bg-white border border-slate-200 rounded-xl p-5 sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 m-0 mb-3 text-center">
+          <div className="mt-8 bg-cream border border-sand rounded-2xl p-5 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-stone m-0 mb-3 text-center">
               Every tier includes
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm text-slate-700">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm text-bark">
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Shopify integration</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Wix integration</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Square integration</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>CSV / XLSX upload</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Per-SKU cost history</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Gross margin tracking</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Live stock counts</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Receipt vault</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Schedule-C P&amp;L</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Events + mileage</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>AR + invoice follow-up</span>
               </div>
               <div className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
+                <span className="text-eucalyptus mt-0.5">{"\u{2713}"}</span>
                 <span>Audit trail + CPA export</span>
               </div>
             </div>
           </div>
 
-          <p className="text-center text-xs text-slate-500 mt-6">
+          <p className="text-center text-xs text-stone mt-6">
             All tiers start with a 14-day free trial. No credit card
             required. Cancel anytime — your data exports cleanly to
             CSV. As your tracked revenue grows, your tier auto-bumps
@@ -397,15 +397,16 @@ export default async function MarketingLandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400">
-        <Link href="/privacy" className="text-slate-500 no-underline mx-2">
+      <footer className="border-t border-sand py-6 text-center text-xs text-stone">
+        <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
           Privacy
         </Link>
-        <span className="text-slate-300">{"\u{00B7}"}</span>
-        <Link href="/terms" className="text-slate-500 no-underline mx-2">
+        <span className="text-sand">{"\u{00B7}"}</span>
+        <Link href="/terms" className="text-bark no-underline mx-2 hover:text-forest">
           Terms
         </Link>
-        <p className="m-0 mt-2">
+        <p className="m-0 mt-2 flex items-center justify-center gap-1.5">
+          <SproutMark className="w-3.5 h-3.5 text-eucalyptus" />
           {"\u{00A9}"} {new Date().getFullYear()} Dreamward
         </p>
       </footer>
@@ -414,6 +415,35 @@ export default async function MarketingLandingPage() {
 }
 
 // ─── Section helpers (server-component-safe) ─────────────────────────────────
+
+// Dreamward sprout — the brand mark. A two-leaf sprout on a stem,
+// replacing the old lightning bolt for the earthy/handmade identity.
+// Inherits color via currentColor; size via the className's w/h.
+function SproutMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M12 22V10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 13c-3.3 0-6-2.7-6-6 3.3 0 6 2.7 6 6Z"
+        fill="currentColor"
+      />
+      <path
+        d="M12 11c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 function FeatureCard({
   icon,
@@ -425,12 +455,12 @@ function FeatureCard({
   body: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+    <div className="bg-cream rounded-2xl border border-sand p-5 text-center">
       <div className="text-3xl mb-3">{icon}</div>
-      <h4 className="text-base font-semibold text-slate-900 m-0 mb-2">
+      <h4 className="font-serif text-base font-semibold text-forest m-0 mb-2">
         {title}
       </h4>
-      <p className="text-sm text-slate-600 m-0 leading-relaxed">{body}</p>
+      <p className="text-sm text-bark m-0 leading-relaxed">{body}</p>
     </div>
   );
 }
@@ -448,10 +478,10 @@ function ChannelCard({
   blurb: string;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
+    <div className="bg-cream rounded-xl border border-sand p-4 text-center">
       <div className="text-2xl mb-2">{icon}</div>
-      <div className="text-sm font-semibold text-slate-900 mb-1">{label}</div>
-      <div className="text-xs text-slate-500 leading-snug">{blurb}</div>
+      <div className="text-sm font-semibold text-forest mb-1">{label}</div>
+      <div className="text-xs text-bark leading-snug">{blurb}</div>
     </div>
   );
 }
@@ -485,48 +515,46 @@ function PricingTile({
   // CTA. Previously they landed on a bare /dashboard.
   return (
     <div
-      className={`relative rounded-xl p-6 ${
+      className={`relative rounded-2xl p-6 ${
         highlighted
-          ? "bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-xl"
-          : "bg-white border border-slate-200 text-slate-900"
+          ? "bg-eucalyptus text-cream shadow-lg"
+          : "bg-cream border border-sand text-forest"
       }`}
     >
       {highlighted && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-honey text-forest text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
           Most popular
         </div>
       )}
       <h4
-        className={`text-lg font-bold m-0 mb-1 ${highlighted ? "text-white" : "text-slate-900"}`}
+        className={`font-serif text-lg font-semibold m-0 mb-1 ${highlighted ? "text-cream" : "text-forest"}`}
       >
         {name}
       </h4>
-      <div
-        className={`mb-1 ${highlighted ? "text-white" : "text-slate-900"}`}
-      >
+      <div className={`mb-1 ${highlighted ? "text-cream" : "text-forest"}`}>
         <span className="text-3xl font-extrabold">{price}</span>
         <span
-          className={`text-sm ml-1 ${highlighted ? "text-white/80" : "text-slate-500"}`}
+          className={`text-sm ml-1 ${highlighted ? "text-cream/80" : "text-stone"}`}
         >
           {priceSub}
         </span>
       </div>
       {eligibility && (
         <p
-          className={`text-xs m-0 mb-4 ${highlighted ? "text-white/75" : "text-slate-500"}`}
+          className={`text-xs m-0 mb-4 ${highlighted ? "text-cream/75" : "text-stone"}`}
         >
           {eligibility}
         </p>
       )}
       <ul
         className={`space-y-1.5 m-0 mb-5 p-0 list-none text-sm ${
-          highlighted ? "text-white/90" : "text-slate-700"
+          highlighted ? "text-cream/90" : "text-bark"
         }`}
       >
         {features.map((f) => (
           <li key={f} className="flex items-start gap-2">
             <span
-              className={`flex-shrink-0 mt-0.5 ${highlighted ? "text-amber-300" : "text-emerald-600"}`}
+              className={`flex-shrink-0 mt-0.5 ${highlighted ? "text-honey" : "text-eucalyptus"}`}
             >
               {"\u{2713}"}
             </span>
@@ -536,10 +564,10 @@ function PricingTile({
       </ul>
       <Link
         href="/signin?callbackUrl=/onboarding"
-        className={`block text-center py-2 px-4 rounded-lg text-sm font-semibold no-underline cursor-pointer ${
+        className={`block text-center py-2.5 px-4 rounded-full text-sm font-semibold no-underline cursor-pointer ${
           highlighted
-            ? "bg-white text-blue-700 hover:bg-slate-100"
-            : "bg-slate-900 text-white hover:bg-slate-800"
+            ? "bg-cream text-eucalyptus-dark hover:bg-white"
+            : "bg-eucalyptus text-cream hover:bg-eucalyptus-dark"
         }`}
       >
         {ctaLabel}

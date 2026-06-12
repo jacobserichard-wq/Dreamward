@@ -1,28 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f4eb;
+  --foreground: #34362e;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* ── Dreamward brand palette — "Sage & Rose" ──────────────────
+     Earthy/handmade-feminine direction (chosen June 11). Additive
+     to Tailwind's defaults — the logged-in app still uses slate/
+     blue until its own reskin pass; the public marketing surfaces
+     use these. */
+  --color-oat: #f7f4eb;            /* page background */
+  --color-cream: #fbf9f3;          /* lifted card surface */
+  --color-sand: #e9e2d2;           /* soft borders / alt fill */
+  --color-eucalyptus: #6e8970;     /* primary */
+  --color-eucalyptus-dark: #566b4e;/* primary hover / strong */
+  --color-eucalyptus-soft: #dce3d2;/* light fill */
+  --color-rose: #cd9a93;           /* secondary accent */
+  --color-rose-dark: #a35a57;      /* text on rose / strong */
+  --color-rose-soft: #f3deda;      /* light fill */
+  --color-honey: #d7a95c;          /* warm accent */
+  --color-honey-dark: #9a6f22;     /* text on honey / strong */
+  --color-forest: #34362e;         /* primary text */
+  --color-bark: #62675a;           /* secondary text */
+  --color-stone: #9aa08e;          /* tertiary text / hints */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
 @keyframes fw-spin {
