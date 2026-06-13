@@ -46,9 +46,11 @@ export default function MarketsPage() {
         {/* Honesty note */}
         <div className="bg-honey/15 border border-honey/40 rounded-2xl px-4 py-3 mb-6 text-sm text-bark">
           Curated from public listings (South Shore CVA, Indiana Dunes,
-          Town Planner). Days &amp; seasons are stable year to year, but
-          always confirm <strong>current dates, hours, and booth fees</strong>{" "}
-          at each market&apos;s source link before you go.
+          Town Planner). Days &amp; seasons are stable year to year, and{" "}
+          <strong>&ldquo;Apply to vend&rdquo;</strong> goes to each
+          market&apos;s real application where we could confirm one. Always
+          double-check <strong>current dates, fees, and deadlines</strong> on
+          the application — markets adjust every season.
         </div>
 
         {/* County filter */}
@@ -114,24 +116,64 @@ export default function MarketsPage() {
                 </dl>
 
                 {m.note && (
-                  <p className="text-xs text-bark italic m-0 mb-3">{m.note}</p>
+                  <p className="text-xs text-bark italic m-0 mb-2">{m.note}</p>
                 )}
 
-                <div className="mt-auto flex items-center gap-3 flex-wrap pt-2 border-t border-sand">
-                  <Link
-                    href={addHref}
-                    className="py-1.5 px-3.5 rounded-full bg-eucalyptus text-cream text-xs font-semibold no-underline hover:bg-eucalyptus-dark"
-                  >
-                    + Add to my events
-                  </Link>
-                  <a
-                    href={m.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-eucalyptus-dark hover:underline"
-                  >
-                    {m.sourceName} {"\u{2197}"}
-                  </a>
+                <div className="mt-auto pt-3 border-t border-sand">
+                  {m.vendorNote && (
+                    <p className="text-xs text-bark m-0 mb-2.5">
+                      <span className="font-medium text-forest">To vend:</span>{" "}
+                      {m.vendorNote}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Primary action: apply to vend. Prefer the real
+                        application page; fall back to email when that's
+                        the only path; nothing when neither is confirmed. */}
+                    {m.applyUrl ? (
+                      <a
+                        href={m.applyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-1.5 px-3.5 rounded-full bg-eucalyptus text-cream text-xs font-semibold no-underline hover:bg-eucalyptus-dark"
+                      >
+                        Apply to vend {"\u{2197}"}
+                      </a>
+                    ) : m.vendorContact ? (
+                      <a
+                        href={`mailto:${m.vendorContact}`}
+                        className="py-1.5 px-3.5 rounded-full bg-eucalyptus text-cream text-xs font-semibold no-underline hover:bg-eucalyptus-dark"
+                      >
+                        Email to apply {"\u{2197}"}
+                      </a>
+                    ) : null}
+                    <Link
+                      href={addHref}
+                      className="py-1.5 px-3.5 rounded-full border border-eucalyptus text-eucalyptus-dark text-xs font-semibold no-underline hover:bg-eucalyptus-soft"
+                    >
+                      + Add to my events
+                    </Link>
+                    <a
+                      href={m.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-stone hover:underline"
+                    >
+                      Info {"\u{2197}"}
+                    </a>
+                  </div>
+                  {/* Contact line when there's both a form AND an email. */}
+                  {m.applyUrl && m.vendorContact && (
+                    <p className="text-[11px] text-stone m-0 mt-1.5">
+                      Questions?{" "}
+                      <a
+                        href={`mailto:${m.vendorContact}`}
+                        className="text-eucalyptus-dark hover:underline"
+                      >
+                        {m.vendorContact}
+                      </a>
+                    </p>
+                  )}
                 </div>
               </div>
             );
