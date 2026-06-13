@@ -305,9 +305,11 @@ export default async function MarketingLandingPage() {
               priceSub="/month"
               eligibility="$50k–$500k/year revenue"
               features={[
-                "Everything in Maker",
-                "Priority support",
-                "Faster response times",
+                "Every product feature included",
+                "All integrations",
+                "Full COGS + gross margin",
+                "Schedule-C P&L for your CPA",
+                "Priority support — faster response times",
               ]}
               ctaLabel="Start with Growth"
               highlighted={false}
@@ -318,9 +320,11 @@ export default async function MarketingLandingPage() {
               priceSub="/month"
               eligibility="$500k+/year revenue"
               features={[
-                "Everything in Growth",
-                "Same-day priority support",
-                "Dedicated support contact",
+                "Every product feature included",
+                "All integrations",
+                "Full COGS + gross margin",
+                "Schedule-C P&L for your CPA",
+                "Same-day priority support + dedicated contact",
               ]}
               ctaLabel="Start with Pro"
               highlighted={false}

@@ -27,11 +27,15 @@ const TIER_ORDER: PaidPlanName[] = ["dream", "maker", "growth", "pro"];
 const SERVICE_FEATURES: Record<PaidPlanName, string[]> = {
   dream: ["Every product feature", "All integrations", "Standard email support"],
   maker: ["Every product feature", "All integrations", "Standard email support"],
-  growth: ["Everything in Maker", "Priority support", "Faster response times"],
+  growth: [
+    "Every product feature",
+    "All integrations",
+    "Priority support — faster response times",
+  ],
   pro: [
-    "Everything in Growth",
-    "Same-day priority support",
-    "Dedicated support contact",
+    "Every product feature",
+    "All integrations",
+    "Same-day priority support + dedicated contact",
   ],
 };
 
