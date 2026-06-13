@@ -19,6 +19,7 @@
 
 import type { Industry } from "../categories";
 import { getCategoriesForIndustry } from "../categories";
+import { FEATURES } from "../features";
 
 // ---------------------------------------------------------------------
 // Channel ID + display registry
@@ -349,7 +350,11 @@ function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
   if (row.source === "wix") return "wix";
   if (row.source === "square") return "square";
   if (row.source === "etsy") return "etsy";
-  if (row.source === "gmail" || row.source === "email") return "gmail";
+  if (row.source === "gmail" || row.source === "email") {
+    // Gmail hidden → its channel doesn't exist; fold into Uncategorized
+    // so the revenue still shows up honestly rather than vanishing.
+    return FEATURES.GMAIL_INGEST ? "gmail" : "uploads";
+  }
   if (row.event_id !== null) return "markets";
   if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
     return CATEGORY_TO_CHANNEL[row.category];
@@ -410,6 +415,11 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
   // appear even when the user has no data for some of them.
   const channelMap = new Map<ChannelId, ChannelMetrics>();
   for (const meta of CANONICAL_CHANNELS) {
+    // "Forwarded invoices" (gmail) is gated behind the Gmail feature
+    // flag — hidden everywhere while ingest is off. classifyIncomeRow
+    // folds any email-source row into Uncategorized in that mode, so
+    // nothing is silently dropped.
+    if (meta.id === "gmail" && !FEATURES.GMAIL_INGEST) continue;
     channelMap.set(meta.id, {
       id: meta.id,
       label: meta.label,
