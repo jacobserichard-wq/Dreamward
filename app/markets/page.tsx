@@ -2,16 +2,17 @@
 
 // app/markets/page.tsx
 //
-// The Dreamward Market Register — a discovery page listing recurring
-// vendor/farmers markets in Northwest Indiana (data in
-// lib/marketRegister.ts). A vendor browses markets near them, filters
-// by county, and one-click "Add to my events" to start tracking one
-// (prefills the /events create form via query params).
+// The Dreamward Market Register. Two tiers:
+//   1. NATIONAL finder — search any US zip via the USDA Local Food
+//      Portal directory (lib/usdaMarkets + /api/markets/search).
+//      Location + website only; national datasets have no
+//      vendor-application links, so national cards link to each
+//      market's own site.
+//   2. VERIFIED regional set — hand-researched Northwest Indiana
+//      markets (lib/marketRegister) WITH real "apply to vend" links.
 //
-// Honest by design: schedules are day-of-week + season (stable year
-// to year); every card links to its source so the vendor confirms
-// current details. One-off craft/holiday fairs point to live
-// aggregators rather than frozen dates.
+// Honest by design: only the verified set gets apply buttons; the
+// national set links to source/site (see [[feedback_silent_fallbacks]]).
 
 import { useState } from "react";
 import Link from "next/link";
@@ -23,34 +24,236 @@ import {
   MARKET_COUNTIES,
   type MarketCounty,
 } from "@/lib/marketRegister";
+import type { UsdaMarket } from "@/lib/usdaMarkets";
 
 type CountyFilter = MarketCounty | "all";
 
+function eventHref(opts: {
+  name: string;
+  venue?: string | null;
+  address?: string | null;
+}): string {
+  let href = `/events?new=1&name=${encodeURIComponent(opts.name)}`;
+  if (opts.venue) href += `&venue=${encodeURIComponent(opts.venue)}`;
+  if (opts.address) href += `&address=${encodeURIComponent(opts.address)}`;
+  return href;
+}
+
 export default function MarketsPage() {
   const [county, setCounty] = useState<CountyFilter>("all");
+
+  // National USDA search state.
+  const [zip, setZip] = useState("");
+  const [radius, setRadius] = useState(30);
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<UsdaMarket[] | null>(null);
+  const [near, setNear] = useState<{ place: string; state: string } | null>(
+    null
+  );
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
 
   const visible =
     county === "all"
       ? MARKET_REGISTER
       : MARKET_REGISTER.filter((m) => m.county === county);
 
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setSearchError(null);
+    setFallbackUrl(null);
+    setResults(null);
+    setNear(null);
+    if (!/^\d{5}$/.test(zip.trim())) {
+      setSearchError("Enter a 5-digit US zip code.");
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await fetch(
+        `/api/markets/search?zip=${zip.trim()}&radius=${radius}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setSearchError(data.error || "Search failed. Try again.");
+        return;
+      }
+      if (data.configured === false) {
+        setFallbackUrl(data.fallbackUrl as string);
+        return;
+      }
+      setResults(data.markets as UsdaMarket[]);
+      setNear(data.near);
+    } catch {
+      setSearchError("Couldn't reach the market search. Try again.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-oat font-sans text-forest">
       <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          title="Markets near you"
-          subtitle="Recurring farmers & vendor markets across Northwest Indiana — find your next booth."
+          title="Find your next market"
+          subtitle="Search farmers & vendor markets anywhere in the US, then track the ones you work in your events."
         />
 
-        {/* Honesty note */}
-        <div className="bg-honey/15 border border-honey/40 rounded-2xl px-4 py-3 mb-6 text-sm text-bark">
-          Curated from public listings (South Shore CVA, Indiana Dunes,
-          Town Planner). Days &amp; seasons are stable year to year, and{" "}
-          <strong>&ldquo;Apply to vend&rdquo;</strong> goes to each
-          market&apos;s real application where we could confirm one. Always
-          double-check <strong>current dates, fees, and deadlines</strong> on
-          the application — markets adjust every season.
+        {/* ── National finder ──────────────────────────────────── */}
+        <section className="bg-cream border border-sand rounded-2xl p-5 mb-8">
+          <h2 className="font-serif text-xl font-semibold text-forest m-0 mb-1">
+            Markets anywhere in the US
+          </h2>
+          <p className="text-sm text-bark m-0 mb-4">
+            Powered by the USDA National Farmers Market Directory — 7,800+
+            markets across all 50 states. Enter your zip to find markets
+            near you.
+          </p>
+          <form
+            onSubmit={runSearch}
+            className="flex items-end gap-2 flex-wrap mb-2"
+          >
+            <div>
+              <label
+                htmlFor="zip"
+                className="block text-xs font-medium text-bark mb-1"
+              >
+                Zip code
+              </label>
+              <input
+                id="zip"
+                type="text"
+                inputMode="numeric"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                placeholder="46303"
+                maxLength={5}
+                className="w-28 py-2 px-3 text-sm border border-sand rounded-lg bg-white outline-none focus:ring-2 focus:ring-eucalyptus/30 focus:border-eucalyptus"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="radius"
+                className="block text-xs font-medium text-bark mb-1"
+              >
+                Within
+              </label>
+              <select
+                id="radius"
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value))}
+                className="py-2 px-3 text-sm border border-sand rounded-lg bg-white outline-none focus:ring-2 focus:ring-eucalyptus/30 focus:border-eucalyptus"
+              >
+                <option value={10}>10 miles</option>
+                <option value={30}>30 miles</option>
+                <option value={50}>50 miles</option>
+                <option value={100}>100 miles</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={searching}
+              className="py-2 px-5 rounded-full bg-eucalyptus text-cream text-sm font-semibold cursor-pointer border-0 hover:bg-eucalyptus-dark disabled:opacity-60"
+            >
+              {searching ? "Searching…" : "Search"}
+            </button>
+          </form>
+
+          {searchError && (
+            <p className="text-sm text-rose-dark m-0 mt-2">{searchError}</p>
+          )}
+
+          {/* Key not granted yet → link out to the USDA directory. */}
+          {fallbackUrl && (
+            <p className="text-sm text-bark m-0 mt-2">
+              National in-app search is being set up. For now, browse the{" "}
+              <a
+                href={fallbackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-eucalyptus-dark font-medium hover:underline"
+              >
+                USDA market directory {"\u{2197}"}
+              </a>{" "}
+              for your area.
+            </p>
+          )}
+
+          {results && (
+            <div className="mt-4">
+              <p className="text-xs text-stone m-0 mb-3">
+                {results.length > 0
+                  ? `${results.length} market${results.length === 1 ? "" : "s"} within ${radius} miles${
+                      near ? ` of ${near.place}, ${near.state}` : ""
+                    }`
+                  : `No markets found within ${radius} miles${
+                      near ? ` of ${near.place}, ${near.state}` : ""
+                    }. Try a wider radius.`}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {results.map((m) => (
+                  <div
+                    key={m.id}
+                    className="bg-white border border-sand rounded-xl p-4 flex flex-col"
+                  >
+                    <h3 className="text-sm font-semibold text-forest m-0 mb-1">
+                      {m.name}
+                    </h3>
+                    {(m.city || m.state) && (
+                      <p className="text-xs text-stone m-0 mb-1">
+                        {[m.city, m.state].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                    {m.address && (
+                      <p className="text-xs text-bark m-0 mb-3">{m.address}</p>
+                    )}
+                    <div className="mt-auto flex items-center gap-3 flex-wrap pt-2 border-t border-sand">
+                      <Link
+                        href={eventHref({
+                          name: m.name,
+                          venue:
+                            m.city && m.state ? `${m.city}, ${m.state}` : null,
+                          address: m.address,
+                        })}
+                        className="py-1.5 px-3 rounded-full border border-eucalyptus text-eucalyptus-dark text-xs font-semibold no-underline hover:bg-eucalyptus-soft"
+                      >
+                        + Add to my events
+                      </Link>
+                      {m.website && (
+                        <a
+                          href={m.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-eucalyptus-dark hover:underline"
+                        >
+                          Market site {"\u{2197}"}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-stone m-0 mt-3">
+                To vend, check each market&apos;s own site for its vendor
+                application — national listings don&apos;t include apply links.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* ── Verified regional set (apply links) ──────────────── */}
+        <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+          <h2 className="font-serif text-xl font-semibold text-forest m-0">
+            Verified markets — apply directly
+          </h2>
+          <span className="text-xs text-stone">Northwest Indiana</span>
+        </div>
+        <div className="bg-honey/15 border border-honey/40 rounded-2xl px-4 py-3 mb-5 text-sm text-bark">
+          Hand-researched markets with a real{" "}
+          <strong>&ldquo;Apply to vend&rdquo;</strong> link where we could
+          confirm one. Always double-check current dates, fees, and deadlines
+          on the application — markets adjust every season.
         </div>
 
         {/* County filter */}
@@ -74,15 +277,13 @@ export default function MarketsPage() {
           })}
         </div>
 
-        {/* Market cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visible.map((m) => {
-            // Prefill the event form: name + a location (venue → address
-            // so mileage can compute; city as the venue label).
-            const addHref =
-              `/events?new=1&name=${encodeURIComponent(m.name)}` +
-              `&venue=${encodeURIComponent(m.city + ", IN")}` +
-              (m.venue ? `&address=${encodeURIComponent(m.venue)}` : "");
+            const addHref = eventHref({
+              name: m.name,
+              venue: `${m.city}, IN`,
+              address: m.venue,
+            });
             return (
               <div
                 key={m.id}
@@ -101,7 +302,9 @@ export default function MarketsPage() {
                 <dl className="text-sm text-bark m-0 mb-3 space-y-1">
                   <div className="flex gap-2">
                     <dt className="text-stone w-16 flex-shrink-0">When</dt>
-                    <dd className="m-0 font-medium text-forest">{m.schedule}</dd>
+                    <dd className="m-0 font-medium text-forest">
+                      {m.schedule}
+                    </dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="text-stone w-16 flex-shrink-0">Season</dt>
@@ -127,9 +330,6 @@ export default function MarketsPage() {
                     </p>
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Primary action: apply to vend. Prefer the real
-                        application page; fall back to email when that's
-                        the only path; nothing when neither is confirmed. */}
                     {m.applyUrl ? (
                       <a
                         href={m.applyUrl}
@@ -162,7 +362,6 @@ export default function MarketsPage() {
                       Info {"\u{2197}"}
                     </a>
                   </div>
-                  {/* Contact line when there's both a form AND an email. */}
                   {m.applyUrl && m.vendorContact && (
                     <p className="text-[11px] text-stone m-0 mt-1.5">
                       Questions?{" "}
@@ -180,14 +379,14 @@ export default function MarketsPage() {
           })}
         </div>
 
-        {/* Seasonal craft & holiday fairs */}
+        {/* ── Seasonal craft & holiday fairs ───────────────────── */}
         <div className="mt-10">
           <h2 className="font-serif text-xl font-semibold text-forest m-0 mb-1">
             Seasonal craft &amp; holiday fairs
           </h2>
           <p className="text-sm text-bark m-0 mb-4">
-            One-off fairs (Crown Point, Valparaiso, and more) change dates
-            every year — these live calendars stay current:
+            Craft/artisan fairs aren&apos;t in any national registry — they
+            live on promoter sites and these live calendars:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {CRAFT_FAIR_SOURCES.map((s) => (
@@ -208,14 +407,14 @@ export default function MarketsPage() {
         </div>
 
         <p className="text-xs text-stone mt-8 text-center">
-          Know a market we&apos;re missing?{" "}
+          Know a market we should verify?{" "}
           <a
             href="mailto:hello@godreamward.com?subject=Market%20to%20add"
             className="text-eucalyptus-dark hover:underline"
           >
             Tell us
           </a>{" "}
-          and we&apos;ll add it.
+          and we&apos;ll research it.
         </p>
       </div>
     </div>
