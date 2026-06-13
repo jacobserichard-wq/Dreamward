@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Spinner from "../components/Spinner";
 import AppHeader from "../components/AppHeader";
@@ -73,7 +73,17 @@ const STATUS_BUTTON_META: Record<
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function Home() {
+// useSearchParams (for the ?view=transactions deep-link) requires a
+// Suspense boundary in Next 15+. Thin wrapper provides it.
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
 
@@ -84,6 +94,16 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<Label>("Invoices");
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(false);
+
+  // The "Transactions" nav item deep-links here via ?view=transactions
+  // (the processed-items list lives on this page, not a separate
+  // route). Sync the URL param into the in-page view so it works both
+  // on fresh load and when already on the dashboard.
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
+  useEffect(() => {
+    if (viewParam === "transactions") setActiveTab("processed");
+  }, [viewParam]);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -880,45 +900,11 @@ export default function Home() {
         loading={!clientInfo}
       />
 
-      {/* Navigation Tabs. Sub-session 33: Emails tab filtered out
-          when FEATURES.GMAIL_INGEST is false. Tab type stays
-          intact so the rest of the component still typechecks. */}
-      <nav className="flex bg-white border-b border-slate-200 px-4 sm:px-8 max-w-[1200px] mx-auto">
-        {(FEATURES.GMAIL_INGEST
-          ? (["emails", "processed", "dashboard"] as Tab[])
-          : (["processed", "dashboard"] as Tab[])
-        ).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`py-3.5 px-3 sm:px-6 bg-transparent cursor-pointer text-sm font-medium border-b-2 transition-all duration-150 ${
-              activeTab === tab
-                ? "text-slate-800 border-blue-500"
-                : "text-slate-500 border-transparent"
-            }`}
-          >
-            {tab === "emails" && "\u{1F4E7} Emails"}
-            {/* Sub-session 32 polish: badge reflects what's visible.
-                When hideSettled is on (default), show only the count
-                of actionable rows. When off, show the full count.
-                Stops the "Processed (8)" lying when 7 of them are
-                hidden by the inbox filter. */}
-            {tab === "processed" && (
-              <>
-                {"\u{1F4C4} Processed ("}
-                {hideSettled && processedStatusFilter === null
-                  ? processedItems.filter((i) => i.status !== "paid").length
-                  : processedItems.length}
-                {")"}
-              </>
-            )}
-            {/* Fable-5 audit: a tab named "Dashboard" inside the
-                dashboard page is semantically muddy — "Overview"
-                says what it is. Tab id stays "dashboard". */}
-            {tab === "dashboard" && "\u{1F4CA} Overview"}
-          </button>
-        ))}
-      </nav>
+      {/* Tab bar removed (June 2026 IA): the dashboard IS the
+          overview — no tab chrome. The processed-items list moved to
+          a "Transactions" top-nav item that deep-links here via
+          ?view=transactions; the processed view renders its own
+          header + back-to-overview link below. */}
 
       <main className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6">
         {/* Status messages */}
@@ -1266,6 +1252,23 @@ export default function Home() {
         {/* ── PROCESSED TAB ── */}
         {activeTab === "processed" && (
           <>
+            {/* Transactions header + back-to-overview. Replaces the
+                old tab bar now that this is a nav-reached view. */}
+            <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+              <h2 className="font-serif text-2xl font-semibold text-slate-900 m-0">
+                Transactions
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("dashboard");
+                  router.replace("/dashboard");
+                }}
+                className="text-sm text-blue-600 hover:underline cursor-pointer bg-transparent border-0 inline-flex items-center gap-1"
+              >
+                {"\u{2190}"} Back to overview
+              </button>
+            </div>
             {/* UX commit 4: status-filter chip. Visible only when a
                 filter is active (typically set by clicking a Status
                 Breakdown pill on the Dashboard tab). */}

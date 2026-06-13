@@ -130,6 +130,12 @@ export default function AppHeader({
             </Link>
           )}
 
+          {/* Transactions — the processed-items list. Moved out of
+              the dashboard tabs (June 2026 IA) into the nav; deep-
+              links to the dashboard's processed view. */}
+          <Link href="/dashboard?view=transactions" className={NAV_LINK}>
+            <span>{"\u{1F4C4}"}</span> Transactions
+          </Link>
           {/* Fable-5 audit: the "(template)" nav link read like a bug
               as global chrome. The CSV template is still linked from
               the dashboard upload hint, the Help hub, the
