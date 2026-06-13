@@ -41,6 +41,12 @@ interface Props {
   existingEvents: EventResponse[];
   onCreated: (event: EventResponse) => void;
   onCancel: () => void;
+  // Optional prefill from the Market Register ("Add to my events").
+  // When name is provided we seed the fields and auto-open the
+  // venue/address section so the carried-over location is visible.
+  initialName?: string;
+  initialVenue?: string;
+  initialAddress?: string;
 }
 
 // "today" in the customer's local timezone, formatted YYYY-MM-DD. The
@@ -84,17 +90,24 @@ export default function EventCreateForm({
   existingEvents,
   onCreated,
   onCancel,
+  initialName,
+  initialVenue,
+  initialAddress,
 }: Props) {
   const today = useMemo(todayLocalISO, []);
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName ?? "");
   const [startDate, setStartDate] = useState(today);
   const [multiDay, setMultiDay] = useState(false);
   const [endDate, setEndDate] = useState(today);
   const [returnsHomeNightly, setReturnsHomeNightly] = useState(true);
-  const [showProgressive, setShowProgressive] = useState(false);
-  const [venue, setVenue] = useState("");
-  const [address, setAddress] = useState("");
+  // Auto-open the venue/address section when a market prefilled a
+  // location, so the carried-over details are visible (and editable).
+  const [showProgressive, setShowProgressive] = useState(
+    Boolean(initialVenue || initialAddress)
+  );
+  const [venue, setVenue] = useState(initialVenue ?? "");
+  const [address, setAddress] = useState(initialAddress ?? "");
   const [boothFee, setBoothFee] = useState("");
   const [revenue, setRevenue] = useState("");
   const [notes, setNotes] = useState("");

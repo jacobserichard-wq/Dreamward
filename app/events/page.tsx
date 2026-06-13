@@ -18,6 +18,13 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  // Prefill from the Market Register ("Add to my events" deep-links
+  // here with name/venue/address params).
+  const [prefill, setPrefill] = useState<{
+    name?: string;
+    venue?: string;
+    address?: string;
+  }>({});
 
   const loadEvents = useCallback(async () => {
     const res = await fetch("/api/events");
@@ -77,6 +84,12 @@ export default function EventsPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("new") === "1") {
       setShowCreateForm(true);
+    }
+    const name = params.get("name") ?? undefined;
+    const venue = params.get("venue") ?? undefined;
+    const address = params.get("address") ?? undefined;
+    if (name || venue || address) {
+      setPrefill({ name, venue, address });
     }
   }, []);
 
@@ -158,6 +171,13 @@ export default function EventsPage() {
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Link
+              href="/markets"
+              className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
+              title="Browse recurring markets in Northwest Indiana"
+            >
+              {"\u{1F50D}"} Find markets
+            </Link>
+            <Link
               href="/profitability"
               className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
             >
@@ -175,6 +195,9 @@ export default function EventsPage() {
         {showCreateForm && (
           <EventCreateForm
             existingEvents={events}
+            initialName={prefill.name}
+            initialVenue={prefill.venue}
+            initialAddress={prefill.address}
             onCreated={(newEvent) => {
               // /api/events GET returns events sorted by start_date DESC, id
               // DESC. A new event is the most recent → prepend.
