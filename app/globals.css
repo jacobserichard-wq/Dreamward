@@ -31,6 +31,82 @@
   --color-forest: #34362e;         /* primary text */
   --color-bark: #62675a;           /* secondary text */
   --color-stone: #9aa08e;          /* tertiary text / hints */
+
+  /* ── Whole-app reskin via ramp remap ─────────────────────────
+     The logged-in app uses Tailwind's slate/blue/emerald/amber
+     classes everywhere. Rather than hand-edit every component, we
+     REDEFINE those ramps to warm Sage & Rose equivalents — so
+     `bg-slate-50`, `text-slate-900`, `bg-blue-500`, `text-emerald-600`
+     etc. all shift palette app-wide from one place. red stays red
+     (error semantics). These converge on the same palette as the
+     custom oat/eucalyptus tokens above. */
+
+  /* slate → warm taupe/stone (neutral: backgrounds + text) */
+  --color-slate-50: #faf7f0;
+  --color-slate-100: #f2ece0;
+  --color-slate-200: #e6dece;
+  --color-slate-300: #d2c9b5;
+  --color-slate-400: #aba088;
+  --color-slate-500: #847b68;
+  --color-slate-600: #655d4d;
+  --color-slate-700: #4b463a;
+  --color-slate-800: #3a3529;
+  --color-slate-900: #2d2a20;
+
+  /* blue → eucalyptus (primary actions, links) */
+  --color-blue-50: #e9efe3;
+  --color-blue-100: #d7e0c9;
+  --color-blue-200: #c2d0af;
+  --color-blue-300: #a6ba8e;
+  --color-blue-400: #8aa383;
+  --color-blue-500: #6e8970;
+  --color-blue-600: #566b4e;
+  --color-blue-700: #455a40;
+  --color-blue-800: #3a4a36;
+  --color-blue-900: #2c3829;
+
+  /* emerald + green → sage green (positive / margin / success) */
+  --color-emerald-50: #e7f0e0;
+  --color-emerald-100: #d2e3c6;
+  --color-emerald-200: #b9d3a8;
+  --color-emerald-400: #7aa471;
+  --color-emerald-500: #5e8a5a;
+  --color-emerald-600: #4c7449;
+  --color-emerald-700: #3d5e3b;
+  --color-emerald-800: #324c31;
+  --color-emerald-900: #243823;
+  --color-green-50: #e7f0e0;
+  --color-green-100: #d2e3c6;
+  --color-green-500: #5e8a5a;
+  --color-green-600: #4c7449;
+  --color-green-700: #3d5e3b;
+
+  /* amber + yellow → honey (highlights, warnings, badges) */
+  --color-amber-50: #faf1dd;
+  --color-amber-100: #f5e4c4;
+  --color-amber-200: #edd2a0;
+  --color-amber-300: #e3bc78;
+  --color-amber-400: #d7a95c;
+  --color-amber-500: #c8923d;
+  --color-amber-600: #a8761f;
+  --color-amber-700: #855c18;
+  --color-amber-800: #6b4a14;
+  --color-amber-900: #4d350e;
+  --color-yellow-50: #faf1dd;
+  --color-yellow-100: #f5e4c4;
+  --color-yellow-400: #d7a95c;
+  --color-yellow-500: #c8923d;
+
+  /* violet/indigo → rose (highlighted tiles, accents) */
+  --color-violet-50: #f7e7e4;
+  --color-violet-100: #f0d3ce;
+  --color-violet-500: #cd9a93;
+  --color-violet-600: #bc827c;
+  --color-violet-700: #a35a57;
+  --color-indigo-50: #f7e7e4;
+  --color-indigo-500: #cd9a93;
+  --color-indigo-600: #bc827c;
+  --color-indigo-700: #a35a57;
 }
 
 body {
