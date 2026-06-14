@@ -1,17 +1,18 @@
 // app/pricing/page.tsx
 //
-// Sub-session 33: standalone pricing page. Sources tier data from
-// TIER_DISPLAY (lib/plans) so prices/brackets/names never drift
-// from the landing page or /billing. Public route — no auth gate.
+// Standalone pricing page. Tier data comes from TIER_DISPLAY and the
+// flat feature list from PLAN_FEATURE_GROUPS (both in lib/plans) so
+// prices/brackets/features never drift from the landing or /billing.
+// Public route — no auth gate.
 //
 // "Built for people. Priced for people." — feature-flat tiers that
-// scale by business size, not by which features you're allowed to
-// use. This page exists so prospects comparing tools have one URL
-// that lays out the whole model + answers the obvious questions.
+// scale by business size. Tiles are FEATURE-FREE on purpose: the
+// revenue bracket is the hero (it's the only thing that sets your
+// price), and the full product list lives in one grouped block below.
 
 import Link from "next/link";
 import SignInButton from "../components/SignInButton";
-import { TIER_DISPLAY, type PaidPlanName } from "@/lib/plans";
+import { TIER_DISPLAY, PLAN_FEATURE_GROUPS, type PaidPlanName } from "@/lib/plans";
 
 export const metadata = {
   title: "Pricing",
@@ -21,38 +22,13 @@ export const metadata = {
 
 const TIER_ORDER: PaidPlanName[] = ["dream", "maker", "growth", "pro"];
 
-// Service-level bullets per tier (product features are flat across
-// all tiers — see the "every tier includes" grid). Mirrors
-// app/billing/page.tsx TIER_SERVICE_FEATURES.
-const SERVICE_FEATURES: Record<PaidPlanName, string[]> = {
-  dream: ["Every product feature", "All integrations", "Standard email support"],
-  maker: ["Every product feature", "All integrations", "Standard email support"],
-  growth: [
-    "Every product feature",
-    "All integrations",
-    "Priority support — faster response times",
-  ],
-  pro: [
-    "Every product feature",
-    "All integrations",
-    "Same-day priority support + dedicated contact",
-  ],
+// The one genuine per-tier difference: support speed.
+const TIER_SUPPORT: Record<PaidPlanName, string> = {
+  dream: "Standard email support",
+  maker: "Standard email support",
+  growth: "Priority support",
+  pro: "Same-day priority + dedicated contact",
 };
-
-const INCLUDED_EVERYWHERE = [
-  "Shopify integration",
-  "Wix integration",
-  "Square integration",
-  "CSV / XLSX upload",
-  "Per-SKU cost history",
-  "Gross margin tracking",
-  "Live stock counts",
-  "Receipt vault",
-  "Schedule-C P&L",
-  "Events + mileage",
-  "AR + invoice follow-up",
-  "Audit trail + CPA export",
-];
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -76,53 +52,57 @@ const FAQ: { q: string; a: string }[] = [
     a: "Cancel anytime from your billing page. Your data exports cleanly to CSV, so you’re never locked in.",
   },
   {
-    q: "Why is this so much cheaper than QuickBooks or Xero?",
-    a: "Because we built one focused tool — gross-margin tracking and Schedule-C-ready reports — instead of a sprawling ERP. You shouldn’t have to pay $275/month or be locked out of a profit report to know whether your business is making money.",
+    q: "Why is this so much cheaper than the big accounting tools?",
+    a: "Because we built one focused tool — gross-margin tracking and Schedule-C-ready reports — instead of a sprawling ERP. You shouldn’t have to pay hundreds a month or be locked out of a profit report to know whether your business is making money.",
   },
 ];
 
 function fmtBracket(low: number, high: number): string {
   const k = (n: number) => (n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`);
-  if (high === Infinity) return `${k(low)}+/year revenue`;
-  if (low === 0) return `Under ${k(high)}/year revenue`;
-  return `${k(low)}–${k(high)}/year revenue`;
+  if (high === Infinity) return `${k(low)}+ a year`;
+  if (low === 0) return `Under ${k(high)} a year`;
+  return `${k(low)}–${k(high)} a year`;
 }
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-white font-sans">
-      {/* Header — matches the landing page band */}
-      <header className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+    <div className="min-h-screen bg-oat font-sans text-forest">
+      {/* Header — matches the landing band */}
+      <header className="border-b border-sand/70">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
-          <Link href="/" className="m-0 text-xl sm:text-2xl font-bold text-white no-underline">
-            <span className="text-xl sm:text-2xl">{"\u{26A1}"}</span> Dreamward
+          <Link
+            href="/"
+            className="m-0 text-xl sm:text-2xl font-semibold font-serif text-forest no-underline flex items-center gap-2"
+          >
+            <SproutMark className="w-6 h-6 text-eucalyptus" />
+            Dreamward
           </Link>
           <Link
             href="/signin"
-            className="text-sm text-white/80 hover:text-white no-underline"
+            className="text-sm text-bark hover:text-forest no-underline"
           >
             Sign in
           </Link>
         </div>
 
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-10 sm:pt-16 pb-12 sm:pb-16 text-center">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-white/10 px-3 py-1 rounded-full">
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-12 sm:pt-16 pb-14 sm:pb-20 text-center">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-rose-dark bg-rose-soft px-3 py-1 rounded-full">
             Built for people. Priced for people.
           </span>
-          <h1 className="text-3xl sm:text-5xl font-extrabold m-0 mb-4 mt-4 leading-tight">
+          <h1 className="font-serif text-3xl sm:text-5xl font-semibold m-0 mb-4 mt-4 leading-[1.1] text-forest tracking-tight">
             Pricing that grows with you. Not against you.
           </h1>
-          <p className="text-base sm:text-lg text-white/80 max-w-2xl mx-auto m-0 leading-relaxed">
-            Every tier includes every feature. You&apos;re billed by your
-            business size, not by which tools you&apos;re allowed to use. As
-            your revenue grows, your tier auto-updates — no upsell calls, no
+          <p className="text-base sm:text-lg text-bark max-w-2xl mx-auto m-0 leading-relaxed">
+            Every plan includes every feature. You&apos;re billed by your
+            business size — not by which tools you&apos;re allowed to use. As
+            your revenue grows, your tier auto-updates. No upsell calls, no
             &ldquo;upgrade to unlock&rdquo; walls.
           </p>
         </div>
       </header>
 
-      {/* Pricing tiles */}
-      <section className="max-w-[1100px] mx-auto px-4 sm:px-8 -mt-8 sm:-mt-10">
+      {/* Pricing tiles — feature-free, revenue bracket as the hero */}
+      <section className="max-w-[1100px] mx-auto px-4 sm:px-8 -mt-8 sm:-mt-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TIER_ORDER.map((id) => {
             const tier = TIER_DISPLAY[id];
@@ -130,53 +110,66 @@ export default function PricingPage() {
             return (
               <div
                 key={id}
-                className={`relative rounded-xl p-6 ${
+                className={`relative rounded-2xl p-6 flex flex-col text-center ${
                   highlighted
-                    ? "bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-xl"
-                    : "bg-white border border-slate-200 text-slate-900"
+                    ? "bg-eucalyptus text-cream shadow-lg"
+                    : "bg-cream border border-sand text-forest"
                 }`}
               >
                 {highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-honey text-forest text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
                     Most popular
                   </div>
                 )}
                 <h3
-                  className={`text-lg font-bold m-0 mb-0.5 ${highlighted ? "text-white" : "text-slate-900"}`}
+                  className={`font-serif text-lg font-semibold m-0 mb-2 ${highlighted ? "text-cream" : "text-forest"}`}
                 >
                   {tier.name}
                 </h3>
-                <div className={`mb-0.5 ${highlighted ? "text-white" : "text-slate-900"}`}>
-                  <span className="text-3xl font-extrabold">${tier.priceMonthly}</span>
-                  <span className={`text-sm ml-1 ${highlighted ? "text-white/80" : "text-slate-500"}`}>
+                <div className={`mb-4 ${highlighted ? "text-cream" : "text-forest"}`}>
+                  <span className="text-4xl font-extrabold">
+                    ${tier.priceMonthly}
+                  </span>
+                  <span
+                    className={`text-sm ml-1 ${highlighted ? "text-cream/80" : "text-stone"}`}
+                  >
                     /month
                   </span>
                 </div>
-                <p className={`text-xs m-0 mb-4 ${highlighted ? "text-white/75" : "text-slate-500"}`}>
-                  {fmtBracket(tier.revenueLow, tier.revenueHigh)}
-                </p>
-                <ul
-                  className={`space-y-1.5 m-0 mb-5 p-0 list-none text-sm ${
-                    highlighted ? "text-white/90" : "text-slate-700"
+                <div
+                  className={`rounded-xl px-3 py-3 mb-4 ${
+                    highlighted ? "bg-cream/15" : "bg-eucalyptus-soft/60"
                   }`}
                 >
-                  {SERVICE_FEATURES[id].map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <span
-                        className={`flex-shrink-0 mt-0.5 ${highlighted ? "text-amber-300" : "text-emerald-600"}`}
-                      >
-                        {"\u{2713}"}
-                      </span>
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
+                  <p
+                    className={`text-[10px] uppercase tracking-wider font-semibold m-0 mb-0.5 ${
+                      highlighted ? "text-cream/70" : "text-eucalyptus-dark"
+                    }`}
+                  >
+                    For businesses doing
+                  </p>
+                  <p
+                    className={`text-sm font-bold m-0 ${highlighted ? "text-cream" : "text-forest"}`}
+                  >
+                    {fmtBracket(tier.revenueLow, tier.revenueHigh)}
+                  </p>
+                  <p
+                    className={`text-[10px] m-0 mt-0.5 ${highlighted ? "text-cream/70" : "text-stone"}`}
+                  >
+                    in revenue
+                  </p>
+                </div>
+                <p
+                  className={`text-xs m-0 mb-5 ${highlighted ? "text-cream/85" : "text-bark"}`}
+                >
+                  {TIER_SUPPORT[id]}
+                </p>
                 <Link
                   href="/signin?callbackUrl=/onboarding"
-                  className={`block text-center py-2 px-4 rounded-lg text-sm font-semibold no-underline cursor-pointer ${
+                  className={`mt-auto block text-center py-2.5 px-4 rounded-full text-sm font-semibold no-underline cursor-pointer ${
                     highlighted
-                      ? "bg-white text-blue-700 hover:bg-slate-100"
-                      : "bg-slate-900 text-white hover:bg-slate-800"
+                      ? "bg-cream text-eucalyptus-dark hover:bg-white"
+                      : "bg-eucalyptus text-cream hover:bg-eucalyptus-dark"
                   }`}
                 >
                   Start with {tier.name}
@@ -186,26 +179,37 @@ export default function PricingPage() {
           })}
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-6">
+        <p className="text-center text-xs text-stone mt-6">
           All tiers start with a 14-day free trial. No credit card required.
           Cancel anytime — your data exports cleanly to CSV.
         </p>
       </section>
 
-      {/* Every tier includes */}
+      {/* Every plan includes everything — grouped feature list */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 sm:p-8">
-          <h2 className="text-center text-lg sm:text-xl font-bold text-slate-900 m-0 mb-1">
-            Every tier includes every feature
+        <div className="bg-cream border border-sand rounded-2xl p-6 sm:p-8">
+          <h2 className="text-center font-serif text-xl sm:text-2xl font-semibold text-forest m-0 mb-1">
+            Every plan includes everything
           </h2>
-          <p className="text-center text-sm text-slate-500 m-0 mb-6">
+          <p className="text-center text-sm text-bark m-0 mb-6">
             No feature gates. The tiers above differ only by support speed.
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 text-sm text-slate-700">
-            {INCLUDED_EVERYWHERE.map((f) => (
-              <div key={f} className="flex items-start gap-1.5">
-                <span className="text-emerald-600 mt-0.5">{"\u{2713}"}</span>
-                <span>{f}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {PLAN_FEATURE_GROUPS.map((group) => (
+              <div key={group.group}>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-eucalyptus-dark m-0 mb-3">
+                  {group.group}
+                </h3>
+                <ul className="m-0 p-0 list-none space-y-2 text-sm text-bark">
+                  {group.items.map((item) => (
+                    <li key={item} className="flex items-start gap-1.5">
+                      <span className="text-eucalyptus mt-0.5 flex-shrink-0">
+                        {"\u{2713}"}
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
@@ -214,53 +218,68 @@ export default function PricingPage() {
 
       {/* FAQ */}
       <section className="max-w-[760px] mx-auto px-4 sm:px-8 pb-12 sm:pb-16">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 m-0 mb-6 text-center">
+        <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-6 text-center">
           Questions
         </h2>
         <div className="space-y-4">
           {FAQ.map((item) => (
-            <div key={item.q} className="bg-white border border-slate-200 rounded-xl p-5">
-              <h3 className="text-base font-semibold text-slate-900 m-0 mb-2">
+            <div key={item.q} className="bg-cream border border-sand rounded-2xl p-5">
+              <h3 className="text-base font-semibold text-forest m-0 mb-2">
                 {item.q}
               </h3>
-              <p className="text-sm text-slate-600 m-0 leading-relaxed">{item.a}</p>
+              <p className="text-sm text-bark m-0 leading-relaxed">{item.a}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Bottom CTA */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white py-12 sm:py-16">
+      <section className="bg-eucalyptus-soft/50 border-t border-sand py-12 sm:py-16">
         <div className="max-w-[800px] mx-auto px-4 sm:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold m-0 mb-3">
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold m-0 mb-3 text-forest">
             Start free. Stay because it&apos;s fair.
           </h2>
-          <p className="text-base text-white/80 m-0 mb-6 max-w-xl mx-auto">
+          <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial on any tier. No credit card. Every feature
             included from day one.
           </p>
-          <SignInButton label="Start your free trial &rarr;" />
+          <SignInButton label="Go dreamward &rarr;" />
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400">
-        <Link href="/" className="text-slate-500 no-underline mx-2">
+      <footer className="border-t border-sand py-6 text-center text-xs text-stone">
+        <Link href="/" className="text-bark no-underline mx-2 hover:text-forest">
           Home
         </Link>
-        <span className="text-slate-300">{"\u{00B7}"}</span>
-        <Link href="/compare" className="text-slate-500 no-underline mx-2">
+        <span className="text-sand">{"\u{00B7}"}</span>
+        <Link href="/compare" className="text-bark no-underline mx-2 hover:text-forest">
           Compare
         </Link>
-        <span className="text-slate-300">{"\u{00B7}"}</span>
-        <Link href="/privacy" className="text-slate-500 no-underline mx-2">
+        <span className="text-sand">{"\u{00B7}"}</span>
+        <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
           Privacy
         </Link>
-        <span className="text-slate-300">{"\u{00B7}"}</span>
-        <Link href="/terms" className="text-slate-500 no-underline mx-2">
+        <span className="text-sand">{"\u{00B7}"}</span>
+        <Link href="/terms" className="text-bark no-underline mx-2 hover:text-forest">
           Terms
         </Link>
       </footer>
     </div>
+  );
+}
+
+function SproutMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 22V10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path d="M12 13c-3.3 0-6-2.7-6-6 3.3 0 6 2.7 6 6Z" fill="currentColor" />
+      <path d="M12 11c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z" fill="currentColor" />
+    </svg>
   );
 }

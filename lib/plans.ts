@@ -195,3 +195,40 @@ export const TIER_DISPLAY: Record<PaidPlanName, {
     serviceTier: "premium",
   },
 };
+
+// The full product list, grouped for scannability. FLAT across every
+// tier — the single source of truth shown on the landing pricing
+// section and the /pricing page, so the "every plan includes
+// everything" promise never drifts between them. Add new features
+// here once and both surfaces pick them up.
+export const PLAN_FEATURE_GROUPS: { group: string; items: string[] }[] = [
+  {
+    group: "Sell everywhere",
+    items: [
+      "Shopify, Wix, Square & Etsy sync",
+      "CSV / XLSX upload",
+      "Market Day mode — tap sales at your booth",
+      "Find markets near you",
+    ],
+  },
+  {
+    group: "Know your real numbers",
+    items: [
+      "Per-SKU cost history (effective-date)",
+      "Gross margin per product & channel",
+      "Live stock counts",
+      "Recipes + production runs",
+      "Audit trail on every number",
+    ],
+  },
+  {
+    group: "Tax-ready & organized",
+    items: [
+      "Schedule-C P&L (PDF + CSV for your CPA)",
+      "Inventory value (Form 1125-A)",
+      "Receipt vault on every expense",
+      "AR + invoice follow-up",
+      "Event mileage tracking",
+    ],
+  },
+];
