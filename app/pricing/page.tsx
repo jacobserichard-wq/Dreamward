@@ -27,12 +27,12 @@ const FAQ: { q: string; a: string }[] = [
     a: "No. Every tier — from the $10 Dream plan to the $99 Pro plan — includes every product feature: all integrations, COGS, gross margin, live stock, Schedule-C reports, receipt vault, everything. The only difference between tiers is how fast you get support.",
   },
   {
-    q: "How do you decide which tier I'm on?",
-    a: "By your business size, measured as your trailing-12-month revenue tracked through Dreamward. Under $5k/year is Dream, $5k–$50k is Maker, $50k–$500k is Growth, $500k+ is Pro. You pick a starting tier when you sign up, and we move you up automatically as you grow.",
+    q: "How do you decide my price?",
+    a: "By your business size — specifically, your trailing 12 months of revenue tracked in Dreamward (sales across your connected stores, uploads, and logged market days), recalculated every month. It's a rolling window, so it always reflects where your business is right now — not a calendar-year reset, and not your all-time total. One honest caveat: it's the revenue we can see in Dreamward, which may be less than your whole business if you don't log everything.",
   },
   {
-    q: "What happens when my revenue grows past a threshold?",
-    a: "Your tier auto-adjusts on a calendar-month boundary, and the new price takes effect on your next billing cycle — never mid-cycle, never a surprise charge. No upsell calls, no “upgrade to unlock” walls.",
+    q: "What happens when my revenue changes?",
+    a: "Your band updates on a calendar-month boundary, one step at a time, and the new price takes effect on your next billing cycle — never mid-cycle, never a surprise charge. And it works both ways: if your trailing revenue dips, your price comes back down too. No upsell calls, no “upgrade to unlock” walls.",
   },
   {
     q: "Is there a free trial?",
