@@ -641,6 +641,22 @@ the foundation all of this builds on.
       /compare/crafty-base page in Etsy seller communities.
 - [ ] SEO comparison pages: vs-QuickBooks, vs-spreadsheets, plus a
       shareable "is this market worth it?" calculator.
+- [ ] **Named competitor comparison pages (post-launch SEO).** The
+      live /compare page is deliberately GENERIC (no competitor named
+      — cleaner tone, lower legal risk, on-brand). That gives up the
+      high-intent "{competitor} alternative" / "{competitor} vs"
+      search traffic, which is the lowest-funnel, ready-to-switch
+      audience in SaaS. Pre-launch this costs ~nothing (a days-old
+      domain won't rank for competitive brand terms for months
+      regardless). REVISIT once we have (a) real users + testimonials
+      to make the pages credible and (b) enough domain authority for
+      ranking to be achievable. The mature pattern: keep the neutral
+      /compare for brand, ADD dedicated named pages (/compare/crafty-
+      base, /compare/quickbooks, etc.) targeting each competitor's
+      alternative searches — factual, dated, substantiated claims to
+      stay clear of comparative-advertising risk. The original named
+      page (git history pre-`6719887`) is the starting draft for the
+      Crafty Base one.
 
 ---
 
