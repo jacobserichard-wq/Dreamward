@@ -588,6 +588,35 @@ the foundation all of this builds on.
 - [ ] End-to-end test with a real card: signup → trial → checkout →
       plan lands in DB → cancel → refund path.
 
+### 1b. Pricing model — granular revenue ladder (decide with Stripe live)
+
+A smoother 7-band ladder is LIVE as a display-only preview (the
+"find your price" slider on the landing + /pricing, data in
+`lib/plans.ts` PRICE_LADDER): $10 / $15 / $22 / $32 / $48 / $69 /
+$99 across under-$5k → $300k+. Replaces the old 4-tier cliff where a
+$5.5k seller paid the same as a $45k one. Jacob is reviewing the
+look; nothing billed on it yet. When approved, do this WITH the
+Stripe live setup above (it supersedes the "4 products at
+$10/$19/$49/$99" line):
+
+- [ ] Create a Stripe price object per band (7), live + sandbox.
+- [ ] Align the model in code to the bands: `TIER_DISPLAY`,
+      `PLAN_REVENUE_THRESHOLDS`, `tierForAnnualRevenue`, the
+      env-backed `STRIPE_PRICE_ID_*` set, and the billing +
+      onboarding screens (which still show the old 4 tiers).
+- [ ] **Downgrade hysteresis** — bands are now ~1.5–2x apart (not
+      10x), so a business hovering near a boundary (~$60k) would
+      flip-flop monthly. Only move someone DOWN after 2–3 consecutive
+      months below the line, and/or a small buffer zone around each
+      boundary. Add to `reconcileClientTier` (lib/revenueTier).
+- [ ] Confirm the revenue calc is **gross sales, net of refunds** —
+      finer bands make accuracy matter more than the old
+      order-of-magnitude brackets did.
+- [ ] Revenue definition is already correct + documented: trailing
+      365 days tracked in Dreamward, recomputed monthly, moves both
+      directions (code: `computeTrailingRevenue`; copy: /pricing FAQ).
+      No change needed — just don't regress it.
+
 ### 2. Auth — Google OAuth production (launch-blocking; Jacob ~15 min + review)
 - [ ] Google Auth Platform → Audience → **Publish app** (Testing →
       Production). With only `openid email` scopes this is the
