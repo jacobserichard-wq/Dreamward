@@ -232,3 +232,19 @@ export const PLAN_FEATURE_GROUPS: { group: string; items: string[] }[] = [
     ],
   },
 ];
+
+// PROPOSED smoother price ladder — powers the "find your price"
+// slider on the marketing pages. Display-only for now: actual
+// billing + auto-switch still run on the 4-tier TIER_DISPLAY above
+// until Stripe is updated to match these bands. Smaller bands so a
+// $5.5k seller no longer pays the same as a $45k one. Each band's
+// `range` is display text; `price` is monthly USD.
+export const PRICE_LADDER: { range: string; price: number }[] = [
+  { range: "under $5k", price: 10 },
+  { range: "$5k–$15k", price: 15 },
+  { range: "$15k–$30k", price: 22 },
+  { range: "$30k–$60k", price: 32 },
+  { range: "$60k–$120k", price: 48 },
+  { range: "$120k–$300k", price: 69 },
+  { range: "$300k+", price: 99 },
+];

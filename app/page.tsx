@@ -24,6 +24,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
+import PriceSlider from "./components/PriceSlider";
 import { TESTIMONIALS } from "@/lib/testimonials";
 import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 
@@ -265,47 +266,11 @@ export default async function MarketingLandingPage() {
             </p>
           </div>
 
-          {/* Tiles are feature-free on purpose: every plan includes
-              everything (full list below). The tile's job is to show
-              which one fits YOUR revenue — that's the only thing that
-              changes your price. Support speed is the lone per-tier
-              service difference. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <PricingTile
-              name="Dream"
-              price="$10"
-              eligibility="Under $5k a year"
-              support="Standard email support"
-              ctaLabel="Start with Dream"
-              highlighted={false}
-            />
-            {/* Maker carries "Most popular" — the conversion sweet spot
-                solo makers land on as they graduate out of Dream. */}
-            <PricingTile
-              name="Maker"
-              price="$19"
-              eligibility="$5k–$50k a year"
-              support="Standard email support"
-              ctaLabel="Start with Maker"
-              highlighted
-            />
-            <PricingTile
-              name="Growth"
-              price="$49"
-              eligibility="$50k–$500k a year"
-              support="Priority support"
-              ctaLabel="Start with Growth"
-              highlighted={false}
-            />
-            <PricingTile
-              name="Pro"
-              price="$99"
-              eligibility="$500k+ a year"
-              support="Same-day priority + dedicated contact"
-              ctaLabel="Start with Pro"
-              highlighted={false}
-            />
-          </div>
+          {/* "Find your price" slider replaces the coarse tiles —
+              price climbs gently with revenue (no $5k→$50k cliff),
+              and it's revenue-driven so there's no "most popular"
+              choice to make. Full feature list below. */}
+          <PriceSlider />
 
           {/* Everything-included — the real product list, grouped so
               it's scannable. This is where features live now (off the
@@ -435,99 +400,6 @@ function ChannelCard({
       <div className="text-2xl mb-2">{icon}</div>
       <div className="text-sm font-semibold text-forest mb-1">{label}</div>
       <div className="text-xs text-bark leading-snug">{blurb}</div>
-    </div>
-  );
-}
-
-// Feature-free pricing tile. The revenue bracket is the hero — it's
-// the only thing that determines which tier you're on. The full
-// product list lives in the "Every plan includes everything" block.
-function PricingTile({
-  name,
-  price,
-  eligibility,
-  support,
-  ctaLabel,
-  highlighted,
-}: {
-  name: string;
-  price: string;
-  /** Annual-revenue bracket — the basis for the price, shown as the
-   *  tile's focal point. */
-  eligibility: string;
-  /** The one genuine per-tier difference: support speed. */
-  support: string;
-  ctaLabel: string;
-  highlighted: boolean;
-}) {
-  // Locked decision #11: every CTA routes to the same Google OAuth
-  // flow (→ Trial). Users pick their tier from /billing post-signin;
-  // ?callbackUrl=/onboarding gives them the guided setup.
-  return (
-    <div
-      className={`relative rounded-2xl p-6 flex flex-col text-center ${
-        highlighted
-          ? "bg-eucalyptus text-cream shadow-lg"
-          : "bg-cream border border-sand text-forest"
-      }`}
-    >
-      {highlighted && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-honey text-forest text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
-          Most popular
-        </div>
-      )}
-      <h4
-        className={`font-serif text-lg font-semibold m-0 mb-2 ${highlighted ? "text-cream" : "text-forest"}`}
-      >
-        {name}
-      </h4>
-      <div className={`mb-4 ${highlighted ? "text-cream" : "text-forest"}`}>
-        <span className="text-4xl font-extrabold">{price}</span>
-        <span
-          className={`text-sm ml-1 ${highlighted ? "text-cream/80" : "text-stone"}`}
-        >
-          /month
-        </span>
-      </div>
-      {/* Revenue bracket — the focal point (what sets your tier). */}
-      <div
-        className={`rounded-xl px-3 py-3 mb-4 ${
-          highlighted ? "bg-cream/15" : "bg-eucalyptus-soft/60"
-        }`}
-      >
-        <p
-          className={`text-[10px] uppercase tracking-wider font-semibold m-0 mb-0.5 ${
-            highlighted ? "text-cream/70" : "text-eucalyptus-dark"
-          }`}
-        >
-          For businesses doing
-        </p>
-        <p
-          className={`text-sm font-bold m-0 ${highlighted ? "text-cream" : "text-forest"}`}
-        >
-          {eligibility}
-        </p>
-        <p
-          className={`text-[10px] m-0 mt-0.5 ${highlighted ? "text-cream/70" : "text-stone"}`}
-        >
-          in revenue
-        </p>
-      </div>
-      <p
-        className={`text-xs m-0 mb-5 ${highlighted ? "text-cream/85" : "text-bark"}`}
-      >
-        {support}
-      </p>
-      <Link
-        href="/signin?callbackUrl=/onboarding"
-        className={`mt-auto block text-center py-2.5 px-4 rounded-full text-sm font-semibold no-underline cursor-pointer ${
-          highlighted
-            ? "bg-cream text-eucalyptus-dark hover:bg-white"
-            : "bg-eucalyptus text-cream hover:bg-eucalyptus-dark"
-        }`}
-      >
-        {ctaLabel}
-      </Link>
     </div>
   );
 }

@@ -12,22 +12,13 @@
 
 import Link from "next/link";
 import SignInButton from "../components/SignInButton";
-import { TIER_DISPLAY, PLAN_FEATURE_GROUPS, type PaidPlanName } from "@/lib/plans";
+import PriceSlider from "../components/PriceSlider";
+import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 
 export const metadata = {
   title: "Pricing",
   description:
     "Every feature on every tier. Priced by your business size, not by feature gates. Starts at $10/month — your tier auto-adjusts as you grow.",
-};
-
-const TIER_ORDER: PaidPlanName[] = ["dream", "maker", "growth", "pro"];
-
-// The one genuine per-tier difference: support speed.
-const TIER_SUPPORT: Record<PaidPlanName, string> = {
-  dream: "Standard email support",
-  maker: "Standard email support",
-  growth: "Priority support",
-  pro: "Same-day priority + dedicated contact",
 };
 
 const FAQ: { q: string; a: string }[] = [
@@ -56,13 +47,6 @@ const FAQ: { q: string; a: string }[] = [
     a: "Because we built one focused tool — gross-margin tracking and Schedule-C-ready reports — instead of a sprawling ERP. You shouldn’t have to pay hundreds a month or be locked out of a profit report to know whether your business is making money.",
   },
 ];
-
-function fmtBracket(low: number, high: number): string {
-  const k = (n: number) => (n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`);
-  if (high === Infinity) return `${k(low)}+ a year`;
-  if (low === 0) return `Under ${k(high)} a year`;
-  return `${k(low)}–${k(high)} a year`;
-}
 
 export default function PricingPage() {
   return (
@@ -101,87 +85,13 @@ export default function PricingPage() {
         </div>
       </header>
 
-      {/* Pricing tiles — feature-free, revenue bracket as the hero */}
+      {/* Find-your-price slider — revenue-driven, no tier to choose */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 -mt-8 sm:-mt-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {TIER_ORDER.map((id) => {
-            const tier = TIER_DISPLAY[id];
-            const highlighted = id === "maker";
-            return (
-              <div
-                key={id}
-                className={`relative rounded-2xl p-6 flex flex-col text-center ${
-                  highlighted
-                    ? "bg-eucalyptus text-cream shadow-lg"
-                    : "bg-cream border border-sand text-forest"
-                }`}
-              >
-                {highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-honey text-forest text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
-                    Most popular
-                  </div>
-                )}
-                <h3
-                  className={`font-serif text-lg font-semibold m-0 mb-2 ${highlighted ? "text-cream" : "text-forest"}`}
-                >
-                  {tier.name}
-                </h3>
-                <div className={`mb-4 ${highlighted ? "text-cream" : "text-forest"}`}>
-                  <span className="text-4xl font-extrabold">
-                    ${tier.priceMonthly}
-                  </span>
-                  <span
-                    className={`text-sm ml-1 ${highlighted ? "text-cream/80" : "text-stone"}`}
-                  >
-                    /month
-                  </span>
-                </div>
-                <div
-                  className={`rounded-xl px-3 py-3 mb-4 ${
-                    highlighted ? "bg-cream/15" : "bg-eucalyptus-soft/60"
-                  }`}
-                >
-                  <p
-                    className={`text-[10px] uppercase tracking-wider font-semibold m-0 mb-0.5 ${
-                      highlighted ? "text-cream/70" : "text-eucalyptus-dark"
-                    }`}
-                  >
-                    For businesses doing
-                  </p>
-                  <p
-                    className={`text-sm font-bold m-0 ${highlighted ? "text-cream" : "text-forest"}`}
-                  >
-                    {fmtBracket(tier.revenueLow, tier.revenueHigh)}
-                  </p>
-                  <p
-                    className={`text-[10px] m-0 mt-0.5 ${highlighted ? "text-cream/70" : "text-stone"}`}
-                  >
-                    in revenue
-                  </p>
-                </div>
-                <p
-                  className={`text-xs m-0 mb-5 ${highlighted ? "text-cream/85" : "text-bark"}`}
-                >
-                  {TIER_SUPPORT[id]}
-                </p>
-                <Link
-                  href="/signin?callbackUrl=/onboarding"
-                  className={`mt-auto block text-center py-2.5 px-4 rounded-full text-sm font-semibold no-underline cursor-pointer ${
-                    highlighted
-                      ? "bg-cream text-eucalyptus-dark hover:bg-white"
-                      : "bg-eucalyptus text-cream hover:bg-eucalyptus-dark"
-                  }`}
-                >
-                  Start with {tier.name}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-
+        <PriceSlider />
         <p className="text-center text-xs text-stone mt-6">
-          All tiers start with a 14-day free trial. No credit card required.
-          Cancel anytime — your data exports cleanly to CSV.
+          Cancel anytime — your data exports cleanly to CSV. As your tracked
+          revenue grows, your price moves up one band at a time, never a
+          surprise jump.
         </p>
       </section>
 
