@@ -225,11 +225,11 @@ export default async function MarketingLandingPage() {
             it doesn't compete with the primary CTA. */}
         <div className="text-center mt-8">
           <Link
-            href="/compare/crafty-base"
+            href="/compare"
             className="inline-flex items-center gap-2 text-sm font-medium text-eucalyptus-dark bg-cream border border-sand rounded-full px-4 py-2 no-underline hover:border-eucalyptus hover:text-forest"
           >
             <span>{"\u{2696}\u{FE0F}"}</span>
-            <span>How Dreamward compares to Crafty Base</span>
+            <span>Why makers switch to Dreamward</span>
             <span className="text-eucalyptus">{"\u{2192}"}</span>
           </Link>
         </div>

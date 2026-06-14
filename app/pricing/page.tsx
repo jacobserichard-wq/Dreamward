@@ -249,7 +249,7 @@ export default function PricingPage() {
           Home
         </Link>
         <span className="text-slate-300">{"\u{00B7}"}</span>
-        <Link href="/compare/crafty-base" className="text-slate-500 no-underline mx-2">
+        <Link href="/compare" className="text-slate-500 no-underline mx-2">
           Compare
         </Link>
         <span className="text-slate-300">{"\u{00B7}"}</span>
