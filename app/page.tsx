@@ -58,20 +58,74 @@ export default async function MarketingLandingPage() {
             <SproutMark className="w-6 h-6 sm:w-7 sm:h-7 text-eucalyptus" />
             Dreamward
           </h1>
-          <div className="flex items-center gap-4 sm:gap-5">
+          {/* Desktop nav — visible links read as an intentional nav
+              bar (Pricing was easy to miss as a lone right-side
+              link). */}
+          <nav className="hidden sm:flex items-center gap-7">
             <Link
               href="/pricing"
-              className="text-sm text-bark hover:text-forest no-underline"
+              className="text-sm font-medium text-bark hover:text-forest no-underline"
             >
               Pricing
             </Link>
             <Link
+              href="/compare"
+              className="text-sm font-medium text-bark hover:text-forest no-underline"
+            >
+              Compare
+            </Link>
+            <Link
               href="/signin"
-              className="text-sm text-bark hover:text-forest no-underline"
+              className="text-sm font-medium text-bark hover:text-forest no-underline"
             >
               Sign in
             </Link>
-          </div>
+          </nav>
+
+          {/* Mobile menu — hamburger only below sm, where space runs
+              out. Pure <details> so the landing stays a server
+              component (no client JS). */}
+          <details className="sm:hidden relative">
+            <summary
+              className="list-none [&::-webkit-details-marker]:hidden cursor-pointer p-1.5 text-forest"
+              aria-label="Menu"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M4 7h16M4 12h16M4 17h16"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </summary>
+            <div className="absolute right-0 mt-2 w-44 bg-cream border border-sand rounded-xl shadow-sm py-1.5 z-20 flex flex-col">
+              <Link
+                href="/pricing"
+                className="px-4 py-2 text-sm text-bark hover:bg-oat hover:text-forest no-underline"
+              >
+                Pricing
+              </Link>
+              <Link
+                href="/compare"
+                className="px-4 py-2 text-sm text-bark hover:bg-oat hover:text-forest no-underline"
+              >
+                Compare
+              </Link>
+              <Link
+                href="/signin"
+                className="px-4 py-2 text-sm text-bark hover:bg-oat hover:text-forest no-underline"
+              >
+                Sign in
+              </Link>
+            </div>
+          </details>
         </div>
 
         {/* Hero. Sub-session 32 marketing refresh: leads with the
