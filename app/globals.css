@@ -115,6 +115,16 @@ body {
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
+/* Tame Fraunces' display flamboyance — at large sizes the browser
+   pushes its optical-size axis toward 144, which gives the swooping
+   f / g terminals. Pin a moderate opsz + turn off the "wonky"
+   alternates so headings read warm but conventional, site-wide.
+   font-weight still drives the wght axis (not listed here), so the
+   Tailwind font-semibold/bold utilities keep working. */
+.font-serif {
+  font-variation-settings: "opsz" 34, "WONK" 0, "SOFT" 0;
+}
+
 @keyframes fw-spin {
   to { transform: rotate(360deg); }
 }

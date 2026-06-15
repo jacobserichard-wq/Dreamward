@@ -7,9 +7,12 @@ import { SessionProvider } from "./providers";
 // editorial display serif for headlines; Nunito Sans is the friendly
 // humanist body sans. Exposed as CSS variables that globals.css wires
 // to --font-serif / --font-sans (Tailwind's font-serif / font-sans).
+// Loaded as a VARIABLE font (no fixed `weight`) so we can control its
+// optical-size (opsz) + wonky-alternate (WONK) axes in CSS — see the
+// .font-serif rule in globals.css that calms the display flamboyance.
 const fraunces = Fraunces({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  axes: ["opsz", "SOFT", "WONK"],
   variable: "--font-fraunces",
   display: "swap",
 });
