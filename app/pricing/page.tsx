@@ -21,33 +21,6 @@ export const metadata = {
     "Every feature on every tier. Priced by your business size, not by feature gates. Starts at $10/month — your tier auto-adjusts as you grow.",
 };
 
-const FAQ: { q: string; a: string }[] = [
-  {
-    q: "Do cheaper tiers get fewer features?",
-    a: "No. Every tier — from the $10 Dream plan to the $99 Pro plan — includes every product feature: all integrations, COGS, gross margin, live stock, Schedule-C reports, receipt vault, everything. The only difference between tiers is how fast you get support.",
-  },
-  {
-    q: "How do you decide my price?",
-    a: "By your business size — specifically, your trailing 12 months of revenue tracked in Dreamward (sales across your connected stores, uploads, and logged market days), recalculated every month. It's a rolling window, so it always reflects where your business is right now — not a calendar-year reset, and not your all-time total. One honest caveat: it's the revenue we can see in Dreamward, which may be less than your whole business if you don't log everything.",
-  },
-  {
-    q: "What happens when my revenue changes?",
-    a: "Your band updates on a calendar-month boundary, one step at a time, and the new price takes effect on your next billing cycle — never mid-cycle, never a surprise charge. And it works both ways: if your trailing revenue dips, your price comes back down too. No upsell calls, no “upgrade to unlock” walls.",
-  },
-  {
-    q: "Is there a free trial?",
-    a: "Yes — every tier starts with a 14-day free trial. No credit card required to start. You get full access to every feature during the trial.",
-  },
-  {
-    q: "What if I want to cancel?",
-    a: "Cancel anytime from your billing page. Your data exports cleanly to CSV, so you’re never locked in.",
-  },
-  {
-    q: "Why is this so much cheaper than the big accounting tools?",
-    a: "Because we built one focused tool — gross-margin tracking and Schedule-C-ready reports — instead of a sprawling ERP. You shouldn’t have to pay hundreds a month or be locked out of a profit report to know whether your business is making money.",
-  },
-];
-
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-oat font-sans text-forest">
@@ -88,10 +61,11 @@ export default function PricingPage() {
       {/* Find-your-price slider — revenue-driven, no tier to choose */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 -mt-8 sm:-mt-12">
         <PriceSlider />
-        <p className="text-center text-xs text-stone mt-6">
-          Cancel anytime — your data exports cleanly to CSV. As your tracked
-          revenue grows, your price moves up one band at a time, never a
-          surprise jump.
+        <p className="text-center text-xs text-stone mt-6 max-w-xl mx-auto leading-relaxed">
+          Your price is set by your trailing 12 months of revenue tracked in
+          Dreamward, recalculated monthly — it moves down as well as up, one
+          band at a time, never a surprise jump. Cancel anytime; your data
+          exports cleanly to CSV.
         </p>
       </section>
 
@@ -126,28 +100,11 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="max-w-[760px] mx-auto px-4 sm:px-8 pb-12 sm:pb-16">
-        <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-6 text-center">
-          Questions
-        </h2>
-        <div className="space-y-4">
-          {FAQ.map((item) => (
-            <div key={item.q} className="bg-cream border border-sand rounded-2xl p-5">
-              <h3 className="text-base font-semibold text-forest m-0 mb-2">
-                {item.q}
-              </h3>
-              <p className="text-sm text-bark m-0 leading-relaxed">{item.a}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Bottom CTA */}
       <section className="bg-eucalyptus-soft/50 border-t border-sand py-12 sm:py-16">
         <div className="max-w-[800px] mx-auto px-4 sm:px-8 text-center">
           <h2 className="font-serif text-2xl sm:text-3xl font-semibold m-0 mb-3 text-forest">
-            Start free. Stay because it&apos;s fair.
+            Start free. Cancel anytime.
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial on any tier. No credit card. Every feature
