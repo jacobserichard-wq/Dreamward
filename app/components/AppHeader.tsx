@@ -23,7 +23,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import Spinner from "./Spinner";
-import { isPayingTier } from "@/lib/plans";
+import { isPayingTier, planDisplayLabel } from "@/lib/plans";
 
 export interface AppHeaderProps {
   /** Current plan. When omitted, AppHeader fetches it from
@@ -84,9 +84,9 @@ export default function AppHeader({
           {plan && (
             <a
               href="/billing"
-              className="bg-white/15 text-white px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-semibold uppercase tracking-wider no-underline cursor-pointer"
+              className="bg-white/15 text-white px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-semibold tracking-wider no-underline cursor-pointer"
             >
-              {plan}
+              {planDisplayLabel(plan)}
             </a>
           )}
 
@@ -211,6 +211,12 @@ export default function AppHeader({
           </Link>
           <Link href="/settings" className={NAV_LINK}>
             Settings
+          </Link>
+          {/* Billing was only reachable via the plan badge (which now
+              reads as a price, e.g. "$32/mo") — easy to miss. Explicit
+              nav link so managing the subscription is always one tap. */}
+          <Link href="/billing" className={NAV_LINK} title="Plan & billing">
+            Billing
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/signin" })}

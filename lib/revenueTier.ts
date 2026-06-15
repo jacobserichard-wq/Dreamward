@@ -34,6 +34,7 @@ import {
   tierForAnnualRevenue,
   type PaidPlanName,
   PLAN_REVENUE_THRESHOLDS,
+  BANDS,
 } from "@/lib/plans";
 import { buildClassifier } from "@/lib/reports/aggregate";
 import { type Industry } from "@/lib/categories";
@@ -127,14 +128,30 @@ export async function reconcileClientTier(client: {
     clientId: client.id,
     email: client.email,
     previousPlan: client.plan,
-    targetPlan: "dream",
+    targetPlan: "band1",
     trailingRevenue: 0,
   };
 
   try {
     const industry = (client.industry ?? "general") as Industry;
     const trailingRevenue = await computeTrailingRevenue(client.id, industry);
-    const targetPlan = tierForAnnualRevenue(trailingRevenue);
+    let targetPlan = tierForAnnualRevenue(trailingRevenue);
+
+    // Downgrade hysteresis: don't drop a band until trailing revenue
+    // falls 10% below the current band's floor. A business hovering at
+    // a boundary (e.g. revenue oscillating around $30k) would otherwise
+    // flip-flop band every month. Upgrades apply immediately — only
+    // downgrades get the buffer. Trial/legacy plans have no band index
+    // (currentIdx === -1) so they skip the buffer and land on target.
+    const currentIdx = BANDS.findIndex((b) => b.id === client.plan);
+    const targetIdx = BANDS.findIndex((b) => b.id === targetPlan);
+    if (currentIdx >= 0 && targetIdx >= 0 && targetIdx < currentIdx) {
+      const floor = BANDS[currentIdx].revenueLow;
+      if (trailingRevenue >= floor * 0.9) {
+        targetPlan = client.plan as PaidPlanName; // hold the current band
+      }
+    }
+
     base.targetPlan = targetPlan;
     base.trailingRevenue = trailingRevenue;
 
@@ -150,7 +167,7 @@ export async function reconcileClientTier(client: {
       return {
         ...base,
         action: "skipped-no-subscription",
-        detail: `would switch ${client.plan} -> ${targetPlan} at $${PLAN_REVENUE_THRESHOLDS[targetPlan] === Infinity ? "500k+" : trailingRevenue.toFixed(0)} revenue`,
+        detail: `would switch ${client.plan} -> ${targetPlan} at $${PLAN_REVENUE_THRESHOLDS[targetPlan] === Infinity ? "300k+" : trailingRevenue.toFixed(0)} revenue`,
       };
     }
 
@@ -228,9 +245,13 @@ export async function reconcileAllTiers(): Promise<{
     industry: string | null;
     stripe_subscription_id: string | null;
   }>(
+    // Bands are the live plan values; the legacy 4-tier names are
+    // included so any row not yet migrated still gets reconciled (and
+    // thereby moved onto a band) on the next monthly run.
     `SELECT id, email, plan, industry, stripe_subscription_id
        FROM clients
-      WHERE plan IN ('dream', 'maker', 'growth', 'pro')`
+      WHERE plan IN ('band1','band2','band3','band4','band5','band6','band7',
+                     'dream','maker','growth','pro')`
   );
 
   const results: TierReconcileResult[] = [];

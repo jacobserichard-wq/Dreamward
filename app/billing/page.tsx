@@ -6,7 +6,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
 import { apiFetch } from "@/lib/apiFetch";
-import { TIER_DISPLAY, type PaidPlanName } from "@/lib/plans";
+import { TIER_DISPLAY, BANDS, serviceTierLabel, type PaidPlanName } from "@/lib/plans";
 
 interface BillingData {
   plan: string;
@@ -25,40 +25,10 @@ interface BillingData {
   };
 }
 
-// Sub-session 33 pricing pivot. The billing page now reflects the
-// "Built for people. Priced for people." model: every paying tier
-// gets every feature, tiers differ only by business-size bracket +
-// service level. The tier order matters for the comparison grid +
-// the "is this a downgrade?" check.
-const TIER_ORDER: PaidPlanName[] = ["dream", "maker", "growth", "pro"];
-
-/** Per-tier service-level feature bullets shown on the comparison
- *  cards. Deliberately NOT product features — those are flat across
- *  all tiers (see the "every tier includes" note). These bullets
- *  describe what changes as you move up: support speed + onboarding
- *  depth. */
-const TIER_SERVICE_FEATURES: Record<PaidPlanName, string[]> = {
-  dream: [
-    "Every product feature",
-    "All integrations",
-    "Standard email support",
-  ],
-  maker: [
-    "Every product feature",
-    "All integrations",
-    "Standard email support",
-  ],
-  growth: [
-    "Every product feature",
-    "All integrations",
-    "Priority support — faster response times",
-  ],
-  pro: [
-    "Every product feature",
-    "All integrations",
-    "Same-day priority support + dedicated contact",
-  ],
-};
+// Sub-session 33 pricing pivot → 7-band ladder. The billing page
+// reflects "Built for people. Priced for people.": every paying band
+// gets every feature, and the customer never picks a band — price is
+// set by trailing-12-month revenue and auto-adjusts one step at a time.
 
 /** Display metadata for the non-paid plan states. */
 const STATE_DISPLAY: Record<
@@ -114,14 +84,16 @@ export default function BillingPage() {
     }
   };
 
-  const startCheckout = async (planId: string) => {
-    setActionLoading(planId);
+  // Revenue-driven: no band to pass. The server computes the band from
+  // the customer's trailing revenue and starts the subscription there.
+  const startCheckout = async () => {
+    setActionLoading("checkout");
     setError(null);
     try {
       const data = await apiFetch<{ url?: string }>("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({}),
       });
       if (data.url) {
         window.location.href = data.url;
@@ -174,7 +146,11 @@ export default function BillingPage() {
     ? fmtRevenueBracket(paidTier.revenueLow, paidTier.revenueHigh)
     : null;
   const currentServiceFeatures = paidTier
-    ? TIER_SERVICE_FEATURES[paidTier.id]
+    ? [
+        "Every product feature",
+        "All integrations",
+        serviceTierLabel(paidTier.serviceTier),
+      ]
     : billing.plan === "canceled"
       ? ["Dashboard only — reactivate to restore full access"]
       : ["Full access during your 14-day trial"];
@@ -281,95 +257,66 @@ export default function BillingPage() {
           revenue grows, your tier auto-adjusts on a calendar-month boundary.
         </div>
 
-        {/* Plan Comparison */}
+        {/* Revenue-band ladder — informational. The customer never
+            picks a band; their price is set by trailing revenue and
+            auto-adjusts one step at a time. */}
         <h2 className="text-xl font-bold text-slate-900 mb-1">
-          {billing.plan === "canceled" ? "Reactivate your plan" : "Choose your tier"}
+          {billing.plan === "canceled" ? "Reactivate your plan" : "Your pricing ladder"}
         </h2>
         <p className="text-sm text-slate-500 mb-4">
-          Pick the tier that matches your current revenue. We&apos;ll move you
-          up automatically as you grow — no upsell calls.
+          Your price is set by your trailing 12 months of revenue tracked in
+          Dreamward — it moves up (and down) one band at a time,
+          automatically. You never pick a tier.
         </p>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4 mb-8">
-          {TIER_ORDER.map((planId) => {
-            const tier = TIER_DISPLAY[planId];
-            const isCurrent = billing.plan === planId;
-            // Downgrade = target tier sits below the current paid tier
-            // in TIER_ORDER. Stripe portal handles proration on
-            // downgrades; checkout handles upgrades + new subs.
-            const currentIdx = TIER_ORDER.indexOf(billing.plan as PaidPlanName);
-            const targetIdx = TIER_ORDER.indexOf(planId);
-            const isDowngrade = currentIdx >= 0 && targetIdx < currentIdx;
-
-            // Maker carries the "Most popular" highlight (the new
-            // conversion sweet spot for solo makers).
-            const borderClass =
-              planId === "maker"
-                ? "border-2 border-violet-500"
-                : isCurrent
-                ? "border-2 border-blue-500"
-                : "border border-slate-200";
-
+        <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 mb-6">
+          {BANDS.map((b) => {
+            const isCurrent = billing.plan === b.id;
             return (
               <div
-                key={planId}
-                className={`bg-white rounded-xl p-6 flex flex-col relative ${borderClass}`}
+                key={b.id}
+                className={`flex items-center justify-between px-5 py-3 ${
+                  isCurrent ? "bg-blue-50" : ""
+                }`}
               >
-                {planId === "maker" && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-500 text-white text-xs font-semibold py-1 px-4 rounded-[20px] whitespace-nowrap">
-                    Most popular
-                  </div>
-                )}
-                <h3 className="text-xl font-bold text-slate-900 mt-2 mb-0.5">{tier.name}</h3>
-                <div className="text-3xl font-extrabold text-slate-900 mb-0.5">
-                  ${tier.priceMonthly}
-                  <span className="text-sm font-medium text-slate-400">/mo</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-slate-700">
+                    {fmtRevenueBracket(b.revenueLow, b.revenueHigh)}
+                  </span>
+                  {isCurrent && (
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                      You&apos;re here
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-slate-500 m-0 mb-4">
-                  {fmtRevenueBracket(tier.revenueLow, tier.revenueHigh)}
-                </p>
-                <div className="flex flex-col gap-2 mb-5 flex-1">
-                  {TIER_SERVICE_FEATURES[planId].map((f) => (
-                    <div key={f} className="flex items-start gap-2 text-[13px] text-slate-600">
-                      <span className="text-green-600 font-bold text-sm mt-0.5">{"✓"}</span>
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-                {isCurrent ? (
-                  <div className="text-center p-2.5 text-sm font-semibold text-blue-500 bg-blue-50 rounded-lg">
-                    Current plan
-                  </div>
-                ) : isDowngrade ? (
-                  <button
-                    onClick={openPortal}
-                    disabled={actionLoading === "portal"}
-                    className={`p-3 rounded-lg border border-slate-200 bg-white cursor-pointer text-sm font-medium text-slate-500 text-center inline-flex items-center justify-center gap-2 ${
-                      actionLoading === "portal" ? "opacity-60 cursor-wait" : ""
-                    }`}
-                  >
-                    {actionLoading === "portal" && <Spinner size={14} color="#64748b" />}
-                    {actionLoading === "portal" ? "Opening portal..." : "Change in portal"}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => startCheckout(planId)}
-                    disabled={actionLoading === planId}
-                    className={`p-3 rounded-lg border-0 bg-green-600 text-white cursor-pointer text-sm font-semibold text-center inline-flex items-center justify-center gap-2 ${
-                      actionLoading === planId ? "opacity-70 cursor-wait" : ""
-                    }`}
-                  >
-                    {actionLoading === planId && <Spinner size={14} color="white" />}
-                    {actionLoading === planId
-                      ? "Starting checkout..."
-                      : isCurrent
-                        ? "Current plan"
-                        : `Choose ${tier.name}`}
-                  </button>
-                )}
+                <span className="text-sm font-bold text-slate-900">
+                  ${b.price}
+                  <span className="text-xs font-medium text-slate-400">/mo</span>
+                </span>
               </div>
             );
           })}
         </div>
+
+        {/* CTA — trial/canceled users start a subscription; the band is
+            computed server-side from their revenue. Paying users change
+            via the "Manage subscription" portal button in the card
+            above (and the cron auto-adjusts their band monthly). */}
+        {(billing.plan === "trial" || billing.plan === "canceled") && (
+          <button
+            onClick={startCheckout}
+            disabled={actionLoading === "checkout"}
+            className={`w-full sm:w-auto p-3 px-6 rounded-lg border-0 bg-green-600 text-white cursor-pointer text-sm font-semibold inline-flex items-center justify-center gap-2 mb-8 ${
+              actionLoading === "checkout" ? "opacity-70 cursor-wait" : ""
+            }`}
+          >
+            {actionLoading === "checkout" && <Spinner size={14} color="white" />}
+            {actionLoading === "checkout"
+              ? "Starting checkout..."
+              : billing.plan === "canceled"
+                ? "Reactivate subscription"
+                : "Start your subscription"}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,74 +1,58 @@
 // lib/stripe.ts
 //
-// Sub-session 33 strategic pricing pivot. Price IDs migrated to
-// env vars so the new Dream/Maker/Growth/Pro products can be
-// configured per environment without code changes.
+// 7-band revenue ladder. Each band's Stripe price ID comes from a
+// per-band env var, so the bands can be configured per environment
+// (sandbox vs. live) without code changes.
 //
 // Setup (Jacob, on your end):
-//   1. Stripe Dashboard → Create 4 recurring products:
-//        Dream  — $10/month
-//        Maker  — $19/month
-//        Growth — $49/month
-//        Pro    — $99/month
-//   2. Copy each price ID
+//   1. Stripe Dashboard → 7 recurring Standard (flat-rate) prices:
+//        Band 1 — $10/mo   Band 2 — $15/mo   Band 3 — $22/mo
+//        Band 4 — $32/mo   Band 5 — $48/mo   Band 6 — $69/mo
+//        Band 7 — $99/mo
+//   2. Copy each price ID (price_…, NOT prod_…)
 //   3. Vercel env vars (Production + Preview):
-//        STRIPE_PRICE_ID_DREAM
-//        STRIPE_PRICE_ID_MAKER
-//        STRIPE_PRICE_ID_GROWTH
-//        STRIPE_PRICE_ID_PRO
+//        STRIPE_PRICE_ID_BAND1 … STRIPE_PRICE_ID_BAND7
 //
-// Falls back to the legacy hardcoded Starter/Growth/Pro IDs while
-// the new products are being created so the app doesn't error
-// mid-deploy. Once env vars are set, the fallback is dead code.
+// A band with no env var configured resolves to "" — checkout and the
+// reconcile cron both guard on a missing priceId and surface an error
+// rather than billing the wrong amount.
 
 import Stripe from "stripe";
-import type { PaidPlanName } from "./plans";
+import { BANDS, type PaidPlanName } from "./plans";
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-04-22.dahlia",
 });
 
-/** Legacy hardcoded price IDs — kept as fallback during the
- *  transition to env-backed config. Remove once
- *  STRIPE_PRICE_ID_* env vars are confirmed live in Vercel. */
-const LEGACY_PRICE_IDS = {
-  // The old "starter" product now maps to "maker" semantically.
-  starter_as_maker: "price_1TSpgoBeNxvLulr9f4aeZEbD",
-  growth: "price_1TSpgpBeNxvLulr9pABRmVqT",
-  pro: "price_1TSpgpBeNxvLulr9Wsr5gajq",
+// Literal env references (not computed keys) so they're unambiguous and
+// survive any future build-time inlining.
+const BAND_PRICE_ENV: Record<PaidPlanName, string | undefined> = {
+  band1: process.env.STRIPE_PRICE_ID_BAND1,
+  band2: process.env.STRIPE_PRICE_ID_BAND2,
+  band3: process.env.STRIPE_PRICE_ID_BAND3,
+  band4: process.env.STRIPE_PRICE_ID_BAND4,
+  band5: process.env.STRIPE_PRICE_ID_BAND5,
+  band6: process.env.STRIPE_PRICE_ID_BAND6,
+  band7: process.env.STRIPE_PRICE_ID_BAND7,
 };
 
 export const PLANS: Record<
   PaidPlanName,
   { priceId: string; name: string; price: number }
-> = {
-  dream: {
-    priceId: process.env.STRIPE_PRICE_ID_DREAM ?? "",
-    name: "Dream",
-    price: 10,
-  },
-  maker: {
-    priceId:
-      process.env.STRIPE_PRICE_ID_MAKER ?? LEGACY_PRICE_IDS.starter_as_maker,
-    name: "Maker",
-    price: 19,
-  },
-  growth: {
-    priceId: process.env.STRIPE_PRICE_ID_GROWTH ?? LEGACY_PRICE_IDS.growth,
-    name: "Growth",
-    price: 49,
-  },
-  pro: {
-    priceId: process.env.STRIPE_PRICE_ID_PRO ?? LEGACY_PRICE_IDS.pro,
-    name: "Pro",
-    price: 99,
-  },
-};
+> = Object.fromEntries(
+  BANDS.map((b) => [
+    b.id,
+    {
+      priceId: BAND_PRICE_ENV[b.id] ?? "",
+      name: b.range,
+      price: b.price,
+    },
+  ])
+) as Record<PaidPlanName, { priceId: string; name: string; price: number }>;
 
-/** Resolve a Stripe price ID back to its plan tier. Used by the
- *  webhook handler to set client.plan when a subscription event
- *  fires. Returns null when the price ID doesn't match any tier
- *  (likely a legacy ID that's been retired). */
+/** Resolve a Stripe price ID back to its band. Used by the webhook
+ *  handler to set client.plan when a subscription event fires. Returns
+ *  null when the price ID doesn't match any configured band. */
 export function planFromPriceId(
   priceId: string | undefined
 ): PaidPlanName | null {
@@ -78,11 +62,5 @@ export function planFromPriceId(
       return name as PaidPlanName;
     }
   }
-  // Defense in depth: also match the raw legacy IDs so any
-  // existing subscriptions (created against the old Starter/Growth/
-  // Pro products) still resolve cleanly during the transition.
-  if (priceId === LEGACY_PRICE_IDS.starter_as_maker) return "maker";
-  if (priceId === LEGACY_PRICE_IDS.growth) return "growth";
-  if (priceId === LEGACY_PRICE_IDS.pro) return "pro";
   return null;
 }

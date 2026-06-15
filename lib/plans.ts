@@ -1,46 +1,84 @@
-// Sub-session 33 strategic pricing pivot. "Built for people. Priced
-// for people." — feature-flat pricing where every paying tier gets
-// every product feature. Tiers differentiate by business size
-// (auto-switched based on annual revenue tracked through the app)
-// and by service level (support response time + onboarding depth),
-// never by which features the customer is allowed to use.
+// Pricing model — "Built for people. Priced for people." Every paying
+// customer gets every product feature; price is set purely by business
+// size (trailing-12-month revenue tracked through the app) and the only
+// other differentiator is service level (support response time).
 //
-// Old model (deprecated): starter/growth/pro gated COGS, integrations,
-// reports, etc. behind Pro. Solo makers could not evaluate the
-// product's actual value without paying $89/mo.
+// 7-band revenue ladder (sub-session 33 → smoother-ladder revision):
+// the old 4 tiers (Dream/Maker/Growth/Pro) jumped too coarsely — a
+// $5.5k seller paid the same as a $45k one. The ladder below has
+// narrower bands so price tracks size fairly. The customer never picks
+// a band: they sign up onto the trial, check out onto the band their
+// revenue maps to, and a monthly cron (lib/revenueTier.ts) nudges the
+// band up or down one step at a time as revenue moves.
 //
-// New model: Dream / Maker / Growth / Pro all list every module.
-// Support speed is the only tier differentiator: standard email
-// (Dream/Maker) -> priority (Growth) -> same-day priority +
-// dedicated contact (Pro). Trial keeps 14-day full access;
-// Canceled retains read-only dashboard.
+// EVERYTHING derives from the BANDS array — thresholds, the revenue→
+// band lookup, the Stripe price map (lib/stripe.ts), the billing
+// display tiles, and the marketing "find your price" slider — so the
+// ladder can never drift between surfaces. Trial keeps 14-day full
+// access; Canceled retains a read-only dashboard.
 //
-// Revenue thresholds drive automatic tier switching via a monthly
-// cron job (lib/revenueTier.ts). Customer never picks a tier
-// manually; they sign up, Dreamward places them on Dream by default,
-// then bumps them up as their tracked revenue crosses thresholds.
+// Legacy 4-tier plan values (dream/maker/growth/pro) are still treated
+// as paying for back-compat until existing rows are migrated to bands
+// (db/migrations/0027_*). They are NOT valid PaidPlanName values.
 
-/** Maximum annual revenue (USD) covered by each tier. Set to
- *  Infinity on Pro because Pro is the ceiling. Trial / Canceled
- *  don't have revenue thresholds — they're transient states. */
-export const PLAN_REVENUE_THRESHOLDS = {
-  dream: 5_000,
-  maker: 50_000,
-  growth: 500_000,
-  pro: Infinity,
-} as const;
+export type PaidPlanName =
+  | "band1"
+  | "band2"
+  | "band3"
+  | "band4"
+  | "band5"
+  | "band6"
+  | "band7";
 
-/** Feature set per plan. Note: all paying tiers (and the 14-day
- *  trial) list the same `modules` array — that's the strategic
- *  promise. The differentiator is `service.tier` below, not
- *  features.
- *
- *  `labels` is retained for forward compatibility with the Gmail
- *  feature flag (FEATURES.GMAIL_INGEST). All tiers currently
- *  hold the same labels array; when GMAIL_INGEST flips back to
- *  true, the route handler reads from the canonical Pro labels
- *  list. Keeping the field on every tier means flipping the flag
- *  doesn't require a plan-registry migration. */
+export type PlanName = "trial" | PaidPlanName | "canceled";
+
+export type ServiceTier = "standard" | "priority" | "premium";
+
+export interface BandDef {
+  id: PaidPlanName;
+  /** Monthly price in USD. */
+  price: number;
+  /** Display label for the revenue range, e.g. "$30k–$60k". */
+  range: string;
+  /** Trailing-12-month revenue floor (inclusive). */
+  revenueLow: number;
+  /** Trailing-12-month revenue ceiling (exclusive; Infinity at top). */
+  revenueHigh: number;
+  serviceTier: ServiceTier;
+}
+
+/** Canonical revenue→price ladder. Single source of truth. */
+export const BANDS: readonly BandDef[] = [
+  { id: "band1", price: 10, range: "under $5k",   revenueLow: 0,       revenueHigh: 5_000,    serviceTier: "standard" },
+  { id: "band2", price: 15, range: "$5k–$15k",    revenueLow: 5_000,   revenueHigh: 15_000,   serviceTier: "standard" },
+  { id: "band3", price: 22, range: "$15k–$30k",   revenueLow: 15_000,  revenueHigh: 30_000,   serviceTier: "standard" },
+  { id: "band4", price: 32, range: "$30k–$60k",   revenueLow: 30_000,  revenueHigh: 60_000,   serviceTier: "priority" },
+  { id: "band5", price: 48, range: "$60k–$120k",  revenueLow: 60_000,  revenueHigh: 120_000,  serviceTier: "priority" },
+  { id: "band6", price: 69, range: "$120k–$300k", revenueLow: 120_000, revenueHigh: 300_000,  serviceTier: "premium"  },
+  { id: "band7", price: 99, range: "$300k+",      revenueLow: 300_000, revenueHigh: Infinity, serviceTier: "premium"  },
+] as const;
+
+const BAND_BY_ID: Record<PaidPlanName, BandDef> = Object.fromEntries(
+  BANDS.map((b) => [b.id, b])
+) as Record<PaidPlanName, BandDef>;
+
+const BAND_IDS: ReadonlySet<string> = new Set(BANDS.map((b) => b.id));
+
+/** Legacy 4-tier plan names. Kept as "paying" so no existing account
+ *  loses access between this deploy and the data migration. Not valid
+ *  PaidPlanName values — they resolve to full access in getPlanFeatures
+ *  via the band-not-found fallback. */
+const LEGACY_PAID: ReadonlySet<string> = new Set([
+  "dream",
+  "maker",
+  "growth",
+  "pro",
+]);
+
+// All product modules. FLAT across every paying tier + the trial —
+// that's the strategic promise. `labels` is retained for forward-compat
+// with the Gmail feature flag (FEATURES.GMAIL_INGEST); it's empty while
+// the flag is off so flipping it back doesn't need a plan migration.
 const ALL_MODULES = [
   "invoices",
   "expenses",
@@ -57,147 +95,122 @@ const ALL_MODULES = [
   "receipt_vault",
 ] as const;
 
-export const PLAN_FEATURES = {
-  trial: {
-    maxItemsPerMonth: Infinity,
-    modules: [...ALL_MODULES] as string[],
-    labels: [] as string[],
-    /** Service tier — "standard" = email support, normal turnaround */
-    serviceTier: "standard" as const,
-  },
-  dream: {
-    maxItemsPerMonth: Infinity,
-    modules: [...ALL_MODULES] as string[],
-    labels: [] as string[],
-    serviceTier: "standard" as const,
-  },
-  maker: {
-    maxItemsPerMonth: Infinity,
-    modules: [...ALL_MODULES] as string[],
-    labels: [] as string[],
-    serviceTier: "standard" as const,
-  },
-  growth: {
-    maxItemsPerMonth: Infinity,
-    modules: [...ALL_MODULES] as string[],
-    labels: [] as string[],
-    /** Priority support — faster response times */
-    serviceTier: "priority" as const,
-  },
-  pro: {
-    maxItemsPerMonth: Infinity,
-    modules: [...ALL_MODULES] as string[],
-    labels: ["Invoices", "AR Follow Up", "Expenses"] as string[],
-    /** Same-day priority support + dedicated support contact */
-    serviceTier: "premium" as const,
-  },
-  canceled: {
-    maxItemsPerMonth: 0,
-    modules: ["dashboard"] as string[],
-    labels: [] as string[],
-    serviceTier: "standard" as const,
-  },
-} as const;
+export interface PlanFeatures {
+  maxItemsPerMonth: number;
+  modules: string[];
+  labels: string[];
+  serviceTier: ServiceTier;
+}
 
-export type PlanName = keyof typeof PLAN_FEATURES;
+/** Resolve the feature set for any plan value. Bands, the trial, and
+ *  legacy paid names all get full access (legacy via the band-not-found
+ *  fallback). Canceled is read-only dashboard. Unknown → full access
+ *  (fail-open: a paying customer is never wrongly locked out). */
+export function getPlanFeatures(plan: string): PlanFeatures {
+  if (plan === "canceled") {
+    return {
+      maxItemsPerMonth: 0,
+      modules: ["dashboard"],
+      labels: [],
+      serviceTier: "standard",
+    };
+  }
+  const band = BAND_BY_ID[plan as PaidPlanName];
+  return {
+    maxItemsPerMonth: Infinity,
+    modules: [...ALL_MODULES],
+    labels: [],
+    serviceTier: band?.serviceTier ?? "standard",
+  };
+}
 
-/** The four paid product tiers (excludes trial + canceled which are
- *  states, not products). */
-export type PaidPlanName = Extract<
-  PlanName,
-  "dream" | "maker" | "growth" | "pro"
->;
-
-/** Plans that have full product access. Used by the feature-gating
- *  sweep (commit 3) to replace `plan === "pro"` checks. */
-export const FULL_ACCESS_PLANS: ReadonlySet<PlanName> = new Set([
-  "trial",
-  "dream",
-  "maker",
-  "growth",
-  "pro",
-]);
-
-/** Returns true when the plan has full feature access. Trial users
- *  evaluate the full product for 14 days; Dream/Maker/Growth/Pro
- *  all retain it permanently. Canceled users get read-only
- *  dashboard. */
+/** True when the plan has full feature access — trial, any band, or a
+ *  not-yet-migrated legacy paid name. Canceled returns false. */
 export function isPayingTier(plan: string | null | undefined): boolean {
   if (!plan) return false;
-  return FULL_ACCESS_PLANS.has(plan as PlanName);
+  return plan === "trial" || BAND_IDS.has(plan) || LEGACY_PAID.has(plan);
 }
 
-export function getPlanFeatures(plan: string) {
-  return PLAN_FEATURES[plan as PlanName] || PLAN_FEATURES.trial;
-}
-
-/** Map an annual revenue figure (USD) to the appropriate tier.
- *  Used by the monthly auto-switch cron job. Boundaries are
- *  inclusive on the low end:
- *    revenue <  $5k       → dream
- *    revenue >= $5k       → maker
- *    revenue >= $50k      → growth
- *    revenue >= $500k     → pro
- */
+/** Map trailing-12-month revenue (USD) to its band. Boundaries are
+ *  inclusive on the low end (revenue < ceiling → that band). */
 export function tierForAnnualRevenue(revenueUsd: number): PaidPlanName {
-  if (revenueUsd >= PLAN_REVENUE_THRESHOLDS.growth) return "pro";
-  if (revenueUsd >= PLAN_REVENUE_THRESHOLDS.maker) return "growth";
-  if (revenueUsd >= PLAN_REVENUE_THRESHOLDS.dream) return "maker";
-  return "dream";
+  for (const b of BANDS) {
+    if (revenueUsd < b.revenueHigh) return b.id;
+  }
+  return BANDS[BANDS.length - 1].id;
 }
 
-/** Display metadata per tier — drives the pricing tiles + billing
- *  page. The `id` field doubles as the plan name in the URL path
- *  for upgrade flows. */
-export const TIER_DISPLAY: Record<PaidPlanName, {
-  id: PaidPlanName;
-  name: string;
-  priceMonthly: number;
-  revenueLow: number;     // inclusive
-  revenueHigh: number;    // exclusive, Infinity for Pro
-  tagline: string;
-  serviceTier: "standard" | "priority" | "premium";
-}> = {
-  dream: {
-    id: "dream",
-    name: "Dream",
-    priceMonthly: 10,
-    revenueLow: 0,
-    revenueHigh: 5_000,
-    tagline: "For solo sellers chasing the dream.",
-    serviceTier: "standard",
-  },
-  maker: {
-    id: "maker",
-    name: "Maker",
-    priceMonthly: 19,
-    revenueLow: 5_000,
-    revenueHigh: 50_000,
-    tagline: "For solo + small-team makers earning their living.",
-    serviceTier: "standard",
-  },
-  growth: {
-    id: "growth",
-    name: "Growth",
-    priceMonthly: 49,
-    revenueLow: 50_000,
-    revenueHigh: 500_000,
-    tagline: "For businesses scaling beyond the kitchen table.",
-    serviceTier: "priority",
-  },
-  pro: {
-    id: "pro",
-    name: "Pro",
-    priceMonthly: 99,
-    revenueLow: 500_000,
-    revenueHigh: Infinity,
-    tagline: "For established businesses that need same-day priority support.",
-    serviceTier: "premium",
-  },
-};
+/** Per-band revenue ceiling. Derived from BANDS — used by the
+ *  reconcile cron's log detail. */
+export const PLAN_REVENUE_THRESHOLDS: Record<PaidPlanName, number> =
+  Object.fromEntries(BANDS.map((b) => [b.id, b.revenueHigh])) as Record<
+    PaidPlanName,
+    number
+  >;
+
+/** Display metadata per band — drives the /billing page. Derived from
+ *  BANDS so price/brackets never drift. `name` is the revenue range
+ *  (bands have no marketing name — the range IS the identity). */
+export const TIER_DISPLAY: Record<
+  PaidPlanName,
+  {
+    id: PaidPlanName;
+    name: string;
+    priceMonthly: number;
+    revenueLow: number;
+    revenueHigh: number;
+    serviceTier: ServiceTier;
+  }
+> = Object.fromEntries(
+  BANDS.map((b) => [
+    b.id,
+    {
+      id: b.id,
+      name: b.range,
+      priceMonthly: b.price,
+      revenueLow: b.revenueLow,
+      revenueHigh: b.revenueHigh,
+      serviceTier: b.serviceTier,
+    },
+  ])
+) as Record<
+  PaidPlanName,
+  {
+    id: PaidPlanName;
+    name: string;
+    priceMonthly: number;
+    revenueLow: number;
+    revenueHigh: number;
+    serviceTier: ServiceTier;
+  }
+>;
+
+/** Short human label for a plan value, for badges/headers. Bands show
+ *  their price ("$32/mo"); trial/canceled show their state; legacy
+ *  names show capitalized until migrated. */
+export function planDisplayLabel(plan: string | null | undefined): string {
+  if (!plan) return "";
+  if (plan === "trial") return "Trial";
+  if (plan === "canceled") return "Canceled";
+  const band = BAND_BY_ID[plan as PaidPlanName];
+  if (band) return `$${band.price}/mo`;
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
+}
+
+/** One-line description of a service tier, shown on the billing page. */
+export function serviceTierLabel(tier: ServiceTier): string {
+  switch (tier) {
+    case "premium":
+      return "Same-day priority support + dedicated contact";
+    case "priority":
+      return "Priority support — faster response times";
+    default:
+      return "Standard email support";
+  }
+}
 
 // The full product list, grouped for scannability. FLAT across every
-// tier — the single source of truth shown on the landing pricing
+// band — the single source of truth shown on the landing pricing
 // section and the /pricing page, so the "every plan includes
 // everything" promise never drifts between them. Add new features
 // here once and both surfaces pick them up.
@@ -233,18 +246,10 @@ export const PLAN_FEATURE_GROUPS: { group: string; items: string[] }[] = [
   },
 ];
 
-// PROPOSED smoother price ladder — powers the "find your price"
-// slider on the marketing pages. Display-only for now: actual
-// billing + auto-switch still run on the 4-tier TIER_DISPLAY above
-// until Stripe is updated to match these bands. Smaller bands so a
-// $5.5k seller no longer pays the same as a $45k one. Each band's
-// `range` is display text; `price` is monthly USD.
-export const PRICE_LADDER: { range: string; price: number }[] = [
-  { range: "under $5k", price: 10 },
-  { range: "$5k–$15k", price: 15 },
-  { range: "$15k–$30k", price: 22 },
-  { range: "$30k–$60k", price: 32 },
-  { range: "$60k–$120k", price: 48 },
-  { range: "$120k–$300k", price: 69 },
-  { range: "$300k+", price: 99 },
-];
+// Powers the "find your price" slider on the marketing pages. Derived
+// from BANDS — the slider, /billing, checkout, and the auto-switch cron
+// now all run on the same ladder. Each band's `range` is display text;
+// `price` is monthly USD.
+export const PRICE_LADDER: { range: string; price: number }[] = BANDS.map(
+  (b) => ({ range: b.range, price: b.price })
+);

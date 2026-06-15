@@ -5,8 +5,10 @@
 // the monthly price updates, so pricing reads as a gentle climb that
 // fits exactly where the business is (vs. the old $5k-to-$50k cliff).
 //
-// Display-only preview: bands come from PRICE_LADDER (lib/plans).
-// Actual billing still runs on TIER_DISPLAY until Stripe is updated.
+// Bands come from PRICE_LADDER (lib/plans) — the same canonical BANDS
+// ladder that now drives checkout, /billing, and the auto-switch cron,
+// so the slider price always matches what the customer is actually
+// billed.
 
 "use client";
 

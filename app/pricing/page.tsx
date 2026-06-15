@@ -1,8 +1,9 @@
 // app/pricing/page.tsx
 //
-// Standalone pricing page. Tier data comes from TIER_DISPLAY and the
-// flat feature list from PLAN_FEATURE_GROUPS (both in lib/plans) so
-// prices/brackets/features never drift from the landing or /billing.
+// Standalone pricing page. The price ladder comes from PRICE_LADDER
+// (via PriceSlider) and the flat feature list from PLAN_FEATURE_GROUPS
+// (both in lib/plans) so prices/brackets/features never drift from the
+// landing or /billing.
 // Public route — no auth gate.
 //
 // "Built for people. Priced for people." — feature-flat tiers that

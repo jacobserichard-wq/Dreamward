@@ -1,33 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { stripe, PLANS } from "@/lib/stripe";
 import { getSessionClient } from "@/lib/getClient";
+import { computeTrailingRevenue } from "@/lib/revenueTier";
+import { tierForAnnualRevenue } from "@/lib/plans";
+import { type Industry } from "@/lib/categories";
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const client = await getSessionClient();
+    if (!client?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { planId } = await req.json();
-    const plan = PLANS[planId as keyof typeof PLANS];
-    if (!plan) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    // Revenue-driven: the customer never picks a tier. We compute their
+    // trailing-12-month revenue and start the subscription on the band
+    // it maps to. The monthly reconcile cron (lib/revenueTier) keeps
+    // the band current from there. A brand-new account with little/no
+    // tracked revenue lands on band1 ($10) — the right floor.
+    const industry = (client.industry ?? "general") as Industry;
+    const revenue = await computeTrailingRevenue(client.id, industry);
+    const band = tierForAnnualRevenue(revenue);
+    const plan = PLANS[band];
+    if (!plan.priceId) {
+      // No silent fallback: surface the misconfiguration rather than
+      // billing an arbitrary band.
+      return NextResponse.json(
+        { error: "Pricing isn't configured yet — please contact support." },
+        { status: 500 }
+      );
     }
 
-    const client = await getSessionClient();
-
     // Sub-session 33: the Pro onboarding-call offering was removed,
-    // so every tier (including Pro) lands on the dashboard after
-    // checkout. The /welcome-pro page + Calendly flow are retired.
+    // so every band lands on the dashboard after checkout. The
+    // /welcome-pro page + Calendly flow are retired.
     const successPath = "/dashboard";
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: session.user.email,
+      customer_email: client.email,
       line_items: [{ price: plan.priceId, quantity: 1 }],
       subscription_data: {
         trial_period_days: 14,

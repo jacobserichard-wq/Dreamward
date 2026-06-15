@@ -495,16 +495,19 @@ Market vendors & craft sellers · Freelancers & consultants · Small landscaping
 
 ## Pricing
 
-**"Built for people. Priced for people."** — strategic pivot, June 2026 (sub-session 33). Feature-flat pricing: every paying tier gets every product feature. Tiers are sized by the customer's annual revenue, with revenue-based auto tier-switching reconciled monthly by cron. Service tiers differ only in support speed.
+**"Built for people. Priced for people."** — strategic pivot, June 2026 (sub-session 33). Feature-flat pricing: every paying band gets every product feature. Price is sized by the customer's trailing-12-month revenue, with revenue-based auto band-switching reconciled monthly by cron. Service tiers differ only in support speed. The customer never picks a band — checkout computes it from their revenue.
 
-| Plan | Price | For businesses with annual revenue |
+| Band | Price | Trailing-12-month revenue |
 |---|---|---|
-| **Dream** | $10/mo | under $5k |
-| **Maker** | $19/mo | $5k–$50k |
-| **Growth** | $49/mo | $50k–$500k |
-| **Pro** | $99/mo | $500k+ |
+| band1 | $10/mo | under $5k |
+| band2 | $15/mo | $5k–$15k |
+| band3 | $22/mo | $15k–$30k |
+| band4 | $32/mo | $30k–$60k |
+| band5 | $48/mo | $60k–$120k |
+| band6 | $69/mo | $120k–$300k |
+| band7 | $99/mo | $300k+ |
 
-All tiers include a 14-day free trial (no credit card). Stripe price IDs are env-backed (`STRIPE_PRICE_ID_DREAM/MAKER/GROWTH/PRO`); legacy starter/growth/pro priceIds still resolve via fallback for grandfathered subscriptions. The old tiered-auth model (Gmail Pro-only gate) is superseded — Gmail ingest is behind the `FEATURES.GMAIL_INGEST` feature flag (currently off) pending the keep-or-kill decision.
+All bands include a 14-day free trial (no credit card). Single source of truth: `lib/plans.ts` BANDS. Stripe price IDs are env-backed (`STRIPE_PRICE_ID_BAND1…7`). The old tiered-auth model (Gmail Pro-only gate) is superseded — Gmail ingest is behind the `FEATURES.GMAIL_INGEST` feature flag (currently off) pending the keep-or-kill decision. Legacy 4-tier values (dream/maker/growth/pro) still resolve as full-access until migrated by `db/migrations/0027_map_tiers_to_bands.sql`.
 
 ---
 
@@ -577,38 +580,49 @@ the foundation all of this builds on.
 - [ ] Live-mode business details: Public business name **Dreamward**,
       statement descriptor **DREAMWARD** (card statements — wrong
       descriptor = "what's this charge?" disputes).
-- [ ] Recreate the four products/prices in LIVE mode at exactly
-      $10 / $19 / $49 / $99 (sandbox products don't carry over).
+- [ ] Recreate the 7 band prices in LIVE mode at $10 / $15 / $22 /
+      $32 / $48 / $69 / $99 (sandbox products don't carry over). See
+      §1b — the band ladder supersedes the old 4 products.
 - [ ] Live webhook endpoint `https://godreamward.com/api/stripe/webhook`
       with the same 4 events (checkout.session.completed +
       customer.subscription.created/updated/deleted).
 - [ ] Swap Vercel Production env: STRIPE_SECRET_KEY,
-      STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID_DREAM/MAKER/GROWTH/PRO
+      STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID_BAND1…7
       → live values. Keep sandbox keys in Preview env for testing.
 - [ ] End-to-end test with a real card: signup → trial → checkout →
       plan lands in DB → cancel → refund path.
 
-### 1b. Pricing model — granular revenue ladder (decide with Stripe live)
+### 1b. Pricing model — granular revenue ladder (CODE DONE; live cutover pending)
 
-A smoother 7-band ladder is LIVE as a display-only preview (the
-"find your price" slider on the landing + /pricing, data in
-`lib/plans.ts` PRICE_LADDER): $10 / $15 / $22 / $32 / $48 / $69 /
-$99 across under-$5k → $300k+. Replaces the old 4-tier cliff where a
-$5.5k seller paid the same as a $45k one. Jacob is reviewing the
-look; nothing billed on it yet. When approved, do this WITH the
-Stripe live setup above (it supersedes the "4 products at
-$10/$19/$49/$99" line):
+The 7-band ladder ($10 / $15 / $22 / $32 / $48 / $69 / $99 across
+under-$5k → $300k+) is now the LIVE model in code (sandbox Stripe).
+Replaces the old 4-tier cliff where a $5.5k seller paid the same as a
+$45k one. `lib/plans.ts` BANDS is the single source of truth; the
+slider, /billing, checkout, and the auto-switch cron all derive from
+it. Supersedes the "4 products at $10/$19/$49/$99" line in §1.
 
-- [ ] Create a Stripe price object per band (7), live + sandbox.
-- [ ] Align the model in code to the bands: `TIER_DISPLAY`,
-      `PLAN_REVENUE_THRESHOLDS`, `tierForAnnualRevenue`, the
-      env-backed `STRIPE_PRICE_ID_*` set, and the billing +
-      onboarding screens (which still show the old 4 tiers).
-- [ ] **Downgrade hysteresis** — bands are now ~1.5–2x apart (not
-      10x), so a business hovering near a boundary (~$60k) would
-      flip-flop monthly. Only move someone DOWN after 2–3 consecutive
-      months below the line, and/or a small buffer zone around each
-      boundary. Add to `reconcileClientTier` (lib/revenueTier).
+Done (sandbox):
+- [x] Create a Stripe price object per band (7) — sandbox.
+- [x] Align the model in code to the bands: `BANDS`, `TIER_DISPLAY`,
+      `PLAN_REVENUE_THRESHOLDS`, `tierForAnnualRevenue`, the env-backed
+      `STRIPE_PRICE_ID_BAND1…7` set, revenue-driven checkout (band
+      computed server-side, customer no longer picks), and the billing
+      screen (read-only band ladder; "Most popular" removed).
+- [x] **Downgrade hysteresis** — `reconcileClientTier` holds the
+      current band until trailing revenue falls 10% below its floor, so
+      a business hovering near a boundary (~$60k) doesn't flip-flop
+      monthly. Upgrades still apply immediately. (Stateless buffer; if
+      flip-flop is still observed in practice, upgrade to consecutive-
+      month tracking via client_settings.preferences.)
+- [x] Data migration `db/migrations/0027_map_tiers_to_bands.sql` maps
+      existing dream/maker/growth/pro rows → bands. **Run on Railway
+      before/with the cutover** (idempotent).
+
+Pending for LIVE cutover (do WITH the Stripe live setup in §1):
+- [ ] Recreate the 7 band prices in LIVE mode (sandbox doesn't carry
+      over) and set `STRIPE_PRICE_ID_BAND1…7` to live values in Vercel
+      Production. Keep sandbox values in Preview.
+- [ ] Run `0027_map_tiers_to_bands.sql` against the production DB.
 - [ ] Confirm the revenue calc is **gross sales, net of refunds** —
       finer bands make accuracy matter more than the old
       order-of-magnitude brackets did.
