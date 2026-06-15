@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
-import { Fraunces, Nunito_Sans } from "next/font/google";
+import { Lora, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "./providers";
 
-// Dreamward brand type (Sage & Rose redesign): Fraunces is the warm
-// editorial display serif for headlines; Nunito Sans is the friendly
-// humanist body sans. Exposed as CSS variables that globals.css wires
-// to --font-serif / --font-sans (Tailwind's font-serif / font-sans).
-// Loaded as a VARIABLE font (no fixed `weight`) so we can control its
-// optical-size (opsz) + wonky-alternate (WONK) axes in CSS — see the
-// .font-serif rule in globals.css that calms the display flamboyance.
-const fraunces = Fraunces({
+// Dreamward brand type (Sage & Rose redesign): Lora is the warm
+// editorial display serif for headlines — calligraphic warmth with
+// conventional letterforms (Fraunces' swooping f read as "weird" at
+// display sizes). Nunito Sans is the friendly humanist body sans.
+// Exposed as CSS variables that globals.css wires to --font-serif /
+// --font-sans (Tailwind's font-serif / font-sans).
+const display = Lora({
   subsets: ["latin"],
-  axes: ["opsz", "SOFT", "WONK"],
-  variable: "--font-fraunces",
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -42,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${nunitoSans.variable}`}>
+    <html lang="en" className={`${display.variable} ${nunitoSans.variable}`}>
       <body>
         <SessionProvider>{children}</SessionProvider>
       </body>

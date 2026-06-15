@@ -9,7 +9,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-serif: var(--font-display), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   /* ── Dreamward brand palette — "Sage & Rose" ──────────────────
@@ -113,16 +113,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
-}
-
-/* Tame Fraunces' display flamboyance — at large sizes the browser
-   pushes its optical-size axis toward 144, which gives the swooping
-   f / g terminals. Pin a moderate opsz + turn off the "wonky"
-   alternates so headings read warm but conventional, site-wide.
-   font-weight still drives the wght axis (not listed here), so the
-   Tailwind font-semibold/bold utilities keep working. */
-.font-serif {
-  font-variation-settings: "opsz" 34, "WONK" 0, "SOFT" 0;
 }
 
 @keyframes fw-spin {
