@@ -20,7 +20,28 @@ export async function GET(request: NextRequest) {
     }
     const category = searchParams.get("category");
     const result = await getItems(client.id, category || undefined);
-    return NextResponse.json({ items: result.rows });
+    const items = result.rows;
+    // Attach receipt/invoice files (id + filename) so the Transactions
+    // cards can offer a download. One extra query keyed on the returned
+    // item ids; items with none get an empty array.
+    if (items.length > 0) {
+      const ids = items.map((r) => r.id);
+      const att = await pool.query(
+        `SELECT id, processed_item_id, filename, mime_type
+           FROM expense_attachments
+          WHERE client_id = $1 AND processed_item_id = ANY($2)
+          ORDER BY uploaded_at ASC, id ASC`,
+        [client.id, ids]
+      );
+      const byItem = new Map<number, { id: number; filename: string; mimeType: string }[]>();
+      for (const a of att.rows) {
+        const list = byItem.get(a.processed_item_id) ?? [];
+        list.push({ id: a.id, filename: a.filename, mimeType: a.mime_type });
+        byItem.set(a.processed_item_id, list);
+      }
+      for (const it of items) it.attachments = byItem.get(it.id) ?? [];
+    }
+    return NextResponse.json({ items });
   } catch (error) {
     console.error("Error fetching items:", error);
     return NextResponse.json(

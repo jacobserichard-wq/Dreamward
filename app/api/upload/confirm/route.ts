@@ -92,6 +92,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       imported: results.length,
+      // Created row ids in insert order — the PDF-upload client uses
+      // ids[0] to attach the original invoice file to its transaction.
+      ids: results.map((r) => r.id),
     });
   } catch (error) {
     console.error("Import confirm error:", error);

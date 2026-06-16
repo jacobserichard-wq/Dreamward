@@ -53,6 +53,9 @@ interface ProcessedItem {
   // "Currently in X" preview in the ReclassifyModal + powers
   // future per-channel filters on this tab.
   channel: string | null;
+  // Receipt/invoice files attached to this transaction (e.g. an
+  // uploaded PDF invoice) — surfaced as a download link on the card.
+  attachments?: { id: number; filename: string; mimeType: string }[];
 }
 
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
@@ -126,6 +129,9 @@ function DashboardInner() {
   const [uploading, setUploading] = useState(false);
   const [uploadReview, setUploadReview] = useState<any>(null);
   const [reviewRows, setReviewRows] = useState<any[]>([]);
+  // The original PDF, held between extraction and confirm so we can
+  // attach it to the created transaction (PDF uploads only).
+  const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
 
   // Event auto-coding state — Phase 3 sub-session 17. The selector drives
@@ -199,6 +205,7 @@ function DashboardInner() {
         summary: item.summary || "",
         source: item.source || "email",
         channel: item.channel ?? null,
+        attachments: item.attachments || [],
       }));
       setProcessedItems(mapped);
     } catch (err) {
@@ -669,8 +676,11 @@ function DashboardInner() {
         setReviewRows(
           data.mappedRows.map((r: any, i: number) => ({ ...r, _approved: true, _index: i }))
         );
+        // Stash the PDF so confirmImport can attach it to the new row.
+        setPendingPdfFile(isPdf ? file : null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed");
+        setPendingPdfFile(null);
       } finally {
         setUploading(false);
       }
@@ -796,14 +806,39 @@ function DashboardInner() {
     setImporting(true);
     setError(null);
     try {
-      const data = await apiFetch<{ imported: number }>("/api/upload/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rows: approved.map(({ _approved, _index, ...rest }: any) => rest),
-          source: uploadReview?.source === "pdf" ? "pdf_import" : "csv_import",
-        }),
-      });
+      const data = await apiFetch<{ imported: number; ids: number[] }>(
+        "/api/upload/confirm",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rows: approved.map(({ _approved, _index, ...rest }: any) => rest),
+            source: uploadReview?.source === "pdf" ? "pdf_import" : "csv_import",
+          }),
+        }
+      );
+
+      // PDF uploads: attach the original invoice to the first created
+      // transaction so it's downloadable from the card. The row is
+      // already saved — a failed attach is a soft warning, not a hard
+      // import failure.
+      if (pendingPdfFile && data.ids && data.ids.length > 0) {
+        try {
+          const fd = new FormData();
+          fd.append("file", pendingPdfFile);
+          await apiFetch(`/api/expenses/${data.ids[0]}/attachments`, {
+            method: "POST",
+            body: fd,
+          });
+        } catch (attErr) {
+          console.error("PDF attach failed:", attErr);
+          setError(
+            "Imported, but couldn't save the original PDF to the transaction. You can re-attach it from the expense."
+          );
+        }
+      }
+      setPendingPdfFile(null);
+
       setSuccessMsg(`Imported ${data.imported} items`);
       setUploadReview(null);
       setReviewRows([]);
@@ -814,7 +849,7 @@ function DashboardInner() {
     } finally {
       setImporting(false);
     }
-  }, [reviewRows, loadItems, uploadReview]);
+  }, [reviewRows, loadItems, uploadReview, pendingPdfFile]);
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
@@ -1493,6 +1528,24 @@ function DashboardInner() {
                           {item.confidence}%
                         </span>
                       </div>
+                      {item.attachments && item.attachments.length > 0 && (
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                          <span className="text-[13px] text-slate-500">
+                            Invoice file
+                          </span>
+                          <a
+                            href={`/api/expenses/${item.id}/attachments/${item.attachments[0].id}/raw`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                          >
+                            <span aria-hidden="true">{"\u{1F4CE}"}</span>
+                            {item.attachments.length > 1
+                              ? `Download (${item.attachments.length})`
+                              : "Download"}
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     {/* Summary */}
@@ -1846,6 +1899,7 @@ function DashboardInner() {
           onCancel={() => {
             setUploadReview(null);
             setReviewRows([]);
+            setPendingPdfFile(null);
           }}
           onConfirm={confirmImport}
           importing={importing}
