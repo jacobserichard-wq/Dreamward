@@ -540,7 +540,12 @@ export async function annualSummary(opts: {
   // processed_items: linked income, linked + manual expenses.
   for (const t of txnsResult.rows) {
     const amount = Number(t.amount);
-    if (!Number.isFinite(amount) || amount <= 0) continue;
+    // Skip only zero/NaN. NEGATIVE income rows are kept on purpose:
+    // platform refunds are stored as negative "income" (e.g. Shopify),
+    // so letting them through makes revenue NET of refunds — the cash
+    // actually kept. Negative expense/unknown rows are nonsense data
+    // and get dropped in their branches below.
+    if (!Number.isFinite(amount) || amount === 0) continue;
     const kind = classify(t.category);
     if (!t.due_date) continue;
     const mKey = monthKey(t.due_date);
@@ -550,10 +555,11 @@ export async function annualSummary(opts: {
       const cat = t.category ?? "Uncategorized income";
       const bucket = byCategoryIncome.get(cat) ?? { count: 0, total: 0 };
       bucket.count += 1;
-      bucket.total += amount;
+      bucket.total += amount; // may be negative (a refund)
       byCategoryIncome.set(cat, bucket);
       monthBucket.revenue += amount;
     } else if (kind === "expense") {
+      if (amount < 0) continue; // a negative expense is nonsense data
       const cat = t.category ?? "Uncategorized expense";
       const bucket = byCategoryExpense.get(cat) ?? { count: 0, total: 0 };
       bucket.count += 1;
@@ -561,6 +567,7 @@ export async function annualSummary(opts: {
       byCategoryExpense.set(cat, bucket);
       monthBucket.expenses += amount;
     } else {
+      if (amount < 0) continue; // can't sign-guess an unknown refund
       unknownAmount += amount;
     }
   }

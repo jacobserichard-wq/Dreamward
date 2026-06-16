@@ -230,19 +230,23 @@ export async function renderAnnualCsvBody(opts: {
   // processed_items → income or expense.
   for (const t of txnsResult.rows) {
     const amount = Number(t.amount);
-    if (!Number.isFinite(amount) || amount <= 0) continue;
+    // Keep negative income rows (refunds — e.g. Shopify stores them as
+    // negative "income") so the ledger nets out; drop only zero/NaN.
+    // Negative expense rows are nonsense data and skipped below.
+    if (!Number.isFinite(amount) || amount === 0) continue;
     const kind = classify(t.category);
     if (!t.due_date) continue;
     if (kind === "income") {
-      totalRevenue += amount;
+      totalRevenue += amount; // may be negative (a refund)
       // Income → Schedule C line 1 (Gross receipts or sales) by
       // convention (design §1 #7). All income types map to line 1
-      // for sole-prop filings.
+      // for sole-prop filings. A negative row is a refund — label it
+      // so the ledger reconciles at a glance.
       incomeLines.push(
         csvRow([
           "Income",
           t.due_date,
-          "Linked income",
+          amount < 0 ? "Refund" : "Linked income",
           t.vendor ?? "",
           t.summary ?? "",
           t.category ?? "Uncategorized income",
@@ -252,6 +256,7 @@ export async function renderAnnualCsvBody(opts: {
         ])
       );
     } else if (kind === "expense") {
+      if (amount < 0) continue; // a negative expense is nonsense data
       totalExpenses += amount;
       const cat = t.category ?? "Uncategorized expense";
       const line = scheduleCMap.get(cat) ?? "";
