@@ -580,9 +580,19 @@ the foundation all of this builds on.
 - [ ] Live-mode business details: Public business name **Dreamward**,
       statement descriptor **DREAMWARD** (card statements — wrong
       descriptor = "what's this charge?" disputes).
-- [ ] Recreate the 7 band prices in LIVE mode at $10 / $15 / $22 /
+- [ ] Recreate the 7 band products in LIVE mode at $10 / $15 / $22 /
       $32 / $48 / $69 / $99 (sandbox products don't carry over). See
-      §1b — the band ladder supersedes the old 4 products.
+      §1b — the band ladder supersedes the old 4 products. Match the
+      sandbox naming so checkout reads clean (Name is customer-visible;
+      the Description ALSO shows at checkout, so leave it BLANK — don't
+      put "Band N" there):
+        - Dreamward (under $5k)      — $10/mo  → STRIPE_PRICE_ID_BAND1
+        - Dreamward ($5k–$15k)       — $15/mo  → STRIPE_PRICE_ID_BAND2
+        - Dreamward ($15k–$30k)      — $22/mo  → STRIPE_PRICE_ID_BAND3
+        - Dreamward ($30k–$60k)      — $32/mo  → STRIPE_PRICE_ID_BAND4
+        - Dreamward ($60k–$120k)     — $48/mo  → STRIPE_PRICE_ID_BAND5
+        - Dreamward ($120k–$300k)    — $69/mo  → STRIPE_PRICE_ID_BAND6
+        - Dreamward ($300k+)         — $99/mo  → STRIPE_PRICE_ID_BAND7
 - [ ] Live webhook endpoint `https://godreamward.com/api/stripe/webhook`
       with the same 4 events (checkout.session.completed +
       customer.subscription.created/updated/deleted).
