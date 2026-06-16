@@ -1269,6 +1269,30 @@ function DashboardInner() {
                 {"\u{2190}"} Back to overview
               </button>
             </div>
+            {/* Upload helper. The global Upload button opens the file
+                picker directly, and the old dashboard upload tip lived
+                inside the now-disabled Gmail block — so this is the
+                always-visible home for the format guidance + template
+                on the Transactions view. */}
+            <div className="mb-5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-[260px]">
+                <span className="mr-1">{"\u{1F4A1}"}</span>
+                <span className="font-medium text-slate-700">
+                  Add transactions by upload.
+                </span>{" "}
+                Use the <strong>{"\u{1F4C1}"} Upload</strong> button up top
+                (CSV, TSV, or XLSX). Expected columns: Date {"\u{00B7}"}{" "}
+                Customer/Vendor {"\u{00B7}"} Amount {"\u{00B7}"} Description{" "}
+                {"\u{00B7}"} Category.
+              </div>
+              <a
+                href="/templates/dreamward-sales-template.csv"
+                download="dreamward-sales-template.csv"
+                className="text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap font-medium"
+              >
+                {"\u{2B07}\u{FE0F}"} Download CSV template
+              </a>
+            </div>
             {/* UX commit 4: status-filter chip. Visible only when a
                 filter is active (typically set by clicking a Status
                 Breakdown pill on the Dashboard tab). */}
