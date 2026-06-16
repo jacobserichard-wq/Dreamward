@@ -140,7 +140,13 @@ export default function AppHeader({
   return (
     <header className="bg-gradient-to-br from-eucalyptus-dark to-eucalyptus text-white px-4 sm:px-8 py-6">
       <div className="max-w-[1200px] mx-auto flex justify-between items-center">
-        <Link href="/dashboard" className="no-underline text-white">
+        {/* Plain <a>, not next/link: a full navigation to /dashboard
+            guarantees the overview renders. A soft <Link> nav that only
+            strips the ?view=transactions param didn't reliably refresh
+            the in-page view in Next 16, so the logo could land on the
+            Transactions view. The logo is the "go home" reset — a clean
+            load is the right behavior here. */}
+        <a href="/dashboard" className="no-underline text-white">
           <h1 className="m-0 text-2xl sm:text-[28px] font-semibold font-serif flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" aria-hidden="true">
               <path d="M12 22V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -149,7 +155,7 @@ export default function AppHeader({
             </svg>
             Dreamward
           </h1>
-        </Link>
+        </a>
         <div ref={navRef} className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
           {plan && (
             <a
