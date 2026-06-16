@@ -196,6 +196,10 @@ export default function AppHeader({
             </Link>
           )}
 
+          {/* Desktop nav — inline links + dropdowns, sm and up. On
+              phones this whole block hides and the hamburger below
+              takes over, so the header stays one tidy row. */}
+          <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* ── Daily-work surfaces (primary) ─────────────────────
               Transactions deep-links to the dashboard's processed view
               (June 2026 IA). */}
@@ -317,9 +321,88 @@ export default function AppHeader({
               </button>
             </div>
           </details>
+          </div>
+
+          {/* Mobile nav — everything collapses into one hamburger below
+              sm, so phones get a single clean header row instead of a
+              wrapped pile of links. */}
+          <details className="sm:hidden relative">
+            <summary className={SUMMARY_LINK} aria-label="Menu">
+              <BarsIcon />
+            </summary>
+            <div className={MENU_PANEL}>
+              <Link href="/dashboard?view=transactions" className={MENU_ITEM}>
+                Transactions
+              </Link>
+              <Link href="/expenses" className={MENU_ITEM}>
+                Expenses
+              </Link>
+              <Link href="/invoices" className={MENU_ITEM}>
+                AR
+              </Link>
+              <Link href="/events" className={MENU_ITEM}>
+                Events
+              </Link>
+              {paying && (
+                <Link href="/reports" className={MENU_ITEM}>
+                  Reports
+                </Link>
+              )}
+              {paying && (
+                <Link href="/skus" className={MENU_ITEM}>
+                  SKUs
+                </Link>
+              )}
+              {paying && (
+                <Link href="/inventory" className={MENU_ITEM}>
+                  Inventory
+                </Link>
+              )}
+              {paying && (
+                <Link href="/cogs" className={MENU_ITEM}>
+                  COGS
+                </Link>
+              )}
+              <div className="my-1 border-t border-sand" />
+              <Link href="/settings" className={MENU_ITEM}>
+                Settings
+              </Link>
+              <Link href="/billing" className={MENU_ITEM}>
+                Billing
+              </Link>
+              <Link href="/integrations" className={MENU_ITEM}>
+                Integrations
+              </Link>
+              <Link href="/onboarding" className={MENU_ITEM}>
+                Setup
+              </Link>
+              <Link href="/help" className={MENU_ITEM}>
+                Help
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/signin" })}
+                className={`${MENU_ITEM} text-left bg-transparent border-0 cursor-pointer w-full`}
+              >
+                Sign out
+              </button>
+            </div>
+          </details>
         </div>
       </div>
     </header>
+  );
+}
+
+function BarsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" aria-hidden="true">
+      <path
+        d="M4 7h16M4 12h16M4 17h16"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
