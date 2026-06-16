@@ -8,7 +8,7 @@ import {
 
 const DEFAULT_BATCH_LIMIT = 50;
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
-const AI_MODEL = "claude-sonnet-4-20250514";
+const AI_MODEL = "claude-sonnet-4-6";
 
 interface TargetItem {
   id: number;

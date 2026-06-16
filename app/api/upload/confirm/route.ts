@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
           extracted_data: null,
           source: "csv_import",
           ai_classified_at: new Date(),
-          ai_model: "claude-sonnet-4-20250514",
+          ai_model: "claude-sonnet-4-6",
           event_id: eventId,
           channel: derivedChannel,
         },

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const prompt = buildExtractionPrompt(emails, category, industryName, allowedCategories);
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4096,
       messages: [
         {
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
             aiClassifiedAt: new Date(),
-            aiModel: "claude-sonnet-4-20250514",
+            aiModel: "claude-sonnet-4-6",
           }, client.id);
           savedCount++;
         } catch (dbErr) {
