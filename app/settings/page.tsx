@@ -5,32 +5,14 @@ import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
 
-const ALL_MODULES = [
-  { id: "invoices", label: "Invoices", description: "Track and process vendor invoices from email", icon: "\u{1F4D1}" },
-  { id: "expenses", label: "Expenses", description: "Categorize and manage business expenses", icon: "\u{1F4B3}" },
-  { id: "ar", label: "AR Follow-Up", description: "Track accounts receivable and send reminders", icon: "\u{1F514}", minPlan: "growth" },
-  { id: "events", label: "Events and Sales", description: "Log revenue per market day or event", icon: "\u{1F3EA}", minPlan: "growth" },
-  { id: "mileage", label: "Mileage Tracking", description: "Track trips and calculate IRS deductions", icon: "\u{1F697}", minPlan: "growth" },
-  { id: "exports", label: "CSV/PDF Exports", description: "Export data for your CPA or records", icon: "\u{1F4E4}", minPlan: "growth" },
-  { id: "custom_categories", label: "Custom Categories", description: "Create your own expense categories", icon: "\u{1F3F7}️" },
-  { id: "tax_reports", label: "Tax Reports", description: "Schedule C mapping and quarterly estimates", icon: "\u{1F4CA}", minPlan: "pro" },
-];
-
-const PLAN_RANK: Record<string, number> = { trial: 0, starter: 1, growth: 2, pro: 3 };
-
 export default function SettingsPage() {
-  const [plan, setPlan] = useState("trial");
   const [industry, setIndustry] = useState<string | null>(null);
   const [industryDefaults, setIndustryDefaults] = useState<string[]>([]);
-  const [activeModules, setActiveModules] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [catSaving, setCatSaving] = useState(false);
   const [catSaved, setCatSaved] = useState(false);
-  const [savedModules, setSavedModules] = useState<string[]>([]);
   const [savedCategories, setSavedCategories] = useState<string[]>([]);
   // Phase 4: home address — third dirty-tracked section (mirrors the
   // modules + categories pattern from sub-session 12.4).
@@ -86,17 +68,10 @@ export default function SettingsPage() {
   const [incomeCatSaving, setIncomeCatSaving] = useState(false);
   const [incomeCatSaved, setIncomeCatSaved] = useState(false);
 
-  // Phase 5 commit 8: IRS mileage rate edit. The rate is federal (one row
-  // in app_settings, not per-client) — any user editing it affects every
-  // tenant's mileage math. rateSource tells us whether the loaded value
-  // came from the table (config) or the API's hardcoded fallback (fallback)
-  // so we can label the indicator honestly.
-  const [irsRateInput, setIrsRateInput] = useState("");
+  // IRS mileage rate is a global (federal) value in app_settings —
+  // read-only here, set system-wide (not per customer). Kept for display
+  // on the tax surfaces so the user can see the rate their deduction uses.
   const [savedIrsRate, setSavedIrsRate] = useState<number>(0.7);
-  const [irsRateSource, setIrsRateSource] = useState<"config" | "fallback">("fallback");
-  const [irsRateSaving, setIrsRateSaving] = useState(false);
-  const [irsRateSaved, setIrsRateSaved] = useState(false);
-  const [irsRateError, setIrsRateError] = useState<string | null>(null);
 
   // Vehicle config (gas price + MPG) drives the operating-rate
   // mileage cost on profitability surfaces. Defaults match
@@ -118,10 +93,6 @@ export default function SettingsPage() {
     [hiddenDefaults, savedHiddenDefaults]
   );
 
-  const modulesDirty = useMemo(
-    () => JSON.stringify(activeModules) !== JSON.stringify(savedModules),
-    [activeModules, savedModules]
-  );
   const categoriesDirty = useMemo(
     () => JSON.stringify(categories) !== JSON.stringify(savedCategories),
     [categories, savedCategories]
@@ -148,17 +119,6 @@ export default function SettingsPage() {
       JSON.stringify([...savedIncomeCategories].sort()),
     [incomeCategories, savedIncomeCategories]
   );
-  // IRS rate dirty when parsed input differs from saved value. Empty input
-  // is treated as "no change" rather than 0 so accidentally clearing the
-  // field doesn't enable the save button on garbage.
-  const irsRateDirty = useMemo(() => {
-    const trimmed = irsRateInput.trim();
-    if (trimmed === "") return false;
-    const num = Number(trimmed);
-    if (!Number.isFinite(num)) return false;
-    return Math.abs(num - savedIrsRate) > 1e-6;
-  }, [irsRateInput, savedIrsRate]);
-
   const vehicleDirty = useMemo(
     () =>
       gasPriceInput.trim() !== savedGasPrice.trim() ||
@@ -183,10 +143,8 @@ export default function SettingsPage() {
         const res = await fetch("/api/settings");
         if (!res.ok) return;
         const data = await res.json();
-        setPlan(data.plan);
         setIndustry(data.industry ?? null);
         setIndustryDefaults(Array.isArray(data.industryDefaults) ? data.industryDefaults : []);
-        const initialModules = data.settings?.active_modules || ["invoices", "expenses"];
         const initialCategories = Array.isArray(data.settings?.custom_categories) ? data.settings.custom_categories : [];
         const initialHomeAddress = typeof data.homeAddress === "string" ? data.homeAddress : "";
         // Preferences round-trips as a JSON object so other fields aren't
@@ -214,9 +172,7 @@ export default function SettingsPage() {
           typeof (rawCpa as Record<string, unknown>).email === "string"
             ? ((rawCpa as Record<string, unknown>).email as string)
             : "";
-        setActiveModules(initialModules);
         setCategories(initialCategories);
-        setSavedModules(initialModules);
         setSavedCategories(initialCategories);
         setHomeAddress(initialHomeAddress);
         setSavedHomeAddress(initialHomeAddress);
@@ -246,14 +202,9 @@ export default function SettingsPage() {
 
         setCpaEmail(initialCpaEmail);
         setSavedCpaEmail(initialCpaEmail);
-        // Phase 5 commit 8: IRS rate is global, so it comes back on the
-        // top-level response (not nested under settings.preferences).
+        // IRS rate is global, returned at the top level. Read-only display.
         if (typeof data.irsMileageRate === "number") {
           setSavedIrsRate(data.irsMileageRate);
-          setIrsRateInput(data.irsMileageRate.toString());
-        }
-        if (data.rateSource === "config" || data.rateSource === "fallback") {
-          setIrsRateSource(data.rateSource);
         }
 
         // Vehicle config (gas + MPG). Lives under preferences.vehicle.
@@ -291,12 +242,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (
-      !modulesDirty &&
       !categoriesDirty &&
       !homeAddressDirty &&
       !hiddenDefaultsDirty &&
       !incomeCategoriesDirty &&
-      !irsRateDirty &&
       !cpaEmailDirty &&
       !bracketDirty &&
       !vehicleDirty
@@ -309,45 +258,14 @@ export default function SettingsPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [
-    modulesDirty,
     categoriesDirty,
     homeAddressDirty,
     hiddenDefaultsDirty,
     incomeCategoriesDirty,
-    irsRateDirty,
     cpaEmailDirty,
     bracketDirty,
     vehicleDirty,
   ]);
-
-  const toggleModule = (moduleId: string) => {
-    setActiveModules((prev) =>
-      prev.includes(moduleId)
-        ? prev.filter((m) => m !== moduleId)
-        : [...prev, moduleId]
-    );
-    setSaved(false);
-  };
-
-  const saveModules = async () => {
-    setSaving(true);
-    const toSave = activeModules;
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activeModules: toSave }),
-      });
-      if (res.ok) {
-        setSavedModules(toSave);
-        setSaved(true);
-      }
-    } catch (err) {
-      console.error("Save failed:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const addCategory = () => {
     const trimmed = newCategory.trim();
@@ -462,48 +380,6 @@ export default function SettingsPage() {
       console.error("Save failed:", err);
     } finally {
       setIncomeCatSaving(false);
-    }
-  };
-
-  // Phase 5 commit 8: save IRS mileage rate. Validates inline before the
-  // round-trip so the user gets specific feedback. The API re-validates
-  // (sanity ceiling 10/mi). On success, rateSource flips to "config" — a
-  // configured value is now in the table.
-  const saveIrsRate = async () => {
-    setIrsRateError(null);
-    const trimmed = irsRateInput.trim().replace(/^\$/, "");
-    const rate = Number(trimmed);
-    if (!Number.isFinite(rate) || rate <= 0) {
-      setIrsRateError("Rate must be a positive number (dollars per mile).");
-      return;
-    }
-    if (rate > 10) {
-      setIrsRateError("Rate looks too high — did you mean dollars per mile?");
-      return;
-    }
-    setIrsRateSaving(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ irsMileageRate: rate }),
-      });
-      if (res.ok) {
-        setSavedIrsRate(rate);
-        setIrsRateSource("config");
-        setIrsRateSaved(true);
-      } else {
-        const data = await res.json().catch(() => null);
-        const msg =
-          data && typeof data === "object" && "error" in data && typeof data.error === "string"
-            ? data.error
-            : `Couldn't save (HTTP ${res.status})`;
-        setIrsRateError(msg);
-      }
-    } catch (err) {
-      setIrsRateError(err instanceof Error ? err.message : "Couldn't save");
-    } finally {
-      setIrsRateSaving(false);
     }
   };
 
@@ -690,84 +566,8 @@ export default function SettingsPage() {
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
           title="Settings"
-          subtitle="Manage your modules and preferences"
+          subtitle="Manage your preferences"
         />
-
-        {/* Module Toggles */}
-        <div className="mb-10">
-          <div className="mb-5">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Active Modules</h2>
-            <p className="text-sm text-slate-500 m-0">Enable or disable features for your workspace</p>
-          </div>
-
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-            {ALL_MODULES.map((mod) => {
-              const isActive = activeModules.includes(mod.id);
-              const minRank = PLAN_RANK[mod.minPlan || "trial"] || 0;
-              const userRank = PLAN_RANK[plan] || 0;
-              const isLocked = userRank < minRank;
-
-              // Compose card classes per state — atomic Tailwind doesn't override
-              // the way inline-style spreads do, so each state owns its full set
-              // of conflicting utilities (border color, bg, opacity, cursor).
-              const cardStateClasses = isLocked
-                ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
-                : isActive
-                ? "border-blue-500 bg-blue-50 cursor-pointer"
-                : "border-slate-200 bg-white cursor-pointer";
-
-              const toggleBgClass = isLocked
-                ? "bg-slate-100"
-                : isActive
-                ? "bg-blue-500"
-                : "bg-slate-200";
-
-              return (
-                <div
-                  key={mod.id}
-                  onClick={() => {
-                    if (!isLocked) toggleModule(mod.id);
-                  }}
-                  className={`rounded-xl border-2 py-4 px-[18px] transition duration-150 ${cardStateClasses}`}
-                >
-                  <div className="flex justify-between items-center mb-2.5">
-                    <span className="text-[22px]">{mod.icon}</span>
-                    <div
-                      className={`relative w-9 h-5 rounded-full transition-[background-color] duration-200 ${toggleBgClass}`}
-                    >
-                      <div
-                        className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-[left] duration-200 shadow-sm ${
-                          isActive && !isLocked ? "left-[18px]" : "left-0.5"
-                        }`}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-slate-900 mb-1">{mod.label}</div>
-                  <div className="text-xs text-slate-500 leading-snug">{mod.description}</div>
-                  {isLocked && (
-                    <div className="mt-2 text-[11px] text-slate-500 bg-slate-100 py-[3px] px-2 rounded inline-block">
-                      {mod.minPlan === "growth" ? "Growth+ plan required" : "Pro plan required"}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-3 mt-5">
-            <button
-              onClick={saveModules}
-              disabled={saving || !modulesDirty}
-              className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
-                modulesDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
-              } ${saving ? "opacity-50" : ""}`}
-            >
-              {saving ? "Saving..." : "Save changes"}
-            </button>
-            {modulesDirty && <span className="text-sm text-amber-600 font-medium">Unsaved changes</span>}
-            {!modulesDirty && saved && <span className="text-sm text-green-600 font-medium">{"✓ Saved"}</span>}
-          </div>
-        </div>
 
         {/* Categories — expense + income. The industry defaults block
             inside this section shows both types (categories carry a
@@ -1051,11 +851,11 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Phase 5 commit 8: IRS mileage rate edit. The rate is federal
-            (one value across the entire app, in app_settings) — editing it
-            changes mileage math for every tenant. The visible indicator
-            tells the user when the stored value is the hardcoded fallback
-            vs. a configured row. */}
+        {/* IRS mileage rate — read-only. The rate is federal (one value
+            across the whole app, in app_settings); it's the same for
+            everyone, so it's set system-wide by Dreamward, not edited per
+            customer. Shown here so the user can see the rate their
+            Schedule C deduction uses. */}
         <div className="mb-10">
           <div className="mb-5">
             <h2 className="text-lg font-bold text-slate-900 mb-1">IRS mileage rate</h2>
@@ -1070,62 +870,13 @@ export default function SettingsPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
-            {irsRateSource === "fallback" && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 mb-4 text-sm">
-                <strong>Using default rate</strong> (${savedIrsRate.toFixed(2)}/mi).
-                No configured value found — save below to make this the configured
-                rate.
-              </div>
-            )}
-            {irsRateSource === "config" && (
-              <p className="text-xs text-slate-500 m-0 mb-3">
-                Currently configured: <strong>${savedIrsRate.toFixed(2)}/mi</strong>
-              </p>
-            )}
-
-            {irsRateError && (
-              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
-                {irsRateError}
-              </div>
-            )}
-
-            <label htmlFor="settings-irs-rate" className="block text-sm font-medium text-slate-700 mb-1">
-              Rate (dollars per mile)
-            </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                id="settings-irs-rate"
-                type="text"
-                inputMode="decimal"
-                value={irsRateInput}
-                onChange={(e) => {
-                  setIrsRateInput(e.target.value);
-                  setIrsRateSaved(false);
-                  setIrsRateError(null);
-                }}
-                placeholder="0.70"
-                className="w-32 py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <button
-                onClick={saveIrsRate}
-                disabled={irsRateSaving || !irsRateDirty}
-                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
-                  irsRateDirty ? "bg-blue-500 cursor-pointer" : "bg-slate-300 cursor-not-allowed"
-                } ${irsRateSaving ? "opacity-50" : ""}`}
-              >
-                {irsRateSaving ? "Saving..." : "Save rate"}
-              </button>
-              {irsRateDirty && (
-                <span className="text-sm text-amber-600 font-medium self-center">Unsaved changes</span>
-              )}
-              {!irsRateDirty && irsRateSaved && (
-                <span className="text-sm text-green-600 font-medium self-center">{"✓ Saved"}</span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 m-0">
-              The IRS publishes this figure once per year. Changing it
-              updates only the tax-deduction calculation on /reports
-              and quarterly estimates.
+            <p className="text-sm text-slate-600 m-0">
+              Current rate: <strong>${savedIrsRate.toFixed(2)}/mi</strong>
+            </p>
+            <p className="text-xs text-slate-500 mt-2 m-0">
+              Set by Dreamward and updated when the IRS publishes a new
+              figure each year. It applies the same to everyone, so there&apos;s
+              nothing to configure here.
             </p>
           </div>
         </div>

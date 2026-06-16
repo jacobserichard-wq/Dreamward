@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { activeModules, customCategories, preferences, homeAddress, irsMileageRate } = body;
+    const { activeModules, customCategories, preferences, homeAddress } = body;
 
     await pool.query(
       `INSERT INTO client_settings (client_id, active_modules, custom_categories, preferences)
@@ -82,29 +82,10 @@ export async function PATCH(req: NextRequest) {
       ]
     );
 
-    // Phase 5 commit 8: IRS mileage rate edit. The rate is federal (not
-    // per-client), so writes hit the global app_settings table. Any user
-    // changing it affects all clients — by design (the IRS publishes one
-    // figure per year). Defensive validation: must be a positive finite
-    // number under $10/mi (sanity ceiling — the IRS rate has historically
-    // been $0.50–$0.75/mi, and a 100× bigger value almost certainly means
-    // the user typed cents instead of dollars).
-    if (irsMileageRate !== undefined) {
-      const rate = Number(irsMileageRate);
-      if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
-        return NextResponse.json(
-          { error: "IRS mileage rate must be a positive number (dollars per mile)" },
-          { status: 400 }
-        );
-      }
-      await pool.query(
-        `INSERT INTO app_settings (key, value, updated_at)
-              VALUES ('irs_mileage_rate', $1, NOW())
-         ON CONFLICT (key) DO UPDATE
-              SET value = EXCLUDED.value, updated_at = NOW()`,
-        [rate.toFixed(4)]
-      );
-    }
+    // NOTE: the IRS mileage rate is a GLOBAL value (app_settings, one row
+    // for the whole app). It is intentionally NOT writable here — letting
+    // any authenticated customer PATCH it would rewrite the rate for every
+    // tenant. It's read-only in Settings and set system-wide instead.
 
     // Phase 4: home address change. Only handles the field when it's
     // explicitly in the body (undefined means "no change"). null/""
