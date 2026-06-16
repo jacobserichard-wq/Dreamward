@@ -11,10 +11,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { rows } = await req.json();
+    const { rows, source: importSource } = await req.json();
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "No rows to import" }, { status: 400 });
     }
+    // Where these rows came from — tabular CSV/XLSX vs PDF invoice
+    // extraction. Stamped on each saved row's `source` for telemetry +
+    // future filtering. Defaults to csv_import for back-compat.
+    const source = importSource === "pdf_import" ? "pdf_import" : "csv_import";
 
     // Phase 3 sub-session 17: defense-in-depth event-id verification.
     // /api/upload already verifies any incoming eventId belongs to this
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest) {
           summary: row.description || null,
           raw_email_id: null,
           extracted_data: null,
-          source: "csv_import",
+          source,
           ai_classified_at: new Date(),
           ai_model: "claude-sonnet-4-6",
           event_id: eventId,

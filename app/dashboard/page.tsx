@@ -653,10 +653,18 @@ function DashboardInner() {
         ) {
           formData.append("eventId", selectedEventChoice);
         }
-        const data = await apiFetch<{ mappedRows: any[]; categories: string[] }>(
-          "/api/upload",
-          { method: "POST", body: formData }
-        );
+        // PDF invoices go through the document-extraction route; CSV/TSV/
+        // XLSX through the tabular row-mapper. Both return the same
+        // { mappedRows, categories } shape → same review modal + confirm.
+        const isPdf = file.name.toLowerCase().endsWith(".pdf");
+        const data = await apiFetch<{
+          mappedRows: any[];
+          categories: string[];
+          source?: string;
+        }>(isPdf ? "/api/upload/pdf" : "/api/upload", {
+          method: "POST",
+          body: formData,
+        });
         setUploadReview(data);
         setReviewRows(
           data.mappedRows.map((r: any, i: number) => ({ ...r, _approved: true, _index: i }))
@@ -793,9 +801,10 @@ function DashboardInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rows: approved.map(({ _approved, _index, ...rest }: any) => rest),
+          source: uploadReview?.source === "pdf" ? "pdf_import" : "csv_import",
         }),
       });
-      setSuccessMsg(`Imported ${data.imported} items from CSV`);
+      setSuccessMsg(`Imported ${data.imported} items`);
       setUploadReview(null);
       setReviewRows([]);
       await loadItems();
@@ -805,7 +814,7 @@ function DashboardInner() {
     } finally {
       setImporting(false);
     }
-  }, [reviewRows, loadItems]);
+  }, [reviewRows, loadItems, uploadReview]);
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
@@ -1090,7 +1099,7 @@ function DashboardInner() {
                     // XLSX added alongside CSV/TSV — see lib/xlsx.ts.
                     // Legacy .xls intentionally excluded (server returns
                     // a "save as .xlsx" message if uploaded anyway).
-                    accept=".csv,.tsv,.xlsx"
+                    accept=".csv,.tsv,.xlsx,.pdf"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -1285,10 +1294,11 @@ function DashboardInner() {
                 <span className="font-medium text-slate-700">
                   Add transactions by upload.
                 </span>{" "}
-                Use the <strong>{"\u{1F4C1}"} Upload</strong> button up top
-                (CSV, TSV, or XLSX). Expected columns: Date {"\u{00B7}"}{" "}
-                Customer/Vendor {"\u{00B7}"} Amount {"\u{00B7}"} Description{" "}
-                {"\u{00B7}"} Category.
+                Use the <strong>{"\u{1F4C1}"} Upload</strong> button up top —
+                a CSV/TSV/XLSX of transactions, or a <strong>PDF invoice</strong>{" "}
+                (we&apos;ll read it for you). Expected CSV columns: Date{" "}
+                {"\u{00B7}"} Customer/Vendor {"\u{00B7}"} Amount {"\u{00B7}"}{" "}
+                Description {"\u{00B7}"} Category.
               </div>
               <a
                 href="/templates/dreamward-sales-template.csv"
@@ -1784,7 +1794,7 @@ function DashboardInner() {
                       </div>
                       <input
                         type="file"
-                        accept=".csv,.tsv,.xlsx"
+                        accept=".csv,.tsv,.xlsx,.pdf"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];

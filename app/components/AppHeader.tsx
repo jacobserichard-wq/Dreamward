@@ -176,7 +176,7 @@ export default function AppHeader({
               {uploading ? "Uploading..." : "Upload"}
               <input
                 type="file"
-                accept=".csv,.tsv,.xlsx"
+                accept=".csv,.tsv,.xlsx,.pdf"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
