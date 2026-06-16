@@ -39,6 +39,16 @@ export interface AppHeaderProps {
 const NAV_LINK =
   "bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 hover:text-white";
 
+// Dropdown (`<details>`) styling. `summary` reuses the nav-link look but
+// adds the chevron/gear affordance and hides the native disclosure
+// marker. The panel is a white card; items read as a standard menu.
+const SUMMARY_LINK =
+  "bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 hover:text-white cursor-pointer inline-flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden";
+const MENU_PANEL =
+  "absolute right-0 mt-2 z-30 bg-white rounded-xl shadow-lg border border-sand py-1.5 min-w-[180px] flex flex-col";
+const MENU_ITEM =
+  "px-4 py-2 text-sm text-bark hover:text-forest hover:bg-oat no-underline";
+
 export default function AppHeader({
   plan: planProp,
   onUploadFile,
@@ -130,26 +140,12 @@ export default function AppHeader({
             </Link>
           )}
 
-          {/* Transactions — the processed-items list. Moved out of
-              the dashboard tabs (June 2026 IA) into the nav; deep-
-              links to the dashboard's processed view. */}
+          {/* ── Daily-work surfaces (primary) ─────────────────────
+              Transactions deep-links to the dashboard's processed view
+              (June 2026 IA). */}
           <Link href="/dashboard?view=transactions" className={NAV_LINK}>
             <span>{"\u{1F4C4}"}</span> Transactions
           </Link>
-          {/* Fable-5 audit: the "(template)" nav link read like a bug
-              as global chrome. The CSV template is still linked from
-              the dashboard upload hint, the Help hub, the
-              getting-started guide, and the SKUs tip. */}
-          <Link href="/events" className={NAV_LINK}>
-            Events
-          </Link>
-          {/* Market-day mode: phone-first booth sale logging. Gated
-              like the other paying-tier surfaces. */}
-          {paying && (
-            <Link href="/market-day" className={NAV_LINK}>
-              Market Day
-            </Link>
-          )}
           <Link href="/expenses" className={NAV_LINK}>
             Expenses
           </Link>
@@ -160,31 +156,13 @@ export default function AppHeader({
           >
             AR
           </Link>
+          <Link href="/events" className={NAV_LINK}>
+            Events
+          </Link>
+          {/* Market-day mode: phone-first booth sale logging. Paying. */}
           {paying && (
-            <Link
-              href="/skus"
-              className={NAV_LINK}
-              title="Your product catalog — costs, stock, and recipes"
-            >
-              SKUs
-            </Link>
-          )}
-          {paying && (
-            <Link
-              href="/inventory"
-              className={NAV_LINK}
-              title="Stock levels, value, and reorder alerts"
-            >
-              Inventory
-            </Link>
-          )}
-          {paying && (
-            <Link
-              href="/cogs"
-              className={NAV_LINK}
-              title="Cost of goods sold + gross margin per channel and per SKU"
-            >
-              COGS
+            <Link href="/market-day" className={NAV_LINK}>
+              Market Day
             </Link>
           )}
           {paying && (
@@ -192,40 +170,118 @@ export default function AppHeader({
               Reports
             </Link>
           )}
-          <Link
-            href="/onboarding"
-            className={NAV_LINK}
-            title="Open the setup checklist"
-          >
-            Setup
-          </Link>
-          <Link
-            href="/integrations"
-            className={NAV_LINK}
-            title="Connect Shopify and other platforms"
-          >
-            Integrations
-          </Link>
-          <Link href="/help" className={NAV_LINK} title="User guides and walkthroughs">
-            Help
-          </Link>
-          <Link href="/settings" className={NAV_LINK}>
-            Settings
-          </Link>
-          {/* Billing was only reachable via the plan badge (which now
-              reads as a price, e.g. "$32/mo") — easy to miss. Explicit
-              nav link so managing the subscription is always one tap. */}
-          <Link href="/billing" className={NAV_LINK} title="Plan & billing">
-            Billing
-          </Link>
-          <button
-            onClick={() => signOut({ callbackUrl: "/signin" })}
-            className="bg-transparent text-white/75 text-[11px] sm:text-[13px] cursor-pointer px-1 py-1.5 hover:text-white border-0"
-          >
-            Sign out
-          </button>
+
+          {/* ── Products dropdown ─────────────────────────────────
+              SKUs + Inventory + COGS are one mental model (the product
+              catalog), so they collapse into a single menu instead of
+              three competing top-level links. */}
+          {paying && (
+            <details className="relative">
+              <summary className={SUMMARY_LINK}>
+                Products
+                <Chevron />
+              </summary>
+              <div className={MENU_PANEL}>
+                <Link
+                  href="/skus"
+                  className={MENU_ITEM}
+                  title="Your product catalog — costs, stock, and recipes"
+                >
+                  SKUs
+                </Link>
+                <Link
+                  href="/inventory"
+                  className={MENU_ITEM}
+                  title="Stock levels, value, and reorder alerts"
+                >
+                  Inventory
+                </Link>
+                <Link
+                  href="/cogs"
+                  className={MENU_ITEM}
+                  title="Cost of goods sold + gross margin per channel and per SKU"
+                >
+                  COGS
+                </Link>
+              </div>
+            </details>
+          )}
+
+          {/* ── Account menu ──────────────────────────────────────
+              Settings / Billing / Integrations / Setup / Help / Sign
+              out are account-admin, not daily work — folded into one
+              gear menu so they don't each take a top-level slot. */}
+          <details className="relative">
+            <summary className={SUMMARY_LINK}>
+              <GearIcon />
+              Account
+            </summary>
+            <div className={MENU_PANEL}>
+              <Link href="/settings" className={MENU_ITEM}>
+                Settings
+              </Link>
+              <Link href="/billing" className={MENU_ITEM} title="Plan & billing">
+                Billing
+              </Link>
+              <Link
+                href="/integrations"
+                className={MENU_ITEM}
+                title="Connect Shopify and other platforms"
+              >
+                Integrations
+              </Link>
+              <Link
+                href="/onboarding"
+                className={MENU_ITEM}
+                title="Open the setup checklist"
+              >
+                Setup
+              </Link>
+              <Link
+                href="/help"
+                className={MENU_ITEM}
+                title="User guides and walkthroughs"
+              >
+                Help
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/signin" })}
+                className={`${MENU_ITEM} text-left bg-transparent border-0 cursor-pointer w-full`}
+              >
+                Sign out
+              </button>
+            </div>
+          </details>
         </div>
       </div>
     </header>
+  );
+}
+
+function Chevron() {
+  return (
+    <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" aria-hidden="true">
+      <path
+        d="M3 4.5 6 7.5 9 4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
