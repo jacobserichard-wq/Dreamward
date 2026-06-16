@@ -7,6 +7,7 @@ import Spinner from "../components/Spinner";
 import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
+import SaleForm, { type SaleFormSubmit } from "../components/SaleForm";
 import ConfirmModal from "../components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import type { ChannelRow } from "../components/ChannelTable";
@@ -127,6 +128,10 @@ function DashboardInner() {
   // The original PDF, held between extraction and confirm so we can
   // attach it to the created transaction (PDF uploads only).
   const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
+  // "+ Add a sale" — manual income entry (income counterpart to the
+  // "+ New expense" path). Income categories loaded from /api/sales.
+  const [showSaleForm, setShowSaleForm] = useState(false);
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
   // Event auto-coding state — Phase 3 sub-session 17. The selector drives
@@ -211,6 +216,18 @@ function DashboardInner() {
   useEffect(() => {
     loadItems();
   }, [loadItems]);
+
+  // Income categories for the "Add a sale" form (seeded income + custom).
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch<{ categories: string[] }>("/api/sales");
+        setIncomeCategories(data.categories || []);
+      } catch {
+        // best-effort — the form still opens with an empty category list
+      }
+    })();
+  }, []);
 
   // Load client plan info
   useEffect(() => {
@@ -846,6 +863,20 @@ function DashboardInner() {
     }
   }, [reviewRows, loadItems, uploadReview, pendingPdfFile]);
 
+  const handleSaveSale = useCallback(
+    async (data: SaleFormSubmit) => {
+      await apiFetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      setShowSaleForm(false);
+      setSuccessMsg("Sale added.");
+      await loadItems();
+    },
+    [loadItems]
+  );
+
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
   // Phase 4: total business miles across all events. Sums totalMiles (the
@@ -1299,9 +1330,18 @@ function DashboardInner() {
             {/* Transactions header + back-to-overview. Replaces the
                 old tab bar now that this is a nav-reached view. */}
             <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
-              <h2 className="font-serif text-2xl font-semibold text-slate-900 m-0">
-                Transactions
-              </h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="font-serif text-2xl font-semibold text-slate-900 m-0">
+                  Transactions
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowSaleForm(true)}
+                  className="py-1.5 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-1"
+                >
+                  <span>+</span> Add a sale
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1898,6 +1938,14 @@ function DashboardInner() {
           }}
           onConfirm={confirmImport}
           importing={importing}
+        />
+
+        <SaleForm
+          open={showSaleForm}
+          categories={incomeCategories}
+          events={availableEvents}
+          onSave={handleSaveSale}
+          onClose={() => setShowSaleForm(false)}
         />
 
         {/* ── CLEAR SAMPLE DATA CONFIRMATION ── */}
