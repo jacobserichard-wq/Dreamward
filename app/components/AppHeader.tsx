@@ -19,7 +19,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import Spinner from "./Spinner";
@@ -56,6 +56,9 @@ export default function AppHeader({
 }: AppHeaderProps) {
   // Self-fetch the plan only when the parent didn't supply it.
   const [fetchedPlan, setFetchedPlan] = useState<string | null>(null);
+  // Ref to the nav container so a document-level click can close any
+  // open <details> menu when the click lands outside it.
+  const navRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (planProp !== undefined) return;
     let cancelled = false;
@@ -77,6 +80,39 @@ export default function AppHeader({
   const plan = planProp !== undefined ? planProp : fetchedPlan;
   const paying = isPayingTier(plan);
 
+  // Click-outside / Escape to close the dropdown menus. Native <details>
+  // stays open until its summary is clicked again; this makes it behave
+  // like a normal menu. Any click except on a menu's own <summary>
+  // closes any open menu (so clicking a menu item, another menu's
+  // summary, or empty space all dismiss it); the summary is left to the
+  // native toggle.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const nav = navRef.current;
+      if (!nav) return;
+      const target = e.target as Node;
+      nav.querySelectorAll<HTMLDetailsElement>("details[open]").forEach((d) => {
+        const summary = d.querySelector("summary");
+        if (summary && summary.contains(target)) return;
+        d.open = false;
+      });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      navRef.current
+        ?.querySelectorAll<HTMLDetailsElement>("details[open]")
+        .forEach((d) => {
+          d.open = false;
+        });
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   return (
     <header className="bg-gradient-to-br from-eucalyptus-dark to-eucalyptus text-white px-4 sm:px-8 py-6">
       <div className="max-w-[1200px] mx-auto flex justify-between items-center">
@@ -90,7 +126,7 @@ export default function AppHeader({
             Dreamward
           </h1>
         </Link>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+        <div ref={navRef} className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
           {plan && (
             <a
               href="/billing"
