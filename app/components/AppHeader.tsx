@@ -224,15 +224,8 @@ export default function AppHeader({
           >
             Events
           </Link>
-          {/* Market-day mode: phone-first booth sale logging. Paying. */}
-          {paying && (
-            <Link
-              href="/market-day"
-              className={isActive("/market-day") ? NAV_ACTIVE : NAV_LINK}
-            >
-              Market Day
-            </Link>
-          )}
+          {/* Market Day moved off the global nav onto the Events page —
+              it only works in the context of an event. */}
           {paying && (
             <Link
               href="/reports"

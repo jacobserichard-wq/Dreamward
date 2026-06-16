@@ -170,6 +170,18 @@ export default function EventsPage() {
               : `${events.length} ${events.length === 1 ? "event" : "events"}`}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Market Day lives here now (removed from the global nav):
+                it only makes sense in the context of events, and the
+                /market-day page has its own event picker. */}
+            {isPayingTier(plan) && (
+              <Link
+                href="/market-day"
+                className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
+                title="Phone-first booth sale logging — tap sales as they happen"
+              >
+                {"\u{1F3EA}"} Market Day
+              </Link>
+            )}
             <Link
               href="/markets"
               className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
