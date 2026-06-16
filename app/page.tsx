@@ -131,7 +131,7 @@ export default async function MarketingLandingPage() {
         {/* Hero. Sub-session 32 marketing refresh: leads with the
             gross-margin + audit-trail differentiation shipped in
             Phase 12 (COGS) + Phase 13 (Schedule-C P&L). Sage & Rose
-            redesign: airy warm hero, Fraunces display headline. */}
+            redesign: airy warm hero, Lora display headline. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
           <h2 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
             Built for people.
@@ -151,6 +151,9 @@ export default async function MarketingLandingPage() {
           <SignInButton label="Go dreamward &rarr;" />
           <p className="text-xs text-stone mt-4">
             14-day free trial. No credit card required.
+          </p>
+          <p className="text-[11px] uppercase tracking-widest text-stone mt-6">
+            Syncs with Shopify {"\u{00B7}"} Etsy {"\u{00B7}"} Square {"\u{00B7}"} Wix
           </p>
         </div>
       </header>
