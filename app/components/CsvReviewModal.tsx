@@ -62,6 +62,20 @@ export default function CsvReviewModal({
             <p className="mt-1 mb-0 mx-0 text-[13px] text-slate-500">
               Review categories and uncheck any rows you don&apos;t want to import.
             </p>
+            {/* Format guidance at the recovery point: if the columns
+                came through wrong, the user can grab the template and
+                re-upload without hunting for it. */}
+            <p className="mt-1.5 mb-0 mx-0 text-xs text-slate-400">
+              Expected columns: Date {"\u{00B7}"} Customer/Vendor {"\u{00B7}"} Amount{" "}
+              {"\u{00B7}"} Description {"\u{00B7}"} Category.{" "}
+              <a
+                href="/templates/dreamward-sales-template.csv"
+                download="dreamward-sales-template.csv"
+                className="text-blue-600 underline"
+              >
+                Download template
+              </a>
+            </p>
           </div>
           <button
             onClick={onCancel}
