@@ -172,11 +172,25 @@ Other Accounting Software:
 - Wave exports: "Date", "Description", "Amount", "Account", "Name"
 - Generic bookkeeping: look for any columns resembling date, vendor/payee/name, amount/total, description/memo, category/account/type`;
 
+    // Explicit missing-key check (mirrors lib/reclassify, /api/process,
+    // /api/invoices/ingest) — without it a missing key silently sends an
+    // empty x-api-key and surfaces as an opaque "AI processing failed".
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error("Upload: ANTHROPIC_API_KEY not configured");
+      return NextResponse.json(
+        {
+          error:
+            "AI isn't configured (missing ANTHROPIC_API_KEY). Set it in Vercel and redeploy.",
+        },
+        { status: 500 }
+      );
+    }
+
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -188,9 +202,18 @@ Other Accounting Software:
 
     if (!claudeRes.ok) {
       const err = await claudeRes.text();
-      console.error("Claude API error:", err);
+      // Surface the HTTP status so config failures are diagnosable from
+      // the UI instead of a generic message: 401 = bad/missing key,
+      // 404 = model id not available to this account.
+      console.error(`Claude API error (HTTP ${claudeRes.status}):`, err);
+      const hint =
+        claudeRes.status === 401
+          ? "The Anthropic API key looks invalid."
+          : claudeRes.status === 404
+            ? "The configured AI model wasn't found for this account."
+            : "Please try again.";
       return NextResponse.json(
-        { error: "AI processing failed. Please try again." },
+        { error: `AI processing failed (HTTP ${claudeRes.status}). ${hint}` },
         { status: 500 }
       );
     }
