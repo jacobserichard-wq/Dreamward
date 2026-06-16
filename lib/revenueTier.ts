@@ -39,11 +39,19 @@ import {
 import { buildClassifier } from "@/lib/reports/aggregate";
 import { type Industry } from "@/lib/categories";
 
-/** Trailing-365-day revenue for a client. Income-classified paid
- *  processed_items + event cash-day revenue. Approximate by design —
- *  it only needs to be accurate enough to pick the right size
- *  bracket, and the brackets are an order of magnitude apart
- *  ($5k / $50k / $500k). */
+/** Trailing-365-day revenue for a client, NET OF REFUNDS — the figure
+ *  the band ladder sizes on. Income-classified paid processed_items
+ *  (this INCLUDES negative refund rows — e.g. Shopify stores a refund
+ *  as a negative "income" row, so it nets out in the income sum) +
+ *  event cash-day revenue, MINUS manually-tracked "Returns & Refunds"
+ *  rows (a seeded expense category, so they wouldn't otherwise reduce
+ *  the figure).
+ *
+ *  Known gap: Square/Etsy/Wix don't yet ingest refunds as rows, so
+ *  their refunds aren't reflected here — that's per-platform ingestion
+ *  work, not a calc fix.
+ *
+ *  Approximate by design — it only needs to land the right band. */
 export async function computeTrailingRevenue(
   clientId: number,
   industry: Industry
@@ -85,10 +93,19 @@ export async function computeTrailingRevenue(
   const customIncome: string[] = Array.isArray(prefIncome) ? prefIncome : [];
   const classify = buildClassifier(industry, customIncome, customExpense);
 
+  // "Returns & Refunds" is a universal seeded expense category
+  // (lib/categories.ts) — the canonical home for manually-logged
+  // customer refunds. Subtract it so a heavy refunder isn't sized on
+  // gross sales. Platform refunds that arrive as negative "income"
+  // rows (e.g. Shopify) already net out via the income sum.
+  const REFUND_CATEGORY = "Returns & Refunds";
   let revenue = 0;
   for (const row of txnsRes.rows) {
+    const amount = Number(row.amount) || 0;
     if (classify(row.category) === "income") {
-      revenue += Number(row.amount) || 0;
+      revenue += amount; // includes negative refund rows → already net
+    } else if (row.category === REFUND_CATEGORY) {
+      revenue -= Math.abs(amount);
     }
   }
   // Event cash-day revenue (manual, not double-counted — event-linked
