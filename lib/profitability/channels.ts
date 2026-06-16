@@ -30,6 +30,7 @@ import { FEATURES } from "../features";
 export type ChannelId =
   | "shopify"
   | "markets"
+  | "direct"
   | "wholesale"
   | "service"
   | "gmail"
@@ -96,6 +97,19 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Add your first event",
     proGated: false,
     drillHref: "/events",
+  },
+  {
+    id: "direct",
+    label: "Direct",
+    icon: "\u{1F91D}",
+    comingSoon: false,
+    // Direct sales are logged via "+ Add a sale" on the Transactions view.
+    emptyAddHref: "/dashboard?view=transactions",
+    emptyAddLabel: "Add a sale",
+    proGated: false,
+    drillHref: "/dashboard?view=transactions",
+    description:
+      "Word-of-mouth, cash, Venmo/Zelle — direct sales not tied to a market, platform, or invoice.",
   },
   {
     id: "wholesale",

@@ -66,7 +66,9 @@ export default function SaleForm({
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState(todayIso());
   const [category, setCategory] = useState("");
-  const [channel, setChannel] = useState("");
+  // Default to the Direct channel — a manually-added sale is almost
+  // always a direct/word-of-mouth one. User can change it.
+  const [channel, setChannel] = useState("direct");
   const [eventId, setEventId] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -78,7 +80,7 @@ export default function SaleForm({
     setAmount("");
     setDueDate(todayIso());
     setCategory("");
-    setChannel("");
+    setChannel("direct");
     setEventId("");
     setNotes("");
     setError(null);
@@ -245,7 +247,7 @@ export default function SaleForm({
               disabled={saving}
               className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
             >
-              <option value="">Direct (not tied to a channel)</option>
+              <option value="">Uncategorized (not tied to a channel)</option>
               {SALE_CHANNELS.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.icon} {c.label}
