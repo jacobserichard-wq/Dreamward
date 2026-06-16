@@ -99,19 +99,14 @@ function DashboardInner() {
   const [loading, setLoading] = useState(false);
 
   // The "Transactions" nav item deep-links here via ?view=transactions
-  // (the processed-items list lives on this page, not a separate
-  // route). Sync the URL param into the in-page view so it works both
-  // on fresh load and when already on the dashboard.
+  // (the processed-items list lives on this page, not a separate route).
+  // The rendered view derives DIRECTLY from the URL — not synced into a
+  // separate state via an effect — so it always matches the address bar.
+  // That's what makes the Dreamward logo (→ /dashboard) reliably return
+  // to the overview on the first click, with no soft-nav timing gap.
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
-  useEffect(() => {
-    // Keep the in-page view in sync with the URL in BOTH directions:
-    // ?view=transactions → the processed list; no/other param (e.g.
-    // clicking the Dreamward logo, which links to /dashboard) → the
-    // overview. Without the else branch, returning to /dashboard left
-    // the Transactions view stuck on screen ("logo does nothing").
-    setActiveTab(viewParam === "transactions" ? "processed" : "dashboard");
-  }, [viewParam]);
+  const showTransactions = viewParam === "transactions";
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -602,7 +597,7 @@ function DashboardInner() {
       );
       setProcessedItems((prev) => [...data.results, ...prev]);
       setSuccessMsg(`Processed ${data.processed} items from ${selectedLabel}`);
-      setActiveTab("processed");
+      router.replace("/dashboard?view=transactions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI processing failed");
     } finally {
@@ -843,7 +838,7 @@ function DashboardInner() {
       setUploadReview(null);
       setReviewRows([]);
       await loadItems();
-      setActiveTab("processed");
+      router.replace("/dashboard?view=transactions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -1299,7 +1294,7 @@ function DashboardInner() {
         )}
 
         {/* ── PROCESSED TAB ── */}
-        {activeTab === "processed" && (
+        {showTransactions && (
           <>
             {/* Transactions header + back-to-overview. Replaces the
                 old tab bar now that this is a nav-reached view. */}
@@ -1611,7 +1606,7 @@ function DashboardInner() {
         )}
 
         {/* ── DASHBOARD TAB ── */}
-        {activeTab === "dashboard" && (
+        {!showTransactions && (
           <div
             // UX commit 5: pale-yellow tint when ANY sample data is
             // present in the processed-items array. Distinct visual
