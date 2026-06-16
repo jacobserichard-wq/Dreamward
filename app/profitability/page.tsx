@@ -438,7 +438,7 @@ export default function ProfitabilityPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               <MonthlyTrendCard
                 title="Revenue"
-                color="#16a34a"
+                color="#5e8a5a"
                 data={monthlyTrend.map((m) => ({ month: m.month, value: m.revenue }))}
               />
               <MonthlyTrendCard
@@ -448,7 +448,7 @@ export default function ProfitabilityPage() {
               />
               <MonthlyTrendCard
                 title="Net profit"
-                color="#2563eb"
+                color="#6e8970"
                 data={monthlyTrend.map((m) => ({ month: m.month, value: m.net }))}
               />
             </div>
@@ -511,19 +511,19 @@ function MonthlyTrendCard({
             data={data}
             margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e9e2d2" vertical={false} />
             <XAxis
               dataKey="month"
               tickFormatter={formatMonthShort}
-              tick={{ fontSize: 11, fill: "#64748b" }}
+              tick={{ fontSize: 11, fill: "#62675a" }}
               tickLine={false}
-              axisLine={{ stroke: "#cbd5e1" }}
+              axisLine={{ stroke: "#d2c9b5" }}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "#64748b" }}
+              tick={{ fontSize: 11, fill: "#62675a" }}
               tickFormatter={(v: number) => `$${formatMoneyShort(v)}`}
               tickLine={false}
-              axisLine={{ stroke: "#cbd5e1" }}
+              axisLine={{ stroke: "#d2c9b5" }}
               width={50}
             />
             <Tooltip
@@ -532,7 +532,7 @@ function MonthlyTrendCard({
               contentStyle={{
                 fontSize: 12,
                 borderRadius: 6,
-                border: "1px solid #e2e8f0",
+                border: "1px solid #e9e2d2",
               }}
             />
             <Line

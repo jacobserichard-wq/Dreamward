@@ -81,9 +81,9 @@ export default function ReportMonthlyChart({ data }: ReportMonthlyChartProps) {
       <div style={{ width: "100%", height: 280 }}>
         <ResponsiveContainer>
           <LineChart data={tagged} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={formatUsd} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e9e2d2" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#62675a" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#62675a" }} tickFormatter={formatUsd} />
             <Tooltip
               formatter={(value) => {
                 const n = typeof value === "number" ? value : Number(value);
@@ -99,7 +99,7 @@ export default function ReportMonthlyChart({ data }: ReportMonthlyChartProps) {
               type="monotone"
               dataKey="revenue"
               name="Revenue"
-              stroke="#16a34a"
+              stroke="#5e8a5a"
               strokeWidth={2}
               dot={{ r: 3 }}
             />
@@ -115,7 +115,7 @@ export default function ReportMonthlyChart({ data }: ReportMonthlyChartProps) {
               type="monotone"
               dataKey="netProfit"
               name="Net profit"
-              stroke="#2563eb"
+              stroke="#6e8970"
               strokeWidth={2}
               dot={{ r: 3 }}
             />

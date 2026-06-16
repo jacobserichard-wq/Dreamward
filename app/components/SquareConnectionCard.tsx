@@ -266,7 +266,7 @@ export default function SquareConnectionCard() {
             <div className="text-sm text-slate-700">
               <strong>{displayLabel}</strong>
               {state.environment === "sandbox" && (
-                <span className="ml-2 inline-flex items-center text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5 uppercase tracking-wide">
+                <span className="ml-2 inline-flex items-center text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 uppercase tracking-wide">
                   Sandbox
                 </span>
               )}
