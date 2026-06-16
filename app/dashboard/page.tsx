@@ -102,7 +102,12 @@ function DashboardInner() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
   useEffect(() => {
-    if (viewParam === "transactions") setActiveTab("processed");
+    // Keep the in-page view in sync with the URL in BOTH directions:
+    // ?view=transactions → the processed list; no/other param (e.g.
+    // clicking the Dreamward logo, which links to /dashboard) → the
+    // overview. Without the else branch, returning to /dashboard left
+    // the Transactions view stuck on screen ("logo does nothing").
+    setActiveTab(viewParam === "transactions" ? "processed" : "dashboard");
   }, [viewParam]);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
