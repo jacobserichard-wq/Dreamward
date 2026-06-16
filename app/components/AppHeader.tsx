@@ -21,6 +21,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Spinner from "./Spinner";
 import { isPayingTier, planDisplayLabel } from "@/lib/plans";
@@ -36,14 +37,20 @@ export interface AppHeaderProps {
   uploading?: boolean;
 }
 
-const NAV_LINK =
-  "bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 hover:text-white";
+// Primary nav link styling. The active (current) section gets a subtle
+// white pill so you can see where you are; inactive links are dimmed.
+const NAV_BASE =
+  "bg-transparent text-[11px] sm:text-[13px] no-underline py-1.5";
+const NAV_LINK = `${NAV_BASE} px-1 text-white/75 hover:text-white`;
+const NAV_ACTIVE = `${NAV_BASE} px-2.5 rounded-full bg-white/15 text-white font-semibold`;
 
 // Dropdown (`<details>`) styling. `summary` reuses the nav-link look but
 // adds the chevron/gear affordance and hides the native disclosure
 // marker. The panel is a white card; items read as a standard menu.
-const SUMMARY_LINK =
-  "bg-transparent text-white/75 text-[11px] sm:text-[13px] no-underline px-1 py-1.5 hover:text-white cursor-pointer inline-flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden";
+const SUMMARY_BASE =
+  "bg-transparent text-[11px] sm:text-[13px] no-underline py-1.5 cursor-pointer inline-flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden";
+const SUMMARY_LINK = `${SUMMARY_BASE} px-1 text-white/75 hover:text-white`;
+const SUMMARY_ACTIVE = `${SUMMARY_BASE} px-2.5 rounded-full bg-white/15 text-white font-semibold`;
 const MENU_PANEL =
   "absolute right-0 mt-2 z-30 bg-white rounded-xl shadow-lg border border-sand py-1.5 min-w-[180px] flex flex-col";
 const MENU_ITEM =
@@ -79,6 +86,23 @@ export default function AppHeader({
 
   const plan = planProp !== undefined ? planProp : fetchedPlan;
   const paying = isPayingTier(plan);
+
+  const pathname = usePathname();
+  // Current-section highlight. Transactions deep-links to
+  // /dashboard?view=transactions, so /dashboard counts as its section.
+  const isActive = (href: string) => {
+    const path = href.split("?")[0];
+    if (path === "/dashboard") return pathname === "/dashboard";
+    return pathname === path || pathname.startsWith(path + "/");
+  };
+  const productsActive =
+    isActive("/skus") || isActive("/inventory") || isActive("/cogs");
+  const accountActive =
+    isActive("/settings") ||
+    isActive("/billing") ||
+    isActive("/integrations") ||
+    isActive("/onboarding") ||
+    isActive("/help");
 
   // Click-outside / Escape to close the dropdown menus. Native <details>
   // stays open until its summary is clicked again; this makes it behave
@@ -148,11 +172,7 @@ export default function AppHeader({
               }`}
               title="Upload a CSV, TSV, or XLSX file"
             >
-              {uploading ? (
-                <Spinner size={11} color="white" />
-              ) : (
-                <span>{"\u{1F4C1}"}</span>
-              )}
+              {uploading && <Spinner size={11} color="white" />}
               {uploading ? "Uploading..." : "Upload"}
               <input
                 type="file"
@@ -172,37 +192,52 @@ export default function AppHeader({
               className={`${NAV_LINK} inline-flex items-center gap-1`}
               title="Upload a file from the dashboard"
             >
-              <span>{"\u{1F4C1}"}</span> Upload
+              Upload
             </Link>
           )}
 
           {/* ── Daily-work surfaces (primary) ─────────────────────
               Transactions deep-links to the dashboard's processed view
               (June 2026 IA). */}
-          <Link href="/dashboard?view=transactions" className={NAV_LINK}>
-            <span>{"\u{1F4C4}"}</span> Transactions
+          <Link
+            href="/dashboard?view=transactions"
+            className={isActive("/dashboard") ? NAV_ACTIVE : NAV_LINK}
+          >
+            Transactions
           </Link>
-          <Link href="/expenses" className={NAV_LINK}>
+          <Link
+            href="/expenses"
+            className={isActive("/expenses") ? NAV_ACTIVE : NAV_LINK}
+          >
             Expenses
           </Link>
           <Link
             href="/invoices"
-            className={NAV_LINK}
+            className={isActive("/invoices") ? NAV_ACTIVE : NAV_LINK}
             title="Accounts Receivable — customer invoices awaiting payment"
           >
             AR
           </Link>
-          <Link href="/events" className={NAV_LINK}>
+          <Link
+            href="/events"
+            className={isActive("/events") ? NAV_ACTIVE : NAV_LINK}
+          >
             Events
           </Link>
           {/* Market-day mode: phone-first booth sale logging. Paying. */}
           {paying && (
-            <Link href="/market-day" className={NAV_LINK}>
+            <Link
+              href="/market-day"
+              className={isActive("/market-day") ? NAV_ACTIVE : NAV_LINK}
+            >
               Market Day
             </Link>
           )}
           {paying && (
-            <Link href="/reports" className={NAV_LINK}>
+            <Link
+              href="/reports"
+              className={isActive("/reports") ? NAV_ACTIVE : NAV_LINK}
+            >
               Reports
             </Link>
           )}
@@ -213,7 +248,7 @@ export default function AppHeader({
               three competing top-level links. */}
           {paying && (
             <details className="relative">
-              <summary className={SUMMARY_LINK}>
+              <summary className={productsActive ? SUMMARY_ACTIVE : SUMMARY_LINK}>
                 Products
                 <Chevron />
               </summary>
@@ -248,9 +283,10 @@ export default function AppHeader({
               out are account-admin, not daily work — folded into one
               gear menu so they don't each take a top-level slot. */}
           <details className="relative">
-            <summary className={SUMMARY_LINK}>
+            <summary className={accountActive ? SUMMARY_ACTIVE : SUMMARY_LINK}>
               <GearIcon />
               Account
+              <Chevron />
             </summary>
             <div className={MENU_PANEL}>
               <Link href="/settings" className={MENU_ITEM}>
