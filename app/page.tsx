@@ -25,6 +25,7 @@ import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
 import PriceSlider from "./components/PriceSlider";
+import HowItWorks from "./components/HowItWorks";
 import { TESTIMONIALS } from "@/lib/testimonials";
 import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 
@@ -62,6 +63,12 @@ export default async function MarketingLandingPage() {
               bar (Pricing was easy to miss as a lone right-side
               link). */}
           <nav className="hidden sm:flex items-center gap-7">
+            <a
+              href="#how-it-works"
+              className="text-sm font-medium text-bark hover:text-forest no-underline"
+            >
+              How it works
+            </a>
             <Link
               href="/pricing"
               className="text-sm font-medium text-bark hover:text-forest no-underline"
@@ -106,6 +113,12 @@ export default async function MarketingLandingPage() {
               </svg>
             </summary>
             <div className="absolute right-0 mt-2 w-44 bg-cream border border-sand rounded-xl shadow-sm py-1.5 z-20 flex flex-col">
+              <a
+                href="#how-it-works"
+                className="px-4 py-2 text-sm text-bark hover:bg-oat hover:text-forest no-underline"
+              >
+                How it works
+              </a>
               <Link
                 href="/pricing"
                 className="px-4 py-2 text-sm text-bark hover:bg-oat hover:text-forest no-underline"
@@ -157,6 +170,11 @@ export default async function MarketingLandingPage() {
           </p>
         </div>
       </header>
+
+      {/* How it works — the four-stage explainer (mirrors the flow
+          chart). Sits right after the hero so a first-time visitor
+          understands the model before the feature deep-dive. */}
+      <HowItWorks />
 
       {/* Feature cards. Sub-session 32 rewrite: leads with the
           gross-margin + audit-trail combo (Phase 12). Card #2
