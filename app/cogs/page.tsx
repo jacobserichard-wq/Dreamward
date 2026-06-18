@@ -242,7 +242,7 @@ export default function CogsPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          title="COGS & gross margin"
+          title="COGS & Gross Margin"
           subtitle="Per-period revenue, cost of goods sold, and margin — broken down by channel and by SKU. Click any number for the audit trail."
         />
 
