@@ -4,7 +4,7 @@
 
 Dreamward ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use Dreamward at godreamward.com (the "Service"). By using the Service, you agree to this policy.
 
-Dreamward is operated by Richard Jacobsen, an individual sole proprietor based in Cedar Lake, Indiana, USA. For privacy questions, contact jacobse.richard@gmail.com.
+Dreamward is operated by Richard Jacobsen, an individual sole proprietor based in Cedar Lake, Indiana, USA. For privacy questions, contact Dreamwardsystems@gmail.com.
 
 ---
 
@@ -131,7 +131,7 @@ You have the right to:
 - **Export** your data in a machine-readable format
 - **Revoke** Google account access at any time
 
-To exercise any of these rights, email **jacobse.richard@gmail.com** with your request and the email address associated with your account. We will respond within 30 days. Manual deletion of account data and processed items will be completed within 30 days of a valid deletion request, with the exceptions noted in Section 7.
+To exercise any of these rights, email **Dreamwardsystems@gmail.com** with your request and the email address associated with your account. We will respond within 30 days. Manual deletion of account data and processed items will be completed within 30 days of a valid deletion request, with the exceptions noted in Section 7.
 
 If you are a California resident, you have additional rights under the CCPA, including the right to know what personal information we have collected and the right to opt out of any "sale" of personal information (we do not sell personal information).
 
@@ -175,7 +175,7 @@ We may update this policy from time to time. Material changes will be communicat
 
 For privacy questions, requests, or concerns:
 
-**Email:** jacobse.richard@gmail.com
+**Email:** Dreamwardsystems@gmail.com
 **Mailing location:** Cedar Lake, Indiana, USA
 
 ---

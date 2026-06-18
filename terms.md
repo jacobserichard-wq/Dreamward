@@ -26,7 +26,7 @@ You are responsible for:
 - All activity that occurs under your account
 - Ensuring that the email content you process through Dreamward does not violate the rights of others, applicable laws, or third-party agreements
 
-If you suspect unauthorized access to your account, contact us immediately at jacobse.richard@gmail.com.
+If you suspect unauthorized access to your account, contact us immediately at Dreamwardsystems@gmail.com.
 
 ---
 
@@ -46,7 +46,7 @@ The Service is offered on a subscription basis with four tiers: Dream ($10/month
 
 ## 4. Refund policy
 
-We offer a **14-day money-back guarantee** on initial paid subscriptions. If you are unsatisfied with the Service within 14 days of your first paid charge, email jacobse.richard@gmail.com with your account email and we will refund that charge in full.
+We offer a **14-day money-back guarantee** on initial paid subscriptions. If you are unsatisfied with the Service within 14 days of your first paid charge, email Dreamwardsystems@gmail.com with your account email and we will refund that charge in full.
 
 The 14-day money-back guarantee applies only to the first paid period of an account. Subsequent renewals, plan upgrades, and downgrades are not refundable. Pro-rated refunds for mid-cycle cancellations are not provided; you retain access through the end of the period you paid for.
 
@@ -144,7 +144,7 @@ If you do not agree to a change, your only remedy is to cancel your subscription
 
 These Terms are governed by the laws of the State of Indiana, USA, without regard to conflict-of-laws principles. Any dispute arising from these Terms or the Service will be resolved exclusively in the state or federal courts located in Lake County, Indiana, and you consent to the personal jurisdiction of those courts.
 
-You agree to attempt informal resolution by contacting us at jacobse.richard@gmail.com before initiating any formal legal proceeding.
+You agree to attempt informal resolution by contacting us at Dreamwardsystems@gmail.com before initiating any formal legal proceeding.
 
 ---
 
@@ -158,7 +158,7 @@ You agree to attempt informal resolution by contacting us at jacobse.richard@gma
 
 **No assignment.** You may not assign or transfer these Terms without our written consent. We may assign these Terms in connection with a sale of the business or similar transaction.
 
-**Notices.** We will send notices to the email address associated with your account. You may send notices to jacobse.richard@gmail.com.
+**Notices.** We will send notices to the email address associated with your account. You may send notices to Dreamwardsystems@gmail.com.
 
 ---
 
@@ -166,5 +166,5 @@ You agree to attempt informal resolution by contacting us at jacobse.richard@gma
 
 For questions about these Terms:
 
-**Email:** jacobse.richard@gmail.com
+**Email:** Dreamwardsystems@gmail.com
 **Mailing location:** Cedar Lake, Indiana, USA

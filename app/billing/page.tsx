@@ -7,6 +7,7 @@ import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
 import { apiFetch } from "@/lib/apiFetch";
 import { TIER_DISPLAY, BANDS, serviceTierLabel, type PaidPlanName } from "@/lib/plans";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 interface BillingData {
   plan: string;
@@ -75,7 +76,7 @@ export default function BillingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        setError("Billing portal returned no URL — please contact support.");
+        setError(`Billing portal returned no URL — please email ${SUPPORT_EMAIL}.`);
         setActionLoading(null);
       }
     } catch (err) {
@@ -98,7 +99,7 @@ export default function BillingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        setError("Checkout returned no URL — please contact support.");
+        setError(`Checkout returned no URL — please email ${SUPPORT_EMAIL}.`);
         setActionLoading(null);
       }
     } catch (err) {
