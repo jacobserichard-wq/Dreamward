@@ -81,8 +81,20 @@ export default function ChannelTable({
   variant = "dashboard",
 }: ChannelTableProps) {
   const collapsed = new Set(collapsedChannels);
-  const visibleChannels = channels.filter((c) => !collapsed.has(c.id));
+  const notCollapsed = channels.filter((c) => !collapsed.has(c.id));
   const hiddenChannels = channels.filter((c) => collapsed.has(c.id));
+
+  // Once any channel has activity, tuck the zero-activity channels into a
+  // disclosure below so the table only shows channels where money actually
+  // moved. A brand-new account (no activity anywhere) still sees every
+  // channel in the table, so its add-a-sale / connect CTAs guide setup.
+  const anyData = channels.some((c) => c.hasData);
+  const visibleChannels = anyData
+    ? notCollapsed.filter((c) => c.hasData)
+    : notCollapsed;
+  const emptyChannels = anyData
+    ? notCollapsed.filter((c) => !c.hasData)
+    : [];
 
   // Bar widths normalized to the largest revenue value (so the
   // biggest channel fills the bar). Math.max with 1 guards against
@@ -209,6 +221,63 @@ export default function ChannelTable({
           </tbody>
         </table>
       </div>
+
+      {/* No-activity channels — auto-tucked so the table above only lists
+          channels where money actually moved. CTAs (add a sale, connect a
+          store, subscribe) are preserved here so empty channels stay
+          reachable; clicking one still routes the same as the inline CTA. */}
+      {emptyChannels.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <details className="group">
+            <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900 list-none flex items-center gap-2">
+              <span className="text-slate-400 group-open:rotate-90 transition-transform inline-block">
+                {"\u{25B6}"}
+              </span>
+              Show {emptyChannels.length} channel
+              {emptyChannels.length === 1 ? "" : "s"} with no activity yet
+            </summary>
+            <ul className="mt-2 space-y-1.5 pl-5 m-0 list-none">
+              {emptyChannels.map((ch) => {
+                const ctaHref =
+                  ch.proGated && !isPro ? "/billing" : ch.emptyAddHref;
+                const ctaLabel =
+                  ch.proGated && !isPro
+                    ? `Subscribe to add ${ch.label}`
+                    : ch.emptyAddLabel;
+                return (
+                  <li
+                    key={ch.id}
+                    className="flex items-center justify-between gap-3 text-xs py-1"
+                  >
+                    <span className="text-slate-500 flex items-center gap-2 min-w-0">
+                      <span className="flex-shrink-0">{ch.icon}</span>
+                      <span className="truncate">{ch.label}</span>
+                      {ch.comingSoon && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">
+                          Coming soon
+                        </span>
+                      )}
+                      {ch.proGated && !isPro && !ch.comingSoon && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 flex-shrink-0">
+                          Pro
+                        </span>
+                      )}
+                    </span>
+                    {!ch.comingSoon && ctaHref && ctaLabel && (
+                      <Link
+                        href={ctaHref}
+                        className="text-blue-600 hover:underline whitespace-nowrap flex-shrink-0"
+                      >
+                        {ctaLabel} {"\u{2192}"}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        </div>
+      )}
 
       {/* Show-collapsed expander */}
       {showShowMore && (
