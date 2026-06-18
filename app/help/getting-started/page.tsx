@@ -82,6 +82,15 @@ export default function GettingStartedGuide() {
           subtitle="A complete walkthrough from sign-in to generating your first Schedule-C P&L. About 15 minutes end-to-end."
         />
 
+        <p className="text-sm text-slate-600 mb-6">
+          Prefer the quick version first? The{" "}
+          <Link href="/how-it-works" className="text-blue-600 no-underline hover:underline">
+            How it works
+          </Link>{" "}
+          overview shows the whole flow on one page — this guide is the deep
+          walkthrough.
+        </p>
+
         {/* Table of contents */}
         <nav className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-10">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 m-0 mb-3">
@@ -199,10 +208,15 @@ export default function GettingStartedGuide() {
             Square, you don&apos;t have to re-enter them here.
           </Callout>
           <p>
-            If you don&apos;t use any of those platforms — or you want to add
-            historical data from one you used to use — skip ahead to{" "}
-            <a href="#log-market-day" className="text-blue-600 no-underline hover:underline">section 5</a>{" "}
-            on CSV upload.
+            <strong>No online store?</strong> You have three other ways to get
+            sales in. For a one-off cash, Venmo, or word-of-mouth sale, hit{" "}
+            <strong>&ldquo;+ Add a sale&rdquo;</strong> on the{" "}
+            <Link href="/dashboard?view=transactions" className="text-blue-600 no-underline hover:underline">Transactions</Link>{" "}
+            page — it defaults to the <strong>Direct</strong> channel. For a
+            market, use events + Market Day (
+            <a href="#log-market-day" className="text-blue-600 no-underline hover:underline">section 5</a>).
+            And to bulk-import history — or a one-off spreadsheet — use the{" "}
+            <strong>Upload</strong> button (CSV, TSV, or XLSX).
           </p>
         </Section>
 
@@ -344,6 +358,14 @@ export default function GettingStartedGuide() {
             Expense (rent, SaaS, marketing). Dreamward tags COGS categories
             automatically based on your industry preferences — Schedule-C will
             split them correctly.
+          </p>
+          <p>
+            <strong>Got a PDF invoice from a supplier?</strong> Skip the typing.
+            Hit <strong>Upload</strong> in the top nav and drop the PDF —
+            Dreamward reads the vendor, amount, date, and a category off the
+            document, shows them for a quick review, then saves the transaction{" "}
+            <em>and</em> keeps the original PDF attached to it, downloadable any
+            time. (CSV/TSV/XLSX upload works too, for a batch of rows.)
           </p>
           <p>
             <strong>Attaching a receipt:</strong> every expense row has a
