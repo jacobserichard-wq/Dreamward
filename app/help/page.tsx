@@ -13,6 +13,7 @@
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata = {
   title: "Help & guides",
@@ -180,12 +181,12 @@ export default function HelpHubPage() {
         </section>
 
         <p className="text-center text-xs text-slate-400 mt-12">
-          Can&apos;t find what you need?{" "}
+          Can&apos;t find what you need? Email us at{" "}
           <a
-            href="mailto:support@godreamward.com"
+            href={`mailto:${SUPPORT_EMAIL}`}
             className="text-blue-600 no-underline hover:underline"
           >
-            Email support
+            {SUPPORT_EMAIL}
           </a>{" "}
           and we&apos;ll write the guide you needed.
         </p>

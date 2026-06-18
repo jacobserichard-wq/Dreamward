@@ -21,6 +21,7 @@
 import Link from "next/link";
 import PageHeader from "../../components/PageHeader";
 import AppHeader from "../../components/AppHeader";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata = {
   title: "Getting started",
@@ -488,7 +489,13 @@ export default function GettingStartedGuide() {
               quietly losing money. Raise their prices or stop making them.
             </li>
             <li>
-              <strong>Reach out if you get stuck</strong> — email support
+              <strong>Reach out if you get stuck</strong> — email{" "}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="text-blue-600 no-underline hover:underline"
+              >
+                support
+              </a>{" "}
               anytime. Growth and Pro tiers get priority response times if
               you need answers fast.
             </li>
@@ -508,12 +515,12 @@ export default function GettingStartedGuide() {
             </li>
           </ul>
           <p>
-            Stuck on something this guide didn&apos;t answer?{" "}
+            Stuck on something this guide didn&apos;t answer? Email us at{" "}
             <a
-              href="mailto:support@godreamward.com"
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="text-blue-600 no-underline hover:underline"
             >
-              Email support
+              {SUPPORT_EMAIL}
             </a>{" "}
             — every question becomes a guide section so the next person
             doesn&apos;t have to ask.
