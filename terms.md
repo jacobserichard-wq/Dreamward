@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last updated: May 5, 2026**
+**Last updated: June 16, 2026**
 
 These Terms of Service ("Terms") govern your access to and use of Dreamward at godreamward.com (the "Service"), operated by Richard Jacobsen, a sole proprietor based in Cedar Lake, Indiana, USA ("Dreamward," "we," "us," or "our"). By creating an account or using the Service, you agree to these Terms.
 
@@ -10,7 +10,7 @@ If you do not agree to these Terms, do not use the Service.
 
 ## 1. What Dreamward does
 
-Dreamward is an AI-powered accounting automation tool. It connects to your Gmail account, reads emails you have labeled (such as invoices, receipts, or expenses), and uses AI to extract structured financial data — vendor, amount, due date, category, and similar fields. It also accepts CSV uploads for bulk data import. Dreamward displays your data in dashboards, reports, and exports for use in your own accounting and tax workflows.
+Dreamward is gross-margin tracking and Schedule-C profit-and-loss software for small businesses. It connects to your sales channels (such as Shopify, Wix, Square, and Etsy), accepts file uploads (CSV/TSV/XLSX spreadsheets and PDF invoices), and lets you record sales and expenses manually. It uses AI to extract structured financial data — vendor, amount, date, category, and similar fields — from the files you upload. Dreamward displays your data in dashboards, reports, and exports for use in your own accounting and tax workflows.
 
 **Dreamward is not an accounting firm.** We do not provide accounting, bookkeeping, tax, financial, legal, or investment advice. You are responsible for verifying the accuracy of all data extracted by the Service before using it for tax filing, financial reporting, or any other regulated purpose. We strongly recommend reviewing AI-extracted data before relying on it.
 
@@ -32,7 +32,7 @@ If you suspect unauthorized access to your account, contact us immediately at Dr
 
 ## 3. Subscriptions and billing
 
-The Service is offered on a subscription basis with four tiers: Dream ($10/month), Maker ($19/month), Growth ($49/month), and Pro ($99/month). Every tier includes every product feature; tiers are sized by your business annual revenue. Pricing and feature lists are at godreamward.com.
+The Service is offered on a monthly subscription. **Every plan includes every product feature** — there are no feature-gated tiers. Your price is set by your business's size: we place you in one of seven revenue bands, based on the trailing twelve months of revenue you track in Dreamward, ranging from $10/month (under $5,000 in revenue) to $99/month ($300,000+). Your band is reviewed periodically and may move up or down as your revenue changes; a band change takes effect on your next billing cycle and is not applied retroactively. Current band pricing is listed at godreamward.com.
 
 **Free trial.** New accounts begin with a 14-day free trial. No payment method is required to start the trial. At the end of the trial, you may subscribe to a paid plan or your access will be limited.
 
@@ -71,7 +71,7 @@ We reserve the right to suspend or terminate accounts that violate these terms. 
 
 ## 6. Your data and intellectual property
 
-**Your data is yours.** You retain all rights to the email content, CSV uploads, and other data you submit to the Service. By using the Service, you grant us a limited, non-exclusive license to access, process, and display that data solely for the purpose of providing the Service to you.
+**Your data is yours.** You retain all rights to the files, sales data, and other content you submit to the Service. By using the Service, you grant us a limited, non-exclusive license to access, process, and display that data solely for the purpose of providing the Service to you.
 
 **We are not your data custodian.** You are responsible for maintaining your own backups of important financial data. While we maintain the Service with reasonable care (Section 9), you should not rely on Dreamward as your sole record of financial information.
 
@@ -83,7 +83,7 @@ We reserve the right to suspend or terminate accounts that violate these terms. 
 
 ## 7. Third-party services
 
-Dreamward integrates with services operated by third parties, including Google (Gmail), Stripe, Anthropic, Vercel, Railway, Resend, and Calendly. Your use of these services through Dreamward is subject to those companies' terms and privacy policies. We are not responsible for the practices, availability, or content of third-party services.
+Dreamward integrates with services operated by third parties, including Google (sign-in), Shopify, Wix, Square, Etsy, Stripe, Anthropic, Vercel, Railway, and Resend. Your use of these services through Dreamward is subject to those companies' terms and privacy policies. We are not responsible for the practices, availability, or content of third-party services.
 
 If a third-party service we depend on becomes unavailable or changes its terms, we may modify the Service to adapt, including discontinuing affected features.
 

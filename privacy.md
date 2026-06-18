@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: May 5, 2026**
+**Last updated: June 16, 2026**
 
 Dreamward ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use Dreamward at godreamward.com (the "Service"). By using the Service, you agree to this policy.
 
@@ -14,7 +14,7 @@ We collect three categories of information:
 
 **Information you provide directly.** When you create an account, you give us your business name, industry, and any custom expense categories you configure. When you upload CSV files for processing, we receive the data those files contain.
 
-**Information collected through Google sign-in.** When you sign in with Google, we receive your name, email address, and profile picture from Google. We also request access to your Gmail account through OAuth scopes (described in Section 2 below) so the Service can read invoice and receipt emails on your behalf.
+**Information collected through Google sign-in.** When you sign in with Google, we request only the `openid` and `email` scopes. We receive your email address and a Google account identifier — used to create and identify your account. We do not request your name, profile picture, Gmail, or any other Google data.
 
 **Information collected automatically.** When you use the Service, we automatically log usage events such as the number of items processed per month, sign-in timestamps, and basic technical information (IP address, browser type) for security and reliability purposes. We use Vercel's built-in analytics for hosting telemetry; we do not use third-party advertising trackers.
 
@@ -22,29 +22,11 @@ We do not collect Social Security numbers, government IDs, biometric data, geolo
 
 ---
 
-## 2. How we use Google user data
+## 2. How we use Google sign-in
 
-Dreamward's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+Dreamward uses Google **solely to sign you in.** We request only the `openid` and `email` scopes — the minimum needed to create and identify your account. We receive your email address and a Google account identifier; nothing else.
 
-We request the following Google OAuth scopes:
-
-- **`openid`**, **`email`**, and **`profile`** — to identify you and create your Dreamward account.
-- **`https://www.googleapis.com/auth/gmail.readonly`** — to read the content of email messages in your Gmail account. This is a "Restricted" scope under Google's classification.
-- **`https://www.googleapis.com/auth/gmail.labels`** — to view and manage Gmail labels (used to identify which emails you have designated for processing).
-
-**What the Gmail scope grants vs. how Dreamward uses it.** The `gmail.readonly` scope is broad: it grants Dreamward's servers the technical ability to read any message in your Gmail account. We disclose this honestly because Google requires us to request the scope at this level — Gmail does not currently offer a narrower production scope that would let us read only labeled messages while still accessing message bodies.
-
-In practice, Dreamward's application code only reads messages that match the Gmail labels you configure (by default: Invoices, Expenses, AR, or whatever labels you select during onboarding). We do not retrieve, store, display, or process messages outside those labels. We do not maintain copies of your full inbox. The broader technical access is not used, not logged, and not retained beyond the duration of the labeled-message fetch.
-
-If you would prefer not to grant this level of access, you should not connect your Gmail account to Dreamward. CSV upload remains available as an alternative for users who do not want to link their Gmail.
-
-We use Gmail data **only** to provide the user-facing accounting automation features of Dreamward. Specifically:
-
-- We do **not** sell Gmail data to anyone.
-- We do **not** use Gmail data for advertising or marketing.
-- We do **not** allow human employees to read your Gmail content, except (a) with your explicit consent, (b) for security purposes such as investigating abuse, or (c) when required by law.
-- We do **not** use Gmail data to train, fine-tune, or develop generalized AI or machine learning models. (Anthropic's Claude API, which we use to extract structured data from your emails, does not train on API inputs by default.)
-- We do **not** transfer Gmail data to third parties except subprocessors essential to providing the Service (described in Section 5).
+We do **not** request access to your Gmail, Google Drive, contacts, calendar, profile details, or any other Google service. We do not read, store, or process any Google data beyond your email address, we do not use it for advertising, and we do not sell it.
 
 You can revoke Dreamward's access to your Google account at any time at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
@@ -55,7 +37,7 @@ You can revoke Dreamward's access to your Google account at any time at [myaccou
 We use the information we collect to:
 
 - Create and manage your Dreamward account
-- Read and process emails you have labeled, to extract invoice/receipt data using AI
+- Extract structured data (vendor, amount, date, category) from files you upload, using AI
 - Display your processed data in dashboards, reports, and exports
 - Process payments through Stripe
 - Send transactional emails (welcome, trial expiration, payment notifications)
@@ -69,14 +51,14 @@ We do not use your information for advertising, profiling, or any purpose unrela
 
 ## 4. AI processing of your data
 
-Dreamward uses Anthropic's Claude API to read the content of emails and CSV uploads and extract structured information (vendor name, amount, due date, category). When this happens:
+Dreamward uses Anthropic's Claude API to read the content of the files you upload (CSV/TSV/XLSX spreadsheets and PDF invoices) and extract structured information (vendor name, amount, due date, category). When this happens:
 
-- Email content is sent to Anthropic's servers in real time.
+- Your uploaded file content is sent to Anthropic's servers in real time.
 - Anthropic does **not** train its AI models on data submitted through its API, per Anthropic's published commercial terms.
 - Anthropic retains API requests for 30 days for abuse monitoring, then deletes them.
 - We do not use any other AI provider for content processing.
 
-If you do not want your emails processed by an AI model, do not connect your Gmail account or use the Process with AI feature.
+If you do not want your data processed by an AI model, do not use the file-upload features.
 
 ---
 
@@ -86,13 +68,12 @@ We share information with the following service providers who help us operate Dr
 
 | Service | What they receive | Purpose |
 |---|---|---|
-| **Google (Cloud + Gmail API)** | OAuth tokens, profile info | Sign-in and Gmail access |
-| **Anthropic (Claude API)** | Email content for processing | AI data extraction |
+| **Google** | Email address | Sign-in |
+| **Anthropic (Claude API)** | Uploaded file content (CSV / PDF) | AI data extraction |
 | **Vercel** | All Service traffic and logs | Hosting and infrastructure |
 | **Railway** | Database contents | PostgreSQL hosting |
 | **Stripe** | Name, email, payment method | Subscription billing |
 | **Resend** | Name, email | Transactional email delivery |
-| **Calendly** (Pro tier only) | Name, email | Onboarding call booking |
 
 We do not sell your information to anyone. We do not share information with advertising networks.
 
