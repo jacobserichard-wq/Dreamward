@@ -1415,8 +1415,10 @@ function DashboardInner() {
             )}
             {/* UX commit 4: status-filter chip. Visible only when a
                 filter is active (typically set by clicking a Status
-                Breakdown pill on the Dashboard tab). */}
-            {processedStatusFilter && (
+                Breakdown pill on the Dashboard tab). Hidden during an
+                active search, which spans all transactions regardless of
+                this filter. */}
+            {!txnSearch.trim() && processedStatusFilter && (
               <div className="mb-4 flex items-center gap-2 flex-wrap">
                 <span className="text-sm text-slate-600">
                   Showing only <strong>{processedStatusFilter.replace("_", " ")}</strong> items
@@ -1435,7 +1437,8 @@ function DashboardInner() {
                 status-filter chip is active (the status-filter chip
                 takes precedence — clicking the dashboard's "paid"
                 pill should still surface paid items). */}
-            {processedStatusFilter === null &&
+            {!txnSearch.trim() &&
+              processedStatusFilter === null &&
               processedItems.some((i) => i.status === "paid") && (
                 <div className="mb-4 flex items-center gap-2 flex-wrap text-sm text-slate-600">
                   {hideSettled ? (
@@ -1480,12 +1483,15 @@ function DashboardInner() {
                 : hideSettled
                 ? processedItems.filter((i) => i.status !== "paid")
                 : processedItems;
-              // Narrow further by the free-text search, if any. Build a
-              // lowercase haystack per row from the fields a user is
-              // likely to recall, then substring-match the trimmed query.
+              // Search is "find" mode, not "filter the current view": when
+              // a query is present, look across ALL transactions — settled
+              // included, regardless of the status pill — so a specific
+              // entry is always findable. (The status + settled filters
+              // only shape the default browse view.) Build a lowercase
+              // haystack per row from the fields a user is likely to recall.
               const q = txnSearch.trim().toLowerCase();
               const searchedItems = q
-                ? visibleItems.filter((i) =>
+                ? processedItems.filter((i) =>
                     [
                       i.vendor,
                       i.category,
@@ -1515,18 +1521,11 @@ function DashboardInner() {
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F50D}"}</p>
                 {q ? (
-                  // Search took precedence — name what was searched and
-                  // why it might be empty (status/settled still apply),
-                  // with a one-click reset.
+                  // Search spans every transaction, so an empty result is
+                  // unambiguous: nothing matches. Offer a one-click reset.
                   <p>
                     No transactions match{" "}
-                    <strong>&ldquo;{txnSearch.trim()}&rdquo;</strong>
-                    {processedStatusFilter
-                      ? " in this filter"
-                      : hideSettled
-                      ? " — settled items are hidden"
-                      : ""}
-                    .{" "}
+                    <strong>&ldquo;{txnSearch.trim()}&rdquo;</strong>.{" "}
                     <button
                       type="button"
                       onClick={() => setTxnSearch("")}
