@@ -8,6 +8,10 @@ import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import SaleForm, { type SaleFormSubmit } from "../components/SaleForm";
+import RefundForm, {
+  type RefundFormSubmit,
+  type RefundPrefill,
+} from "../components/RefundForm";
 import ConfirmModal from "../components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import type { ChannelRow } from "../components/ChannelTable";
@@ -54,6 +58,9 @@ interface ProcessedItem {
   // "Currently in X" preview in the ReclassifyModal + powers
   // future per-channel filters on this tab.
   channel: string | null;
+  // Event this row is linked to (markets sales/expenses). Lets
+  // "Refund this" carry the event so the refund nets per-event too.
+  eventId: number | null;
   // Receipt/invoice files attached to this transaction (e.g. an
   // uploaded PDF invoice) — surfaced as a download link on the card.
   attachments?: { id: number; filename: string; mimeType: string }[];
@@ -133,6 +140,11 @@ function DashboardInner() {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  // "Log a refund" / "Refund this" — both open RefundForm. refundPrefill
+  // is set (customer/amount/channel/event from a sale) for "Refund this",
+  // null for the standalone "Log a refund" button.
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundPrefill, setRefundPrefill] = useState<RefundPrefill | null>(null);
 
   // Event auto-coding state — Phase 3 sub-session 17. The selector drives
   // which event uploaded CSV rows auto-code to. "auto" runs per-row date
@@ -205,6 +217,7 @@ function DashboardInner() {
         summary: item.summary || "",
         source: item.source || "email",
         channel: item.channel ?? null,
+        eventId: item.event_id ?? null,
         attachments: item.attachments || [],
       }));
       setProcessedItems(mapped);
@@ -883,6 +896,43 @@ function DashboardInner() {
     [loadItems]
   );
 
+  // A refund is a "Returns & Refunds" expense — the revenue/band calc and
+  // the tax report both subtract that category, so this nets out of
+  // revenue and reduces the tagged channel's (and event's) profit.
+  const handleSaveRefund = useCallback(
+    async (data: RefundFormSubmit) => {
+      await apiFetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vendor: data.customer || "Refund",
+          amount: data.amount,
+          dueDate: data.dueDate,
+          category: "Returns & Refunds",
+          channel: data.channel,
+          eventId: data.eventId,
+          notes: data.notes,
+        }),
+      });
+      setShowRefundForm(false);
+      setRefundPrefill(null);
+      setSuccessMsg("Refund logged.");
+      await loadItems();
+    },
+    [loadItems]
+  );
+
+  // Open RefundForm pre-filled from a specific sale ("Refund this").
+  const openRefundForItem = useCallback((item: ProcessedItem) => {
+    setRefundPrefill({
+      customer: item.vendor,
+      amount: item.amount,
+      channel: item.channel,
+      eventId: item.eventId,
+    });
+    setShowRefundForm(true);
+  }, []);
+
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
   // Phase 4: total business miles across all events. Sums totalMiles (the
@@ -1347,6 +1397,16 @@ function DashboardInner() {
                 >
                   <span>+</span> Add a sale
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRefundPrefill(null);
+                    setShowRefundForm(true);
+                  }}
+                  className="py-1.5 px-3 rounded-lg border border-rose-300 bg-white hover:bg-rose-50 text-rose-700 text-sm font-semibold cursor-pointer inline-flex items-center gap-1"
+                >
+                  {"\u{21A9}"} Log a refund
+                </button>
               </div>
               <button
                 type="button"
@@ -1709,7 +1769,22 @@ function DashboardInner() {
                         })}
                       </div>
                     </div>
-                    <div className="px-4 pb-3 text-right">
+                    <div className="px-4 pb-3 flex items-center justify-between gap-2">
+                      {/* "Refund this" — only on income/sale rows (an
+                          expense or an existing refund can't be refunded).
+                          Pre-fills the refund with this sale's customer,
+                          amount, channel + event. */}
+                      {incomeCategories.includes(item.category) ? (
+                        <button
+                          type="button"
+                          onClick={() => openRefundForItem(item)}
+                          className="bg-transparent text-rose-600 hover:text-rose-700 hover:underline text-xs cursor-pointer px-2 py-1 inline-flex items-center gap-1"
+                        >
+                          {"\u{21A9}"} Refund this
+                        </button>
+                      ) : (
+                        <span />
+                      )}
                       <button
                         onClick={() => deleteItem(item.id)}
                         disabled={deletingItems.has(item.id)}
@@ -2029,6 +2104,17 @@ function DashboardInner() {
           events={availableEvents}
           onSave={handleSaveSale}
           onClose={() => setShowSaleForm(false)}
+        />
+
+        <RefundForm
+          open={showRefundForm}
+          events={availableEvents}
+          prefill={refundPrefill}
+          onSave={handleSaveRefund}
+          onClose={() => {
+            setShowRefundForm(false);
+            setRefundPrefill(null);
+          }}
         />
 
         {/* ── CLEAR SAMPLE DATA CONFIRMATION ── */}
