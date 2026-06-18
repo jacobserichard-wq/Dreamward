@@ -33,9 +33,13 @@ interface EventItemRow {
   created_at: string;
 }
 
-interface LinkedSummaryRow {
-  count: string;
-  total_amount: string | null;
+interface LinkedTxnRow {
+  id: number;
+  vendor: string | null;
+  amount: string | null;
+  due_date: string | Date | null;
+  category: string | null;
+  status: string | null;
 }
 
 interface PatchBody {
@@ -181,18 +185,36 @@ export async function GET(
       [eventId, client.id]
     );
 
-    // Linked-transaction summary — drives the "Sales from linked uploads:
-    // $X across N transactions" headline on the detail page (design §5.4).
-    const linkedResult = await pool.query<LinkedSummaryRow>(
-      `SELECT COUNT(*)::text AS count,
-              COALESCE(SUM(amount), 0)::text AS total_amount
+    // Linked transactions — the actual sales/expenses tied to this event.
+    // Drives both the "$X across N transactions" headline AND the inline
+    // drill-down list on the detail page, so the user can see what makes
+    // up the linked-revenue total without leaving for the Transactions
+    // page. Count + total are derived from the rows (single query).
+    const linkedResult = await pool.query<LinkedTxnRow>(
+      `SELECT id, vendor, amount, due_date, category, status
          FROM processed_items
-        WHERE event_id = $1 AND client_id = $2`,
+        WHERE event_id = $1 AND client_id = $2
+        ORDER BY due_date DESC NULLS LAST, id DESC`,
       [eventId, client.id]
     );
-    const linked = linkedResult.rows[0];
-    const linkedCount = Number(linked?.count ?? 0);
-    const linkedTotal = Number(linked?.total_amount ?? 0);
+    const linkedTransactions = linkedResult.rows.map((r) => ({
+      id: r.id,
+      vendor: r.vendor ?? "Unknown",
+      amount: Number(r.amount ?? 0),
+      // Date columns can come back as strings or Date objects depending on
+      // the pg parser; normalize to a string. The client formats the
+      // calendar date from the YYYY-MM-DD prefix to avoid UTC off-by-one.
+      dueDate:
+        r.due_date == null
+          ? null
+          : typeof r.due_date === "string"
+            ? r.due_date
+            : r.due_date.toISOString(),
+      category: r.category,
+      status: r.status,
+    }));
+    const linkedCount = linkedTransactions.length;
+    const linkedTotal = linkedTransactions.reduce((s, t) => s + t.amount, 0);
 
     return NextResponse.json({
       event: serializeEvent(eventResult.rows[0]),
@@ -200,6 +222,7 @@ export async function GET(
       linkedTransactions: {
         count: linkedCount,
         totalAmount: linkedTotal,
+        transactions: linkedTransactions,
       },
       totalMiles: computeTotalMiles(eventResult.rows[0]),
     });

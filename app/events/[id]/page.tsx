@@ -24,9 +24,19 @@ interface EventItem {
   createdAt: string;
 }
 
+interface LinkedTxn {
+  id: number;
+  vendor: string;
+  amount: number;
+  dueDate: string | null;
+  category: string | null;
+  status: string | null;
+}
+
 interface LinkedTransactions {
   count: number;
   totalAmount: number;
+  transactions: LinkedTxn[];
 }
 
 // Per-event P&L slice from /api/profitability — see app/api/profitability/route.ts.
@@ -77,6 +87,21 @@ function formatMoney(n: number): string {
   });
 }
 
+// Format a transaction's calendar date for the linked drill-down. Parses
+// the YYYY-MM-DD prefix into a LOCAL date so we never show the prior day
+// from a UTC-midnight ISO string (the known due-date off-by-one trap).
+function formatLinkedDate(raw: string | null): string {
+  if (!raw) return "No date";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!m) return raw;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function EventDetailPage({ params }: PageProps) {
   const { id: rawId } = use(params);
   const router = useRouter();
@@ -84,6 +109,9 @@ export default function EventDetailPage({ params }: PageProps) {
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [linkedTx, setLinkedTx] = useState<LinkedTransactions | null>(null);
+  // Drill-down: reveal the actual transactions behind the linked-revenue
+  // total inline, so the user doesn't have to leave for the Transactions page.
+  const [showLinkedTxns, setShowLinkedTxns] = useState(false);
   const [totalMiles, setTotalMiles] = useState<number | null>(null);
   // Phase 5 commit 6: per-event P&L breakdown sourced from /api/profitability.
   // null until first fetch or if the endpoint returns no slice for this event.
@@ -770,6 +798,67 @@ export default function EventDetailPage({ params }: PageProps) {
               </dd>
             </div>
           </dl>
+
+          {/* Drill-down into the linked transactions. The revenue row above
+              says "$X from N linked txns" but the breakdown alone can't show
+              WHICH sales — this expandable list does, inline, so the user
+              never has to bounce to the Transactions page just to see what
+              an event's revenue is made of. Read-only: edits still happen on
+              the Transactions page. */}
+          {linkedTx && linkedTx.transactions.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowLinkedTxns((s) => !s)}
+                aria-expanded={showLinkedTxns}
+                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform ${showLinkedTxns ? "rotate-90" : ""}`}
+                  aria-hidden="true"
+                >
+                  <polyline points="9 6 15 12 9 18" />
+                </svg>
+                {showLinkedTxns ? "Hide" : "View"} {linkedTx.transactions.length}{" "}
+                linked {linkedTx.transactions.length === 1 ? "transaction" : "transactions"}
+              </button>
+              {showLinkedTxns && (
+                <ul className="mt-2 border border-slate-100 rounded-lg divide-y divide-slate-100 overflow-hidden list-none p-0 m-0">
+                  {linkedTx.transactions.map((t) => (
+                    <li
+                      key={t.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate m-0">
+                          {t.vendor}
+                        </p>
+                        <p className="text-xs text-slate-400 m-0">
+                          {formatLinkedDate(t.dueDate)}
+                          {t.category ? ` · ${t.category}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                          t.amount < 0 ? "text-red-700" : "text-slate-900"
+                        }`}
+                      >
+                        {t.amount < 0 ? "−" : ""}${formatMoney(Math.abs(t.amount))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Schedule C deduction value at IRS rate. Surfaced
               alongside the operating cost above so the user sees
