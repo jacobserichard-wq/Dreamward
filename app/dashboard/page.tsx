@@ -725,6 +725,12 @@ function DashboardInner() {
   // for "paid" should still surface paid rows even with this on.
   const [hideSettled, setHideSettled] = useState<boolean>(true);
 
+  // Free-text search over the Transactions list. Matches vendor/customer,
+  // category, channel, invoice #, status, and amount so a specific
+  // transaction is findable without scrolling a long list. Layers on top
+  // of the status + settled filters (it narrows whatever those leave).
+  const [txnSearch, setTxnSearch] = useState<string>("");
+
 
 
   const requestClearSample = useCallback(() => {
@@ -1378,6 +1384,35 @@ function DashboardInner() {
                 {"\u{2B07}\u{FE0F}"} Download CSV template
               </a>
             </div>
+            {/* Search box: locate a specific transaction without scrolling.
+                Only shown once there's something to search. Filters
+                vendor/customer, category, channel, invoice #, status, and
+                amount — applied below, after the status/settled filters. */}
+            {processedItems.length > 0 && (
+              <div className="mb-4 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none select-none">
+                  {"\u{1F50D}"}
+                </span>
+                <input
+                  type="text"
+                  value={txnSearch}
+                  onChange={(e) => setTxnSearch(e.target.value)}
+                  placeholder="Search by customer, category, channel, amount, or invoice #…"
+                  aria-label="Search transactions"
+                  className="w-full pl-9 pr-9 py-2.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                {txnSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setTxnSearch("")}
+                    aria-label="Clear search"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer text-sm leading-none p-1"
+                  >
+                    {"\u{2715}"}
+                  </button>
+                )}
+              </div>
+            )}
             {/* UX commit 4: status-filter chip. Visible only when a
                 filter is active (typically set by clicking a Status
                 Breakdown pill on the Dashboard tab). */}
@@ -1445,6 +1480,25 @@ function DashboardInner() {
                 : hideSettled
                 ? processedItems.filter((i) => i.status !== "paid")
                 : processedItems;
+              // Narrow further by the free-text search, if any. Build a
+              // lowercase haystack per row from the fields a user is
+              // likely to recall, then substring-match the trimmed query.
+              const q = txnSearch.trim().toLowerCase();
+              const searchedItems = q
+                ? visibleItems.filter((i) =>
+                    [
+                      i.vendor,
+                      i.category,
+                      i.channel ?? "",
+                      i.invoiceNumber,
+                      i.status,
+                      i.amount.toFixed(2),
+                    ]
+                      .join(" ")
+                      .toLowerCase()
+                      .includes(q)
+                  )
+                : visibleItems;
               return processedItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F4CB}"}</p>
@@ -1457,10 +1511,31 @@ function DashboardInner() {
                   page to start pulling in sales.
                 </p>
               </div>
-            ) : visibleItems.length === 0 ? (
+            ) : searchedItems.length === 0 ? (
               <div className="text-center p-[60px] text-slate-400 text-[15px]">
                 <p className="text-5xl mb-2">{"\u{1F50D}"}</p>
-                {processedStatusFilter ? (
+                {q ? (
+                  // Search took precedence — name what was searched and
+                  // why it might be empty (status/settled still apply),
+                  // with a one-click reset.
+                  <p>
+                    No transactions match{" "}
+                    <strong>&ldquo;{txnSearch.trim()}&rdquo;</strong>
+                    {processedStatusFilter
+                      ? " in this filter"
+                      : hideSettled
+                      ? " — settled items are hidden"
+                      : ""}
+                    .{" "}
+                    <button
+                      type="button"
+                      onClick={() => setTxnSearch("")}
+                      className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[15px]"
+                    >
+                      Clear search
+                    </button>
+                  </p>
+                ) : processedStatusFilter ? (
                   <p>
                     No items match the{" "}
                     <strong>{processedStatusFilter.replace("_", " ")}</strong>{" "}
@@ -1483,8 +1558,16 @@ function DashboardInner() {
                 )}
               </div>
             ) : (
+              <>
+                {q && (
+                  <p className="text-xs text-slate-500 mb-3 m-0">
+                    {searchedItems.length}{" "}
+                    {searchedItems.length === 1 ? "match" : "matches"} for{" "}
+                    <strong>&ldquo;{txnSearch.trim()}&rdquo;</strong>
+                  </p>
+                )}
               <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
-                {visibleItems.map((item) => (
+                {searchedItems.map((item) => (
                   <div key={item.id} className="bg-white rounded-xl border border-slate-200">
                     {/* Card header with status badge */}
                     <div className="flex justify-between items-center pt-4 px-5 pb-3 border-b border-slate-100">
@@ -1640,6 +1723,7 @@ function DashboardInner() {
                   </div>
                 ))}
               </div>
+              </>
             );
             })()}
           </>
