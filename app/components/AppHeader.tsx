@@ -88,6 +88,20 @@ export default function AppHeader({
   const paying = isPayingTier(plan);
 
   const pathname = usePathname();
+  // Track the query string client-side so the Home (overview) tab and the
+  // Transactions tab can be told apart — both live at /dashboard,
+  // distinguished only by ?view=transactions. usePathname() drops the
+  // query, and useSearchParams() would force a Suspense boundary on every
+  // page that renders this shared header. Reading window.location in an
+  // effect that runs each render avoids both: AppHeader re-renders when
+  // the dashboard view changes, so the effect re-reads and the pill stays
+  // in sync. setState is guarded so it only re-renders on an actual change.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const s = window.location.search;
+    setSearch((prev) => (prev === s ? prev : s));
+  });
+
   // Current-section highlight. Transactions deep-links to
   // /dashboard?view=transactions, so /dashboard counts as its section.
   const isActive = (href: string) => {
@@ -95,6 +109,12 @@ export default function AppHeader({
     if (path === "/dashboard") return pathname === "/dashboard";
     return pathname === path || pathname.startsWith(path + "/");
   };
+  // Home = the overview; Transactions = the same route with ?view=
+  // transactions. Split them on the tracked query so only one pill lights.
+  const onDashboard = pathname === "/dashboard";
+  const transactionsView = search.includes("view=transactions");
+  const homeActive = onDashboard && !transactionsView;
+  const transactionsActive = onDashboard && transactionsView;
   const productsActive =
     isActive("/skus") || isActive("/inventory") || isActive("/cogs");
   const accountActive =
@@ -207,11 +227,21 @@ export default function AppHeader({
               takes over, so the header stays one tidy row. */}
           <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* ── Daily-work surfaces (primary) ─────────────────────
-              Transactions deep-links to the dashboard's processed view
-              (June 2026 IA). */}
+              Home is the overview dashboard. Plain <a>, matching the logo:
+              a full load reliably resets to the overview (a soft nav that
+              only strips ?view=transactions didn't refresh the in-page
+              view in Next 16). Transactions deep-links to the dashboard's
+              processed view (June 2026 IA). */}
+          <a
+            href="/dashboard"
+            className={homeActive ? NAV_ACTIVE : NAV_LINK}
+            title="Overview dashboard"
+          >
+            Home
+          </a>
           <Link
             href="/dashboard?view=transactions"
-            className={isActive("/dashboard") ? NAV_ACTIVE : NAV_LINK}
+            className={transactionsActive ? NAV_ACTIVE : NAV_LINK}
           >
             Transactions
           </Link>
@@ -337,6 +367,10 @@ export default function AppHeader({
               <BarsIcon />
             </summary>
             <div className={MENU_PANEL}>
+              {/* Plain <a> — same reliable overview reset as the logo. */}
+              <a href="/dashboard" className={MENU_ITEM}>
+                Home
+              </a>
               <Link href="/dashboard?view=transactions" className={MENU_ITEM}>
                 Transactions
               </Link>
