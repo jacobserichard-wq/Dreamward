@@ -57,6 +57,20 @@ function fmtPct(n: number | null): string {
   return `${n.toFixed(1)}%`;
 }
 
+// "May 23 – Jun 21, 2026" from two YYYY-MM-DD bounds.
+function fmtRange(from: string, to: string): string {
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const part = (iso: string, withYear: boolean) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    return `${months[Number(m[2]) - 1]} ${Number(m[3])}${withYear ? `, ${m[1]}` : ""}`;
+  };
+  return `${part(from, false)} – ${part(to, true)}`;
+}
+
 function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
@@ -118,9 +132,14 @@ export default function CogsSummaryCard() {
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-700 m-0 uppercase tracking-wide">
-            COGS & gross margin
+            Profit margin
           </h3>
-          <p className="text-xs text-slate-500 m-0">Last 30 days</p>
+          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+            {"\u{1F4C5}"} Last 30 days
+            {data?.period
+              ? ` · ${fmtRange(data.period.from, data.period.to)}`
+              : ""}
+          </span>
         </div>
         <Link
           href="/cogs"
@@ -154,6 +173,9 @@ export default function CogsSummaryCard() {
         </div>
       ) : (
         <>
+          <p className="text-xs text-slate-500 m-0 mb-2">
+            Revenue, cost &amp; profit margin over the last 30 days.
+          </p>
           {/* Headline strip */}
           <div className="grid grid-cols-3 gap-3 mb-3">
             <Stat label="Revenue" value={fmtUsd(totals.revenue)} />
