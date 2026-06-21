@@ -31,6 +31,7 @@ import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
 import EtsyConnectionCard from "../components/EtsyConnectionCard";
+import PlaidConnectionCard from "../components/PlaidConnectionCard";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
@@ -280,6 +281,7 @@ function IntegrationsPageInner() {
             Available now
           </h2>
           <div className="space-y-3">
+            <PlaidConnectionCard />
             <ShopifyConnectionCard />
             <WixConnectionCard />
             <SquareConnectionCard />
