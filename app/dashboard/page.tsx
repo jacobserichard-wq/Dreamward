@@ -115,6 +115,10 @@ function DashboardInner() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
   const showTransactions = viewParam === "transactions";
+  // Optional ?filter=<status> deep-link (e.g. from the "N items need
+  // review" attention pill) — applied to the Transactions status filter
+  // once that view is showing (see effect below).
+  const filterParam = searchParams.get("filter");
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -743,6 +747,21 @@ function DashboardInner() {
   // transaction is findable without scrolling a long list. Layers on top
   // of the status + settled filters (it narrows whatever those leave).
   const [txnSearch, setTxnSearch] = useState<string>("");
+
+  // Apply a ?filter=<status> deep-link to the Transactions status filter
+  // when the Transactions view is active — powers the "N items need
+  // review" attention pill jumping straight to the needs-review list.
+  useEffect(() => {
+    if (
+      showTransactions &&
+      (filterParam === "pending" ||
+        filterParam === "overdue" ||
+        filterParam === "needs_review" ||
+        filterParam === "paid")
+    ) {
+      setProcessedStatusFilter(filterParam);
+    }
+  }, [showTransactions, filterParam]);
 
 
 

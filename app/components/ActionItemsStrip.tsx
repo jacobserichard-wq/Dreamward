@@ -11,9 +11,8 @@
 // filtered view.
 //
 // Pills currently surfaced:
-//   - Needs Review count → /dashboard?tab=processed&filter=needs_review
-//     (drives the existing processed-status-filter pattern from
-//     UX First-Run commit 4)
+//   - Needs Review count → /dashboard?view=transactions&filter=needs_review
+//     (opens the Transactions view with the status filter applied)
 //   - Overdue $ → /invoices?status=overdue
 //   - (future) Pending payments / Other action prompts
 //
@@ -72,7 +71,7 @@ export default function ActionItemsStrip({
 
         {needsReviewCount > 0 && (
           <Link
-            href="/dashboard?tab=processed&filter=needs_review"
+            href="/dashboard?view=transactions&filter=needs_review"
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-medium no-underline hover:bg-indigo-100 transition-colors"
           >
             <span>{"\u{1F440}"}</span>
