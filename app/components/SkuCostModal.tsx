@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Spinner from "./Spinner";
+import SkuComponentCostPanel from "./SkuComponentCostPanel";
 
 interface CostHistoryRow {
   id: number;
@@ -89,6 +90,11 @@ export default function SkuCostModal({
   const [newNotes, setNewNotes] = useState("");
   const [adding, setAdding] = useState(false);
 
+  // Cost source: 'estimated' (flat typed-in cost) vs 'components'
+  // (built from the recipe). Initialized from the SKU on load.
+  const [mode, setMode] = useState<"estimated" | "components">("estimated");
+  const [switching, setSwitching] = useState(false);
+
   const loadHistory = useCallback(async () => {
     try {
       const res = await fetch(`/api/skus/${skuId}`);
@@ -97,8 +103,14 @@ export default function SkuCostModal({
         setError(body.error || `HTTP ${res.status}`);
         return;
       }
-      const payload = (await res.json()) as { costHistory: CostHistoryRow[] };
+      const payload = (await res.json()) as {
+        sku?: { costingMethod?: string };
+        costHistory: CostHistoryRow[];
+      };
       setHistory(payload.costHistory ?? []);
+      setMode(
+        payload.sku?.costingMethod === "components" ? "components" : "estimated"
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load cost history");
     }
@@ -166,6 +178,41 @@ export default function SkuCostModal({
     }
   }, [newCost, newDate, newNotes, skuId, loadHistory, onChanged]);
 
+  // Flip the cost source. Switching to 'components' triggers a rollup
+  // server-side, so we re-load to pick up any materialized cost row.
+  const switchMode = useCallback(
+    async (next: "estimated" | "components") => {
+      if (next === mode || switching) return;
+      const prev = mode;
+      setSwitching(true);
+      setError(null);
+      setMode(next); // optimistic; revert on failure
+      try {
+        const res = await fetch(`/api/skus/${skuId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ costingMethod: next }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || `HTTP ${res.status}`);
+          setMode(prev);
+          return;
+        }
+        await loadHistory();
+        onChanged?.();
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Couldn't switch cost source"
+        );
+        setMode(prev);
+      } finally {
+        setSwitching(false);
+      }
+    },
+    [mode, switching, skuId, loadHistory, onChanged]
+  );
+
   if (!open) return null;
 
   const today = todayIso();
@@ -184,7 +231,7 @@ export default function SkuCostModal({
       aria-labelledby="sku-cost-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
       onClick={() => {
-        if (!adding) onClose();
+        if (!adding && !switching) onClose();
       }}
     >
       <div
@@ -198,8 +245,8 @@ export default function SkuCostModal({
           Cost history
         </h2>
         <p className="text-xs text-slate-500 m-0 mb-4">
-          Every per-unit cost you&rsquo;ve entered for this item. Add a new one
-          to change the cost going forward — or backdate it to fix past sales.
+          Set this item&rsquo;s cost — type a flat estimate, or build it up from
+          the components it&rsquo;s made of.
         </p>
 
         {/* SKU preview */}
@@ -209,12 +256,36 @@ export default function SkuCostModal({
           </p>
         </div>
 
+        {/* Cost source toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+            {(["estimated", "components"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                disabled={switching}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-0 transition-colors disabled:cursor-wait ${
+                  mode === m
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "bg-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {m === "estimated" ? "Estimate" : "Build from components"}
+              </button>
+            ))}
+          </div>
+          {switching && <Spinner size={14} color="currentColor" />}
+        </div>
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-lg mb-3 text-sm">
             {error}
           </div>
         )}
 
+        {mode === "estimated" ? (
+          <>
         {/* History list */}
         {loading ? (
           <p className="text-center py-6 text-slate-400 text-sm">Loading…</p>
@@ -328,6 +399,16 @@ export default function SkuCostModal({
             className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
           />
         </div>
+          </>
+        ) : (
+          <SkuComponentCostPanel
+            skuId={skuId}
+            onCostChanged={() => {
+              void loadHistory();
+              onChanged?.();
+            }}
+          />
+        )}
 
         <div className="flex items-center justify-between gap-2 mt-5">
           <Link
@@ -345,15 +426,17 @@ export default function SkuCostModal({
             >
               Close
             </button>
-            <button
-              type="button"
-              onClick={handleAddCost}
-              disabled={adding}
-              className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
-            >
-              {adding && <Spinner size={12} color="white" />}
-              {adding ? "Adding…" : "Add cost"}
-            </button>
+            {mode === "estimated" && (
+              <button
+                type="button"
+                onClick={handleAddCost}
+                disabled={adding}
+                className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+              >
+                {adding && <Spinner size={12} color="white" />}
+                {adding ? "Adding…" : "Add cost"}
+              </button>
+            )}
           </div>
         </div>
       </div>
