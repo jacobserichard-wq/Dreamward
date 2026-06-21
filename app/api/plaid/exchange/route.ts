@@ -17,11 +17,13 @@ import {
 } from "@/lib/plaid";
 import { reclassifyClientItems } from "@/lib/reclassify";
 import type { Industry } from "@/lib/categories";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 interface ExchangeBody {
   publicToken?: unknown;
   institutionId?: unknown;
   institutionName?: unknown;
+  importStartDate?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -50,6 +52,8 @@ export async function POST(req: NextRequest) {
       typeof body?.institutionId === "string" ? body.institutionId : null;
     const institutionName =
       typeof body?.institutionName === "string" ? body.institutionName : null;
+    // "Import from" cutoff — bad/missing values degrade to null (all history).
+    const importStartDate = normalizeImportStartDate(body?.importStartDate);
 
     const { accessToken, itemId } = await exchangePublicToken(publicToken);
     await storePlaidItem({
@@ -58,6 +62,7 @@ export async function POST(req: NextRequest) {
       accessToken,
       institutionId,
       institutionName,
+      importStartDate,
     });
 
     // Backfill on connect: pull the initial transactions, then AI-suggest

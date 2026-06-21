@@ -17,13 +17,13 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   usePlaidLink,
   type PlaidLinkOnSuccessMetadata,
 } from "react-plaid-link";
-import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ImportRangePicker from "./ImportRangePicker";
 
 interface PlaidItem {
   id: number;
@@ -48,6 +48,17 @@ export default function PlaidConnectionCard() {
     null
   );
   const [disconnecting, setDisconnecting] = useState(false);
+  // Chosen "import from" cutoff (YYYY-MM-DD or null = all history). Held in
+  // a ref so updating it doesn't re-create onSuccess / re-init Plaid Link.
+  const importStartDateRef = useRef<string | null>(null);
+  const handleRangeChange = useCallback((d: string | null) => {
+    importStartDateRef.current = d;
+  }, []);
+  // Connect flow now asks the import range as an explicit step BEFORE
+  // launching Plaid Link (the inline picker was easy to miss).
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  // Disconnect option: also delete the expenses this bank imported.
+  const [purgeOnDisconnect, setPurgeOnDisconnect] = useState(false);
 
   const loadItems = useCallback(async () => {
     setError(null);
@@ -85,6 +96,7 @@ export default function PlaidConnectionCard() {
             publicToken,
             institutionId: metadata.institution?.institution_id ?? null,
             institutionName: metadata.institution?.name ?? null,
+            importStartDate: importStartDateRef.current,
           }),
         });
         if (!res.ok) {
@@ -150,7 +162,7 @@ export default function PlaidConnectionCard() {
     setDisconnecting(true);
     try {
       const res = await fetch(
-        `/api/plaid/items?itemId=${encodeURIComponent(confirmDisconnect.itemId)}`,
+        `/api/plaid/items?itemId=${encodeURIComponent(confirmDisconnect.itemId)}&purge=${purgeOnDisconnect}`,
         { method: "DELETE" }
       );
       if (!res.ok) {
@@ -158,6 +170,7 @@ export default function PlaidConnectionCard() {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       setConfirmDisconnect(null);
+      setPurgeOnDisconnect(false);
       await loadItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Disconnect failed");
@@ -259,7 +272,10 @@ export default function PlaidConnectionCard() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setConfirmDisconnect(it)}
+                  onClick={() => {
+                    setConfirmDisconnect(it);
+                    setPurgeOnDisconnect(false);
+                  }}
                   className="py-1.5 px-3 rounded border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer whitespace-nowrap"
                 >
                   Disconnect
@@ -269,11 +285,12 @@ export default function PlaidConnectionCard() {
           </ul>
         )}
 
-        {/* Connect button — add the first or another bank */}
-        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+        {/* Connect section — opens the range modal first, which then
+            launches Plaid Link on "Continue". */}
+        <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-slate-100">
           <button
             type="button"
-            onClick={handleConnect}
+            onClick={() => setShowConnectModal(true)}
             disabled={connecting}
             className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
           >
@@ -291,16 +308,120 @@ export default function PlaidConnectionCard() {
         </div>
       </div>
 
-      <ConfirmModal
-        open={confirmDisconnect !== null}
-        title="Disconnect this bank?"
-        message="This stops pulling new transactions and removes the connection. Expenses already imported stay in your reports. You can reconnect any time."
-        confirmLabel="Disconnect"
-        danger
-        busy={disconnecting}
-        onConfirm={handleConfirmDisconnect}
-        onCancel={() => setConfirmDisconnect(null)}
-      />
+      {/* Connect step: choose the import range, then launch Plaid Link. */}
+      {showConnectModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plaid-connect-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setShowConnectModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+          >
+            <h2
+              id="plaid-connect-title"
+              className="text-lg font-bold text-slate-900 m-0 mb-1"
+            >
+              {"\u{1F3E6}"} Connect a bank
+            </h2>
+            <p className="text-xs text-slate-500 m-0 mb-4">
+              Choose how far back to import, then you&apos;ll log in to your
+              bank securely through Plaid. We pull spending (expenses) only.
+            </p>
+            <ImportRangePicker onChange={handleRangeChange} className="mb-5" />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConnectModal(false)}
+                className="py-2 px-4 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConnectModal(false);
+                  handleConnect();
+                }}
+                className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer inline-flex items-center gap-2"
+              >
+                Continue to your bank {"\u{2192}"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disconnect modal with the optional "remove imported" checkbox. */}
+      {confirmDisconnect && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plaid-disconnect-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => {
+            if (!disconnecting) setConfirmDisconnect(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+          >
+            <h2
+              id="plaid-disconnect-title"
+              className="text-lg font-bold text-slate-900 m-0 mb-1"
+            >
+              Disconnect {confirmDisconnect.institutionName || "this bank"}?
+            </h2>
+            <p className="text-sm text-slate-600 m-0 mb-4">
+              This stops pulling new transactions and removes the connection.
+              You can reconnect any time.
+            </p>
+            <label className="flex items-start gap-2 mb-5 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={purgeOnDisconnect}
+                onChange={(e) => setPurgeOnDisconnect(e.target.checked)}
+                disabled={disconnecting}
+                className="mt-0.5"
+              />
+              <span>
+                Also remove the expenses this bank imported.{" "}
+                <span className="text-slate-400">
+                  Use this to clear a wrong import and reconnect with a
+                  different date. Leave unchecked to keep them in your reports.
+                </span>
+              </span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDisconnect(null)}
+                disabled={disconnecting}
+                className="py-2 px-4 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer disabled:opacity-40 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDisconnect}
+                disabled={disconnecting}
+                className="py-2 px-4 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+              >
+                {disconnecting && <Spinner size={12} color="white" />}
+                {disconnecting
+                  ? "Disconnecting…"
+                  : purgeOnDisconnect
+                    ? "Disconnect + remove"
+                    : "Disconnect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

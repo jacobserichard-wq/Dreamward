@@ -48,8 +48,11 @@ export async function DELETE(req: NextRequest) {
     if (!itemId) {
       return NextResponse.json({ error: "Missing itemId" }, { status: 400 });
     }
-    await disconnectPlaidItem(client.id, itemId);
-    return NextResponse.json({ ok: true });
+    // ?purge=true also removes the transactions this bank imported (for
+    // "delete a wrong import and redo it"). Default keeps them.
+    const purge = req.nextUrl.searchParams.get("purge") === "true";
+    const { purged } = await disconnectPlaidItem(client.id, itemId, purge);
+    return NextResponse.json({ ok: true, purged });
   } catch (error) {
     console.error("Plaid items DELETE error:", error);
     return NextResponse.json(

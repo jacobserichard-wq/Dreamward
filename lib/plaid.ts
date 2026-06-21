@@ -104,14 +104,17 @@ export async function storePlaidItem(opts: {
   accessToken: string;
   institutionId: string | null;
   institutionName: string | null;
+  /** "Import from" cutoff (YYYY-MM-DD) or null = all history. Honored by
+   *  syncTransactions on both backfill and ongoing sync. */
+  importStartDate?: string | null;
 }): Promise<void> {
   const { ciphertext, iv, authTag } = encryptForDb(opts.accessToken);
   await pool.query(
     `INSERT INTO plaid_items
        (client_id, item_id, institution_id, institution_name,
         access_token_ciphertext, access_token_iv, access_token_auth_tag,
-        environment, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+        environment, status, import_start_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)
      ON CONFLICT (item_id) DO UPDATE SET
        client_id               = EXCLUDED.client_id,
        institution_id          = EXCLUDED.institution_id,
@@ -121,6 +124,7 @@ export async function storePlaidItem(opts: {
        access_token_auth_tag   = EXCLUDED.access_token_auth_tag,
        environment             = EXCLUDED.environment,
        status                  = 'active',
+       import_start_date       = EXCLUDED.import_start_date,
        updated_at              = NOW()`,
     [
       opts.clientId,
@@ -131,6 +135,7 @@ export async function storePlaidItem(opts: {
       iv,
       authTag,
       plaidEnv(),
+      opts.importStartDate ?? null,
     ]
   );
 }
@@ -207,7 +212,8 @@ export async function syncTransactions(opts: {
   const { clientId, itemId } = opts;
   const res = await pool.query(
     `SELECT access_token_ciphertext, access_token_iv, access_token_auth_tag,
-            sync_cursor, institution_name
+            sync_cursor, institution_name,
+            import_start_date::text AS import_start_date
        FROM plaid_items
       WHERE client_id = $1 AND item_id = $2`,
     [clientId, itemId]
@@ -221,6 +227,10 @@ export async function syncTransactions(opts: {
     authTag: row.access_token_auth_tag,
   });
   const institution: string = row.institution_name ?? "bank";
+  // "Import from" cutoff: skip transactions dated before it. NULL/absent =
+  // all history. Cast to text in SQL so it's a plain YYYY-MM-DD string,
+  // comparable to txn.date lexicographically (= chronologically).
+  const importStart: string | null = row.import_start_date ?? null;
 
   const client = getPlaidClient();
   let cursor: string | undefined = row.sync_cursor ?? undefined;
@@ -244,6 +254,7 @@ export async function syncTransactions(opts: {
       for (const txn of [...data.added, ...data.modified]) {
         if (txn.pending) continue;
         if (typeof txn.amount !== "number" || txn.amount <= 0) continue; // deposits / zero
+        if (importStart && txn.date < importStart) continue; // before the chosen cutoff
         const pfc = txn.personal_finance_category;
         const summary = `Bank import (${institution}) · Plaid: ${
           pfc ? `${pfc.primary} / ${pfc.detailed}` : "uncategorized"
@@ -252,12 +263,12 @@ export async function syncTransactions(opts: {
           `INSERT INTO processed_items
              (client_id, vendor, amount, due_date, status, category,
               confidence, summary, source, channel,
-              plaid_transaction_id, plaid_account_id,
+              plaid_transaction_id, plaid_account_id, plaid_item_id,
               invoice_number, processed_at, updated_at)
            VALUES
              ($1, $2, $3, $4, 'needs_review', 'expense',
               0, $5, 'plaid', NULL,
-              $6, $7,
+              $6, $7, $8,
               '', NOW(), NOW())
            ON CONFLICT (client_id, plaid_transaction_id)
              WHERE plaid_transaction_id IS NOT NULL
@@ -267,6 +278,7 @@ export async function syncTransactions(opts: {
              due_date         = EXCLUDED.due_date,
              summary          = EXCLUDED.summary,
              plaid_account_id = EXCLUDED.plaid_account_id,
+             plaid_item_id    = EXCLUDED.plaid_item_id,
              updated_at       = NOW()
            RETURNING (xmax = 0) AS inserted`,
           [
@@ -277,6 +289,7 @@ export async function syncTransactions(opts: {
             summary,
             txn.transaction_id,
             txn.account_id,
+            itemId,
           ]
         );
         const wasInsert = result.rows[0]?.inserted === true;
@@ -331,8 +344,9 @@ export async function syncTransactions(opts: {
  *  remove their own items. */
 export async function disconnectPlaidItem(
   clientId: number,
-  itemId: string
-): Promise<void> {
+  itemId: string,
+  purgeTransactions = false
+): Promise<{ purged: number }> {
   const res = await pool.query(
     `SELECT access_token_ciphertext, access_token_iv, access_token_auth_tag
        FROM plaid_items
@@ -340,7 +354,7 @@ export async function disconnectPlaidItem(
     [clientId, itemId]
   );
   const row = res.rows[0];
-  if (!row) return; // nothing to disconnect
+  if (!row) return { purged: 0 }; // nothing to disconnect
 
   try {
     const accessToken = decryptFromDb({
@@ -354,8 +368,21 @@ export async function disconnectPlaidItem(
     // delete the local row so the user can re-connect cleanly.
   }
 
+  // Optionally remove the transactions this bank imported ("delete a wrong
+  // import and redo it" + prevents reconnect pileup). Scoped to this item.
+  let purged = 0;
+  if (purgeTransactions) {
+    const del = await pool.query(
+      `DELETE FROM processed_items
+        WHERE client_id = $1 AND source = 'plaid' AND plaid_item_id = $2`,
+      [clientId, itemId]
+    );
+    purged = del.rowCount ?? 0;
+  }
+
   await pool.query(
     `DELETE FROM plaid_items WHERE client_id = $1 AND item_id = $2`,
     [clientId, itemId]
   );
+  return { purged };
 }
