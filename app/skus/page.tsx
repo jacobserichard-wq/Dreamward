@@ -45,6 +45,8 @@ interface SkuRow {
   quantityOnHand: number;
   // Tier 2: has a recipe (bill of materials) → shows a 🧪 chip.
   hasRecipe: boolean;
+  // 'product' (finished good) | 'component' (material).
+  kind: string;
   // Tier 2: unit of measure (each, oz, ...) shown next to stock.
   unit: string;
   createdAt: string;
@@ -102,6 +104,12 @@ export default function SkusPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  // Catalog split: which kind the list shows + which kind the create form
+  // is adding.
+  const [kindFilter, setKindFilter] = useState<"product" | "component">(
+    "product"
+  );
+  const [formKind, setFormKind] = useState<"product" | "component">("product");
 
   // Bulk-select state (Phase 12d commit 4)
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -159,8 +167,9 @@ export default function SkusPage() {
   // The list page only handles creation now that /skus/[id] exists.
   // Row clicks navigate to the detail page where edits happen
   // contextually alongside cost history + aliases.
-  const handleNewSku = useCallback(() => {
+  const handleNewSku = useCallback((k: "product" | "component") => {
     setError(null);
+    setFormKind(k);
     setFormOpen(true);
   }, []);
 
@@ -418,10 +427,10 @@ export default function SkusPage() {
             </button>
             <button
               type="button"
-              onClick={handleNewSku}
+              onClick={() => handleNewSku(kindFilter)}
               className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-2"
             >
-              <span>+</span> New SKU
+              <span>+</span> New {kindFilter === "component" ? "component" : "product"}
             </button>
           </div>
         </div>
@@ -457,6 +466,30 @@ export default function SkusPage() {
           </div>
         )}
 
+        {/* Finished Goods vs Components split */}
+        <div className="flex items-center gap-2 mb-4">
+          {(["product", "component"] as const).map((k) => {
+            const count = skus.filter(
+              (s) => (s.kind ?? "product") === k
+            ).length;
+            const label = k === "product" ? "Finished Goods" : "Components";
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKindFilter(k)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer border transition-colors ${
+                  kindFilter === k
+                    ? "bg-slate-800 text-white border-slate-800"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         {/* Table or empty state */}
         {loading ? (
           <p className="text-center p-[60px] text-slate-500">Loading SKUs…</p>
@@ -473,132 +506,149 @@ export default function SkusPage() {
             </p>
             <button
               type="button"
-              onClick={handleNewSku}
+              onClick={() => handleNewSku("product")}
               className="inline-block py-2 px-4 rounded-lg bg-blue-500 text-white text-sm font-semibold border-0 cursor-pointer hover:bg-blue-600"
             >
-              Add your first SKU
+              Add your first product
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
-                  <th className="w-10 text-center py-2.5 px-2">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all"
-                      checked={
-                        selected.size > 0 && selected.size === skus.length
-                      }
-                      ref={(el) => {
-                        if (el)
-                          el.indeterminate =
-                            selected.size > 0 && selected.size < skus.length;
-                      }}
-                      onChange={toggleAll}
-                      className="cursor-pointer"
-                    />
-                  </th>
-                  <th className="text-left py-2.5 px-4 font-medium">Code</th>
-                  <th className="text-left py-2.5 px-4 font-medium">Name</th>
-                  <th className="text-right py-2.5 px-4 font-medium">
-                    Current cost
-                  </th>
-                  <th className="text-right py-2.5 px-4 font-medium">Stock</th>
-                  <th className="text-right py-2.5 px-4 font-medium">Sales</th>
-                  <th className="text-left py-2.5 px-4 font-medium">
-                    Last sale
-                  </th>
-                  <th className="w-10" aria-label="Status" />
-                </tr>
-              </thead>
-              <tbody>
-                {skus.map((s) => {
+          <div>
+            <label className="flex items-center gap-2 mb-3 text-xs text-slate-500 w-fit cursor-pointer">
+              <input
+                type="checkbox"
+                aria-label="Select all"
+                checked={selected.size > 0 && selected.size === skus.length}
+                ref={(el) => {
+                  if (el)
+                    el.indeterminate =
+                      selected.size > 0 && selected.size < skus.length;
+                }}
+                onChange={toggleAll}
+                className="cursor-pointer"
+              />
+              Select all
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                {(() => {
+                const shown = skus.filter(
+                  (s) => (s.kind ?? "product") === kindFilter
+                );
+                if (shown.length === 0) {
+                  return (
+                    <div className="col-span-full bg-white rounded-xl border border-slate-200 py-8 text-center text-sm text-slate-400">
+                      No{" "}
+                      {kindFilter === "component"
+                        ? "components"
+                        : "finished goods"}{" "}
+                      in this view yet.
+                    </div>
+                  );
+                }
+                return shown.map((s) => {
                   const isSelected = selected.has(s.id);
                   return (
-                    <tr
+                    <div
                       key={s.id}
                       onClick={() => handleRowClick(s.id)}
-                      className={`border-b border-slate-100 last:border-b-0 cursor-pointer group ${
-                        isSelected ? "bg-blue-50/50" : "hover:bg-slate-50"
-                      }`}
                       title="Click for details"
+                      className={`bg-white rounded-xl border cursor-pointer transition-colors ${
+                        isSelected
+                          ? "border-blue-300 bg-blue-50/40"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
                     >
-                      <td
-                        className="py-3 px-2 text-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${s.code}`}
-                          checked={isSelected}
-                          onChange={() => toggleOne(s.id)}
-                          className="cursor-pointer"
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-slate-900 font-mono font-semibold whitespace-nowrap">
-                        {s.code}
-                      </td>
-                      <td className="py-3 px-4 text-slate-900">
-                        <span className="inline-flex items-center gap-1.5">
-                          {s.name}
-                          {s.hasRecipe && (
-                            <span
-                              title="Has a recipe (bill of materials)"
-                              className="text-[10px]"
-                              aria-label="Has a recipe"
-                            >
-                              {"\u{1F9EA}"}
-                            </span>
-                          )}
-                        </span>
-                        {s.description && (
-                          <p className="text-xs text-slate-500 m-0 mt-0.5">
-                            {s.description}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
-                        {fmtMoney(s.currentCost, s.costCurrency)}
-                      </td>
-                      <td
-                        className={`py-3 px-4 text-right font-semibold tabular-nums whitespace-nowrap ${stockBadgeClasses(s.quantityOnHand)}`}
-                        title={
-                          s.quantityOnHand < 0
-                            ? "Negative — likely missing a starting count"
-                            : s.quantityOnHand === 0
-                              ? "Out of stock"
-                              : s.quantityOnHand <= 10
-                                ? "Low stock"
-                                : "Healthy stock"
-                        }
-                      >
-                        {s.quantityOnHand.toLocaleString()}
-                        {s.unit && s.unit !== "each" && (
-                          <span className="text-[11px] font-normal text-slate-400 ml-1">
-                            {s.unit}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right text-slate-600 tabular-nums whitespace-nowrap">
-                        {s.salesCount > 0 ? s.salesCount : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 text-xs whitespace-nowrap">
-                        {fmtDate(s.lastSaleDate)}
-                      </td>
-                      <td className="py-3 pr-3 text-xs">
+                      {/* Header: select + name + code + archived badge */}
+                      <div className="flex items-start justify-between gap-2 pt-4 px-5 pb-3 border-b border-slate-100">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${s.code}`}
+                            checked={isSelected}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleOne(s.id)}
+                            className="mt-1 cursor-pointer flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-base font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                              <span className="truncate">{s.name}</span>
+                              {s.hasRecipe && (
+                                <span
+                                  title="Has a recipe (bill of materials)"
+                                  className="text-[11px]"
+                                  aria-label="Has a recipe"
+                                >
+                                  {"\u{1F9EA}"}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs font-mono text-slate-500 mt-0.5">
+                              {s.code}
+                            </div>
+                          </div>
+                        </div>
                         {!s.active && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase tracking-wide">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase tracking-wide flex-shrink-0">
                             Archived
                           </span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+
+                      {/* Detail rows (expense-card style) */}
+                      <div className="px-5 py-3">
+                        {s.description && (
+                          <p className="text-xs text-slate-500 m-0 mb-2">
+                            {s.description}
+                          </p>
+                        )}
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                          <span className="text-[13px] text-slate-500">Cost</span>
+                          <span className="text-[13px] font-semibold text-slate-900 tabular-nums">
+                            {fmtMoney(s.currentCost, s.costCurrency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                          <span className="text-[13px] text-slate-500">Stock</span>
+                          <span
+                            className={`text-[13px] font-semibold tabular-nums ${stockBadgeClasses(s.quantityOnHand)}`}
+                            title={
+                              s.quantityOnHand < 0
+                                ? "Negative — likely missing a starting count"
+                                : s.quantityOnHand === 0
+                                  ? "Out of stock"
+                                  : s.quantityOnHand <= 10
+                                    ? "Low stock"
+                                    : "Healthy stock"
+                            }
+                          >
+                            {s.quantityOnHand.toLocaleString()}
+                            {s.unit && s.unit !== "each" && (
+                              <span className="text-[11px] font-normal text-slate-400 ml-1">
+                                {s.unit}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                          <span className="text-[13px] text-slate-500">Sales</span>
+                          <span className="text-[13px] text-slate-700 tabular-nums">
+                            {s.salesCount > 0 ? s.salesCount : "—"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5">
+                          <span className="text-[13px] text-slate-500">
+                            Last sale
+                          </span>
+                          <span className="text-[13px] text-slate-600">
+                            {fmtDate(s.lastSaleDate)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
+                });
+                })()}
+            </div>
           </div>
         )}
 
@@ -613,6 +663,7 @@ export default function SkusPage() {
 
       <SkuForm
         open={formOpen}
+        kind={formKind}
         onSave={handleSaveSku}
         onClose={handleCloseForm}
       />

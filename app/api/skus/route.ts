@@ -52,6 +52,8 @@ interface SkuRowDb {
   quantity_on_hand: string;
   // Tier 2: true when the SKU has a recipe (≥1 bom_components row).
   has_recipe: boolean;
+  kind: string;
+  costing_method: string;
   unit: string;
   created_at: string;
   updated_at: string;
@@ -117,6 +119,7 @@ export async function GET(req: NextRequest) {
               EXISTS (
                 SELECT 1 FROM bom_components b WHERE b.parent_sku_id = s.id
               ) AS has_recipe,
+              s.kind, s.costing_method,
               s.unit,
               s.created_at, s.updated_at
          FROM skus s
@@ -171,6 +174,8 @@ export async function GET(req: NextRequest) {
         lastSaleDate: r.last_sale_date,
         quantityOnHand: Number(r.quantity_on_hand),
         hasRecipe: r.has_recipe,
+        kind: r.kind,
+        costingMethod: r.costing_method,
         unit: r.unit,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
@@ -209,6 +214,7 @@ interface CreateSkuBody {
   cost?: unknown;
   effectiveDate?: unknown;
   unit?: unknown;
+  kind?: unknown;
 }
 
 function isNonEmptyString(v: unknown): v is string {
@@ -293,6 +299,8 @@ export async function POST(req: NextRequest) {
       typeof body.unit === "string" && body.unit.trim().length > 0
         ? body.unit.trim().slice(0, 16)
         : "each";
+    // 'product' (finished good) | 'component' (material). Default product.
+    const kind = body.kind === "component" ? "component" : "product";
 
     // ── Transactional create ────────────────────────────────────
     const dbClient = await pool.connect();
@@ -300,10 +308,10 @@ export async function POST(req: NextRequest) {
       await dbClient.query("BEGIN");
 
       const skuInsert = await dbClient.query<{ id: number }>(
-        `INSERT INTO skus (client_id, code, name, description, unit)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO skus (client_id, code, name, description, unit, kind)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [client.id, code, name, description, unit]
+        [client.id, code, name, description, unit, kind]
       );
       const skuId = skuInsert.rows[0].id;
 
@@ -332,6 +340,8 @@ export async function POST(req: NextRequest) {
           lastSaleDate: null,
           quantityOnHand: 0,
           hasRecipe: false,
+          kind,
+          costingMethod: "estimated",
           unit,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

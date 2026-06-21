@@ -32,6 +32,8 @@ export interface SkuFormSubmit {
   /** Unit of measure — "each", "oz", "g", "ft", etc. Display-only
    *  label shown next to quantities. Tier 2. */
   unit: string;
+  /** 'product' (finished good) | 'component' (material). */
+  kind: "product" | "component";
 }
 
 /** Subset of SkuFormSubmit that the edit path actually mutates.
@@ -58,6 +60,8 @@ export interface SkuFormEditing {
 
 export interface SkuFormProps {
   open: boolean;
+  /** Which kind of item this create form is adding. Ignored in edit mode. */
+  kind?: "product" | "component";
   /** When set, the modal runs in EDIT mode: code is read-only,
    *  cost + effective_date fields are hidden, and Archive/Restore
    *  buttons appear. The parent's onSaveEdit handler is called
@@ -85,12 +89,14 @@ function todayIso(): string {
 
 export default function SkuForm({
   open,
+  kind = "product",
   editing = null,
   onSave,
   onSaveEdit,
   onToggleActive,
   onClose,
 }: SkuFormProps) {
+  const kindLabel = kind === "component" ? "component" : "product";
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -215,6 +221,7 @@ export default function SkuForm({
         cost: costNum,
         effectiveDate,
         unit: unit.trim() || "each",
+        kind,
       });
       // Parent closes the modal on success.
     } catch (err) {
@@ -260,7 +267,7 @@ export default function SkuForm({
             ? editing!.active
               ? "Edit SKU"
               : "Restore SKU"
-            : "Add a SKU"}
+            : `Add a ${kindLabel}`}
         </h2>
         <p className="text-xs text-slate-500 m-0 mb-5">
           {isEdit
@@ -371,7 +378,14 @@ export default function SkuForm({
           {!isEdit && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Per-unit cost" htmlFor="sku-cost">
+                <Field
+                  label={
+                    kind === "component"
+                      ? "Cost (per unit)"
+                      : "Estimated cost (per unit)"
+                  }
+                  htmlFor="sku-cost"
+                >
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
                       {"$"}
