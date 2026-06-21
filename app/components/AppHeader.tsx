@@ -240,12 +240,6 @@ export default function AppHeader({
             Transactions
           </Link>
           <Link
-            href="/expenses"
-            className={isActive("/expenses") ? NAV_ACTIVE : NAV_LINK}
-          >
-            Expenses
-          </Link>
-          <Link
             href="/invoices"
             className={isActive("/invoices") ? NAV_ACTIVE : NAV_LINK}
             title="Accounts Receivable — customer invoices awaiting payment"
@@ -367,9 +361,6 @@ export default function AppHeader({
               </a>
               <Link href="/dashboard?view=transactions" className={MENU_ITEM}>
                 Transactions
-              </Link>
-              <Link href="/expenses" className={MENU_ITEM}>
-                Expenses
               </Link>
               <Link href="/invoices" className={MENU_ITEM}>
                 AR

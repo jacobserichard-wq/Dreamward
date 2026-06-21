@@ -13,6 +13,11 @@ import RefundForm, {
   type RefundPrefill,
 } from "../components/RefundForm";
 import DashboardBankCard from "../components/DashboardBankCard";
+import ExpenseForm, {
+  type ExpenseFormCategory,
+  type ExpenseFormSubmit,
+} from "../components/ExpenseForm";
+import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
 import ConfirmModal from "../components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import type { ChannelRow } from "../components/ChannelTable";
@@ -150,6 +155,12 @@ function DashboardInner() {
   // null for the standalone "Log a refund" button.
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundPrefill, setRefundPrefill] = useState<RefundPrefill | null>(null);
+  // "+ New expense" — manual expense entry with receipts, consolidated
+  // from the retired Expenses tab into the Transactions view.
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseCategories, setExpenseCategories] = useState<
+    ExpenseFormCategory[]
+  >([]);
 
   // Event auto-coding state — Phase 3 sub-session 17. The selector drives
   // which event uploaded CSV rows auto-code to. "auto" runs per-row date
@@ -246,6 +257,37 @@ function DashboardInner() {
       }
     })();
   }, []);
+
+  // Expense categories for the "+ New expense" form (industry defaults +
+  // custom, minus income categories). Ported from the retired Expenses tab
+  // so manual expense entry lives here in Transactions.
+  const loadExpenseCategories = useCallback(async () => {
+    try {
+      const sdata = await apiFetch<{
+        industryDefaults?: string[];
+        settings?: {
+          custom_categories?: string[];
+          preferences?: { custom_income_categories?: string[] };
+        };
+      }>("/api/settings");
+      const incomeSet = new Set(
+        sdata.settings?.preferences?.custom_income_categories ?? []
+      );
+      const cats = (sdata.industryDefaults ?? [])
+        .filter((name) => !incomeSet.has(name))
+        .map((name) => ({ name }) as ExpenseFormCategory);
+      for (const c of sdata.settings?.custom_categories ?? []) {
+        if (!cats.find((cc) => cc.name === c)) cats.push({ name: c });
+      }
+      cats.sort((a, b) => a.name.localeCompare(b.name));
+      setExpenseCategories(cats);
+    } catch {
+      // best-effort — form opens with whatever categories are loaded
+    }
+  }, []);
+  useEffect(() => {
+    loadExpenseCategories();
+  }, [loadExpenseCategories]);
 
   // Load client plan info
   useEffect(() => {
@@ -748,6 +790,9 @@ function DashboardInner() {
   // transaction is findable without scrolling a long list. Layers on top
   // of the status + settled filters (it narrows whatever those leave).
   const [txnSearch, setTxnSearch] = useState<string>("");
+  // Channel filter for the Transactions view (ported from the Expenses
+  // tab). "" = all channels.
+  const [txnChannelFilter, setTxnChannelFilter] = useState<string>("");
 
   // Apply a ?filter=<status> deep-link to the Transactions status filter
   // when the Transactions view is active — powers the "N items need
@@ -952,6 +997,78 @@ function DashboardInner() {
     });
     setShowRefundForm(true);
   }, []);
+
+  // "+ New expense" save — POST the expense, then upload staged receipts
+  // against the new expense id. Ported from the retired Expenses tab.
+  const handleSaveExpense = useCallback(
+    async (data: ExpenseFormSubmit) => {
+      const { files, ...metadata } = data;
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metadata),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const payload = (await res.json().catch(() => null)) as
+        | { expense?: { id?: number } }
+        | null;
+      const savedId = payload?.expense?.id ?? null;
+      if (savedId !== null && files.length > 0) {
+        const failures: string[] = [];
+        await Promise.all(
+          files.map(async (file) => {
+            const fd = new FormData();
+            fd.append("file", file);
+            const up = await fetch(`/api/expenses/${savedId}/attachments`, {
+              method: "POST",
+              body: fd,
+            });
+            if (!up.ok) {
+              const b = await up.json().catch(() => ({}));
+              failures.push(`${file.name}: ${b.error ?? `HTTP ${up.status}`}`);
+            }
+          })
+        );
+        if (failures.length > 0) {
+          await loadItems();
+          throw new Error(
+            `Expense saved, but ${failures.length} attachment${failures.length === 1 ? "" : "s"} failed: ${failures.join("; ")}`
+          );
+        }
+      }
+      setShowExpenseForm(false);
+      setSuccessMsg("Expense added.");
+      await loadItems();
+    },
+    [loadItems]
+  );
+
+  // Inline "create new category" from the expense form (PATCH /api/settings).
+  const handleCreateExpenseCategory = useCallback(
+    async (name: string) => {
+      const sdata = await apiFetch<{
+        settings?: { custom_categories?: string[] };
+      }>("/api/settings");
+      const current = Array.isArray(sdata.settings?.custom_categories)
+        ? sdata.settings!.custom_categories!
+        : [];
+      const next = current.includes(name) ? current : [...current, name];
+      const patchRes = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customCategories: next }),
+      });
+      if (!patchRes.ok) {
+        const body = await patchRes.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${patchRes.status}`);
+      }
+      await loadExpenseCategories();
+    },
+    [loadExpenseCategories]
+  );
 
   // ─── Dashboard stats ──────────────────────────────────────────────────────
 
@@ -1427,6 +1544,13 @@ function DashboardInner() {
                 >
                   {"\u{21A9}"} Log a refund
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExpenseForm(true)}
+                  className="py-1.5 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold cursor-pointer inline-flex items-center gap-1"
+                >
+                  <span>+</span> New expense
+                </button>
               </div>
               <button
                 type="button"
@@ -1489,6 +1613,39 @@ function DashboardInner() {
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer text-sm leading-none p-1"
                   >
                     {"\u{2715}"}
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Channel filter (ported from the retired Expenses tab). */}
+            {processedItems.length > 0 && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <label
+                  htmlFor="txn-channel"
+                  className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                >
+                  Channel
+                </label>
+                <select
+                  id="txn-channel"
+                  value={txnChannelFilter}
+                  onChange={(e) => setTxnChannelFilter(e.target.value)}
+                  className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">All channels</option>
+                  {CANONICAL_CHANNELS.filter((c) => !c.comingSoon).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.icon} {c.label}
+                    </option>
+                  ))}
+                </select>
+                {txnChannelFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setTxnChannelFilter("")}
+                    className="text-xs text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Clear
                   </button>
                 )}
               </div>
@@ -1558,20 +1715,30 @@ function DashboardInner() {
               //   1. processedStatusFilter — set via dashboard pill click
               //   2. hideSettled — default inbox behavior, hides "paid"
               //   3. no filter — show everything
-              const visibleItems = processedStatusFilter
-                ? processedItems.filter((i) => i.status === processedStatusFilter)
-                : hideSettled
-                ? processedItems.filter((i) => i.status !== "paid")
-                : processedItems;
+              // Channel filter (ported from the Expenses tab) narrows
+              // whatever the other filters / search leave.
+              const byChannel = (items: ProcessedItem[]) =>
+                txnChannelFilter
+                  ? items.filter((i) => (i.channel ?? "") === txnChannelFilter)
+                  : items;
+              const visibleItems = byChannel(
+                processedStatusFilter
+                  ? processedItems.filter(
+                      (i) => i.status === processedStatusFilter
+                    )
+                  : hideSettled
+                  ? processedItems.filter((i) => i.status !== "paid")
+                  : processedItems
+              );
               // Search is "find" mode, not "filter the current view": when
               // a query is present, look across ALL transactions — settled
               // included, regardless of the status pill — so a specific
               // entry is always findable. (The status + settled filters
-              // only shape the default browse view.) Build a lowercase
-              // haystack per row from the fields a user is likely to recall.
+              // only shape the default browse view.) The channel filter
+              // still applies. Build a lowercase haystack per row.
               const q = txnSearch.trim().toLowerCase();
               const searchedItems = q
-                ? processedItems.filter((i) =>
+                ? byChannel(processedItems).filter((i) =>
                     [
                       i.vendor,
                       i.category,
@@ -2153,6 +2320,15 @@ function DashboardInner() {
             setShowRefundForm(false);
             setRefundPrefill(null);
           }}
+        />
+
+        <ExpenseForm
+          open={showExpenseForm}
+          categories={expenseCategories}
+          events={availableEvents}
+          onSave={handleSaveExpense}
+          onClose={() => setShowExpenseForm(false)}
+          onCreateCategory={handleCreateExpenseCategory}
         />
 
         {/* ── CLEAR SAMPLE DATA CONFIRMATION ── */}
