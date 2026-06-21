@@ -43,8 +43,10 @@ import {
 } from "@/lib/shopify";
 import { encryptForDb } from "@/lib/crypto";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 const STATE_COOKIE_NAME = "shopify_oauth_state";
+const IMPORT_DATE_COOKIE_NAME = "shopify_import_start_date";
 
 // Where we redirect on success or error. The /integrations page
 // (commit 8b) reads ?connected=1 / ?error=... query params to show
@@ -62,6 +64,7 @@ function redirectWithError(req: NextRequest, message: string): NextResponse {
   // Clear the state cookie either way — it's single-use.
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE_NAME);
+  res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
   return res;
 }
 
@@ -142,6 +145,10 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 7. Persist the connection ─────────────────────────────────
+  // "Import from" cutoff carried via the sibling cookie ("" → null = all).
+  const importStartDate = normalizeImportStartDate(
+    req.cookies.get(IMPORT_DATE_COOKIE_NAME)?.value
+  );
   try {
     await pool.query(
       `INSERT INTO shopify_connections (
@@ -150,8 +157,9 @@ export async function GET(req: NextRequest) {
          access_token_ciphertext,
          access_token_iv,
          access_token_auth_tag,
-         scopes
-       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+         scopes,
+         import_start_date
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         client.id,
         shopDomain,
@@ -159,6 +167,7 @@ export async function GET(req: NextRequest) {
         encrypted.iv,
         encrypted.authTag,
         tokenResult.scopes,
+        importStartDate,
       ]
     );
   } catch (err) {
@@ -252,6 +261,7 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("shop", shopDomain);
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE_NAME);
+  res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
   return res;
 
   // NOTE: sub-phase 8d will additionally register webhooks here so

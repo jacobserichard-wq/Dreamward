@@ -28,10 +28,13 @@ import {
   buildAuthorizeUrl,
 } from "@/lib/shopify";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 // Cookie name for the CSRF state token. Read by the callback route.
 // Short TTL since the OAuth flow takes seconds, not minutes.
 const STATE_COOKIE_NAME = "shopify_oauth_state";
+// Sibling cookie carrying the "import from" cutoff across the redirect.
+const IMPORT_DATE_COOKIE_NAME = "shopify_import_start_date";
 const STATE_COOKIE_MAX_AGE_SECONDS = 600; // 10 minutes — generous for slow merchants
 
 // The OAuth redirect URI registered with Shopify. Must EXACTLY match
@@ -70,9 +73,11 @@ export async function POST(req: NextRequest) {
     // ── Validate shop domain ────────────────────────────────────
     const body = (await req.json().catch(() => null)) as {
       shopDomain?: unknown;
+      importStartDate?: unknown;
     } | null;
     const raw = body && typeof body.shopDomain === "string" ? body.shopDomain : "";
     const shopDomain = normalizeShopDomain(raw);
+    const importStartDate = normalizeImportStartDate(body?.importStartDate);
     if (!shopDomain) {
       return NextResponse.json(
         {
@@ -106,6 +111,15 @@ export async function POST(req: NextRequest) {
     res.cookies.set({
       name: STATE_COOKIE_NAME,
       value: state,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: STATE_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+    });
+    res.cookies.set({
+      name: IMPORT_DATE_COOKIE_NAME,
+      value: importStartDate ?? "",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

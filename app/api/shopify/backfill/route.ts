@@ -60,6 +60,7 @@ interface ConnectionRow {
   backfill_capped_at_30k: boolean;
   backfill_extended_paid_at: string | null;
   backfill_completed_at: string | null;
+  import_start_date: string | null;
 }
 
 export async function POST() {
@@ -84,7 +85,8 @@ export async function POST() {
       `SELECT id, shop_domain,
               access_token_ciphertext, access_token_iv, access_token_auth_tag,
               backfill_orders_imported, backfill_capped_at_30k,
-              backfill_extended_paid_at, backfill_completed_at
+              backfill_extended_paid_at, backfill_completed_at,
+              import_start_date::text AS import_start_date
          FROM shopify_connections
         WHERE client_id = $1`,
       [client.id]
@@ -140,6 +142,10 @@ export async function POST() {
       [client.id]
     );
     let sinceId = cursorRes.rows[0]?.max ? Number(cursorRes.rows[0].max) : 0;
+    // "Import from" cutoff → Shopify created_at_min (ISO). undefined = all.
+    const createdAtMin = conn.import_start_date
+      ? new Date(`${conn.import_start_date}T00:00:00Z`).toISOString()
+      : undefined;
     let totalImported = conn.backfill_orders_imported;
     let ordersThisRun = 0;
     let done = false;
@@ -167,6 +173,7 @@ export async function POST() {
           accessToken,
           sinceId,
           limit: 250,
+          createdAtMin,
         });
       } catch (err) {
         // Shopify error — record it, stop. Frontend retries via the

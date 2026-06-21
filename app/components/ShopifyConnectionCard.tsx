@@ -33,6 +33,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ImportRangePicker from "./ImportRangePicker";
 import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 // Backfill polling cadence — how often the card re-fetches state
@@ -69,6 +70,11 @@ export default function ShopifyConnectionCard() {
 
   // Connect-modal state
   const [shopInput, setShopInput] = useState("");
+  // Import-range cutoff (rides the initiate POST body).
+  const importStartDateRef = useRef<string | null>(null);
+  const handleRangeChange = useCallback((d: string | null) => {
+    importStartDateRef.current = d;
+  }, []);
   const [connecting, setConnecting] = useState(false);
 
   // Disconnect-modal state
@@ -171,7 +177,10 @@ export default function ShopifyConnectionCard() {
       const res = await fetch("/api/shopify/oauth/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopDomain: shopInput.trim() }),
+        body: JSON.stringify({
+          shopDomain: shopInput.trim(),
+          importStartDate: importStartDateRef.current,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         authorizeUrl?: string;
@@ -465,6 +474,11 @@ export default function ShopifyConnectionCard() {
                   {connecting ? "Redirecting…" : "Connect"}
                 </button>
               </div>
+              <ImportRangePicker
+                onChange={handleRangeChange}
+                disabled={connecting}
+                className="mt-3"
+              />
               <p className="text-xs text-slate-500 mt-1.5">
                 Enter the part before <code>.myshopify.com</code>, or the full
                 URL. You&apos;ll be redirected to Shopify to approve.

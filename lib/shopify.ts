@@ -353,6 +353,9 @@ export async function listOrders(opts: {
   sinceId?: number;
   limit?: number;
   status?: "open" | "closed" | "cancelled" | "any";
+  /** ISO 8601 timestamp — only orders created on/after this. Used by the
+   *  backfill to honor the connection's import_start_date cutoff. */
+  createdAtMin?: string;
 }): Promise<{ orders: ShopifyOrder[]; nextSinceId: number | null }> {
   const limit = Math.min(Math.max(opts.limit ?? 250, 1), 250);
   const params = new URLSearchParams({
@@ -381,6 +384,9 @@ export async function listOrders(opts: {
   });
   if (opts.sinceId && opts.sinceId > 0) {
     params.set("since_id", String(opts.sinceId));
+  }
+  if (opts.createdAtMin) {
+    params.set("created_at_min", opts.createdAtMin);
   }
   const result = await shopifyGet<{ orders: ShopifyOrder[] }>({
     shopDomain: opts.shopDomain,
