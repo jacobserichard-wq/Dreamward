@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Spinner from "./Spinner";
 
 type ReviewRow = {
@@ -48,8 +49,29 @@ export default function CsvReviewModal({
   onConfirm,
   importing,
 }: Props) {
-  if (!uploadReview) return null;
   const showEventColumn = events.length > 0;
+
+  // "Import transactions from" cutoff — a convenience filter that unchecks
+  // rows dated before the chosen date (the upload equivalent of the
+  // connect-time import range). Pure client-side: confirm only sends
+  // _approved rows. Undated/unparseable rows are kept (never auto-excluded).
+  const [cutoff, setCutoff] = useState("");
+  const rowYmd = (s: string): string | null => {
+    const m = /^(\d{4}-\d{2}-\d{2})/.exec(s || "");
+    return m ? m[1] : null;
+  };
+  const applyCutoff = (value: string) => {
+    setCutoff(value);
+    setReviewRows(
+      reviewRows.map((r) => {
+        if (!value) return { ...r, _approved: true };
+        const ymd = rowYmd(r.due_date);
+        return { ...r, _approved: ymd === null ? true : ymd >= value };
+      })
+    );
+  };
+
+  if (!uploadReview) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-3 sm:p-5">
@@ -76,6 +98,27 @@ export default function CsvReviewModal({
                 Download template
               </a>
             </p>
+            {/* Import-from cutoff — unchecks rows dated before the date. */}
+            <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+              <label
+                htmlFor="csv-cutoff"
+                className="text-xs font-medium text-slate-600"
+              >
+                Import transactions from
+              </label>
+              <input
+                id="csv-cutoff"
+                type="date"
+                value={cutoff}
+                onChange={(e) => applyCutoff(e.target.value)}
+                className="py-1 px-2 text-xs border border-slate-200 rounded bg-white"
+              />
+              {cutoff && (
+                <span className="text-[11px] text-slate-400">
+                  Rows before this date are unchecked
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onCancel}
