@@ -2056,6 +2056,51 @@ function DashboardInner() {
                     breakdowns
                   - Stat cards (Avg Confidence, Business Miles, Total
                     Items) → removed as low-decision-value vanity metrics */}
+            {/* June 2026 reorg: PERIOD picker + a "Total (year to date)"
+                header sit ABOVE the big totals; the picker drives both the
+                SalesBanner numbers and the ChannelStack (shared channelData
+                fetch, re-runs on channelYear change). */}
+            <div className="flex items-end justify-between gap-2 mb-2 flex-wrap">
+              <h2 className="text-sm font-semibold text-slate-700 m-0 uppercase tracking-wide">
+                {channelYear === dashboardCurrentYear
+                  ? "Total (year to date)"
+                  : `Total · ${channelYear}`}
+              </h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="dashboard-year"
+                    className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                  >
+                    Period
+                  </label>
+                  <select
+                    id="dashboard-year"
+                    value={channelYear}
+                    onChange={(e) => setChannelYear(Number(e.target.value))}
+                    className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                  >
+                    {[
+                      dashboardCurrentYear,
+                      dashboardCurrentYear - 1,
+                      dashboardCurrentYear - 2,
+                      dashboardCurrentYear - 3,
+                    ].map((y) => (
+                      <option key={y} value={y}>
+                        {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Link
+                  href="/profitability"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  See full channel breakdown {"\u{2192}"}
+                </Link>
+              </div>
+            </div>
+
             <SalesBanner
               totalSales={channelData?.totalRevenue ?? 0}
               totalExpenses={
@@ -2070,6 +2115,12 @@ function DashboardInner() {
               year={channelYear}
               loading={!channelData || !collapsedChannelsLoaded}
             />
+
+            {/* Cost breakdown pulled up to sit directly under the totals
+                (June 2026 reorg — was at the bottom of the page). */}
+            <div className="mt-4">
+              <CogsSummaryCard />
+            </div>
 
             {/* Phase 9.2: AR card removed. Overdue $ now surfaces in
                 the ActionItemsStrip below the top nav as a click-
@@ -2086,43 +2137,6 @@ function DashboardInner() {
                 "See full breakdown →" link on the top-right routes
                 to /profitability for the full ChannelTable detail
                 view (which keeps the year picker + mode toggle). */}
-            {/* Period picker + drill-down link row. The picker
-                drives BOTH the SalesBanner numbers AND the
-                ChannelStack data — they share the same channelData
-                fetch (re-runs when channelYear changes). */}
-            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="dashboard-year"
-                  className="text-xs font-medium text-slate-500 uppercase tracking-wide"
-                >
-                  Period
-                </label>
-                <select
-                  id="dashboard-year"
-                  value={channelYear}
-                  onChange={(e) => setChannelYear(Number(e.target.value))}
-                  className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
-                >
-                  {[
-                    dashboardCurrentYear,
-                    dashboardCurrentYear - 1,
-                    dashboardCurrentYear - 2,
-                    dashboardCurrentYear - 3,
-                  ].map((y) => (
-                    <option key={y} value={y}>
-                      {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Link
-                href="/profitability"
-                className="text-xs text-blue-600 hover:underline"
-              >
-                See full channel breakdown {"\u{2192}"}
-              </Link>
-            </div>
             {/* June 2026 reshuffle (Jacob's call): Bank accounts (cash
                 out) takes the prominent left slot where Channels was;
                 Channels (revenue) moves to the right; Events + Promotions
@@ -2175,13 +2189,6 @@ function DashboardInner() {
                 loading={availableEvents.length === 0 && !clientInfo}
               />
             </div>
-
-            {/* Phase 12g: COGS gross-margin widget. Pro-gated via the
-                /api/cogs/summary 403 (silent hide for non-Pro). Self-
-                fetches a 30-day window, surfaces top SKUs +
-                underwater + unmatched warnings, links to /cogs for
-                the full dashboard. */}
-            <CogsSummaryCard />
 
             {/* Phase 9.2: Top Categories removed from dashboard.
                 Same data lives on /reports as the by-category
