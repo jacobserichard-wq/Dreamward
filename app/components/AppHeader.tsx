@@ -149,7 +149,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
 
   return (
     <header className="bg-gradient-to-br from-eucalyptus-dark to-eucalyptus text-white px-4 sm:px-8 py-6">
-      <div className="max-w-[1200px] mx-auto flex justify-between items-center">
+      <div className="max-w-[1200px] mx-auto flex items-center justify-between sm:justify-start sm:gap-10">
         {/* Plain <a>, not next/link: a full navigation to /dashboard
             guarantees the overview renders. A soft <Link> nav that only
             strips the ?view=transactions param didn't reliably refresh
@@ -166,7 +166,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
             Dreamward
           </h1>
         </a>
-        <div ref={navRef} className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+        <div ref={navRef} className="flex items-center gap-2 sm:gap-3 flex-wrap justify-start">
           {/* Plan badge removed — current plan + trial status live on the
               Billing page (Account → Billing). */}
 
