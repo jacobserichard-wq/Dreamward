@@ -1150,11 +1150,7 @@ function DashboardInner() {
           The dashboard supplies plan + the inline-upload handler so
           its Upload entry stays a file picker (the CSV review modal
           lives on this page). */}
-      <AppHeader
-        plan={clientInfo?.plan ?? null}
-        onUploadFile={handleUpload}
-        uploading={uploading}
-      />
+      <AppHeader plan={clientInfo?.plan ?? null} />
 
       {/* Phase 9.2: ActionItemsStrip — pill row showing pending user
           actions (Needs Review count + Overdue $). Auto-hides when
@@ -1551,6 +1547,32 @@ function DashboardInner() {
                 >
                   <span>+</span> New expense
                 </button>
+                {/* Upload moved here from the nav: a CSV/TSV/XLSX of
+                    transactions or a PDF invoice. */}
+                <label
+                  className={`py-1.5 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold inline-flex items-center gap-1 m-0 ${
+                    uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                  title="Upload a CSV/TSV/XLSX of transactions, or a PDF invoice"
+                >
+                  {uploading ? (
+                    <Spinner size={12} color="#334155" />
+                  ) : (
+                    <span>{"\u{1F4C1}"}</span>
+                  )}
+                  {uploading ? "Uploading…" : "Upload"}
+                  <input
+                    type="file"
+                    accept=".csv,.tsv,.xlsx,.pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleUpload(f);
+                      e.target.value = "";
+                    }}
+                    disabled={uploading}
+                  />
+                </label>
               </div>
               <button
                 type="button"
@@ -1574,7 +1596,7 @@ function DashboardInner() {
                 <span className="font-medium text-slate-700">
                   Add transactions by upload.
                 </span>{" "}
-                Use the <strong>{"\u{1F4C1}"} Upload</strong> button up top —
+                Use the <strong>{"\u{1F4C1}"} Upload</strong> button above —
                 a CSV/TSV/XLSX of transactions, or a <strong>PDF invoice</strong>{" "}
                 (we&apos;ll read it for you). Expected CSV columns: Date{" "}
                 {"\u{00B7}"} Customer/Vendor {"\u{00B7}"} Amount {"\u{00B7}"}{" "}

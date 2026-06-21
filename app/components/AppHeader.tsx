@@ -23,18 +23,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import Spinner from "./Spinner";
 import { isPayingTier } from "@/lib/plans";
 
 export interface AppHeaderProps {
   /** Current plan. When omitted, AppHeader fetches it from
    *  /api/client itself (drop-in for inner pages). */
   plan?: string | null;
-  /** When provided, the Upload entry is an inline file picker
-   *  (dashboard). When omitted, Upload links to /dashboard. */
-  onUploadFile?: (file: File) => void;
-  /** Spinner state for the inline upload (dashboard only). */
-  uploading?: boolean;
 }
 
 // Primary nav link styling. The active (current) section gets a subtle
@@ -56,11 +50,7 @@ const MENU_PANEL =
 const MENU_ITEM =
   "px-4 py-2 text-sm text-bark hover:text-forest hover:bg-oat no-underline";
 
-export default function AppHeader({
-  plan: planProp,
-  onUploadFile,
-  uploading,
-}: AppHeaderProps) {
+export default function AppHeader({ plan: planProp }: AppHeaderProps) {
   // Self-fetch the plan only when the parent didn't supply it.
   const [fetchedPlan, setFetchedPlan] = useState<string | null>(null);
   // Ref to the nav container so a document-level click can close any
@@ -180,41 +170,9 @@ export default function AppHeader({
           {/* Plan badge removed — current plan + trial status live on the
               Billing page (Account → Billing). */}
 
-          {/* Upload: inline file picker on the dashboard (onUploadFile
-              provided); a link to /dashboard everywhere else, since
-              the CSV review modal lives there. */}
-          {onUploadFile ? (
-            <label
-              className={`${NAV_LINK} inline-flex items-center gap-1 m-0 ${
-                uploading
-                  ? "opacity-50 cursor-not-allowed"
-                  : "cursor-pointer"
-              }`}
-              title="Upload a CSV, TSV, or XLSX file"
-            >
-              {uploading && <Spinner size={11} color="white" />}
-              {uploading ? "Uploading..." : "Upload"}
-              <input
-                type="file"
-                accept=".csv,.tsv,.xlsx,.pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onUploadFile(f);
-                  e.target.value = "";
-                }}
-                disabled={uploading}
-              />
-            </label>
-          ) : (
-            <Link
-              href="/dashboard"
-              className={`${NAV_LINK} inline-flex items-center gap-1`}
-              title="Upload a file from the dashboard"
-            >
-              Upload
-            </Link>
-          )}
+          {/* Upload moved into the Transactions view (June 2026) — it's a
+              button alongside Add-a-sale / New-expense there, no longer a
+              separate nav entry. */}
 
           {/* Desktop nav — inline links + dropdowns, sm and up. On
               phones this whole block hides and the hamburger below
