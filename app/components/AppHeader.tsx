@@ -24,7 +24,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Spinner from "./Spinner";
-import { isPayingTier, planDisplayLabel } from "@/lib/plans";
+import { isPayingTier } from "@/lib/plans";
 
 export interface AppHeaderProps {
   /** Current plan. When omitted, AppHeader fetches it from
@@ -177,14 +177,8 @@ export default function AppHeader({
           </h1>
         </a>
         <div ref={navRef} className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-          {plan && (
-            <a
-              href="/billing"
-              className="bg-white/15 text-white px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-semibold tracking-wider no-underline cursor-pointer"
-            >
-              {planDisplayLabel(plan)}
-            </a>
-          )}
+          {/* Plan badge removed — current plan + trial status live on the
+              Billing page (Account → Billing). */}
 
           {/* Upload: inline file picker on the dashboard (onUploadFile
               provided); a link to /dashboard everywhere else, since
