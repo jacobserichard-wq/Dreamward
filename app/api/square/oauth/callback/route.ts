@@ -30,14 +30,17 @@ import {
 } from "@/lib/square";
 import { encryptForDb } from "@/lib/crypto";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 const STATE_COOKIE_NAME = "square_oauth_state";
+const IMPORT_DATE_COOKIE_NAME = "square_import_start_date";
 
 function redirectWithError(req: NextRequest, message: string): NextResponse {
   const url = new URL("/integrations", req.url);
   url.searchParams.set("error", message);
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE_NAME);
+  res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
   return res;
 }
 
@@ -122,6 +125,10 @@ export async function GET(req: NextRequest) {
   // ── 7. Persist the connection ───────────────────────────────
   const environment = getSquareEnvironment();
   const scopes = tokenResult.scope ? tokenResult.scope.split(" ") : [];
+  // "Import from" cutoff carried via the sibling cookie ("" → null = all).
+  const importStartDate = normalizeImportStartDate(
+    req.cookies.get(IMPORT_DATE_COOKIE_NAME)?.value
+  );
 
   try {
     await pool.query(
@@ -137,8 +144,9 @@ export async function GET(req: NextRequest) {
          refresh_token_iv,
          refresh_token_auth_tag,
          scopes,
-         environment
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         environment,
+         import_start_date
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         client.id,
         tokenResult.merchant_id,
@@ -152,6 +160,7 @@ export async function GET(req: NextRequest) {
         refreshBlob.authTag,
         scopes,
         environment,
+        importStartDate,
       ]
     );
   } catch (err) {
@@ -171,6 +180,7 @@ export async function GET(req: NextRequest) {
   if (businessName) url.searchParams.set("merchant", businessName);
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE_NAME);
+  res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
   return res;
 
   // NOTE: Phase 11c will fire-and-forget the backfill kickoff here.

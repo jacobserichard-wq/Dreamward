@@ -46,6 +46,7 @@ interface ConnectionRow {
   backfill_cursor: string | null;
   backfill_completed_at: string | null;
   backfill_payments_imported: number;
+  import_start_date: string | null;
 }
 
 export async function POST() {
@@ -71,7 +72,8 @@ export async function POST() {
               access_token_ciphertext, access_token_iv, access_token_auth_tag,
               access_token_expires_at,
               refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag,
-              backfill_cursor, backfill_completed_at, backfill_payments_imported
+              backfill_cursor, backfill_completed_at, backfill_payments_imported,
+              import_start_date::text AS import_start_date
          FROM square_connections
         WHERE client_id = $1`,
       [client.id]
@@ -169,6 +171,13 @@ export async function POST() {
     let paymentsThisRun = 0;
     let done = false;
 
+    // "Import from" cutoff → Square begin_time (RFC3339). Must be passed
+    // identically on every page when paginating with a cursor. undefined =
+    // all history.
+    const beginTime = conn.import_start_date
+      ? new Date(`${conn.import_start_date}T00:00:00Z`).toISOString()
+      : undefined;
+
     while (true) {
       if (Date.now() - startMs > TIME_BUDGET_MS) break;
 
@@ -179,6 +188,7 @@ export async function POST() {
           cursor,
           limit: 100,
           sortOrder: "ASC", // oldest first for backfill
+          beginTime,
         });
       } catch (err) {
         await pool.query(

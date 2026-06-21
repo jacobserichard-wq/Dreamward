@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
 import ReimportLineItemsButton from "./ReimportLineItemsButton";
+import ConnectRangeModal from "./ConnectRangeModal";
 
 // Phase 11c: while a backfill is in-progress, re-trigger the next
 // chunk + refresh state every 5s. Mirrors WixConnectionCard.
@@ -57,6 +58,8 @@ export default function SquareConnectionCard() {
   const [error, setError] = useState<string | null>(null);
 
   const [connecting, setConnecting] = useState(false);
+  // Connect now opens the import-range modal first, then redirects to Square.
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -129,12 +132,14 @@ export default function SquareConnectionCard() {
     loadState,
   ]);
 
-  const handleConnect = useCallback(async () => {
+  const handleConnect = useCallback(async (importStartDate: string | null) => {
     setConnecting(true);
     setError(null);
     try {
       const res = await fetch("/api/square/oauth/initiate", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importStartDate }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         authorizeUrl?: string;
@@ -433,7 +438,7 @@ export default function SquareConnectionCard() {
             <div className="flex gap-2 flex-wrap items-center">
               <button
                 type="button"
-                onClick={handleConnect}
+                onClick={() => setShowConnectModal(true)}
                 disabled={connecting}
                 className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
               >
@@ -469,6 +474,16 @@ export default function SquareConnectionCard() {
         busy={purging}
         onConfirm={handleConfirmPurge}
         onCancel={() => setConfirmPurge(false)}
+      />
+
+      <ConnectRangeModal
+        open={showConnectModal}
+        providerName="Square"
+        onContinue={(d) => {
+          setShowConnectModal(false);
+          handleConnect(d);
+        }}
+        onCancel={() => setShowConnectModal(false)}
       />
     </>
   );

@@ -11,16 +11,21 @@
 //   3. Build the Square authorize URL
 //   4. Return { authorizeUrl } — client redirects browser to it
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSessionClient } from "@/lib/getClient";
 import { buildOauthAuthorizeUrl } from "@/lib/square";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 const STATE_COOKIE_NAME = "square_oauth_state";
+// Carries the connect-time "import from" cutoff across the OAuth redirect
+// (Square's flow has no place to round-trip arbitrary data, so we stash it
+// in a sibling httpOnly cookie the callback reads). Empty = all history.
+const IMPORT_DATE_COOKIE_NAME = "square_import_start_date";
 const STATE_COOKIE_MAX_AGE_SECONDS = 600; // 10 minutes
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     // ── Auth + plan gate ────────────────────────────────────────
     const client = await getSessionClient();
@@ -40,6 +45,12 @@ export async function POST() {
       );
     }
 
+    // ── Read the chosen import cutoff (bad/missing → null = all) ──
+    const body = (await req.json().catch(() => null)) as {
+      importStartDate?: unknown;
+    } | null;
+    const importStartDate = normalizeImportStartDate(body?.importStartDate);
+
     // ── Generate CSRF state ─────────────────────────────────────
     // 32 random bytes hex-encoded = 64 chars of entropy. Callback
     // verifies the cookie value against Square's round-tripped state.
@@ -58,6 +69,16 @@ export async function POST() {
     res.cookies.set({
       name: STATE_COOKIE_NAME,
       value: state,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: STATE_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+    });
+    // Sibling cookie carrying the import cutoff (empty = all history).
+    res.cookies.set({
+      name: IMPORT_DATE_COOKIE_NAME,
+      value: importStartDate ?? "",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
