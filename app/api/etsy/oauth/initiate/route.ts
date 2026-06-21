@@ -12,7 +12,7 @@
 //   3. Build the Etsy authorize URL (S256 challenge of the verifier)
 //   4. Return { authorizeUrl } — client redirects the browser
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSessionClient } from "@/lib/getClient";
 import {
@@ -21,12 +21,14 @@ import {
   codeChallengeS256,
 } from "@/lib/etsy";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 const STATE_COOKIE = "etsy_oauth_state";
 const VERIFIER_COOKIE = "etsy_oauth_verifier";
+const IMPORT_DATE_COOKIE = "etsy_import_start_date";
 const COOKIE_MAX_AGE_SECONDS = 600; // 10 minutes
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const client = await getSessionClient();
     if (!client) {
@@ -44,6 +46,11 @@ export async function POST() {
         { status: 403 }
       );
     }
+
+    const body = (await req.json().catch(() => null)) as {
+      importStartDate?: unknown;
+    } | null;
+    const importStartDate = normalizeImportStartDate(body?.importStartDate);
 
     const state = randomBytes(32).toString("hex");
     const verifier = generateCodeVerifier();
@@ -65,6 +72,11 @@ export async function POST() {
     };
     res.cookies.set({ name: STATE_COOKIE, value: state, ...cookieOpts });
     res.cookies.set({ name: VERIFIER_COOKIE, value: verifier, ...cookieOpts });
+    res.cookies.set({
+      name: IMPORT_DATE_COOKIE,
+      value: importStartDate ?? "",
+      ...cookieOpts,
+    });
     return res;
   } catch (err) {
     console.error("Etsy OAuth initiate error:", err);

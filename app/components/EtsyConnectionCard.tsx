@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ConnectRangeModal from "./ConnectRangeModal";
 
 // Transient chunk failures retry after a pause; give up after this
 // many consecutive failures so a dead connection doesn't loop forever.
@@ -44,6 +45,7 @@ export default function EtsyConnectionCard() {
   const [error, setError] = useState<string | null>(null);
 
   const [connecting, setConnecting] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -149,12 +151,14 @@ export default function EtsyConnectionCard() {
     };
   }, [state?.connected, state?.backfillDone, loadState]);
 
-  const handleConnect = useCallback(async () => {
+  const handleConnect = useCallback(async (importStartDate: string | null) => {
     setConnecting(true);
     setError(null);
     try {
       const res = await fetch("/api/etsy/oauth/initiate", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importStartDate }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         authorizeUrl?: string;
@@ -383,7 +387,7 @@ export default function EtsyConnectionCard() {
             <div className="flex gap-2 flex-wrap items-center">
               <button
                 type="button"
-                onClick={handleConnect}
+                onClick={() => setShowConnectModal(true)}
                 disabled={connecting}
                 className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
               >
@@ -419,6 +423,16 @@ export default function EtsyConnectionCard() {
         busy={purging}
         onConfirm={handleConfirmPurge}
         onCancel={() => setConfirmPurge(false)}
+      />
+
+      <ConnectRangeModal
+        open={showConnectModal}
+        providerName="Etsy"
+        onContinue={(d) => {
+          setShowConnectModal(false);
+          handleConnect(d);
+        }}
+        onCancel={() => setShowConnectModal(false)}
       />
     </>
   );

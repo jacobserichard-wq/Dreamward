@@ -24,9 +24,11 @@ import { getSessionClient } from "@/lib/getClient";
 import { exchangeCodeForToken, fetchShopIdentity } from "@/lib/etsy";
 import { encryptForDb } from "@/lib/crypto";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 const STATE_COOKIE = "etsy_oauth_state";
 const VERIFIER_COOKIE = "etsy_oauth_verifier";
+const IMPORT_DATE_COOKIE = "etsy_import_start_date";
 
 function redirectWithError(req: NextRequest, message: string): NextResponse {
   const url = new URL("/integrations", req.url);
@@ -34,6 +36,7 @@ function redirectWithError(req: NextRequest, message: string): NextResponse {
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE);
   res.cookies.delete(VERIFIER_COOKIE);
+  res.cookies.delete(IMPORT_DATE_COOKIE);
   return res;
 }
 
@@ -141,6 +144,10 @@ export async function GET(req: NextRequest) {
   // re-authorizing after a revoke) — ON CONFLICT keeps it idempotent
   // rather than erroring like the Square route does.
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+  // "Import from" cutoff carried via the sibling cookie ("" → null = all).
+  const importStartDate = normalizeImportStartDate(
+    req.cookies.get(IMPORT_DATE_COOKIE)?.value
+  );
   try {
     await pool.query(
       `INSERT INTO etsy_connections (
@@ -148,8 +155,8 @@ export async function GET(req: NextRequest) {
          access_token_ciphertext, access_token_iv, access_token_auth_tag,
          access_token_expires_at,
          refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag,
-         refresh_token_obtained_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+         refresh_token_obtained_at, import_start_date
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),$11)
        ON CONFLICT (client_id) DO UPDATE SET
          shop_id = EXCLUDED.shop_id,
          shop_name = EXCLUDED.shop_name,
@@ -161,6 +168,7 @@ export async function GET(req: NextRequest) {
          refresh_token_iv = EXCLUDED.refresh_token_iv,
          refresh_token_auth_tag = EXCLUDED.refresh_token_auth_tag,
          refresh_token_obtained_at = NOW(),
+         import_start_date = EXCLUDED.import_start_date,
          updated_at = NOW()`,
       [
         client.id,
@@ -173,6 +181,7 @@ export async function GET(req: NextRequest) {
         refreshBlob.ciphertext,
         refreshBlob.iv,
         refreshBlob.authTag,
+        importStartDate,
       ]
     );
   } catch (err) {
@@ -190,5 +199,6 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE);
   res.cookies.delete(VERIFIER_COOKIE);
+  res.cookies.delete(IMPORT_DATE_COOKIE);
   return res;
 }

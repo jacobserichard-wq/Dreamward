@@ -45,6 +45,7 @@ interface ConnectionRow {
   refresh_token_auth_tag: Buffer;
   backfill_cursor: number | null;
   backfill_done: boolean;
+  import_start_date: string | null;
 }
 
 export async function POST() {
@@ -69,7 +70,8 @@ export async function POST() {
               access_token_ciphertext, access_token_iv, access_token_auth_tag,
               access_token_expires_at,
               refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag,
-              backfill_cursor, backfill_done
+              backfill_cursor, backfill_done,
+              import_start_date::text AS import_start_date
          FROM etsy_connections
         WHERE client_id = $1`,
       [client.id]
@@ -143,12 +145,20 @@ export async function POST() {
     let receiptsImported = 0;
     let done = false;
 
+    // "Import from" cutoff → Etsy min_created (unix seconds). undefined = all.
+    const minCreated = conn.import_start_date
+      ? Math.floor(
+          new Date(`${conn.import_start_date}T00:00:00Z`).getTime() / 1000
+        )
+      : undefined;
+
     while (Date.now() - startMs < TIME_BUDGET_MS) {
       const page = await fetchReceiptsPage({
         accessToken,
         shopId: conn.shop_id,
         offset,
         sortOrder: "asc", // oldest first — stable offsets
+        minCreated,
       });
 
       if (page.receipts.length === 0) {
