@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: June 16, 2026**
+**Last updated: June 20, 2026**
 
 Dreamward ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use Dreamward at godreamward.com (the "Service"). By using the Service, you agree to this policy.
 
@@ -10,11 +10,13 @@ Dreamward is operated by Richard Jacobsen, an individual sole proprietor based i
 
 ## 1. What we collect
 
-We collect three categories of information:
+We collect the following categories of information:
 
 **Information you provide directly.** When you create an account, you give us your business name, industry, and any custom expense categories you configure. When you upload CSV files for processing, we receive the data those files contain.
 
 **Information collected through Google sign-in.** When you sign in with Google, we request only the `openid` and `email` scopes. We receive your email address and a Google account identifier — used to create and identify your account. We do not request your name, profile picture, Gmail, or any other Google data.
+
+**Information from linked bank accounts (via Plaid).** If you choose to connect a bank account, we use Plaid Inc. ("Plaid") to access your account's transaction data — including transaction date, amount, description, merchant name, category, and the account name and type — on a **read-only** basis, in order to import your business expenses. We do **not** receive or store your bank login credentials, and we do not receive your full bank account or routing numbers. We do not initiate payments or move money. You can disconnect a linked account at any time from the Integrations page, which stops further access. Your use of Plaid is also governed by Plaid's own privacy policy.
 
 **Information collected automatically.** When you use the Service, we automatically log usage events such as the number of items processed per month, sign-in timestamps, and basic technical information (IP address, browser type) for security and reliability purposes. We use Vercel's built-in analytics for hosting telemetry; we do not use third-party advertising trackers.
 
@@ -38,6 +40,7 @@ We use the information we collect to:
 
 - Create and manage your Dreamward account
 - Extract structured data (vendor, amount, date, category) from files you upload, using AI
+- Import and categorize transactions from bank accounts you connect through Plaid, for expense tracking and reporting
 - Display your processed data in dashboards, reports, and exports
 - Process payments through Stripe
 - Send transactional emails (welcome, trial expiration, payment notifications)
@@ -51,7 +54,7 @@ We do not use your information for advertising, profiling, or any purpose unrela
 
 ## 4. AI processing of your data
 
-Dreamward uses Anthropic's Claude API to read the content of the files you upload (CSV/TSV/XLSX spreadsheets and PDF invoices) and extract structured information (vendor name, amount, due date, category). When this happens:
+Dreamward uses Anthropic's Claude API to read the content of the files you upload (CSV/TSV/XLSX spreadsheets and PDF invoices) and the transaction details from any bank accounts you connect through Plaid, and to extract structured information (vendor name, amount, date, category). When this happens:
 
 - Your uploaded file content is sent to Anthropic's servers in real time.
 - Anthropic does **not** train its AI models on data submitted through its API, per Anthropic's published commercial terms.
@@ -69,7 +72,8 @@ We share information with the following service providers who help us operate Dr
 | Service | What they receive | Purpose |
 |---|---|---|
 | **Google** | Email address | Sign-in |
-| **Anthropic (Claude API)** | Uploaded file content (CSV / PDF) | AI data extraction |
+| **Anthropic (Claude API)** | Uploaded file content + connected-account transaction details | AI data extraction |
+| **Plaid** | Bank-account transaction data (read-only) | Connecting bank accounts to import expenses |
 | **Vercel** | All Service traffic and logs | Hosting and infrastructure |
 | **Railway** | Database contents | PostgreSQL hosting |
 | **Stripe** | Name, email, payment method | Subscription billing |
