@@ -171,6 +171,161 @@ export async function listPlaidItems(
   }));
 }
 
+export interface SyncResult {
+  added: number;
+  modified: number;
+  removed: number;
+  /** True if any new debit rows were inserted — the caller uses this to
+   *  decide whether to kick off AI categorization afterward. */
+  importedNew: boolean;
+}
+
+/**
+ * Phase 2: pull new/changed transactions for one item via /transactions/
+ * sync and reflect them into processed_items.
+ *
+ * Expenses-only by design (Jacob's call — avoids double-counting platform
+ * payouts that also land as bank deposits): Plaid reports money LEAVING an
+ * account as a POSITIVE amount, so we ingest `amount > 0` (debits) and skip
+ * deposits entirely. Pending transactions are skipped — we import the
+ * posted version when it lands (posted amounts are what bookkeeping needs).
+ *
+ * Idempotent: rows upsert on (client_id, plaid_transaction_id). A re-sync
+ * never duplicates; a Plaid "modified" event refreshes the financial
+ * fields but PRESERVES the user's category/status (so a reviewed row isn't
+ * reset). "removed" deletes the local row.
+ *
+ * Imported rows land as category='expense' (umbrella) + status='needs_
+ * review', with Plaid's own category in the summary as a hint — the
+ * existing reclassifier (lib/reclassify.ts) then suggests the real
+ * category, and the user confirms in Transactions.
+ */
+export async function syncTransactions(opts: {
+  clientId: number;
+  itemId: string;
+}): Promise<SyncResult> {
+  const { clientId, itemId } = opts;
+  const res = await pool.query(
+    `SELECT access_token_ciphertext, access_token_iv, access_token_auth_tag,
+            sync_cursor, institution_name
+       FROM plaid_items
+      WHERE client_id = $1 AND item_id = $2`,
+    [clientId, itemId]
+  );
+  const row = res.rows[0];
+  if (!row) throw new Error("Plaid item not found");
+
+  const accessToken = decryptFromDb({
+    ciphertext: row.access_token_ciphertext,
+    iv: row.access_token_iv,
+    authTag: row.access_token_auth_tag,
+  });
+  const institution: string = row.institution_name ?? "bank";
+
+  const client = getPlaidClient();
+  let cursor: string | undefined = row.sync_cursor ?? undefined;
+  let added = 0;
+  let modified = 0;
+  let removed = 0;
+  let importedNew = false;
+
+  try {
+    // Page through until Plaid says there's nothing more.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const resp = await client.transactionsSync({
+        access_token: accessToken,
+        cursor,
+        count: 250,
+      });
+      const data = resp.data;
+
+      // added + modified: upsert posted debits; skip pending + deposits.
+      for (const txn of [...data.added, ...data.modified]) {
+        if (txn.pending) continue;
+        if (typeof txn.amount !== "number" || txn.amount <= 0) continue; // deposits / zero
+        const pfc = txn.personal_finance_category;
+        const summary = `Bank import (${institution}) · Plaid: ${
+          pfc ? `${pfc.primary} / ${pfc.detailed}` : "uncategorized"
+        }`;
+        const result = await pool.query(
+          `INSERT INTO processed_items
+             (client_id, vendor, amount, due_date, status, category,
+              confidence, summary, source, channel,
+              plaid_transaction_id, plaid_account_id,
+              invoice_number, processed_at, updated_at)
+           VALUES
+             ($1, $2, $3, $4, 'needs_review', 'expense',
+              0, $5, 'plaid', NULL,
+              $6, $7,
+              '', NOW(), NOW())
+           ON CONFLICT (client_id, plaid_transaction_id)
+             WHERE plaid_transaction_id IS NOT NULL
+           DO UPDATE SET
+             vendor           = EXCLUDED.vendor,
+             amount           = EXCLUDED.amount,
+             due_date         = EXCLUDED.due_date,
+             summary          = EXCLUDED.summary,
+             plaid_account_id = EXCLUDED.plaid_account_id,
+             updated_at       = NOW()
+           RETURNING (xmax = 0) AS inserted`,
+          [
+            clientId,
+            txn.merchant_name || txn.name || "Unknown",
+            txn.amount,
+            txn.date,
+            summary,
+            txn.transaction_id,
+            txn.account_id,
+          ]
+        );
+        const wasInsert = result.rows[0]?.inserted === true;
+        if (wasInsert) {
+          added++;
+          importedNew = true;
+        } else {
+          modified++;
+        }
+      }
+
+      // removed: delete the local row (tenant-scoped).
+      for (const rem of data.removed) {
+        if (!rem.transaction_id) continue;
+        const del = await pool.query(
+          `DELETE FROM processed_items
+            WHERE client_id = $1 AND plaid_transaction_id = $2`,
+          [clientId, rem.transaction_id]
+        );
+        removed += del.rowCount ?? 0;
+      }
+
+      cursor = data.next_cursor;
+      if (!data.has_more) break;
+    }
+
+    await pool.query(
+      `UPDATE plaid_items
+          SET sync_cursor = $1, last_sync_at = NOW(),
+              last_sync_status = 'success', last_sync_error = NULL,
+              status = 'active', updated_at = NOW()
+        WHERE client_id = $2 AND item_id = $3`,
+      [cursor ?? null, clientId, itemId]
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "sync failed";
+    await pool.query(
+      `UPDATE plaid_items
+          SET last_sync_at = NOW(), last_sync_status = 'failed',
+              last_sync_error = $1, updated_at = NOW()
+        WHERE client_id = $2 AND item_id = $3`,
+      [msg.slice(0, 500), clientId, itemId]
+    );
+    throw err;
+  }
+
+  return { added, modified, removed, importedNew };
+}
+
 /** Disconnect an item: tell Plaid to invalidate it (best-effort), then
  *  delete the local row. Tenant-scoped on client_id so a user can only
  *  remove their own items. */

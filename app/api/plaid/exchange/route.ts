@@ -13,7 +13,10 @@ import {
   exchangePublicToken,
   storePlaidItem,
   isPlaidConfigured,
+  syncTransactions,
 } from "@/lib/plaid";
+import { reclassifyClientItems } from "@/lib/reclassify";
+import type { Industry } from "@/lib/categories";
 
 interface ExchangeBody {
   publicToken?: unknown;
@@ -56,6 +59,26 @@ export async function POST(req: NextRequest) {
       institutionId,
       institutionName,
     });
+
+    // Backfill on connect: pull the initial transactions, then AI-suggest
+    // categories for the new umbrella rows. Best-effort — a sync/categorize
+    // hiccup must not fail the connection itself (the daily cron catches
+    // up, and large histories finish arriving over Plaid's normal cycle).
+    try {
+      const sync = await syncTransactions({ clientId: client.id, itemId });
+      if (sync.importedNew) {
+        try {
+          await reclassifyClientItems(
+            client.id,
+            (client.industry ?? "other") as Industry
+          );
+        } catch (e) {
+          console.error("Plaid backfill reclassify failed:", e);
+        }
+      }
+    } catch (e) {
+      console.error("Plaid backfill sync failed:", e);
+    }
 
     return NextResponse.json({ ok: true, itemId, institutionName });
   } catch (error) {

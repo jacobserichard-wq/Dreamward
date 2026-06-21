@@ -31,6 +31,7 @@ import {
   mapTransactionsToLineItems as etsyMapLineItems,
 } from "@/lib/etsy";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
+import { syncTransactions } from "@/lib/plaid";
 
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
 
@@ -648,6 +649,64 @@ export async function GET(req: NextRequest) {
       console.error("[cron] Etsy reconcile pass aggregate failure:", err);
     }
 
+    // ── Plaid bank-feed sync pass ────────────────────────────────
+    // Daily pull of new bank transactions (debits only) for every active
+    // connection. syncTransactions advances each item's cursor and records
+    // its own last_sync_* status; per-item errors are caught so one bad
+    // connection doesn't stop the rest. New umbrella rows get AI-suggested
+    // categories per client (the user confirms in Transactions).
+    let plaidItemsScanned = 0;
+    let plaidExpensesImported = 0;
+    let plaidSyncErrors = 0;
+    try {
+      const plaidItemsRes = await pool.query<{
+        client_id: number;
+        item_id: string;
+        industry: string | null;
+      }>(
+        `SELECT pi.client_id, pi.item_id, c.industry
+           FROM plaid_items pi
+           JOIN clients c ON c.id = pi.client_id
+          WHERE pi.status = 'active'`
+      );
+      for (const item of plaidItemsRes.rows) {
+        plaidItemsScanned++;
+        try {
+          const r = await syncTransactions({
+            clientId: item.client_id,
+            itemId: item.item_id,
+          });
+          plaidExpensesImported += r.added;
+          if (r.importedNew) {
+            try {
+              await reclassifyClientItems(
+                item.client_id,
+                (item.industry ?? "other") as Industry
+              );
+            } catch (e) {
+              console.error(
+                `[cron] Plaid reclassify failed for client ${item.client_id}:`,
+                e
+              );
+            }
+          }
+        } catch (err) {
+          plaidSyncErrors++;
+          console.error(
+            `[cron] Plaid sync failed for item ${item.item_id} ` +
+              `(client_id=${item.client_id}):`,
+            err
+          );
+        }
+      }
+      console.log(
+        `[cron] Plaid sync: ${plaidExpensesImported} expenses imported ` +
+          `across ${plaidItemsScanned} items, ${plaidSyncErrors} errors`
+      );
+    } catch (err) {
+      console.error("[cron] Plaid sync pass aggregate failure:", err);
+    }
+
     // ── Phase 12g: COGS daily digest emails ────────────────────
     //
     // For every Pro client, compute yesterday's revenue / COGS /
@@ -830,6 +889,9 @@ export async function GET(req: NextRequest) {
       etsyConnectionsScanned,
       etsyReceiptsUpserted,
       etsyReconcileErrors,
+      plaidItemsScanned,
+      plaidExpensesImported,
+      plaidSyncErrors,
       cogsDigestsSent,
       cogsDigestsSkipped,
       cogsDigestErrors,
