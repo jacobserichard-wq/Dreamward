@@ -38,6 +38,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
+import ImportRangePicker from "./ImportRangePicker";
 import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 // While disconnected, re-fetch connection state every 5s to catch
@@ -111,6 +112,11 @@ export default function WixConnectionCard() {
   // use until/unless we go through App Market submission.
   const [manualInstanceId, setManualInstanceId] = useState("");
   const [binding, setBinding] = useState(false);
+  // Import-range cutoff for the manual bind (rides the bind POST body).
+  const importStartDateRef = useRef<string | null>(null);
+  const handleRangeChange = useCallback((d: string | null) => {
+    importStartDateRef.current = d;
+  }, []);
 
   const loadState = useCallback(async () => {
     setError(null);
@@ -222,7 +228,10 @@ export default function WixConnectionCard() {
       const res = await fetch("/api/wix/bind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instanceId: trimmed }),
+        body: JSON.stringify({
+          instanceId: trimmed,
+          importStartDate: importStartDateRef.current,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         bound?: boolean;
@@ -548,6 +557,11 @@ export default function WixConnectionCard() {
                     → click your site → <em>Manage Apps</em> → click
                     Dreamward → the UUID in the URL or app details.
                   </p>
+                  <ImportRangePicker
+                    onChange={handleRangeChange}
+                    disabled={binding}
+                    className="mb-3"
+                  />
                   <div className="flex gap-2 flex-wrap">
                     <input
                       type="text"

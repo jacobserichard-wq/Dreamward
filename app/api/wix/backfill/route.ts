@@ -47,6 +47,7 @@ interface ConnectionRow {
   backfill_orders_imported: number;
   backfill_cursor: string | null;
   backfill_completed_at: string | null;
+  import_start_date: string | null;
 }
 
 export async function POST() {
@@ -72,7 +73,8 @@ export async function POST() {
               instance_id,
               backfill_orders_imported,
               backfill_cursor,
-              backfill_completed_at
+              backfill_completed_at,
+              import_start_date::text AS import_start_date
          FROM wix_connections
         WHERE client_id = $1`,
       [client.id]
@@ -110,6 +112,11 @@ export async function POST() {
 
     let cursor: string | null = conn.backfill_cursor;
     let totalImported = conn.backfill_orders_imported;
+    // "Import from" cutoff → ISO timestamp; orders created before it are
+    // skipped (client-side, mirrors the cron). null = all history.
+    const cutoffIso = conn.import_start_date
+      ? new Date(`${conn.import_start_date}T00:00:00Z`).toISOString()
+      : null;
     let ordersThisRun = 0;
     let done = false;
 
@@ -155,7 +162,28 @@ export async function POST() {
       // ── Bulk INSERT with ON CONFLICT DO NOTHING ──────────────
       // 13 fields per row (12 from MappedWixOrderRow + client_id).
       // Build a single multi-row INSERT for the whole page.
-      const rows = page.orders.map(mapWixOrderToProcessedItem);
+      // Apply the import cutoff (client-side, like the cron). A page with
+      // no orders after the cutoff still advances the cursor below.
+      const eligibleOrders = cutoffIso
+        ? page.orders.filter(
+            (o) => !o.createdDate || o.createdDate >= cutoffIso
+          )
+        : page.orders;
+      const rows = eligibleOrders.map(mapWixOrderToProcessedItem);
+      if (rows.length === 0) {
+        cursor = page.nextCursor;
+        await pool.query(
+          `UPDATE wix_connections
+              SET backfill_cursor = $1, last_sync_at = NOW(), updated_at = NOW()
+            WHERE id = $2`,
+          [cursor, conn.id]
+        );
+        if (cursor === null) {
+          done = true;
+          break;
+        }
+        continue;
+      }
       const fieldsPerRow = 13;
       const values: unknown[] = [];
       const placeholders = rows

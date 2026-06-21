@@ -43,6 +43,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { fetchSiteDisplayName, mintAccessToken, wixGet } from "@/lib/wix";
 import { isPayingTier } from "@/lib/plans";
+import { normalizeImportStartDate } from "@/lib/importRange";
 
 // UUID v4-ish pattern (Wix uses standard 8-4-4-4-12 UUIDs for instance IDs)
 const UUID_RE =
@@ -69,8 +70,12 @@ export async function POST(req: NextRequest) {
 
   // ── Parse + validate the input ──────────────────────────────
   let instanceId: string;
+  let importStartDate: string | null = null;
   try {
-    const body = (await req.json()) as { instanceId?: unknown };
+    const body = (await req.json()) as {
+      instanceId?: unknown;
+      importStartDate?: unknown;
+    };
     if (typeof body.instanceId !== "string") {
       return NextResponse.json(
         { error: "Missing or invalid instanceId in request body" },
@@ -87,6 +92,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // "Import from" cutoff (bad/missing → null = all history).
+    importStartDate = normalizeImportStartDate(body.importStartDate);
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body" },
@@ -192,9 +199,10 @@ export async function POST(req: NextRequest) {
          instance_id,
          site_display_name,
          installed_at,
-         scopes
-       ) VALUES ($1, $2, $3, NOW(), $4)`,
-      [client.id, instanceId, siteName, []]
+         scopes,
+         import_start_date
+       ) VALUES ($1, $2, $3, NOW(), $4, $5)`,
+      [client.id, instanceId, siteName, [], importStartDate]
     );
     console.log(
       `Wix bind: manually bound instance=${instanceId} → client_id=${client.id}`
