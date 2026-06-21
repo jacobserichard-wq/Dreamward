@@ -19,6 +19,17 @@ export async function GET() {
     const items = await listPlaidItems(client.id);
     return NextResponse.json({ items });
   } catch (error) {
+    // Before migration 0028 runs (e.g. a deploy that lands ahead of the
+    // migration), the plaid_items table doesn't exist. Degrade to "no
+    // banks connected" instead of a 500 so the Integrations page still
+    // renders cleanly. 42P01 = undefined_table.
+    if (
+      error &&
+      typeof error === "object" &&
+      (error as { code?: string }).code === "42P01"
+    ) {
+      return NextResponse.json({ items: [] });
+    }
     console.error("Plaid items GET error:", error);
     return NextResponse.json(
       { error: "Couldn't load connected banks." },
