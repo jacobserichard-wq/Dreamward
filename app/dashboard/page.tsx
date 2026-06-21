@@ -12,6 +12,7 @@ import RefundForm, {
   type RefundFormSubmit,
   type RefundPrefill,
 } from "../components/RefundForm";
+import DashboardBankCard from "../components/DashboardBankCard";
 import ConfirmModal from "../components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import type { ChannelRow } from "../components/ChannelTable";
@@ -1933,8 +1934,24 @@ function DashboardInner() {
                 See full channel breakdown {"\u{2192}"}
               </Link>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-              {/* Left: Channels (vertical) */}
+            {/* June 2026 reshuffle (Jacob's call): Bank accounts (cash
+                out) takes the prominent left slot where Channels was;
+                Channels (revenue) moves to the right; Events + Promotions
+                drop below. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              {/* Left: Bank accounts */}
+              <DashboardBankCard
+                importedCount={
+                  processedItems.filter((i) => i.source === "plaid").length
+                }
+                needsReviewCount={
+                  processedItems.filter(
+                    (i) => i.source === "plaid" && i.status === "needs_review"
+                  ).length
+                }
+              />
+
+              {/* Right: Channels (vertical) */}
               {channelData && collapsedChannelsLoaded ? (
                 <ChannelStack
                   channels={channelData.channels}
@@ -1960,8 +1977,10 @@ function DashboardInner() {
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Right: Upcoming Events + Promotions */}
+            {/* Below: Upcoming Events + Promotions (moved down) */}
+            <div className="mb-8">
               <UpcomingEventsCard
                 events={upcomingEvents}
                 loading={availableEvents.length === 0 && !clientInfo}
