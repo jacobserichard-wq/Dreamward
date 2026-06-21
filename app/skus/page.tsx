@@ -29,6 +29,9 @@ import SkuBulkCostModal, {
   type SelectedSkuForCost,
 } from "../components/SkuBulkCostModal";
 import SkuPasteImportModal from "../components/SkuPasteImportModal";
+import SkuCostModal from "../components/SkuCostModal";
+import SkuStockModal from "../components/SkuStockModal";
+import SkuSalesModal from "../components/SkuSalesModal";
 
 interface SkuRow {
   id: number;
@@ -116,6 +119,13 @@ export default function SkusPage() {
   const [bulkCostOpen, setBulkCostOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Focused per-card modals (inventory simplification). Clicking a
+  // card's Cost or Stock line opens a targeted modal instead of
+  // dropping the user on the full /skus/[id] detail page.
+  const [costModalSku, setCostModalSku] = useState<SkuRow | null>(null);
+  const [stockModalSku, setStockModalSku] = useState<SkuRow | null>(null);
+  const [salesModalSku, setSalesModalSku] = useState<SkuRow | null>(null);
 
   const loadSkus = useCallback(
     async (includeInactive: boolean) => {
@@ -601,46 +611,136 @@ export default function SkusPage() {
                             {s.description}
                           </p>
                         )}
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                          <span className="text-[13px] text-slate-500">Cost</span>
-                          <span className="text-[13px] font-semibold text-slate-900 tabular-nums">
-                            {fmtMoney(s.currentCost, s.costCurrency)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                          <span className="text-[13px] text-slate-500">Stock</span>
-                          <span
-                            className={`text-[13px] font-semibold tabular-nums ${stockBadgeClasses(s.quantityOnHand)}`}
-                            title={
-                              s.quantityOnHand < 0
-                                ? "Negative — likely missing a starting count"
-                                : s.quantityOnHand === 0
-                                  ? "Out of stock"
-                                  : s.quantityOnHand <= 10
-                                    ? "Low stock"
-                                    : "Healthy stock"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCostModalSku(s);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCostModalSku(s);
                             }
-                          >
-                            {s.quantityOnHand.toLocaleString()}
-                            {s.unit && s.unit !== "each" && (
-                              <span className="text-[11px] font-normal text-slate-400 ml-1">
-                                {s.unit}
-                              </span>
-                            )}
+                          }}
+                          title="View cost history / add a cost"
+                          className="group/row flex justify-between items-center py-1.5 border-b border-slate-50 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                        >
+                          <span className="text-[13px] text-slate-500">Cost</span>
+                          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-900 tabular-nums">
+                            {fmtMoney(s.currentCost, s.costCurrency)}
+                            <span
+                              aria-hidden="true"
+                              className="text-[11px] text-slate-300 group-hover/row:text-blue-600 transition-colors"
+                            >
+                              {"›"}
+                            </span>
                           </span>
                         </div>
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStockModalSku(s);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setStockModalSku(s);
+                            }
+                          }}
+                          title="Receive stock / view stock history"
+                          className="group/row flex justify-between items-center py-1.5 border-b border-slate-50 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                        >
+                          <span className="text-[13px] text-slate-500">Stock</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span
+                              className={`text-[13px] font-semibold tabular-nums ${stockBadgeClasses(s.quantityOnHand)}`}
+                              title={
+                                s.quantityOnHand < 0
+                                  ? "Negative — likely missing a starting count"
+                                  : s.quantityOnHand === 0
+                                    ? "Out of stock"
+                                    : s.quantityOnHand <= 10
+                                      ? "Low stock"
+                                      : "Healthy stock"
+                              }
+                            >
+                              {s.quantityOnHand.toLocaleString()}
+                              {s.unit && s.unit !== "each" && (
+                                <span className="text-[11px] font-normal text-slate-400 ml-1">
+                                  {s.unit}
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="text-[11px] text-slate-300 group-hover/row:text-blue-600 transition-colors"
+                            >
+                              {"›"}
+                            </span>
+                          </span>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSalesModalSku(s);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSalesModalSku(s);
+                            }
+                          }}
+                          title="See where and when this sold"
+                          className="group/row flex justify-between items-center py-1.5 border-b border-slate-50 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                        >
                           <span className="text-[13px] text-slate-500">Sales</span>
-                          <span className="text-[13px] text-slate-700 tabular-nums">
+                          <span className="inline-flex items-center gap-1 text-[13px] text-slate-700 tabular-nums">
                             {s.salesCount > 0 ? s.salesCount : "—"}
+                            <span
+                              aria-hidden="true"
+                              className="text-[11px] text-slate-300 group-hover/row:text-blue-600 transition-colors"
+                            >
+                              {"›"}
+                            </span>
                           </span>
                         </div>
-                        <div className="flex justify-between items-center py-1.5">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSalesModalSku(s);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSalesModalSku(s);
+                            }
+                          }}
+                          title="See where and when this sold"
+                          className="group/row flex justify-between items-center py-1.5 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                        >
                           <span className="text-[13px] text-slate-500">
                             Last sale
                           </span>
-                          <span className="text-[13px] text-slate-600">
+                          <span className="inline-flex items-center gap-1 text-[13px] text-slate-600">
                             {fmtDate(s.lastSaleDate)}
+                            <span
+                              aria-hidden="true"
+                              className="text-[11px] text-slate-300 group-hover/row:text-blue-600 transition-colors"
+                            >
+                              {"›"}
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -680,6 +780,40 @@ export default function SkusPage() {
         onClose={() => setPasteOpen(false)}
         onSaved={handlePasteSaved}
       />
+
+      {costModalSku && (
+        <SkuCostModal
+          open={costModalSku !== null}
+          skuId={costModalSku.id}
+          skuCode={costModalSku.code}
+          skuName={costModalSku.name}
+          onClose={() => setCostModalSku(null)}
+          onChanged={() => loadSkus(showArchived)}
+        />
+      )}
+
+      {stockModalSku && (
+        <SkuStockModal
+          open={stockModalSku !== null}
+          skuId={stockModalSku.id}
+          skuCode={stockModalSku.code}
+          skuName={stockModalSku.name}
+          currentQuantity={stockModalSku.quantityOnHand}
+          unit={stockModalSku.unit}
+          onClose={() => setStockModalSku(null)}
+          onChanged={() => loadSkus(showArchived)}
+        />
+      )}
+
+      {salesModalSku && (
+        <SkuSalesModal
+          open={salesModalSku !== null}
+          skuId={salesModalSku.id}
+          skuCode={salesModalSku.code}
+          skuName={salesModalSku.name}
+          onClose={() => setSalesModalSku(null)}
+        />
+      )}
     </div>
   );
 }
