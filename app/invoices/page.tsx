@@ -246,11 +246,11 @@ export default function InvoicesPage() {
         />
 
         <SectionTip id="invoices" title="Accounts receivable — money owed to you">
-          This is AR: invoices <em>you</em> sent that are awaiting payment
+          This is AR: invoices you sent that are awaiting payment
           (wholesale, consignment, custom orders). Each one lands in an
           aging bucket so you can see at a glance what&apos;s current vs.
           overdue, then send a polite follow-up in one tap. Looking to log
-          a bill you <em>received</em>? That&apos;s an{" "}
+          a bill you received? That&apos;s an{" "}
           <strong>Expense</strong>, not an invoice.
         </SectionTip>
 
