@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { recomputeSkuAndParents } from "@/lib/inventory/costRollup";
 
 export async function DELETE(
   _req: NextRequest,
@@ -49,6 +50,16 @@ export async function DELETE(
        RETURNING id`,
       [parentId, componentSkuId, client.id]
     );
+
+    // Recipe shrank → re-roll this product's cost (if component-costed)
+    // and cascade up. Best-effort.
+    if ((res.rowCount ?? 0) > 0) {
+      try {
+        await recomputeSkuAndParents(parentId, client.id);
+      } catch (rollupErr) {
+        console.error("Cost rollup after recipe remove failed:", rollupErr);
+      }
+    }
 
     return NextResponse.json({ deleted: (res.rowCount ?? 0) > 0 });
   } catch (err) {

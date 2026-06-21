@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { recomputeSkuAndParents } from "@/lib/inventory/costRollup";
 
 interface SkuRowDb {
   id: number;
@@ -45,6 +46,9 @@ interface SkuRowDb {
   // second round trip. NUMERIC since Tier 2 → pg returns a string.
   quantity_on_hand: string;
   unit: string;
+  // Pass 2: 'estimated' (flat cost) | 'components' (cost built from
+  // the recipe). Surfaced so the cost modal can show the right mode.
+  costing_method: string;
   // Market-day mode (migration 0026): what the customer pays at the
   // booth. Distinct from cost history (what the merchant pays).
   // NUMERIC → string from pg, nullable.
@@ -72,6 +76,7 @@ async function loadEnrichedSku(
             sales.last_sale_date,
             s.quantity_on_hand,
             s.unit,
+            s.costing_method,
             s.default_sell_price,
             s.created_at, s.updated_at
        FROM skus s
@@ -108,6 +113,7 @@ function serializeSku(row: SkuRowDb) {
     lastSaleDate: row.last_sale_date,
     quantityOnHand: Number(row.quantity_on_hand),
     unit: row.unit,
+    costingMethod: row.costing_method,
     defaultSellPrice:
       row.default_sell_price != null
         ? Number(row.default_sell_price)
@@ -266,6 +272,7 @@ interface PatchSkuBody {
   active?: unknown;
   reorderPoint?: unknown;
   defaultSellPrice?: unknown;
+  costingMethod?: unknown;
 }
 
 export async function PATCH(
@@ -371,6 +378,25 @@ export async function PATCH(
       }
     }
 
+    // Pass 2: cost source. 'estimated' = flat typed-in cost (default
+    // behavior). 'components' = cost built from the recipe — flipping
+    // here triggers an initial rollup below.
+    let switchedToComponents = false;
+    if (body.costingMethod !== undefined) {
+      if (
+        body.costingMethod !== "estimated" &&
+        body.costingMethod !== "components"
+      ) {
+        return NextResponse.json(
+          { error: "costingMethod must be 'estimated' or 'components'" },
+          { status: 400 }
+        );
+      }
+      updates.push(`costing_method = $${p++}`);
+      values.push(body.costingMethod);
+      switchedToComponents = body.costingMethod === "components";
+    }
+
     if (updates.length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
@@ -394,6 +420,18 @@ export async function PATCH(
         { error: "SKU not found" },
         { status: 404 }
       );
+    }
+
+    // Switching to component costing → roll the cost up from the
+    // recipe now so the returned currentCost reflects it. Best-effort:
+    // a rollup hiccup must not fail the user's save (the cost is a
+    // derived cache; a later recipe edit reconciles it).
+    if (switchedToComponents) {
+      try {
+        await recomputeSkuAndParents(id, client.id);
+      } catch (rollupErr) {
+        console.error("Cost rollup after costingMethod switch failed:", rollupErr);
+      }
     }
 
     // Re-load with the enrichment subqueries so we return the same

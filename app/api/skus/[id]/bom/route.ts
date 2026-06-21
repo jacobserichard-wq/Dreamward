@@ -26,6 +26,10 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import {
+  computeBomUnitCost,
+  recomputeSkuAndParents,
+} from "@/lib/inventory/costRollup";
 
 interface BomRowDb {
   id: number;
@@ -112,7 +116,28 @@ export async function GET(
       if (!Number.isFinite(canMake)) canMake = 0;
     }
 
-    return NextResponse.json({ components, canMake });
+    // Cost rollup for the recipe — per-component unit/line cost + the
+    // rolled-up total. Reuses the engine so the math matches exactly
+    // what materializeBomCost would write.
+    const roll = await computeBomUnitCost(parentId, client.id);
+    const costByComponent = new Map(
+      roll.lines.map((l) => [l.componentSkuId, l])
+    );
+    const componentsWithCost = components.map((c) => {
+      const line = costByComponent.get(c.componentSkuId);
+      return {
+        ...c,
+        unitCost: line?.unitCost ?? null,
+        lineCost: line?.lineCost ?? 0,
+      };
+    });
+
+    return NextResponse.json({
+      components: componentsWithCost,
+      canMake,
+      rolledUpCost: roll.unitCost,
+      missingCostCount: roll.missingCostCount,
+    });
   } catch (err) {
     console.error("BOM GET error:", err);
     return NextResponse.json(
@@ -209,6 +234,14 @@ export async function POST(
        RETURNING id`,
       [client.id, parentId, componentSkuId, body.quantityPerUnit, notes]
     );
+
+    // Recipe changed → re-roll this product's cost (if component-costed)
+    // and cascade up. Best-effort; never fail the recipe edit over it.
+    try {
+      await recomputeSkuAndParents(parentId, client.id);
+    } catch (rollupErr) {
+      console.error("Cost rollup after recipe add failed:", rollupErr);
+    }
 
     return NextResponse.json({ id: saved.rows[0].id });
   } catch (err) {

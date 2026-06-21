@@ -265,3 +265,24 @@ export async function recomputeParentsUsing(
 
   return recomputed;
 }
+
+/**
+ * Single entry-point for write paths. Re-rolls this SKU's own cost (a
+ * no-op unless it's component-costed) and then cascades to every
+ * component-costed product that uses it. Covers all three triggers:
+ *   - a recipe changed on a product P        → call with P
+ *   - a material M's cost changed            → call with M
+ *   - a product P switched to component cost  → call with P
+ *
+ * Best-effort by contract: callers should wrap in try/catch so a
+ * derived-cost refresh can never break the primary mutation. The work
+ * is idempotent — a later edit (or re-call) reconciles any miss.
+ */
+export async function recomputeSkuAndParents(
+  skuId: number,
+  clientId: number,
+  dbClient?: PoolClient
+): Promise<void> {
+  await materializeBomCost(skuId, clientId, dbClient);
+  await recomputeParentsUsing(skuId, clientId, dbClient);
+}

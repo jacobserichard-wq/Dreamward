@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { recomputeParentsUsing } from "@/lib/inventory/costRollup";
 
 interface CreateCostBody {
   cost?: unknown;
@@ -125,6 +126,15 @@ export async function POST(
           { error: "SKU not found" },
           { status: 404 }
         );
+      }
+
+      // If this SKU is used as a component in any component-costed
+      // recipe, its new cost ripples up. Best-effort — never fail the
+      // user's cost entry over a derived-cost refresh.
+      try {
+        await recomputeParentsUsing(skuId, client.id);
+      } catch (rollupErr) {
+        console.error("Cost rollup after cost add failed:", rollupErr);
       }
 
       const r = result.rows[0];

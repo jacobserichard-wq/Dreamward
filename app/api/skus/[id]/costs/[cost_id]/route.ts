@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { recomputeParentsUsing } from "@/lib/inventory/costRollup";
 
 // ---------------------------------------------------------------------
 // PATCH — edit the cost amount or notes in place
@@ -240,6 +241,17 @@ export async function PATCH(
       );
     }
 
+    // A material's cost edit ripples up to any component-costed
+    // products using it. Only when the cost value actually changed
+    // (notes-only edits don't move COGS). Best-effort.
+    if (costIsChanging) {
+      try {
+        await recomputeParentsUsing(skuId, client.id);
+      } catch (rollupErr) {
+        console.error("Cost rollup after cost edit failed:", rollupErr);
+      }
+    }
+
     const r = result.rows[0];
     return NextResponse.json({
       cost: {
@@ -409,6 +421,14 @@ export async function DELETE(
         { error: "Cost row could not be deleted" },
         { status: 500 }
       );
+    }
+
+    // Removing a material's cost row can change its current effective
+    // cost → re-roll any component-costed products using it. Best-effort.
+    try {
+      await recomputeParentsUsing(skuId, client.id);
+    } catch (rollupErr) {
+      console.error("Cost rollup after cost delete failed:", rollupErr);
     }
 
     return NextResponse.json({ deleted: true });
