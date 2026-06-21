@@ -94,6 +94,10 @@ export default function SkuCostModal({
   // (built from the recipe). Initialized from the SKU on load.
   const [mode, setMode] = useState<"estimated" | "components">("estimated");
   const [switching, setSwitching] = useState(false);
+  // "+ Advanced cost input" disclosure (estimated mode only).
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Whether the inline "Update cost" form (behind the Edit tab) is open.
+  const [editingCost, setEditingCost] = useState(false);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -124,6 +128,8 @@ export default function SkuCostModal({
     setNewCost("");
     setNewDate(todayIso());
     setNewNotes("");
+    setAdvancedOpen(false);
+    setEditingCost(false);
     (async () => {
       await loadHistory();
       setLoading(false);
@@ -171,6 +177,7 @@ export default function SkuCostModal({
       setNewCost("");
       setNewDate(todayIso());
       setNewNotes("");
+      setEditingCost(false);
       await loadHistory();
       onChanged?.();
     } finally {
@@ -223,6 +230,7 @@ export default function SkuCostModal({
       .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
     return active[0]?.id ?? null;
   })();
+  const currentRow = history.find((r) => r.id === currentRowId) ?? null;
 
   return (
     <div
@@ -238,45 +246,20 @@ export default function SkuCostModal({
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
       >
-        <h2
+        <p
           id="sku-cost-title"
-          className="text-lg font-bold text-slate-900 m-0 mb-1"
+          className="text-xs font-semibold uppercase tracking-wide text-slate-400 m-0 mb-1"
         >
-          Cost history
-        </h2>
-        <p className="text-xs text-slate-500 m-0 mb-4">
-          Set this item&rsquo;s cost — type a flat estimate, or build it up from
-          the components it&rsquo;s made of.
+          Cost of Product
         </p>
 
-        {/* SKU preview */}
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
-          <p className="text-sm font-medium text-slate-900 m-0 truncate">
-            <span className="font-mono">{skuCode}</span> · {skuName}
-          </p>
-        </div>
-
-        {/* Cost source toggle */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-            {(["estimated", "components"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => switchMode(m)}
-                disabled={switching}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border-0 transition-colors disabled:cursor-wait ${
-                  mode === m
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "bg-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {m === "estimated" ? "Estimate" : "Build from components"}
-              </button>
-            ))}
-          </div>
-          {switching && <Spinner size={14} color="currentColor" />}
-        </div>
+        {/* Product name hero */}
+        <h2 className="text-2xl font-bold text-slate-900 m-0 leading-tight">
+          {skuName}
+        </h2>
+        <p className="text-sm font-mono text-slate-400 m-0 mt-0.5 mb-4">
+          {skuCode}
+        </p>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-lg mb-3 text-sm">
@@ -284,14 +267,133 @@ export default function SkuCostModal({
           </div>
         )}
 
-        {mode === "estimated" ? (
-          <>
-        {/* History list */}
+        {/* Current cost + Edit tab */}
+        <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Current cost
+            </div>
+            <div className="text-2xl font-bold text-slate-900 tabular-nums leading-tight">
+              {currentRow ? fmtMoney(currentRow.cost, currentRow.currency) : "—"}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              {currentRow
+                ? `effective ${fmtDate(currentRow.effectiveDate)}`
+                : "No cost set yet"}
+              {mode === "components" && (
+                <span className="ml-1 text-slate-400">· built from components</span>
+              )}
+            </div>
+          </div>
+          {mode === "estimated" && !editingCost && (
+            <button
+              type="button"
+              onClick={() => setEditingCost(true)}
+              className="flex-shrink-0 py-1.5 px-3 text-xs font-semibold text-slate-700 border border-slate-300 rounded-lg cursor-pointer hover:bg-white bg-white/60"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+
+        {/* Inline update-cost form (behind the Edit tab) */}
+        {mode === "estimated" && editingCost && (
+          <div className="border border-slate-200 rounded-lg p-3 mb-4">
+            <h3 className="text-sm font-semibold text-slate-700 m-0 mb-2">
+              Update cost
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="cost-modal-amount"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
+                  Per-unit cost
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                    {"$"}
+                  </span>
+                  <input
+                    id="cost-modal-amount"
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus
+                    value={newCost}
+                    onChange={(e) => {
+                      setNewCost(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="0.00"
+                    disabled={adding}
+                    className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="cost-modal-date"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
+                  Effective date
+                </label>
+                <input
+                  id="cost-modal-date"
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  disabled={adding}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+                />
+              </div>
+            </div>
+            <label
+              htmlFor="cost-modal-notes"
+              className="block text-xs font-medium text-slate-700 mb-1 mt-3"
+            >
+              Notes{" "}
+              <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="cost-modal-notes"
+              type="text"
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              placeholder="Why did the cost change?"
+              disabled={adding}
+              className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setEditingCost(false)}
+                disabled={adding}
+                className="py-1.5 px-3 text-xs font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer disabled:opacity-40 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddCost}
+                disabled={adding}
+                className="py-1.5 px-3 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+              >
+                {adding && <Spinner size={12} color="white" />}
+                {adding ? "Updating…" : "Update cost"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Cost history */}
+        <h3 className="text-sm font-semibold text-slate-700 m-0 mb-2">
+          Cost history
+        </h3>
         {loading ? (
           <p className="text-center py-6 text-slate-400 text-sm">Loading…</p>
         ) : history.length === 0 ? (
           <p className="text-center py-6 text-slate-400 text-sm border border-slate-100 rounded-lg">
-            No cost history yet. Add the first one below.
+            No cost history yet.
           </p>
         ) : (
           <ul className="m-0 p-0 border border-slate-100 rounded-lg divide-y divide-slate-100">
@@ -334,80 +436,64 @@ export default function SkuCostModal({
           </ul>
         )}
 
-        {/* Add new cost */}
-        <div className="mt-5 pt-4 border-t border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-700 m-0 mb-2">
-            Add a cost
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label
-                htmlFor="cost-modal-amount"
-                className="block text-xs font-medium text-slate-700 mb-1"
+        {mode === "estimated" && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+          {!advancedOpen ? (
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen(true)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer bg-transparent border-0 p-0"
+            >
+              + Advanced cost input
+            </button>
+          ) : (
+            <>
+              <h3 className="text-sm font-semibold text-slate-700 m-0 mb-1">
+                Advanced cost input
+              </h3>
+              <p className="text-xs text-slate-500 m-0 mb-3">
+                Build this product&rsquo;s cost from the materials it&rsquo;s
+                made of. Once switched, the cost updates automatically as those
+                component costs change.
+              </p>
+              <button
+                type="button"
+                onClick={() => switchMode("components")}
+                disabled={switching}
+                className="py-2 px-3 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
               >
-                Per-unit cost
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-                  {"$"}
-                </span>
-                <input
-                  id="cost-modal-amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={newCost}
-                  onChange={(e) => {
-                    setNewCost(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="0.00"
-                  disabled={adding}
-                  className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                htmlFor="cost-modal-date"
-                className="block text-xs font-medium text-slate-700 mb-1"
-              >
-                Effective date
-              </label>
-              <input
-                id="cost-modal-date"
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                disabled={adding}
-                className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
-              />
-            </div>
-          </div>
-          <label
-            htmlFor="cost-modal-notes"
-            className="block text-xs font-medium text-slate-700 mb-1 mt-3"
-          >
-            Notes <span className="text-slate-400 font-normal">(optional)</span>
-          </label>
-          <input
-            id="cost-modal-notes"
-            type="text"
-            value={newNotes}
-            onChange={(e) => setNewNotes(e.target.value)}
-            placeholder="Why did the cost change?"
-            disabled={adding}
-            className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
-          />
+                {switching && <Spinner size={12} color="white" />}
+                Build cost from components
+              </button>
+            </>
+          )}
         </div>
-          </>
-        ) : (
-          <SkuComponentCostPanel
-            skuId={skuId}
-            onCostChanged={() => {
-              void loadHistory();
-              onChanged?.();
-            }}
-          />
+        )}
+
+        {mode === "components" && (
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-700 m-0 mb-1">
+              Advanced cost input
+            </h3>
+            <p className="text-xs text-slate-500 m-0 mb-3">
+              This product&rsquo;s cost is built from its components below.
+            </p>
+            <SkuComponentCostPanel
+              skuId={skuId}
+              onCostChanged={() => {
+                void loadHistory();
+                onChanged?.();
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => switchMode("estimated")}
+              disabled={switching}
+              className="mt-3 text-xs text-slate-400 hover:text-slate-600 hover:underline cursor-pointer bg-transparent border-0 p-0 disabled:opacity-40"
+            >
+              Use a flat cost instead
+            </button>
+          </div>
         )}
 
         <div className="flex items-center justify-between gap-2 mt-5">
@@ -417,27 +503,14 @@ export default function SkuCostModal({
           >
             Open full details →
           </Link>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={adding}
-              className="py-2 px-4 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer disabled:opacity-40 hover:bg-slate-50"
-            >
-              Close
-            </button>
-            {mode === "estimated" && (
-              <button
-                type="button"
-                onClick={handleAddCost}
-                disabled={adding}
-                className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
-              >
-                {adding && <Spinner size={12} color="white" />}
-                {adding ? "Adding…" : "Add cost"}
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={adding}
+            className="py-2 px-4 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer disabled:opacity-40 hover:bg-slate-50"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
