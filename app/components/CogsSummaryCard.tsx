@@ -3,12 +3,13 @@
 // Dashboard "Profit margin" widget. Puts the gross-margin pulse on
 // /dashboard so makers see it without clicking through.
 //
-// Period filter (June 2026): defaults to year-to-date and lets the
-// maker pick exactly which months to include (a checklist + Apply).
-// Months can be non-contiguous, so rather than teach the COGS engine
-// about gaps we fetch /api/cogs/summary once per selected month and
-// aggregate client-side — the engine + endpoint stay untouched, and we
-// never silently fold in a month the user didn't pick.
+// Period filter (June 2026): a dropdown of month checkboxes with a
+// year selector — tick any months (across years, non-contiguous) to
+// include them; defaults to year-to-date. Because months can have gaps
+// we fetch /api/cogs/summary once per selected month and aggregate
+// client-side rather than teach the COGS engine about gaps — the engine
+// + endpoint stay untouched, and a month the user didn't tick is never
+// silently folded in.
 //
 // Renders: revenue / COGS / margin %, top 3 SKUs, underwater +
 // unmatched warning chips, and a link to the full /cogs dashboard.
@@ -16,7 +17,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface MarginTotals {
@@ -53,6 +54,9 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+// How many years back the year selector can go.
+const YEARS_BACK = 5;
+
 function fmtUsd(n: number): string {
   return `$${n.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -71,6 +75,15 @@ function pad2(n: number): string {
 
 function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+// Selection key: "YYYY-MM" (1-based month).
+function keyFor(year: number, monthIdx: number): string {
+  return `${year}-${pad2(monthIdx + 1)}`;
+}
+function parseKey(k: string): { year: number; monthIdx: number } {
+  const [y, m] = k.split("-").map(Number);
+  return { year: y, monthIdx: m - 1 };
 }
 
 // from/to bounds for one month, capped at today so we never query into
@@ -140,13 +153,21 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
 
 export default function CogsSummaryCard() {
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const maxMonth = now.getUTCMonth(); // 0-based; latest selectable month
-  const allMonths = Array.from({ length: maxMonth + 1 }, (_, i) => i);
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth(); // 0-based
+  const minYear = currentYear - YEARS_BACK;
 
-  // Committed selection (drives the fetch) + the in-progress checklist.
-  const [selected, setSelected] = useState<number[]>(allMonths);
-  const [draft, setDraft] = useState<Set<number>>(new Set(allMonths));
+  // Year-to-date keys for the current year (Jan..current month).
+  const ytdKeys = useCallback(
+    () =>
+      Array.from({ length: currentMonth + 1 }, (_, i) => keyFor(currentYear, i)),
+    [currentYear, currentMonth]
+  );
+
+  // Committed selection (drives the fetch) + the in-progress draft.
+  const [selected, setSelected] = useState<string[]>(() => ytdKeys());
+  const [draft, setDraft] = useState<Set<string>>(() => new Set(ytdKeys()));
+  const [viewYear, setViewYear] = useState(currentYear);
   const [filterOpen, setFilterOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -154,76 +175,98 @@ export default function CogsSummaryCard() {
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(
-    async (months: number[]) => {
-      if (months.length === 0) {
-        setData({
-          totals: {
-            revenue: 0,
-            cogs: 0,
-            margin: 0,
-            marginPercent: null,
-            unmatchedRevenue: 0,
-            unmatchedLineItemCount: 0,
-            totalLineItemCount: 0,
-          },
-          bySku: [],
-        });
-        setLoading(false);
-        return;
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const fetchData = useCallback(async (keys: string[]) => {
+    if (keys.length === 0) {
+      setData({
+        totals: {
+          revenue: 0,
+          cogs: 0,
+          margin: 0,
+          marginPercent: null,
+          unmatchedRevenue: 0,
+          unmatchedLineItemCount: 0,
+          totalLineItemCount: 0,
+        },
+        bySku: [],
+      });
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const today = new Date();
+      const parts = await Promise.all(
+        keys.map(async (k) => {
+          const { year, monthIdx } = parseKey(k);
+          const { from, to } = monthBounds(year, monthIdx, today);
+          const url = new URL("/api/cogs/summary", window.location.origin);
+          url.searchParams.set("from", from);
+          url.searchParams.set("to", to);
+          const res = await fetch(url.toString());
+          if (res.status === 403) throw new Error("__forbidden__");
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || `HTTP ${res.status}`);
+          }
+          return (await res.json()) as SummaryResponse;
+        })
+      );
+      setData(aggregate(parts));
+    } catch (err) {
+      if (err instanceof Error && err.message === "__forbidden__") {
+        setForbidden(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Couldn't load margin");
       }
-      setLoading(true);
-      setError(null);
-      try {
-        const today = new Date();
-        const parts = await Promise.all(
-          months.map(async (mi) => {
-            const { from, to } = monthBounds(year, mi, today);
-            const url = new URL("/api/cogs/summary", window.location.origin);
-            url.searchParams.set("from", from);
-            url.searchParams.set("to", to);
-            const res = await fetch(url.toString());
-            if (res.status === 403) {
-              throw new Error("__forbidden__");
-            }
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              throw new Error(body.error || `HTTP ${res.status}`);
-            }
-            return (await res.json()) as SummaryResponse;
-          })
-        );
-        setData(aggregate(parts));
-      } catch (err) {
-        if (err instanceof Error && err.message === "__forbidden__") {
-          setForbidden(true); // non-Pro → hide
-        } else {
-          setError(err instanceof Error ? err.message : "Couldn't load margin");
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [year]
-  );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData(selected);
   }, [selected, fetchData]);
 
-  // Non-Pro users got a 403 — hide the card entirely.
+  // Close the dropdown on an outside click.
+  useEffect(() => {
+    if (!filterOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [filterOpen]);
+
   if (forbidden) return null;
 
-  const isYtd = selected.length === allMonths.length;
+  const ytd = ytdKeys();
+  const isYtd =
+    selected.length === ytd.length && ytd.every((k) => selected.includes(k));
+
   const periodLabel = (() => {
     if (selected.length === 0) return "No months selected";
-    if (isYtd) return `Year to date · ${year}`;
-    const names = selected
-      .slice()
-      .sort((a, b) => a - b)
-      .map((m) => MONTHS[m]);
-    if (names.length <= 3) return `${names.join(", ")} · ${year}`;
-    return `${names.length} months · ${year}`;
+    if (isYtd) return `Year to date · ${currentYear}`;
+    const byYear = new Map<number, number[]>();
+    for (const k of selected) {
+      const { year, monthIdx } = parseKey(k);
+      if (!byYear.has(year)) byYear.set(year, []);
+      byYear.get(year)!.push(monthIdx);
+    }
+    const years = Array.from(byYear.keys()).sort((a, b) => a - b);
+    if (years.length === 1) {
+      const yy = years[0];
+      const months = byYear.get(yy)!.sort((a, b) => a - b);
+      if (months.length === 12) return `${yy}`;
+      if (months.length <= 3)
+        return `${months.map((m) => MONTHS[m]).join(", ")} · ${yy}`;
+      return `${months.length} months · ${yy}`;
+    }
+    return `${selected.length} months · ${years[0]}–${years[years.length - 1]}`;
   })();
 
   const totals = data?.totals;
@@ -232,27 +275,37 @@ export default function CogsSummaryCard() {
     .filter((s) => s.skuId != null && s.revenue > 0)
     .slice(0, 3);
 
+  // Months selectable for the year currently shown in the dropdown
+  // (cap the current year at the current month; past years get all 12).
+  const monthsForViewYear =
+    viewYear === currentYear
+      ? Array.from({ length: currentMonth + 1 }, (_, i) => i)
+      : Array.from({ length: 12 }, (_, i) => i);
+
   const openFilter = () => {
     setDraft(new Set(selected));
+    setViewYear(currentYear);
     setFilterOpen(true);
   };
-  const toggleDraft = (m: number) => {
+  const toggleDraft = (key: string) => {
     setDraft((prev) => {
       const next = new Set(prev);
-      if (next.has(m)) next.delete(m);
-      else next.add(m);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
   const applyFilter = () => {
-    setSelected(Array.from(draft).sort((a, b) => a - b));
+    setSelected(
+      Array.from(draft).sort((a, b) => a.localeCompare(b))
+    );
     setFilterOpen(false);
   };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
+        <div className="relative" ref={wrapRef}>
           <h3 className="text-sm font-semibold text-slate-700 m-0 uppercase tracking-wide">
             Profit margin
           </h3>
@@ -267,6 +320,94 @@ export default function CogsSummaryCard() {
               {filterOpen ? "▴" : "▾"}
             </span>
           </button>
+
+          {/* Month dropdown */}
+          {filterOpen && (
+            <div className="absolute z-20 top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-xl p-3">
+              {/* Year stepper */}
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={() => setViewYear((y) => Math.max(minYear, y - 1))}
+                  disabled={viewYear <= minYear}
+                  className="w-6 h-6 inline-flex items-center justify-center rounded border border-slate-200 text-slate-600 cursor-pointer disabled:opacity-30 hover:bg-slate-50 bg-white"
+                  aria-label="Previous year"
+                >
+                  ‹
+                </button>
+                <span className="text-sm font-semibold text-slate-800">
+                  {viewYear}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setViewYear((y) => Math.min(currentYear, y + 1))
+                  }
+                  disabled={viewYear >= currentYear}
+                  className="w-6 h-6 inline-flex items-center justify-center rounded border border-slate-200 text-slate-600 cursor-pointer disabled:opacity-30 hover:bg-slate-50 bg-white"
+                  aria-label="Next year"
+                >
+                  ›
+                </button>
+              </div>
+
+              {/* Month checkboxes */}
+              <div className="grid grid-cols-3 gap-x-2 gap-y-1 mb-3">
+                {monthsForViewYear.map((m) => {
+                  const key = keyFor(viewYear, m);
+                  return (
+                    <label
+                      key={m}
+                      className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer py-1 px-1 rounded hover:bg-slate-50 select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={draft.has(key)}
+                        onChange={() => toggleDraft(key)}
+                        className="cursor-pointer accent-blue-500"
+                      />
+                      {MONTHS[m]}
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDraft(new Set(ytdKeys()))}
+                    className="text-[11px] font-medium text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                  >
+                    Year to date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(new Set())}
+                    className="text-[11px] font-medium text-slate-500 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen(false)}
+                    className="py-1 px-2.5 text-[11px] font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyFilter}
+                    className="py-1 px-2.5 text-[11px] font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <Link
           href="/cogs"
@@ -276,75 +417,13 @@ export default function CogsSummaryCard() {
         </Link>
       </div>
 
-      {/* Month filter panel */}
-      {filterOpen && (
-        <div className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-600">
-              Include months ({year})
-            </span>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setDraft(new Set(allMonths))}
-                className="text-[11px] font-medium text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0"
-              >
-                Year to date
-              </button>
-              <button
-                type="button"
-                onClick={() => setDraft(new Set())}
-                className="text-[11px] font-medium text-slate-500 hover:underline cursor-pointer bg-transparent border-0 p-0"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 mb-3">
-            {allMonths.map((m) => {
-              const on = draft.has(m);
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => toggleDraft(m)}
-                  className={`py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer border transition-colors ${
-                    on
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  {MONTHS[m]}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterOpen(false)}
-              className="py-1.5 px-3 text-xs font-medium text-slate-700 border border-slate-300 rounded-lg cursor-pointer hover:bg-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={applyFilter}
-              className="py-1.5 px-3 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <p className="text-sm text-slate-500 m-0 py-4 text-center">Loading…</p>
       ) : error ? (
         <p className="text-sm text-red-700 m-0 py-2">{error}</p>
       ) : selected.length === 0 ? (
         <p className="text-sm text-slate-500 m-0 py-4 text-center">
-          Pick at least one month above to see your margin.
+          Pick at least one month to see your margin.
         </p>
       ) : !totals || totals.totalLineItemCount === 0 ? (
         <div className="py-4 text-center">
@@ -362,8 +441,8 @@ export default function CogsSummaryCard() {
       ) : (
         <>
           <p className="text-xs text-slate-500 m-0 mb-2">
-            Revenue, cost &amp; profit margin for {periodLabel.replace(/ · .*/, "")}
-            .
+            Revenue, cost &amp; profit margin for{" "}
+            {periodLabel.replace(/ · .*/, "")}.
           </p>
           {/* Headline strip */}
           <div className="grid grid-cols-3 gap-3 mb-3">
