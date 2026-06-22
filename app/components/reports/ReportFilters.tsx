@@ -61,7 +61,14 @@ export function resolvePeriod(
         label: `${y - 1}`,
       };
     case "all":
-      return { preset, from: "2000-01-01", to: today, label: "All time" };
+      // Capped at the last 3 calendar years (this year + 2 prior) — going
+      // back further just renders empty months for most makers.
+      return {
+        preset,
+        from: `${y - 2}-01-01`,
+        to: today,
+        label: "Last 3 years",
+      };
     case "custom":
       return {
         preset,
@@ -80,7 +87,7 @@ const PRESETS: { key: PeriodPreset; label: string }[] = [
   { key: "quarter", label: "This quarter" },
   { key: "ytd", label: "Year to date" },
   { key: "lastYear", label: "Last year" },
-  { key: "all", label: "All time" },
+  { key: "all", label: "Last 3 years" },
   { key: "custom", label: "Custom…" },
 ];
 
