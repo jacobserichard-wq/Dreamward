@@ -10,6 +10,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import ReportExportButtons from "./ReportExportButtons";
 import type { ReportExportSpec } from "./reportExport";
 
@@ -22,6 +23,7 @@ interface ProductRow {
 }
 
 interface SummaryBySku {
+  totals: { unmatchedRevenue: number; unmatchedLineItemCount: number };
   bySku: {
     skuId: number | null;
     skuCode: string | null;
@@ -71,12 +73,18 @@ export default function ProductProfitabilityReport({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ProductRow[]>([]);
+  // Line items not yet mapped to a SKU: revenue with $0 COGS. Surfaced as
+  // an "Unmatched" row so the report total ties to the Profit Margin card.
+  const [unmatched, setUnmatched] = useState<{ revenue: number; count: number }>(
+    { revenue: 0, count: 0 }
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let result: ProductRow[];
+      let unm = { revenue: 0, count: 0 };
       if (channel === "all") {
         const res = await fetch(`/api/cogs/summary?from=${from}&to=${to}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -90,6 +98,10 @@ export default function ProductProfitabilityReport({
             revenue: s.revenue,
             cogs: s.cogs,
           }));
+        unm = {
+          revenue: d.totals?.unmatchedRevenue ?? 0,
+          count: d.totals?.unmatchedLineItemCount ?? 0,
+        };
       } else {
         const url = new URL("/api/cogs/drill", window.location.origin);
         url.searchParams.set("scope", "channel");
@@ -101,7 +113,11 @@ export default function ProductProfitabilityReport({
         const d = (await res.json()) as DrillResp;
         const map = new Map<string, ProductRow>();
         for (const li of d.lineItems) {
-          if (li.matchedSkuId == null) continue;
+          if (li.matchedSkuId == null) {
+            unm.revenue += li.revenue;
+            unm.count += 1;
+            continue;
+          }
           const k = String(li.matchedSkuId);
           const ex = map.get(k);
           if (ex) {
@@ -120,6 +136,7 @@ export default function ProductProfitabilityReport({
         result = Array.from(map.values());
       }
       setRows(result.sort((a, b) => b.revenue - a.revenue));
+      setUnmatched(unm);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load products");
     } finally {
@@ -133,27 +150,50 @@ export default function ProductProfitabilityReport({
 
   const isAll = channel === "all";
   const underwater = rows.filter((r) => r.revenue > 0 && r.cogs > r.revenue);
+  const matchedRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalCogs = rows.reduce((s, r) => s + r.cogs, 0);
+  const totalRevenue = matchedRevenue + unmatched.revenue;
+  const totalMargin = totalRevenue - totalCogs;
 
-  const buildSpec = (): ReportExportSpec => ({
-    filename: `product-profitability-${channel}-${from}_${to}`,
-    title: "Product profitability",
-    meta: [
-      `Period: ${periodLabel}`,
-      `Channel: ${isAll ? "All channels" : channelLabel}`,
-    ],
-    tables: [
-      {
-        columns: ["Product", "Revenue", "COGS", "Margin", "Margin %"],
-        rows: rows.map((r) => [
-          `${r.code ? r.code + " " : ""}${r.name}`,
-          fmtUsd(r.revenue),
-          fmtUsd(r.cogs),
-          fmtUsd(r.revenue - r.cogs),
-          marginPct(r.revenue, r.cogs),
-        ]),
-      },
-    ],
-  });
+  const buildSpec = (): ReportExportSpec => {
+    const specRows: (string | number)[][] = rows.map((r) => [
+      `${r.code ? r.code + " " : ""}${r.name}`,
+      fmtUsd(r.revenue),
+      fmtUsd(r.cogs),
+      fmtUsd(r.revenue - r.cogs),
+      marginPct(r.revenue, r.cogs),
+    ]);
+    if (unmatched.revenue > 0) {
+      specRows.push([
+        `Unmatched (${unmatched.count} line item${unmatched.count === 1 ? "" : "s"})`,
+        fmtUsd(unmatched.revenue),
+        fmtUsd(0),
+        fmtUsd(unmatched.revenue),
+        marginPct(unmatched.revenue, 0),
+      ]);
+    }
+    specRows.push([
+      "Total",
+      fmtUsd(totalRevenue),
+      fmtUsd(totalCogs),
+      fmtUsd(totalMargin),
+      marginPct(totalRevenue, totalCogs),
+    ]);
+    return {
+      filename: `product-profitability-${channel}-${from}_${to}`,
+      title: "Product profitability",
+      meta: [
+        `Period: ${periodLabel}`,
+        `Channel: ${isAll ? "All channels" : channelLabel}`,
+      ],
+      tables: [
+        {
+          columns: ["Product", "Revenue", "COGS", "Margin", "Margin %"],
+          rows: specRows,
+        },
+      ],
+    };
+  };
 
   if (loading) {
     return (
@@ -240,10 +280,57 @@ export default function ProductProfitabilityReport({
                   </li>
                 );
               })}
+              {unmatched.revenue > 0 && (
+                <li className="flex items-center gap-3 px-1 py-2.5 border-t border-slate-100 bg-amber-50/40 -mx-1 px-2 rounded">
+                  <span className="flex-1 min-w-0 text-sm text-amber-800">
+                    Unmatched{" "}
+                    <span className="text-[11px] text-amber-600">
+                      ({unmatched.count} line item
+                      {unmatched.count === 1 ? "" : "s"})
+                    </span>{" "}
+                    <Link
+                      href="/skus/unmatched"
+                      className="text-[11px] text-blue-600 hover:underline"
+                    >
+                      map these →
+                    </Link>
+                  </span>
+                  <span className="w-24 text-right text-sm tabular-nums text-slate-900">
+                    {fmtUsd(unmatched.revenue)}
+                  </span>
+                  <span className="w-24 text-right text-sm tabular-nums text-slate-400">
+                    {fmtUsd(0)}
+                  </span>
+                  <span className="w-24 text-right text-sm tabular-nums font-semibold text-slate-900">
+                    {fmtUsd(unmatched.revenue)}
+                  </span>
+                  <span className="w-16 text-right text-sm tabular-nums text-slate-400">
+                    {marginPct(unmatched.revenue, 0)}
+                  </span>
+                </li>
+              )}
+              <li className="flex items-center gap-3 px-1 py-2.5 border-t-2 border-slate-200 font-bold text-slate-900">
+                <span className="flex-1 text-sm">Total</span>
+                <span className="w-24 text-right text-sm tabular-nums">
+                  {fmtUsd(totalRevenue)}
+                </span>
+                <span className="w-24 text-right text-sm tabular-nums text-slate-500">
+                  {fmtUsd(totalCogs)}
+                </span>
+                <span className="w-24 text-right text-sm tabular-nums">
+                  {fmtUsd(totalMargin)}
+                </span>
+                <span className="w-16 text-right text-sm tabular-nums text-slate-500">
+                  {marginPct(totalRevenue, totalCogs)}
+                </span>
+              </li>
             </ul>
             <p className="text-[11px] text-slate-400 m-0 mt-3">
               Margin = revenue − COGS (product cost only, before channel
-              expenses + overhead). Only SKU-mapped sales appear here.
+              expenses + overhead). The <strong>Unmatched</strong> row is
+              itemized sales not yet mapped to a SKU (revenue, no cost) — map
+              them to give them a cost. The <strong>Total</strong> ties to the
+              Profit margin card.
             </p>
           </>
         )}
