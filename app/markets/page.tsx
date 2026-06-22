@@ -95,6 +95,12 @@ export default function MarketsPage() {
     <div className="min-h-screen bg-oat font-sans text-forest">
       <AppHeader />
       <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline mb-4"
+        >
+          {"\u{2190}"} Back to events
+        </Link>
         <PageHeader
           title="Find your next market"
           subtitle="Search farmers & vendor markets anywhere in the US, then track the ones you work in your events."
