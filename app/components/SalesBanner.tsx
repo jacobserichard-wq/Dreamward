@@ -29,6 +29,10 @@ interface SalesBannerProps {
   /** Render skeleton state when data hasn't loaded yet (avoids
    *  layout shift on first paint). */
   loading?: boolean;
+  /** When provided, each stat becomes clickable and calls this with
+   *  the drill kind (Total Sales → income, Expenses → expense, Net →
+   *  net). The dashboard opens the TotalsDrillModal. */
+  onDrill?: (kind: "income" | "expense" | "net") => void;
 }
 
 function fmtUsd(n: number): string {
@@ -45,6 +49,7 @@ export default function SalesBanner({
   netProfit,
   year,
   loading = false,
+  onDrill,
 }: SalesBannerProps) {
   if (loading) {
     return (
@@ -76,6 +81,7 @@ export default function SalesBanner({
           value={fmtUsd(totalSales)}
           sub={`Year-to-date ${year}`}
           accentColor="text-emerald-600"
+          onClick={onDrill ? () => onDrill("income") : undefined}
         />
         <Stat
           label="Total Expenses"
@@ -83,6 +89,7 @@ export default function SalesBanner({
           sub={`Year-to-date ${year}`}
           accentColor="text-slate-700"
           isCenter
+          onClick={onDrill ? () => onDrill("expense") : undefined}
         />
         <Stat
           label="Net Profit"
@@ -96,6 +103,7 @@ export default function SalesBanner({
           }
           accentColor={netColor}
           isLast
+          onClick={onDrill ? () => onDrill("net") : undefined}
         />
       </div>
     </div>
@@ -109,6 +117,7 @@ function Stat({
   accentColor,
   isCenter = false,
   isLast = false,
+  onClick,
 }: {
   label: string;
   value: string;
@@ -116,20 +125,42 @@ function Stat({
   accentColor: string;
   isCenter?: boolean;
   isLast?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div
-      className={`${
-        isCenter ? "sm:px-6" : isLast ? "sm:pl-6" : ""
-      } text-center sm:text-left`}
-    >
+  const spacing = isCenter ? "sm:px-6" : isLast ? "sm:pl-6" : "";
+  const inner = (
+    <>
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
         {label}
       </div>
       <div className={`text-3xl sm:text-4xl font-extrabold tabular-nums ${accentColor}`}>
         {value}
       </div>
-      <div className="text-xs text-slate-500 mt-1">{sub}</div>
-    </div>
+      <div className="text-xs text-slate-500 mt-1">
+        {sub}
+        {onClick && (
+          <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+            View details →
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  if (!onClick) {
+    return (
+      <div className={`${spacing} text-center sm:text-left`}>{inner}</div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${label} — see what's in this number`}
+      className={`${spacing} group text-center sm:text-left w-full bg-transparent border-0 p-0 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors`}
+    >
+      {inner}
+    </button>
   );
 }

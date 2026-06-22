@@ -25,6 +25,7 @@ import SalesBanner from "../components/SalesBanner";
 import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
 import CogsSummaryCard from "../components/CogsSummaryCard";
+import TotalsDrillModal from "../components/TotalsDrillModal";
 import ReclassifyModal, {
   type ReclassifyModalRow,
 } from "../components/ReclassifyModal";
@@ -158,6 +159,10 @@ function DashboardInner() {
   // "+ New expense" — manual expense entry with receipts, consolidated
   // from the retired Expenses tab into the Transactions view.
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  // Drill-down modal for the SalesBanner totals (income/expense/net).
+  const [drillKind, setDrillKind] = useState<
+    "income" | "expense" | "net" | null
+  >(null);
   const [expenseCategories, setExpenseCategories] = useState<
     ExpenseFormCategory[]
   >([]);
@@ -1144,6 +1149,15 @@ function DashboardInner() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  // Big-totals figures (shared by SalesBanner + the drill modal so the
+  // modal header reconciles to what's shown).
+  const bannerSales = channelData?.totalRevenue ?? 0;
+  const bannerExpenses = channelData
+    ? channelData.channels.reduce((sum, c) => sum + c.directExpenses, 0) +
+      channelData.overhead
+    : 0;
+  const bannerNet = channelData?.netProfit ?? 0;
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       {/* Sub-session 33: header extracted to the shared AppHeader.
@@ -2102,18 +2116,12 @@ function DashboardInner() {
             </div>
 
             <SalesBanner
-              totalSales={channelData?.totalRevenue ?? 0}
-              totalExpenses={
-                channelData
-                  ? channelData.channels.reduce(
-                      (sum, c) => sum + c.directExpenses,
-                      0
-                    ) + channelData.overhead
-                  : 0
-              }
-              netProfit={channelData?.netProfit ?? 0}
+              totalSales={bannerSales}
+              totalExpenses={bannerExpenses}
+              netProfit={bannerNet}
               year={channelYear}
               loading={!channelData || !collapsedChannelsLoaded}
+              onDrill={setDrillKind}
             />
 
             {/* Cost breakdown pulled up to sit directly under the totals
@@ -2358,6 +2366,15 @@ function DashboardInner() {
           onSave={handleSaveExpense}
           onClose={() => setShowExpenseForm(false)}
           onCreateCategory={handleCreateExpenseCategory}
+        />
+
+        {/* Drill-down for the SalesBanner totals (income/expense/net). */}
+        <TotalsDrillModal
+          open={drillKind !== null}
+          mode={drillKind ?? "income"}
+          year={channelYear}
+          totals={{ sales: bannerSales, expenses: bannerExpenses, net: bannerNet }}
+          onClose={() => setDrillKind(null)}
         />
 
         {/* ── CLEAR SAMPLE DATA CONFIRMATION ── */}
