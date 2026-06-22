@@ -208,11 +208,11 @@ export default function InventoryPage() {
 
   const filterChips: { key: Filter; label: string; count?: number }[] = [
     { key: "all", label: "All", count: data?.totals.skuCount },
-    { key: "low", label: "Low", count: data?.totals.lowCount },
-    { key: "out", label: "Out", count: data?.totals.outCount },
-    { key: "negative", label: "Negative", count: data?.totals.negativeCount },
     { key: "finished", label: "Finished goods" },
     { key: "raw", label: "Raw materials" },
+    { key: "negative", label: "Negative", count: data?.totals.negativeCount },
+    { key: "out", label: "Out", count: data?.totals.outCount },
+    { key: "low", label: "Low", count: data?.totals.lowCount },
   ];
 
   return (
