@@ -126,6 +126,40 @@ const YEAR_OPTIONS = [
   CURRENT_YEAR - 3,
 ];
 
+// Reports hub registry. "Tax pack" is the existing calendar-year report;
+// the Business reports are built one per commit (ready flips to true as
+// each lands). Drives the left-sidebar picker.
+type ReportId =
+  | "tax"
+  | "pnl"
+  | "channel-mix"
+  | "products"
+  | "trend"
+  | "markets"
+  | "ar"
+  | "refunds"
+  | "inventory";
+
+const REPORT_GROUPS: {
+  group: string;
+  items: { id: ReportId; label: string; ready: boolean }[];
+}[] = [
+  { group: "Tax", items: [{ id: "tax", label: "Tax pack", ready: true }] },
+  {
+    group: "Business",
+    items: [
+      { id: "pnl", label: "P&L by channel", ready: false },
+      { id: "channel-mix", label: "Channel mix", ready: false },
+      { id: "products", label: "Product profitability", ready: false },
+      { id: "trend", label: "Sales trend & growth", ready: false },
+      { id: "markets", label: "Market performance", ready: false },
+      { id: "ar", label: "Receivables aging", ready: false },
+      { id: "refunds", label: "Refunds & returns", ready: false },
+      { id: "inventory", label: "Inventory & COGS", ready: false },
+    ],
+  },
+];
+
 function formatGeneratedAt(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("en-US", {
@@ -140,6 +174,7 @@ function formatGeneratedAt(iso: string): string {
 export default function ReportsPage() {
   const router = useRouter();
   const [plan, setPlan] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportId>("tax");
   const [year, setYear] = useState<number>(CURRENT_YEAR);
   const [summary, setSummary] = useState<AnnualSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -267,7 +302,7 @@ export default function ReportsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
-        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+        <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center p-[60px] text-slate-500">
             Loading reports...
           </p>
@@ -279,7 +314,7 @@ export default function ReportsPage() {
   if (!isPayingTier(plan)) {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
-        <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
+        <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
             title="Tax Reports"
             subtitle="Calendar-year summaries for your CPA"
@@ -308,12 +343,50 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <AppHeader />
-      <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
-        <PageHeader
-          title="Tax Reports"
-          subtitle="Calendar-year summaries for your CPA"
-        />
+      <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6">
+        <PageHeader title="Reports" subtitle="Tax + business reports" />
 
+        <div className="flex flex-col lg:flex-row gap-6 mt-2">
+          {/* Sidebar — report picker. Business reports flip to active as
+              each one ships. */}
+          <aside className="lg:w-56 flex-shrink-0">
+            {REPORT_GROUPS.map((grp) => (
+              <div key={grp.group} className="mb-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 m-0 mb-1.5 px-2">
+                  {grp.group}
+                </p>
+                <div className="flex flex-col gap-0.5">
+                  {grp.items.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      disabled={!r.ready}
+                      onClick={() => r.ready && setSelectedReport(r.id)}
+                      className={`text-left text-sm py-1.5 px-2.5 rounded-lg border-0 transition-colors ${
+                        selectedReport === r.id
+                          ? "bg-slate-900 text-white font-semibold cursor-pointer"
+                          : r.ready
+                            ? "bg-transparent text-slate-700 hover:bg-slate-100 cursor-pointer"
+                            : "bg-transparent text-slate-300 cursor-not-allowed"
+                      }`}
+                    >
+                      {r.label}
+                      {!r.ready && (
+                        <span className="text-[10px] text-slate-300 ml-1">
+                          soon
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </aside>
+
+          {/* Selected report */}
+          <div className="flex-1 min-w-0">
+            {selectedReport === "tax" && (
+              <>
         <SectionTip id="reports" title="One-click handoff to your CPA">
           Pick a year and Dreamward builds a Schedule-C-formatted P&amp;L —
           Revenue → COGS → Gross Profit → Operating Expenses → Net. Use{" "}
@@ -559,6 +632,10 @@ export default function ReportsPage() {
             </div>
           </>
         )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
