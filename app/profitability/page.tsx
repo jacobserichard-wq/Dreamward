@@ -100,6 +100,9 @@ export default function ProfitabilityPage() {
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Event filter: null = all events (portfolio view); a number = a
+  // single event's P&L.
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -186,9 +189,34 @@ export default function ProfitabilityPage() {
     );
   }
 
-  const { portfolio, monthlyTrend, bestMarkets, worstMarkets, irsMileageRate, rateSource } = data;
-  const profitColor =
-    portfolio.netProfit >= 0 ? "text-slate-900" : "text-red-700";
+  const { perEvent, portfolio, monthlyTrend, bestMarkets, worstMarkets, irsMileageRate, rateSource } = data;
+  const selectedEvent =
+    selectedEventId != null
+      ? perEvent.find((e) => e.id === selectedEventId) ?? null
+      : null;
+  // KPI figures reflect the filter: one event when picked, else the
+  // whole portfolio.
+  const viewNet = selectedEvent ? selectedEvent.profit : portfolio.netProfit;
+  const viewRevenue = selectedEvent
+    ? selectedEvent.revenue.total
+    : portfolio.totalRevenue;
+  const viewBooth = selectedEvent
+    ? selectedEvent.boothFee
+    : portfolio.totalBoothFees;
+  const viewMileage = selectedEvent
+    ? selectedEvent.mileageCost
+    : portfolio.totalMileageCost;
+  const viewExpenses = selectedEvent
+    ? selectedEvent.expenses.total +
+      selectedEvent.boothFee +
+      selectedEvent.mileageCost
+    : portfolio.totalExpenses +
+      portfolio.totalBoothFees +
+      portfolio.totalMileageCost;
+  const viewUnknown = selectedEvent
+    ? selectedEvent.unknownAmount
+    : portfolio.unknownAmount;
+  const profitColor = viewNet >= 0 ? "text-slate-900" : "text-red-700";
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -230,48 +258,73 @@ export default function ProfitabilityPage() {
           </div>
         ) : (
           <>
-            {/* Portfolio summary — KPI tiles */}
+            {/* Event filter — pick one event, or All for the portfolio */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <label
+                htmlFor="event-filter"
+                className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+              >
+                Event
+              </label>
+              <select
+                id="event-filter"
+                value={selectedEventId ?? ""}
+                onChange={(e) =>
+                  setSelectedEventId(
+                    e.target.value ? Number(e.target.value) : null
+                  )
+                }
+                className="py-1.5 px-2.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500 max-w-full"
+              >
+                <option value="">All events</option>
+                {perEvent.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} · {e.startDate}
+                  </option>
+                ))}
+              </select>
+              {selectedEvent && (
+                <Link
+                  href={`/events/${selectedEvent.id}`}
+                  className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                >
+                  View full detail →
+                </Link>
+              )}
+            </div>
+
+            {/* Summary — KPI tiles (portfolio, or the selected event) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <KpiTile
                 label="Net profit"
-                value={`${portfolio.netProfit < 0 ? "−" : ""}$${formatMoney(Math.abs(portfolio.netProfit))}`}
+                value={`${viewNet < 0 ? "−" : ""}$${formatMoney(Math.abs(viewNet))}`}
                 valueClass={`text-2xl font-bold ${profitColor}`}
-                subtitle={`across ${portfolio.eventCount} ${portfolio.eventCount === 1 ? "event" : "events"}`}
+                subtitle={
+                  selectedEvent
+                    ? selectedEvent.venue ?? selectedEvent.startDate
+                    : `across ${portfolio.eventCount} ${portfolio.eventCount === 1 ? "event" : "events"}`
+                }
               />
               <KpiTile
                 label="Total revenue"
-                value={`$${formatMoney(portfolio.totalRevenue)}`}
+                value={`$${formatMoney(viewRevenue)}`}
               />
               <KpiTile
                 label="Total expenses"
-                value={`$${formatMoney(
-                  portfolio.totalExpenses + portfolio.totalBoothFees + portfolio.totalMileageCost
-                )}`}
-                subtitle={`incl. $${formatMoneyShort(portfolio.totalBoothFees)} booth + $${formatMoneyShort(portfolio.totalMileageCost)} mileage`}
+                value={`$${formatMoney(viewExpenses)}`}
+                subtitle={`incl. $${formatMoneyShort(viewBooth)} booth + $${formatMoneyShort(viewMileage)} mileage`}
               />
-              {/* Per Jacob: replaced Total Miles tile with Profit
-                  Margin %. Mileage is a tax-prep input, not a
-                  decision-support metric, and was already counted
-                  in Total Expenses above. Profit Margin answers a
-                  question every business owner intuitively asks
-                  ("how efficient am I?") in the same shape as the
-                  other tiles ($ → %). Mileage cost still surfaces
-                  in the Total Expenses subtitle + per-event tables
-                  below + the /reports annual summary. */}
               <KpiTile
                 label="Profit margin"
                 value={
-                  portfolio.totalRevenue > 0
-                    ? `${(
-                        (portfolio.netProfit / portfolio.totalRevenue) *
-                        100
-                      ).toFixed(1)}%`
+                  viewRevenue > 0
+                    ? `${((viewNet / viewRevenue) * 100).toFixed(1)}%`
                     : "—"
                 }
                 valueClass={`text-2xl font-bold ${profitColor}`}
                 subtitle={
-                  portfolio.totalRevenue > 0
-                    ? portfolio.netProfit >= 0
+                  viewRevenue > 0
+                    ? viewNet >= 0
                       ? "of every revenue dollar kept"
                       : "of every revenue dollar lost"
                     : "no revenue yet"
@@ -279,9 +332,9 @@ export default function ProfitabilityPage() {
               />
             </div>
 
-            {portfolio.unknownAmount !== 0 && (
+            {viewUnknown !== 0 && (
               <p className="text-xs text-slate-500 mb-5">
-                ${formatMoney(Math.abs(portfolio.unknownAmount))} in uncategorized event
+                ${formatMoney(Math.abs(viewUnknown))} in uncategorized event
                 transactions are excluded from these totals.
               </p>
             )}
@@ -292,7 +345,7 @@ export default function ProfitabilityPage() {
                 points — a single dot per chart looks broken + adds no
                 signal. Reappears as soon as the user has events
                 spanning 2+ months. */}
-            {monthlyTrend.length >= 2 && (
+            {!selectedEvent && monthlyTrend.length >= 2 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               <MonthlyTrendCard
                 title="Revenue"
@@ -312,15 +365,18 @@ export default function ProfitabilityPage() {
             </div>
             )}
 
-            {/* Best/worst markets — ranked tables. worstMarkets is empty
-                when eventCount <= 5 (API suppresses the overlap with
-                bestMarkets); just hide the section in that case. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <MarketsTable title="Best markets" rows={bestMarkets} />
-              {worstMarkets.length > 0 && (
-                <MarketsTable title="Worst markets" rows={worstMarkets} />
-              )}
-            </div>
+            {/* Best/worst markets — ranked tables. Portfolio view only
+                (a single picked event has nothing to rank). worstMarkets
+                is empty when eventCount <= 5 (API suppresses the overlap
+                with bestMarkets); just hide it in that case. */}
+            {!selectedEvent && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <MarketsTable title="Best markets" rows={bestMarkets} />
+                {worstMarkets.length > 0 && (
+                  <MarketsTable title="Worst markets" rows={worstMarkets} />
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
