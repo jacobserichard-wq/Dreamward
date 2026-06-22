@@ -2106,12 +2106,6 @@ function DashboardInner() {
                     ))}
                   </select>
                 </div>
-                <Link
-                  href="/profitability"
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  See full channel breakdown {"\u{2192}"}
-                </Link>
               </div>
             </div>
 
