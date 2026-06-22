@@ -19,6 +19,7 @@ import ReportFilters, {
 import PnlReport from "../components/reports/PnlReport";
 import ChannelMixReport from "../components/reports/ChannelMixReport";
 import ProductProfitabilityReport from "../components/reports/ProductProfitabilityReport";
+import SalesTrendReport from "../components/reports/SalesTrendReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -158,7 +159,7 @@ const REPORT_GROUPS: {
       { id: "pnl", label: "P&L by channel", ready: true },
       { id: "channel-mix", label: "Channel mix", ready: true },
       { id: "products", label: "Product profitability", ready: true },
-      { id: "trend", label: "Sales trend & growth", ready: false },
+      { id: "trend", label: "Sales trend & growth", ready: true },
       { id: "markets", label: "Market performance", ready: false },
       { id: "ar", label: "Receivables aging", ready: false },
       { id: "refunds", label: "Refunds & returns", ready: false },
@@ -745,6 +746,24 @@ export default function ReportsPage() {
                     reportChannels.find((c) => c.id === reportChannel)?.label ??
                     reportChannel
                   }
+                />
+              </>
+            )}
+
+            {selectedReport === "trend" && (
+              <>
+                <ReportFilters
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  channel={reportChannel}
+                  onChannelChange={setReportChannel}
+                  channels={reportChannels}
+                  showChannel={false}
+                />
+                <SalesTrendReport
+                  from={period.from}
+                  to={period.to}
+                  periodLabel={period.label}
                 />
               </>
             )}
