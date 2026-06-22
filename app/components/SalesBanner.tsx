@@ -38,6 +38,9 @@ interface SalesBannerProps {
   /** When set, an "Open dashboard →" link is shown top-right inside the
    *  card (mirrors the Profit margin card). */
   dashboardHref?: string;
+  /** Card title shown top-left, styled like the Profit margin card's
+   *  header so the two cards match. */
+  title?: string;
 }
 
 function fmtUsd(n: number): string {
@@ -56,6 +59,7 @@ export default function SalesBanner({
   loading = false,
   onDrill,
   dashboardHref,
+  title,
 }: SalesBannerProps) {
   if (loading) {
     return (
@@ -77,14 +81,19 @@ export default function SalesBanner({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
-      {dashboardHref && (
-        <div className="flex justify-end mb-3">
-          <Link
-            href={dashboardHref}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700 no-underline whitespace-nowrap"
-          >
-            Open dashboard →
-          </Link>
+      {(title || dashboardHref) && (
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h3 className="text-sm font-semibold text-slate-700 m-0 uppercase tracking-wide">
+            {title}
+          </h3>
+          {dashboardHref && (
+            <Link
+              href={dashboardHref}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 no-underline whitespace-nowrap"
+            >
+              Open dashboard →
+            </Link>
+          )}
         </div>
       )}
       <div className="grid grid-cols-3 gap-3">

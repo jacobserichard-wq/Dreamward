@@ -2108,6 +2108,7 @@ function DashboardInner() {
               loading={!channelData || !collapsedChannelsLoaded}
               onDrill={setDrillKind}
               dashboardHref="/profitability"
+              title="Totals"
             />
 
             {/* Cost breakdown pulled up to sit directly under the totals
