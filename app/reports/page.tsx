@@ -21,6 +21,7 @@ import ChannelMixReport from "../components/reports/ChannelMixReport";
 import ProductProfitabilityReport from "../components/reports/ProductProfitabilityReport";
 import SalesTrendReport from "../components/reports/SalesTrendReport";
 import MarketPerformanceReport from "../components/reports/MarketPerformanceReport";
+import ReceivablesAgingReport from "../components/reports/ReceivablesAgingReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -162,7 +163,7 @@ const REPORT_GROUPS: {
       { id: "products", label: "Product profitability", ready: true },
       { id: "trend", label: "Sales trend & growth", ready: true },
       { id: "markets", label: "Market performance", ready: true },
-      { id: "ar", label: "Receivables aging", ready: false },
+      { id: "ar", label: "Receivables aging", ready: true },
       { id: "refunds", label: "Refunds & returns", ready: false },
       { id: "inventory", label: "Inventory & COGS", ready: false },
     ],
@@ -786,6 +787,8 @@ export default function ReportsPage() {
                 />
               </>
             )}
+
+            {selectedReport === "ar" && <ReceivablesAgingReport />}
           </div>
         </div>
       </div>
