@@ -15,9 +15,6 @@ import {
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
-import ChannelTable, {
-  type ChannelRow,
-} from "../components/ChannelTable";
 import { isPayingTier } from "@/lib/plans";
 
 // Phase 5 commit 7: portfolio profitability dashboard. Reads
@@ -104,24 +101,6 @@ export default function ProfitabilityPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Phase 9.1: tab state + channel data + year picker. Default tab
-  // is "events" (existing behavior). "channels" loads the new
-  // /api/profitability/channels endpoint and renders the
-  // ChannelTable in full-detail variant.
-  const currentYear = new Date().getUTCFullYear();
-  const [activeTab, setActiveTab] = useState<"events" | "channels">("events");
-  const [channelYear, setChannelYear] = useState<number>(currentYear);
-  const [channelMode, setChannelMode] = useState<"attributable" | "allocated">(
-    "attributable"
-  );
-  const [channelData, setChannelData] = useState<{
-    channels: ChannelRow[];
-    overhead: number;
-    totalRevenue: number;
-    netProfit: number;
-  } | null>(null);
-  const [channelLoading, setChannelLoading] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -150,39 +129,6 @@ export default function ProfitabilityPage() {
     }
   }, [router]);
 
-  // Phase 9.1: load channel data when the channels tab is active OR
-  // the year/mode changes. Skip when on the events tab (no point
-  // fetching data we won't display).
-  useEffect(() => {
-    if (activeTab !== "channels") return;
-    let cancelled = false;
-    async function loadChannels() {
-      setChannelLoading(true);
-      try {
-        const res = await fetch(
-          `/api/profitability/channels?year=${channelYear}&mode=${channelMode}`
-        );
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          channels: ChannelRow[];
-          overhead: number;
-          totalRevenue: number;
-          netProfit: number;
-        };
-        if (cancelled) return;
-        setChannelData(json);
-      } catch {
-        // Soft-fail — tab shows the existing channelData (stale OK)
-      } finally {
-        if (!cancelled) setChannelLoading(false);
-      }
-    }
-    loadChannels();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, channelYear, channelMode]);
-
   useEffect(() => {
     load();
   }, [load]);
@@ -202,7 +148,7 @@ export default function ProfitabilityPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            title="Profitability"
+            title="Event profitability"
             subtitle="Per-event profit & loss, monthly trends, and best/worst markets"
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl py-8 px-6 text-center">
@@ -231,7 +177,7 @@ export default function ProfitabilityPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <PageHeader
-            title="Profitability"
+            title="Event profitability"
             subtitle="Per-event profit & loss, monthly trends, and best/worst markets"
           />
           {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -249,7 +195,7 @@ export default function ProfitabilityPage() {
       <AppHeader />
       <div className="max-w-[1100px] mx-auto py-8 px-4 sm:px-6">
         <PageHeader
-          title="Profitability"
+          title="Event profitability"
           subtitle="Per-event profit & loss, monthly trends, and best/worst markets"
         />
 
@@ -271,96 +217,8 @@ export default function ProfitabilityPage() {
           </div>
         )}
 
-        {/* Phase 9.1: tab bar — Events (existing) | Channels (new).
-            "events" stays as the default to preserve existing user
-            expectations + the existing URL stays meaningful. */}
-        <div className="flex gap-1 mb-5 border-b border-slate-200">
-          {(["events", "channels"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`py-2.5 px-4 text-sm font-medium border-b-2 cursor-pointer transition-colors ${
-                activeTab === tab
-                  ? "text-slate-900 border-blue-500"
-                  : "text-slate-500 border-transparent hover:text-slate-700"
-              } bg-transparent`}
-            >
-              {tab === "events" ? "By Event" : "By Channel"}
-            </button>
-          ))}
-        </div>
-
-        {/* ── BY CHANNEL TAB ─────────────────────────────────── */}
-        {activeTab === "channels" && (
-          <>
-            {/* Year picker — matches /reports pattern. Current + 3
-                prior years; older accessible via direct URL */}
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <label
-                htmlFor="channels-year"
-                className="text-sm font-medium text-slate-700"
-              >
-                Year
-              </label>
-              <select
-                id="channels-year"
-                value={channelYear}
-                onChange={(e) => setChannelYear(Number(e.target.value))}
-                disabled={channelLoading}
-                className="py-1.5 px-2.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500 disabled:bg-slate-100"
-              >
-                {[
-                  currentYear,
-                  currentYear - 1,
-                  currentYear - 2,
-                  currentYear - 3,
-                ].map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-              {channelLoading && (
-                <span className="text-xs text-slate-500">Loading…</span>
-              )}
-            </div>
-
-            {channelData ? (
-              <ChannelTable
-                channels={channelData.channels}
-                overhead={channelData.overhead}
-                totalRevenue={channelData.totalRevenue}
-                netProfit={channelData.netProfit}
-                mode={channelMode}
-                onToggleMode={() =>
-                  setChannelMode((m) =>
-                    m === "attributable" ? "allocated" : "attributable"
-                  )
-                }
-                // No collapse on this page — show every channel
-                // in the dedicated view. The dashboard is where
-                // per-user curation matters.
-                collapsedChannels={[]}
-                onToggleCollapse={() => {
-                  /* no-op on this page */
-                }}
-                isPro={isPayingTier(plan)}
-                variant="full"
-              />
-            ) : (
-              <p className="text-center py-12 text-slate-500 text-sm">
-                {channelLoading
-                  ? "Loading channel breakdown…"
-                  : "No channel data for this year yet."}
-              </p>
-            )}
-          </>
-        )}
-
-        {/* ── BY EVENT TAB (existing content) ────────────────── */}
-        {activeTab === "events" && (
-        portfolio.eventCount === 0 ? (
+        {/* Per-event profit & loss */}
+        {portfolio.eventCount === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 py-8 px-6 text-center">
             <p className="text-base text-slate-700 m-0 mb-2">
               No events yet
@@ -464,7 +322,6 @@ export default function ProfitabilityPage() {
               )}
             </div>
           </>
-        )
         )}
       </div>
     </div>

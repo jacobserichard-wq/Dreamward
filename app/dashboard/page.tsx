@@ -2201,7 +2201,7 @@ function DashboardInner() {
               year={channelYear}
               loading={totalsLoading}
               onDrill={setDrillKind}
-              dashboardHref="/profitability"
+              dashboardHref="/reports"
               title="Totals"
               periodLabel={monthSelectionLabel(totalsMonths)}
               filterSlot={
