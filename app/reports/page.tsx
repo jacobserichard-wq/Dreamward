@@ -12,6 +12,11 @@ import ReportMonthlyChart from "../components/ReportMonthlyChart";
 import ReportArSnapshot from "../components/ReportArSnapshot";
 import ScheduleCSummaryPanel from "../components/ScheduleCSummaryPanel";
 import QuarterlyEstimatesPanel from "../components/QuarterlyEstimatesPanel";
+import ReportFilters, {
+  resolvePeriod,
+  type ResolvedPeriod,
+} from "../components/reports/ReportFilters";
+import PnlReport from "../components/reports/PnlReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -148,7 +153,7 @@ const REPORT_GROUPS: {
   {
     group: "Business",
     items: [
-      { id: "pnl", label: "P&L by channel", ready: false },
+      { id: "pnl", label: "P&L by channel", ready: true },
       { id: "channel-mix", label: "Channel mix", ready: false },
       { id: "products", label: "Product profitability", ready: false },
       { id: "trend", label: "Sales trend & growth", ready: false },
@@ -175,6 +180,15 @@ export default function ReportsPage() {
   const router = useRouter();
   const [plan, setPlan] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<ReportId>("tax");
+  // Shared business-report filters (period + channel) + the channel list
+  // for the dropdown.
+  const [period, setPeriod] = useState<ResolvedPeriod>(() =>
+    resolvePeriod("ytd")
+  );
+  const [reportChannel, setReportChannel] = useState<string>("all");
+  const [reportChannels, setReportChannels] = useState<
+    { id: string; label: string }[]
+  >([]);
   const [year, setYear] = useState<number>(CURRENT_YEAR);
   const [summary, setSummary] = useState<AnnualSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -268,6 +282,40 @@ export default function ReportsPage() {
     }
     init();
   }, [router, loadReport]);
+
+  // Channel list for the business-report filter dropdown (channels with
+  // any data this year).
+  useEffect(() => {
+    if (!isPayingTier(plan)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/profitability/channels?year=${CURRENT_YEAR}`
+        );
+        if (!res.ok) return;
+        const d = (await res.json()) as {
+          channels?: {
+            id: string;
+            label: string;
+            revenue: number;
+            directExpenses: number;
+          }[];
+        };
+        if (cancelled) return;
+        setReportChannels(
+          (d.channels ?? [])
+            .filter((c) => c.revenue !== 0 || c.directExpenses !== 0)
+            .map((c) => ({ id: c.id, label: c.label }))
+        );
+      } catch {
+        /* non-fatal — dropdown just stays "All channels" */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plan]);
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newYear = Number(e.target.value);
@@ -632,6 +680,29 @@ export default function ReportsPage() {
             </div>
           </>
         )}
+              </>
+            )}
+
+            {selectedReport === "pnl" && (
+              <>
+                <ReportFilters
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  channel={reportChannel}
+                  onChannelChange={setReportChannel}
+                  channels={reportChannels}
+                  showChannel
+                />
+                <PnlReport
+                  from={period.from}
+                  to={period.to}
+                  periodLabel={period.label}
+                  channel={reportChannel}
+                  channelLabel={
+                    reportChannels.find((c) => c.id === reportChannel)?.label ??
+                    reportChannel
+                  }
+                />
               </>
             )}
           </div>
