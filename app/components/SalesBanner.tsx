@@ -18,6 +18,7 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 interface SalesBannerProps {
@@ -41,6 +42,12 @@ interface SalesBannerProps {
   /** Card title shown top-left, styled like the Profit margin card's
    *  header so the two cards match. */
   title?: string;
+  /** Optional control rendered under the title (the month-filter pill),
+   *  mirroring the Profit margin card. */
+  filterSlot?: ReactNode;
+  /** Period label for the Sales/Expenses sub-text (e.g. "Year to date ·
+   *  2026"). Falls back to "Year-to-date {year}" when omitted. */
+  periodLabel?: string;
 }
 
 function fmtUsd(n: number): string {
@@ -60,7 +67,10 @@ export default function SalesBanner({
   onDrill,
   dashboardHref,
   title,
+  filterSlot,
+  periodLabel,
 }: SalesBannerProps) {
+  const periodSub = periodLabel ?? `Year-to-date ${year}`;
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
@@ -96,17 +106,18 @@ export default function SalesBanner({
           )}
         </div>
       )}
+      {filterSlot && <div className="mb-3">{filterSlot}</div>}
       <div className="grid grid-cols-3 gap-3">
         <Stat
           label="Total Sales"
           value={fmtUsd(totalSales)}
-          sub={`Year-to-date ${year}`}
+          sub={periodSub}
           onClick={onDrill ? () => onDrill("income") : undefined}
         />
         <Stat
           label="Total Expenses"
           value={fmtUsd(totalExpenses)}
-          sub={`Year-to-date ${year}`}
+          sub={periodSub}
           onClick={onDrill ? () => onDrill("expense") : undefined}
         />
         <Stat

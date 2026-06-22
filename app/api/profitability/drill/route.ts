@@ -124,6 +124,14 @@ export async function GET(req: NextRequest) {
     const yearStart = `${year}-01-01`;
     const yearEnd = `${year}-12-31`;
 
+    // Optional explicit date range (from/to) overrides the year bounds so
+    // a month-filtered Totals card can drill into exactly its months.
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    const fromParam = url.get("from");
+    const toParam = url.get("to");
+    const rangeStart = fromParam && ymd.test(fromParam) ? fromParam : yearStart;
+    const rangeEnd = toParam && ymd.test(toParam) ? toParam : yearEnd;
+
     const [eventsResult, txnsResult, settingsResult] = await Promise.all([
       pool.query<EventRow>(
         `SELECT id, name, revenue, booth_fee,
@@ -138,7 +146,7 @@ export async function GET(req: NextRequest) {
           WHERE client_id = $1
             AND start_date >= $2
             AND start_date <= $3`,
-        [client.id, yearStart, yearEnd]
+        [client.id, rangeStart, rangeEnd]
       ),
       pool.query<TxnRow>(
         `SELECT amount, category, vendor, source, event_id, channel, due_date
@@ -147,7 +155,7 @@ export async function GET(req: NextRequest) {
             AND due_date IS NOT NULL
             AND due_date >= $2
             AND due_date <= $3`,
-        [client.id, yearStart, yearEnd]
+        [client.id, rangeStart, rangeEnd]
       ),
       pool.query<SettingsRow>(
         `SELECT custom_categories, preferences

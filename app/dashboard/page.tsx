@@ -26,6 +26,12 @@ import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
 import CogsSummaryCard from "../components/CogsSummaryCard";
 import TotalsDrillModal from "../components/TotalsDrillModal";
+import MonthFilterPill, {
+  currentYtdKeys,
+  parseKey,
+  monthBounds,
+  monthSelectionLabel,
+} from "../components/MonthFilterPill";
 import ReclassifyModal, {
   type ReclassifyModalRow,
 } from "../components/ReclassifyModal";
@@ -562,6 +568,73 @@ function DashboardInner() {
       cancelled = true;
     };
   }, [clientInfo?.plan, channelMode, channelYear]);
+
+  // Totals (Sales / Expenses / Net) month filter — independent of the
+  // year dropdown that drives the channel cards. Fetches the channel
+  // rollup per selected month (date range) and sums the three headline
+  // totals client-side so any month set (even non-contiguous, across
+  // years) reconciles.
+  const [totalsMonths, setTotalsMonths] = useState<string[]>(() =>
+    currentYtdKeys()
+  );
+  const [totalsAgg, setTotalsAgg] = useState<{
+    sales: number;
+    expenses: number;
+    net: number;
+  } | null>(null);
+  const [totalsLoading, setTotalsLoading] = useState(true);
+
+  useEffect(() => {
+    const plan = clientInfo?.plan;
+    if (!isPayingTier(plan)) {
+      setTotalsLoading(false);
+      return;
+    }
+    if (totalsMonths.length === 0) {
+      setTotalsAgg({ sales: 0, expenses: 0, net: 0 });
+      setTotalsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setTotalsLoading(true);
+      try {
+        const today = new Date();
+        const parts = await Promise.all(
+          totalsMonths.map(async (k) => {
+            const { year, monthIdx } = parseKey(k);
+            const { from, to } = monthBounds(year, monthIdx, today);
+            const res = await fetch(
+              `/api/profitability/channels?from=${from}&to=${to}&mode=${channelMode}`
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return (await res.json()) as {
+              channels: ChannelRow[];
+              overhead: number;
+              totalRevenue: number;
+              netProfit: number;
+            };
+          })
+        );
+        if (cancelled) return;
+        let sales = 0;
+        let expenses = 0;
+        for (const p of parts) {
+          sales += p.totalRevenue;
+          expenses +=
+            p.channels.reduce((s, c) => s + c.directExpenses, 0) + p.overhead;
+        }
+        setTotalsAgg({ sales, expenses, net: sales - expenses });
+      } catch {
+        if (!cancelled) setTotalsAgg(null);
+      } finally {
+        if (!cancelled) setTotalsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientInfo?.plan, channelMode, totalsMonths]);
 
   // Phase 9.1: toggle a channel's collapse state. Optimistic update
   // (local state flips immediately) + PATCH /api/settings in the
@@ -1149,14 +1222,11 @@ function DashboardInner() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  // Big-totals figures (shared by SalesBanner + the drill modal so the
-  // modal header reconciles to what's shown).
-  const bannerSales = channelData?.totalRevenue ?? 0;
-  const bannerExpenses = channelData
-    ? channelData.channels.reduce((sum, c) => sum + c.directExpenses, 0) +
-      channelData.overhead
-    : 0;
-  const bannerNet = channelData?.netProfit ?? 0;
+  // Big-totals figures — month-filtered (totalsMonths), shared by the
+  // SalesBanner + the drill modal so the modal header reconciles.
+  const bannerSales = totalsAgg?.sales ?? 0;
+  const bannerExpenses = totalsAgg?.expenses ?? 0;
+  const bannerNet = totalsAgg?.net ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -2105,10 +2175,17 @@ function DashboardInner() {
               totalExpenses={bannerExpenses}
               netProfit={bannerNet}
               year={channelYear}
-              loading={!channelData || !collapsedChannelsLoaded}
+              loading={totalsLoading}
               onDrill={setDrillKind}
               dashboardHref="/profitability"
               title="Totals"
+              periodLabel={monthSelectionLabel(totalsMonths)}
+              filterSlot={
+                <MonthFilterPill
+                  selected={totalsMonths}
+                  onApply={setTotalsMonths}
+                />
+              }
             />
 
             {/* Cost breakdown pulled up to sit directly under the totals
@@ -2359,7 +2436,7 @@ function DashboardInner() {
         <TotalsDrillModal
           open={drillKind !== null}
           mode={drillKind ?? "income"}
-          year={channelYear}
+          months={totalsMonths}
           totals={{ sales: bannerSales, expenses: bannerExpenses, net: bannerNet }}
           onClose={() => setDrillKind(null)}
         />

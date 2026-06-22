@@ -99,6 +99,15 @@ export async function GET(req: NextRequest) {
     const yearStart = `${year}-01-01`;
     const yearEnd = `${year}-12-31`;
 
+    // Optional explicit date range (from/to) overrides the year bounds,
+    // letting callers scope the rollup to specific months. Both must be
+    // valid YYYY-MM-DD; otherwise we fall back to the full year.
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    const fromParam = url.get("from");
+    const toParam = url.get("to");
+    const rangeStart = fromParam && ymd.test(fromParam) ? fromParam : yearStart;
+    const rangeEnd = toParam && ymd.test(toParam) ? toParam : yearEnd;
+
     // ── Parallel fetch (same shape as /api/profitability) ───────
     const [eventsResult, txnsResult, settingsResult, appSettingResult] =
       await Promise.all([
@@ -120,7 +129,7 @@ export async function GET(req: NextRequest) {
             WHERE client_id = $1
               AND start_date >= $2
               AND start_date <= $3`,
-          [client.id, yearStart, yearEnd]
+          [client.id, rangeStart, rangeEnd]
         ),
         pool.query<TxnRow>(
           // ALL processed_items in the year (NOT just event-linked).
@@ -134,7 +143,7 @@ export async function GET(req: NextRequest) {
               AND due_date IS NOT NULL
               AND due_date >= $2
               AND due_date <= $3`,
-          [client.id, yearStart, yearEnd]
+          [client.id, rangeStart, rangeEnd]
         ),
         pool.query<SettingsRow>(
           `SELECT custom_categories, preferences

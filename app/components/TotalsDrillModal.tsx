@@ -14,6 +14,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { parseKey, monthBounds, monthSelectionLabel } from "./MonthFilterPill";
 
 type DrillKind = "income" | "expense";
 
@@ -28,7 +29,8 @@ interface DrillRow {
 export interface TotalsDrillModalProps {
   open: boolean;
   mode: "income" | "expense" | "net";
-  year: number;
+  /** Selected months as "YYYY-MM" keys (from the Totals filter). */
+  months: string[];
   totals: { sales: number; expenses: number; net: number };
   onClose: () => void;
 }
@@ -55,7 +57,7 @@ function fmtDate(iso: string | null): string {
 export default function TotalsDrillModal({
   open,
   mode,
-  year,
+  months,
   totals,
   onClose,
 }: TotalsDrillModalProps) {
@@ -78,28 +80,44 @@ export default function TotalsDrillModal({
       setLoading(true);
       setError(null);
       try {
-        const url = new URL("/api/profitability/drill", window.location.origin);
-        url.searchParams.set("year", String(year));
-        url.searchParams.set("kind", kind);
-        const res = await fetch(url.toString());
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          setError(body.error || `HTTP ${res.status}`);
+        if (months.length === 0) {
+          setRows([]);
+          setFetchedTotal(0);
           return;
         }
-        const payload = (await res.json()) as {
-          rows: DrillRow[];
-          total: number;
-        };
-        setRows(payload.rows ?? []);
-        setFetchedTotal(payload.total ?? 0);
+        const today = new Date();
+        const parts = await Promise.all(
+          months.map(async (k) => {
+            const { year, monthIdx } = parseKey(k);
+            const { from, to } = monthBounds(year, monthIdx, today);
+            const url = new URL(
+              "/api/profitability/drill",
+              window.location.origin
+            );
+            url.searchParams.set("from", from);
+            url.searchParams.set("to", to);
+            url.searchParams.set("kind", kind);
+            const res = await fetch(url.toString());
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.error || `HTTP ${res.status}`);
+            }
+            return (await res.json()) as { rows: DrillRow[]; total: number };
+          })
+        );
+        setRows(
+          parts
+            .flatMap((p) => p.rows ?? [])
+            .sort((a, b) => b.amount - a.amount)
+        );
+        setFetchedTotal(parts.reduce((s, p) => s + (p.total ?? 0), 0));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't load details");
       } finally {
         setLoading(false);
       }
     },
-    [year]
+    [months]
   );
 
   useEffect(() => {
@@ -145,7 +163,7 @@ export default function TotalsDrillModal({
           {title}
         </h2>
         <p className="text-xs text-slate-500 m-0 mb-4">
-          What makes up this number — year-to-date {year}.
+          What makes up this number — {monthSelectionLabel(months)}.
         </p>
 
         {/* Net reconciliation header */}
@@ -206,8 +224,8 @@ export default function TotalsDrillModal({
           <p className="text-center py-8 text-slate-400 text-sm">Loading…</p>
         ) : rows.length === 0 ? (
           <p className="text-center py-8 text-slate-400 text-sm border border-slate-100 rounded-lg">
-            No {activeKind === "income" ? "sales" : "expenses"} recorded for{" "}
-            {year}.
+            No {activeKind === "income" ? "sales" : "expenses"} recorded for
+            the selected months.
           </p>
         ) : (
           <>
