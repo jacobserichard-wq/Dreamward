@@ -871,6 +871,8 @@ function DashboardInner() {
   // Channel filter for the Transactions view (ported from the Expenses
   // tab). "" = all channels.
   const [txnChannelFilter, setTxnChannelFilter] = useState<string>("");
+  // Transaction-type filter: "" (all) | income (sales) | expense | refund.
+  const [txnTypeFilter, setTxnTypeFilter] = useState<string>("");
 
   // Apply a ?filter=<status> deep-link to the Transactions status filter
   // when the Transactions view is active — powers the "N items need
@@ -1754,6 +1756,33 @@ function DashboardInner() {
                     Clear
                   </button>
                 )}
+
+                <label
+                  htmlFor="txn-type"
+                  className="text-xs font-medium text-slate-500 uppercase tracking-wide sm:ml-3"
+                >
+                  Type
+                </label>
+                <select
+                  id="txn-type"
+                  value={txnTypeFilter}
+                  onChange={(e) => setTxnTypeFilter(e.target.value)}
+                  className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">All types</option>
+                  <option value="income">Sales</option>
+                  <option value="expense">Expenses</option>
+                  <option value="refund">Refunds</option>
+                </select>
+                {txnTypeFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setTxnTypeFilter("")}
+                    className="text-xs text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
             )}
             {/* UX commit 4: status-filter chip. Visible only when a
@@ -1827,7 +1856,24 @@ function DashboardInner() {
                 txnChannelFilter
                   ? items.filter((i) => (i.channel ?? "") === txnChannelFilter)
                   : items;
-              const visibleItems = byChannel(
+              // Transaction type: a "Returns & Refunds" row is a refund;
+              // a seeded/custom income category is a sale; everything else
+              // is an expense.
+              const typeOf = (
+                i: ProcessedItem
+              ): "income" | "expense" | "refund" =>
+                i.category === "Returns & Refunds"
+                  ? "refund"
+                  : incomeCategories.includes(i.category)
+                    ? "income"
+                    : "expense";
+              const byType = (items: ProcessedItem[]) =>
+                txnTypeFilter
+                  ? items.filter((i) => typeOf(i) === txnTypeFilter)
+                  : items;
+              const applyFilters = (items: ProcessedItem[]) =>
+                byType(byChannel(items));
+              const visibleItems = applyFilters(
                 processedStatusFilter
                   ? processedItems.filter(
                       (i) => i.status === processedStatusFilter
@@ -1844,7 +1890,7 @@ function DashboardInner() {
               // still applies. Build a lowercase haystack per row.
               const q = txnSearch.trim().toLowerCase();
               const searchedItems = q
-                ? byChannel(processedItems).filter((i) =>
+                ? applyFilters(processedItems).filter((i) =>
                     [
                       i.vendor,
                       i.category,
