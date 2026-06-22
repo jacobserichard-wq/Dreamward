@@ -20,6 +20,7 @@ import PnlReport from "../components/reports/PnlReport";
 import ChannelMixReport from "../components/reports/ChannelMixReport";
 import ProductProfitabilityReport from "../components/reports/ProductProfitabilityReport";
 import SalesTrendReport from "../components/reports/SalesTrendReport";
+import MarketPerformanceReport from "../components/reports/MarketPerformanceReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -160,7 +161,7 @@ const REPORT_GROUPS: {
       { id: "channel-mix", label: "Channel mix", ready: true },
       { id: "products", label: "Product profitability", ready: true },
       { id: "trend", label: "Sales trend & growth", ready: true },
-      { id: "markets", label: "Market performance", ready: false },
+      { id: "markets", label: "Market performance", ready: true },
       { id: "ar", label: "Receivables aging", ready: false },
       { id: "refunds", label: "Refunds & returns", ready: false },
       { id: "inventory", label: "Inventory & COGS", ready: false },
@@ -761,6 +762,24 @@ export default function ReportsPage() {
                   showChannel={false}
                 />
                 <SalesTrendReport
+                  from={period.from}
+                  to={period.to}
+                  periodLabel={period.label}
+                />
+              </>
+            )}
+
+            {selectedReport === "markets" && (
+              <>
+                <ReportFilters
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  channel={reportChannel}
+                  onChannelChange={setReportChannel}
+                  channels={reportChannels}
+                  showChannel={false}
+                />
+                <MarketPerformanceReport
                   from={period.from}
                   to={period.to}
                   periodLabel={period.label}
