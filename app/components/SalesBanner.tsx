@@ -63,8 +63,8 @@ export default function SalesBanner({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[0, 1, 2].map((i) => (
             <div key={i}>
-              <div className="h-3 w-24 bg-slate-100 rounded animate-pulse mb-3" />
-              <div className="h-9 w-32 bg-slate-100 rounded animate-pulse" />
+              <div className="h-2.5 w-24 bg-slate-100 rounded animate-pulse mb-2" />
+              <div className="h-5 w-28 bg-slate-100 rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -146,13 +146,13 @@ function Stat({
   const spacing = isCenter ? "sm:px-6" : isLast ? "sm:pl-6" : "";
   const inner = (
     <>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">
         {label}
       </div>
-      <div className={`text-3xl sm:text-4xl font-extrabold tabular-nums ${accentColor}`}>
+      <div className={`text-base font-bold tabular-nums ${accentColor}`}>
         {value}
       </div>
-      <div className="text-xs text-slate-500 mt-1">
+      <div className="text-[10px] text-slate-500 mt-0.5">
         {sub}
         {onClick && (
           <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
