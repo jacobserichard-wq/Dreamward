@@ -24,6 +24,7 @@ import MarketPerformanceReport from "../components/reports/MarketPerformanceRepo
 import ReceivablesAgingReport from "../components/reports/ReceivablesAgingReport";
 import RefundsReport from "../components/reports/RefundsReport";
 import InventoryCogsReport from "../components/reports/InventoryCogsReport";
+import ReportHelp from "../components/reports/ReportHelp";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -442,6 +443,10 @@ export default function ReportsPage() {
           <div className="flex-1 min-w-0">
             {selectedReport === "tax" && (
               <>
+        <div className="flex items-center gap-1.5 mb-3">
+          <h2 className="text-xl font-bold text-slate-900 m-0">Tax pack</h2>
+          <ReportHelp reportId="tax" />
+        </div>
         <SectionTip id="reports" title="One-click handoff to your CPA">
           Pick a year and Dreamward builds a Schedule-C-formatted P&amp;L —
           Revenue → COGS → Gross Profit → Operating Expenses → Net. Use{" "}

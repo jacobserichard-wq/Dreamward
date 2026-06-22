@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ReportExportButtons from "./ReportExportButtons";
+import ReportHelp from "./ReportHelp";
 import type { ReportExportSpec } from "./reportExport";
 
 interface ProductRow {
@@ -208,9 +209,12 @@ export default function ProductProfitabilityReport({
     <div>
       <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 m-0">
-            Product profitability
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-xl font-bold text-slate-900 m-0">
+              Product profitability
+            </h2>
+            <ReportHelp reportId="products" />
+          </div>
           <p className="text-xs text-slate-500 m-0">
             {periodLabel} · {isAll ? "All channels" : channelLabel}
           </p>

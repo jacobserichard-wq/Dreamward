@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import ReportExportButtons from "./ReportExportButtons";
+import ReportHelp from "./ReportHelp";
 import type { ReportExportSpec } from "./reportExport";
 
 interface ChannelRefund {
@@ -132,9 +133,12 @@ export default function RefundsReport({
     <div>
       <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 m-0">
-            Refunds &amp; returns
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-xl font-bold text-slate-900 m-0">
+              Refunds &amp; returns
+            </h2>
+            <ReportHelp reportId="refunds" />
+          </div>
           <p className="text-xs text-slate-500 m-0">{periodLabel}</p>
         </div>
         <ReportExportButtons
