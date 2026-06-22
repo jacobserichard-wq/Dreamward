@@ -209,18 +209,18 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               </summary>
               <div className={MENU_PANEL}>
                 <Link
-                  href="/skus"
-                  className={MENU_ITEM}
-                  title="Your product catalog — costs, stock, and recipes"
-                >
-                  SKUs
-                </Link>
-                <Link
                   href="/inventory"
                   className={MENU_ITEM}
                   title="Stock levels, value, and reorder alerts"
                 >
                   Inventory
+                </Link>
+                <Link
+                  href="/skus"
+                  className={MENU_ITEM}
+                  title="Your product catalog — costs, stock, and recipes"
+                >
+                  SKUs
                 </Link>
                 <Link
                   href="/cogs"
@@ -321,13 +321,13 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               </Link>
               {/* My Products */}
               {paying && (
-                <Link href="/skus" className={MENU_ITEM}>
-                  SKUs
+                <Link href="/inventory" className={MENU_ITEM}>
+                  Inventory
                 </Link>
               )}
               {paying && (
-                <Link href="/inventory" className={MENU_ITEM}>
-                  Inventory
+                <Link href="/skus" className={MENU_ITEM}>
+                  SKUs
                 </Link>
               )}
               {paying && (
