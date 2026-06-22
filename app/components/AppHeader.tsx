@@ -197,38 +197,14 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
           >
             Transactions
           </Link>
-          <Link
-            href="/invoices"
-            className={isActive("/invoices") ? NAV_ACTIVE : NAV_LINK}
-            title="Accounts Receivable — customer invoices awaiting payment"
-          >
-            AR
-          </Link>
-          <Link
-            href="/events"
-            className={isActive("/events") ? NAV_ACTIVE : NAV_LINK}
-          >
-            Events
-          </Link>
-          {/* Market Day moved off the global nav onto the Events page —
-              it only works in the context of an event. */}
-          {paying && (
-            <Link
-              href="/reports"
-              className={isActive("/reports") ? NAV_ACTIVE : NAV_LINK}
-            >
-              Reports
-            </Link>
-          )}
-
-          {/* ── Products dropdown ─────────────────────────────────
+          {/* ── My Products dropdown ──────────────────────────────
               SKUs + Inventory + COGS are one mental model (the product
               catalog), so they collapse into a single menu instead of
               three competing top-level links. */}
           {paying && (
             <details className="relative">
               <summary className={productsActive ? SUMMARY_ACTIVE : SUMMARY_LINK}>
-                Products
+                My Products
                 <Chevron />
               </summary>
               <div className={MENU_PANEL}>
@@ -255,6 +231,29 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
                 </Link>
               </div>
             </details>
+          )}
+          <Link
+            href="/events"
+            className={isActive("/events") ? NAV_ACTIVE : NAV_LINK}
+          >
+            Events
+          </Link>
+          <Link
+            href="/invoices"
+            className={isActive("/invoices") ? NAV_ACTIVE : NAV_LINK}
+            title="Accounts Receivable — customer invoices awaiting payment"
+          >
+            AR
+          </Link>
+          {/* Market Day moved off the global nav onto the Events page —
+              it only works in the context of an event. */}
+          {paying && (
+            <Link
+              href="/reports"
+              className={isActive("/reports") ? NAV_ACTIVE : NAV_LINK}
+            >
+              Reports
+            </Link>
           )}
 
           {/* ── Account menu ──────────────────────────────────────
@@ -320,17 +319,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               <Link href="/dashboard?view=transactions" className={MENU_ITEM}>
                 Transactions
               </Link>
-              <Link href="/invoices" className={MENU_ITEM}>
-                AR
-              </Link>
-              <Link href="/events" className={MENU_ITEM}>
-                Events
-              </Link>
-              {paying && (
-                <Link href="/reports" className={MENU_ITEM}>
-                  Reports
-                </Link>
-              )}
+              {/* My Products */}
               {paying && (
                 <Link href="/skus" className={MENU_ITEM}>
                   SKUs
@@ -344,6 +333,17 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               {paying && (
                 <Link href="/cogs" className={MENU_ITEM}>
                   COGS
+                </Link>
+              )}
+              <Link href="/events" className={MENU_ITEM}>
+                Events
+              </Link>
+              <Link href="/invoices" className={MENU_ITEM}>
+                AR
+              </Link>
+              {paying && (
+                <Link href="/reports" className={MENU_ITEM}>
+                  Reports
                 </Link>
               )}
               <div className="my-1 border-t border-sand" />
