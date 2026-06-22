@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import CogsDrillModal from "./CogsDrillModal";
 
 interface MarginTotals {
   revenue: number;
@@ -174,6 +175,10 @@ export default function CogsSummaryCard() {
   const [data, setData] = useState<Aggregated | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Drill-down: which figure (revenue/cogs/margin) was clicked.
+  const [drillFocus, setDrillFocus] = useState<
+    "revenue" | "cogs" | "margin" | null
+  >(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -446,13 +451,22 @@ export default function CogsSummaryCard() {
           </p>
           {/* Headline strip */}
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <Stat label="Revenue" value={fmtUsd(totals.revenue)} />
-            <Stat label="COGS" value={fmtUsd(totals.cogs)} />
+            <Stat
+              label="Revenue"
+              value={fmtUsd(totals.revenue)}
+              onClick={() => setDrillFocus("revenue")}
+            />
+            <Stat
+              label="COGS"
+              value={fmtUsd(totals.cogs)}
+              onClick={() => setDrillFocus("cogs")}
+            />
             <Stat
               label="Margin"
               value={fmtUsd(totals.margin)}
               sub={fmtPct(totals.marginPercent)}
               highlight
+              onClick={() => setDrillFocus("margin")}
             />
           </div>
 
@@ -516,6 +530,16 @@ export default function CogsSummaryCard() {
           )}
         </>
       )}
+
+      {drillFocus && (
+        <CogsDrillModal
+          open={drillFocus !== null}
+          months={selected}
+          focus={drillFocus}
+          periodLabel={periodLabel}
+          onClose={() => setDrillFocus(null)}
+        />
+      )}
     </div>
   );
 }
@@ -525,16 +549,17 @@ function Stat({
   value,
   sub,
   highlight,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: string;
   highlight?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div
-      className={`rounded-lg p-2.5 ${highlight ? "bg-emerald-50 border border-emerald-200" : "bg-slate-50 border border-slate-100"}`}
-    >
+  const base = `rounded-lg p-2.5 text-left w-full ${highlight ? "bg-emerald-50 border border-emerald-200" : "bg-slate-50 border border-slate-100"}`;
+  const inner = (
+    <>
       <p className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-0.5">
         {label}
       </p>
@@ -550,6 +575,20 @@ function Stat({
           {sub}
         </p>
       )}
-    </div>
+    </>
+  );
+
+  if (!onClick) {
+    return <div className={base}>{inner}</div>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${label} — see details`}
+      className={`${base} cursor-pointer hover:ring-2 hover:ring-blue-500/20 hover:border-blue-300 transition-all`}
+    >
+      {inner}
+    </button>
   );
 }
