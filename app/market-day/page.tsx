@@ -444,6 +444,12 @@ export default function MarketDayPage() {
       )}
 
       <div className="max-w-[700px] mx-auto py-4 px-4 pb-24">
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline mb-4"
+        >
+          {"\u{2190}"} Back to events
+        </Link>
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         )}
