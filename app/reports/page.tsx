@@ -17,6 +17,7 @@ import ReportFilters, {
   type ResolvedPeriod,
 } from "../components/reports/ReportFilters";
 import PnlReport from "../components/reports/PnlReport";
+import ChannelMixReport from "../components/reports/ChannelMixReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -154,7 +155,7 @@ const REPORT_GROUPS: {
     group: "Business",
     items: [
       { id: "pnl", label: "P&L by channel", ready: true },
-      { id: "channel-mix", label: "Channel mix", ready: false },
+      { id: "channel-mix", label: "Channel mix", ready: true },
       { id: "products", label: "Product profitability", ready: false },
       { id: "trend", label: "Sales trend & growth", ready: false },
       { id: "markets", label: "Market performance", ready: false },
@@ -702,6 +703,24 @@ export default function ReportsPage() {
                     reportChannels.find((c) => c.id === reportChannel)?.label ??
                     reportChannel
                   }
+                />
+              </>
+            )}
+
+            {selectedReport === "channel-mix" && (
+              <>
+                <ReportFilters
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  channel={reportChannel}
+                  onChannelChange={setReportChannel}
+                  channels={reportChannels}
+                  showChannel={false}
+                />
+                <ChannelMixReport
+                  from={period.from}
+                  to={period.to}
+                  periodLabel={period.label}
                 />
               </>
             )}
