@@ -59,12 +59,15 @@ export default function SalesBanner({
 }: SalesBannerProps) {
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+        <div className="grid grid-cols-3 gap-3">
           {[0, 1, 2].map((i) => (
-            <div key={i}>
-              <div className="h-2.5 w-24 bg-slate-100 rounded animate-pulse mb-2" />
-              <div className="h-5 w-28 bg-slate-100 rounded animate-pulse" />
+            <div
+              key={i}
+              className="rounded-lg p-2.5 bg-slate-50 border border-slate-100"
+            >
+              <div className="h-2.5 w-16 bg-slate-100 rounded animate-pulse mb-1.5" />
+              <div className="h-5 w-20 bg-slate-100 rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -72,15 +75,8 @@ export default function SalesBanner({
     );
   }
 
-  const netColor =
-    netProfit > 0
-      ? "text-emerald-700"
-      : netProfit < 0
-        ? "text-red-700"
-        : "text-slate-900";
-
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+    <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
       {dashboardHref && (
         <div className="flex justify-end mb-3">
           <Link
@@ -91,20 +87,17 @@ export default function SalesBanner({
           </Link>
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:divide-x sm:divide-slate-200">
+      <div className="grid grid-cols-3 gap-3">
         <Stat
           label="Total Sales"
           value={fmtUsd(totalSales)}
           sub={`Year-to-date ${year}`}
-          accentColor="text-emerald-600"
           onClick={onDrill ? () => onDrill("income") : undefined}
         />
         <Stat
           label="Total Expenses"
           value={fmtUsd(totalExpenses)}
           sub={`Year-to-date ${year}`}
-          accentColor="text-slate-700"
-          isCenter
           onClick={onDrill ? () => onDrill("expense") : undefined}
         />
         <Stat
@@ -117,8 +110,8 @@ export default function SalesBanner({
                 ? "Operating at a loss"
                 : "Breaking even"
           }
-          accentColor={netColor}
-          isLast
+          highlight
+          tone={netProfit < 0 ? "negative" : "positive"}
           onClick={onDrill ? () => onDrill("net") : undefined}
         />
       </div>
@@ -126,55 +119,61 @@ export default function SalesBanner({
   );
 }
 
+// Boxed stat — same treatment as the Profit margin card's Stat. The
+// highlighted (Net Profit) box is green when >= 0 and red when negative.
 function Stat({
   label,
   value,
   sub,
-  accentColor,
-  isCenter = false,
-  isLast = false,
+  highlight = false,
+  tone = "positive",
   onClick,
 }: {
   label: string;
   value: string;
   sub: string;
-  accentColor: string;
-  isCenter?: boolean;
-  isLast?: boolean;
+  highlight?: boolean;
+  tone?: "positive" | "negative";
   onClick?: () => void;
 }) {
-  const spacing = isCenter ? "sm:px-6" : isLast ? "sm:pl-6" : "";
+  const boxClass = highlight
+    ? tone === "negative"
+      ? "bg-red-50 border border-red-200"
+      : "bg-emerald-50 border border-emerald-200"
+    : "bg-slate-50 border border-slate-100";
+  const valueClass = highlight
+    ? tone === "negative"
+      ? "text-red-800"
+      : "text-emerald-800"
+    : "text-slate-900";
+  const subClass = highlight
+    ? tone === "negative"
+      ? "text-red-700"
+      : "text-emerald-700"
+    : "text-slate-500";
+  const base = `rounded-lg p-2.5 text-left w-full ${boxClass}`;
+
   const inner = (
     <>
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">
+      <p className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-0.5">
         {label}
-      </div>
-      <div className={`text-base font-bold tabular-nums ${accentColor}`}>
+      </p>
+      <p className={`text-base font-bold m-0 tabular-nums ${valueClass}`}>
         {value}
-      </div>
-      <div className="text-[10px] text-slate-500 mt-0.5">
-        {sub}
-        {onClick && (
-          <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-            View details →
-          </span>
-        )}
-      </div>
+      </p>
+      <p className={`text-[10px] m-0 mt-0.5 ${subClass}`}>{sub}</p>
     </>
   );
 
   if (!onClick) {
-    return (
-      <div className={`${spacing} text-center sm:text-left`}>{inner}</div>
-    );
+    return <div className={base}>{inner}</div>;
   }
-
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${label} — see what's in this number`}
-      className={`${spacing} group text-center sm:text-left w-full bg-transparent border-0 p-0 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors`}
+      title={`${label} — see details`}
+      className={`${base} cursor-pointer hover:ring-2 hover:ring-blue-500/20 hover:border-blue-300 transition-all`}
     >
       {inner}
     </button>
