@@ -23,6 +23,7 @@ import SalesTrendReport from "../components/reports/SalesTrendReport";
 import MarketPerformanceReport from "../components/reports/MarketPerformanceReport";
 import ReceivablesAgingReport from "../components/reports/ReceivablesAgingReport";
 import RefundsReport from "../components/reports/RefundsReport";
+import InventoryCogsReport from "../components/reports/InventoryCogsReport";
 import SectionTip from "../components/SectionTip";
 import { isPayingTier } from "@/lib/plans";
 
@@ -166,7 +167,7 @@ const REPORT_GROUPS: {
       { id: "markets", label: "Market performance", ready: true },
       { id: "ar", label: "Receivables aging", ready: true },
       { id: "refunds", label: "Refunds & returns", ready: true },
-      { id: "inventory", label: "Inventory & COGS", ready: false },
+      { id: "inventory", label: "Inventory & COGS", ready: true },
     ],
   },
 ];
@@ -802,6 +803,24 @@ export default function ReportsPage() {
                   showChannel={false}
                 />
                 <RefundsReport
+                  from={period.from}
+                  to={period.to}
+                  periodLabel={period.label}
+                />
+              </>
+            )}
+
+            {selectedReport === "inventory" && (
+              <>
+                <ReportFilters
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  channel={reportChannel}
+                  onChannelChange={setReportChannel}
+                  channels={reportChannels}
+                  showChannel={false}
+                />
+                <InventoryCogsReport
                   from={period.from}
                   to={period.to}
                   periodLabel={period.label}
