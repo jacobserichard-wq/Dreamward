@@ -2106,6 +2106,12 @@ function DashboardInner() {
                     ))}
                   </select>
                 </div>
+                <Link
+                  href="/profitability"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 no-underline whitespace-nowrap"
+                >
+                  Open dashboard {"\u{2192}"}
+                </Link>
               </div>
             </div>
 
