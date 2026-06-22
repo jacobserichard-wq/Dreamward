@@ -1604,17 +1604,32 @@ function DashboardInner() {
           <>
             {/* Transactions header + back-to-overview. Replaces the
                 old tab bar now that this is a nav-reached view. */}
-            <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
+            <div className="mb-5">
+              {/* Title + back link */}
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
                 <h2 className="font-serif text-2xl font-semibold text-slate-900 m-0">
                   Transactions
                 </h2>
                 <button
                   type="button"
-                  onClick={() => setShowSaleForm(true)}
-                  className="py-1.5 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold cursor-pointer border-0 inline-flex items-center gap-1"
+                  onClick={() => {
+                    setActiveTab("dashboard");
+                    router.replace("/dashboard");
+                  }}
+                  className="text-sm text-blue-600 hover:underline cursor-pointer bg-transparent border-0 inline-flex items-center gap-1"
                 >
-                  <span>+</span> Add a sale
+                  {"\u{2190}"} Back to overview
+                </button>
+              </div>
+              {/* Action toolbar — soft, palette-tinted buttons (sage /
+                  rose / honey / eucalyptus) for a calm, cohesive row. */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setShowSaleForm(true)}
+                  className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 cursor-pointer transition-colors"
+                >
+                  <span aria-hidden="true">{"\u{1F4B5}"}</span> Add a sale
                 </button>
                 <button
                   type="button"
@@ -1622,29 +1637,29 @@ function DashboardInner() {
                     setRefundPrefill(null);
                     setShowRefundForm(true);
                   }}
-                  className="py-1.5 px-3 rounded-lg border border-rose-300 bg-white hover:bg-rose-50 text-rose-700 text-sm font-semibold cursor-pointer inline-flex items-center gap-1"
+                  className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 cursor-pointer transition-colors"
                 >
-                  {"\u{21A9}"} Log a refund
+                  <span aria-hidden="true">{"\u{21A9}\u{FE0F}"}</span> Log a refund
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowExpenseForm(true)}
-                  className="py-1.5 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold cursor-pointer inline-flex items-center gap-1"
+                  className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-colors"
                 >
-                  <span>+</span> New expense
+                  <span aria-hidden="true">{"\u{1F4B3}"}</span> New expense
                 </button>
                 {/* Upload moved here from the nav: a CSV/TSV/XLSX of
                     transactions or a PDF invoice. */}
                 <label
-                  className={`py-1.5 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold inline-flex items-center gap-1 m-0 ${
-                    uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  className={`inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 m-0 transition-colors ${
+                    uploading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
                   }`}
                   title="Upload a CSV/TSV/XLSX of transactions, or a PDF invoice"
                 >
                   {uploading ? (
-                    <Spinner size={12} color="#334155" />
+                    <Spinner size={12} color="currentColor" />
                   ) : (
-                    <span>{"\u{1F4C1}"}</span>
+                    <span aria-hidden="true">{"\u{1F4C1}"}</span>
                   )}
                   {uploading ? "Uploading…" : "Upload"}
                   <input
@@ -1660,16 +1675,6 @@ function DashboardInner() {
                   />
                 </label>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("dashboard");
-                  router.replace("/dashboard");
-                }}
-                className="text-sm text-blue-600 hover:underline cursor-pointer bg-transparent border-0 inline-flex items-center gap-1"
-              >
-                {"\u{2190}"} Back to overview
-              </button>
             </div>
             {/* Upload helper. The global Upload button opens the file
                 picker directly, and the old dashboard upload tip lived
