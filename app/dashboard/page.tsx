@@ -2140,36 +2140,9 @@ function DashboardInner() {
                     breakdowns
                   - Stat cards (Avg Confidence, Business Miles, Total
                     Items) → removed as low-decision-value vanity metrics */}
-            {/* June 2026 reorg: PERIOD picker + a "Total (year to date)"
-                header sit ABOVE the big totals; the picker drives both the
-                SalesBanner numbers and the ChannelStack (shared channelData
-                fetch, re-runs on channelYear change). */}
-            <div className="flex items-center justify-end gap-2 mb-2 flex-wrap">
-              <label
-                htmlFor="dashboard-year"
-                className="text-xs font-medium text-slate-500 uppercase tracking-wide"
-              >
-                Period
-              </label>
-              <select
-                id="dashboard-year"
-                value={channelYear}
-                onChange={(e) => setChannelYear(Number(e.target.value))}
-                className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
-              >
-                {[
-                  dashboardCurrentYear,
-                  dashboardCurrentYear - 1,
-                  dashboardCurrentYear - 2,
-                  dashboardCurrentYear - 3,
-                ].map((y) => (
-                  <option key={y} value={y}>
-                    {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+            {/* June 2026 reorg: the Totals card carries its own month
+                filter; the year PERIOD picker moved to the Channels card
+                (which it actually scopes). */}
             <SalesBanner
               totalSales={bannerSales}
               totalExpenses={bannerExpenses}
@@ -2238,6 +2211,26 @@ function DashboardInner() {
                   onToggleCollapse={toggleChannelCollapse}
                   isPro={isPayingTier(clientInfo?.plan)}
                   connectedChannelIds={connectedChannels}
+                  headerRight={
+                    <select
+                      id="dashboard-year"
+                      aria-label="Channel period"
+                      value={channelYear}
+                      onChange={(e) => setChannelYear(Number(e.target.value))}
+                      className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+                    >
+                      {[
+                        dashboardCurrentYear,
+                        dashboardCurrentYear - 1,
+                        dashboardCurrentYear - 2,
+                        dashboardCurrentYear - 3,
+                      ].map((y) => (
+                        <option key={y} value={y}>
+                          {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
+                        </option>
+                      ))}
+                    </select>
+                  }
                 />
               ) : (
                 <div className="bg-white rounded-xl border border-slate-200 p-5">

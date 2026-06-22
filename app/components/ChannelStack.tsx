@@ -17,6 +17,7 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import type { ChannelRow } from "./ChannelTable";
 
@@ -38,6 +39,9 @@ export interface ChannelStackProps {
   connectedChannelIds?: string[];
   /** Optional "Add another channel" footer link. Default true. */
   showAddButton?: boolean;
+  /** Optional control rendered top-right of the card header (the
+   *  period/year selector that scopes the channel data). */
+  headerRight?: ReactNode;
 }
 
 function fmtUsd(n: number, signed = false): string {
@@ -57,6 +61,7 @@ export default function ChannelStack({
   isPro,
   connectedChannelIds = [],
   showAddButton = true,
+  headerRight,
 }: ChannelStackProps) {
   const collapsed = new Set(collapsedChannels);
   const connected = new Set(connectedChannelIds);
@@ -71,11 +76,14 @@ export default function ChannelStack({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-900 m-0 mb-1">Channels</h3>
-        <p className="text-xs text-slate-500 m-0">
-          Where your business made money this year.
-        </p>
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 m-0 mb-1">Channels</h3>
+          <p className="text-xs text-slate-500 m-0">
+            Where your business made money.
+          </p>
+        </div>
+        {headerRight}
       </div>
 
       {/* Stack of channel cards */}
