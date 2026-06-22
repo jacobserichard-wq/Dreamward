@@ -18,6 +18,8 @@
 
 "use client";
 
+import Link from "next/link";
+
 interface SalesBannerProps {
   totalSales: number;
   totalExpenses: number;
@@ -33,6 +35,9 @@ interface SalesBannerProps {
    *  the drill kind (Total Sales → income, Expenses → expense, Net →
    *  net). The dashboard opens the TotalsDrillModal. */
   onDrill?: (kind: "income" | "expense" | "net") => void;
+  /** When set, an "Open dashboard →" link is shown top-right inside the
+   *  card (mirrors the Profit margin card). */
+  dashboardHref?: string;
 }
 
 function fmtUsd(n: number): string {
@@ -50,6 +55,7 @@ export default function SalesBanner({
   year,
   loading = false,
   onDrill,
+  dashboardHref,
 }: SalesBannerProps) {
   if (loading) {
     return (
@@ -75,6 +81,16 @@ export default function SalesBanner({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+      {dashboardHref && (
+        <div className="flex justify-end mb-3">
+          <Link
+            href={dashboardHref}
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 no-underline whitespace-nowrap"
+          >
+            Open dashboard →
+          </Link>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:divide-x sm:divide-slate-200">
         <Stat
           label="Total Sales"

@@ -2074,45 +2074,30 @@ function DashboardInner() {
                 header sit ABOVE the big totals; the picker drives both the
                 SalesBanner numbers and the ChannelStack (shared channelData
                 fetch, re-runs on channelYear change). */}
-            <div className="flex items-end justify-between gap-2 mb-2 flex-wrap">
-              <h2 className="text-sm font-semibold text-slate-700 m-0 uppercase tracking-wide">
-                {channelYear === dashboardCurrentYear
-                  ? "Total (year to date)"
-                  : `Total · ${channelYear}`}
-              </h2>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="dashboard-year"
-                    className="text-xs font-medium text-slate-500 uppercase tracking-wide"
-                  >
-                    Period
-                  </label>
-                  <select
-                    id="dashboard-year"
-                    value={channelYear}
-                    onChange={(e) => setChannelYear(Number(e.target.value))}
-                    className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
-                  >
-                    {[
-                      dashboardCurrentYear,
-                      dashboardCurrentYear - 1,
-                      dashboardCurrentYear - 2,
-                      dashboardCurrentYear - 3,
-                    ].map((y) => (
-                      <option key={y} value={y}>
-                        {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Link
-                  href="/profitability"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 no-underline whitespace-nowrap"
-                >
-                  Open dashboard {"\u{2192}"}
-                </Link>
-              </div>
+            <div className="flex items-center justify-end gap-2 mb-2 flex-wrap">
+              <label
+                htmlFor="dashboard-year"
+                className="text-xs font-medium text-slate-500 uppercase tracking-wide"
+              >
+                Period
+              </label>
+              <select
+                id="dashboard-year"
+                value={channelYear}
+                onChange={(e) => setChannelYear(Number(e.target.value))}
+                className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+              >
+                {[
+                  dashboardCurrentYear,
+                  dashboardCurrentYear - 1,
+                  dashboardCurrentYear - 2,
+                  dashboardCurrentYear - 3,
+                ].map((y) => (
+                  <option key={y} value={y}>
+                    {y === dashboardCurrentYear ? `${y} (YTD)` : String(y)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <SalesBanner
@@ -2122,6 +2107,7 @@ function DashboardInner() {
               year={channelYear}
               loading={!channelData || !collapsedChannelsLoaded}
               onDrill={setDrillKind}
+              dashboardHref="/profitability"
             />
 
             {/* Cost breakdown pulled up to sit directly under the totals
