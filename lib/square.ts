@@ -599,25 +599,35 @@ export interface SquareOrder {
   total_tax_money?: { amount?: number; currency?: string };
   /** Order-level tips (cents). Taxable income — kept in revenue. */
   total_tip_money?: { amount?: number; currency?: string };
+  /** Order-level service charges (cents) — shipping/handling/service
+   *  fees the seller adds. Income, kept in revenue. */
+  total_service_charge_money?: { amount?: number; currency?: string };
+  /** Order-level discounts (cents). Reduces the line-item subtotal. */
+  total_discount_money?: { amount?: number; currency?: string };
   /** Currency for the whole order. Line items inherit this when
    *  their own money objects don't carry a currency string. */
   total_money?: { amount?: number; currency?: string };
 }
 
 /**
- * Pull the sales tax + tip totals off an Order, in dollars. Square
- * returns these in cents. Missing fields → 0. Sales tax is a
- * pass-through liability (excluded from income); tips are taxable
- * income. Kept separate from extractSquareLineItems so the line-item
- * (product revenue) path stays focused on COGS.
+ * Pull the order-level money components off an Order, in dollars
+ * (Square returns cents; missing fields → 0). Lets a sale reconcile:
+ *   gross = line-item subtotal - discount + service + tax + tip
+ * Sales tax is a pass-through liability (excluded from income); tips +
+ * service charges are income. Kept separate from extractSquareLineItems
+ * so the line-item (product revenue) path stays focused on COGS.
  */
-export function extractSquareOrderTaxTip(order: SquareOrder): {
+export function extractSquareOrderMoney(order: SquareOrder): {
   tax: number;
   tip: number;
+  service: number;
+  discount: number;
 } {
   return {
     tax: (order.total_tax_money?.amount ?? 0) / 100,
     tip: (order.total_tip_money?.amount ?? 0) / 100,
+    service: (order.total_service_charge_money?.amount ?? 0) / 100,
+    discount: (order.total_discount_money?.amount ?? 0) / 100,
   };
 }
 

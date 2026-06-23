@@ -20,7 +20,7 @@ import {
   refreshAccessToken,
   getOrder,
   extractSquareLineItems,
-  extractSquareOrderTaxTip,
+  extractSquareOrderMoney,
 } from "@/lib/square";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -280,9 +280,15 @@ export async function POST() {
           items: ReturnType<typeof extractSquareLineItems>;
         };
         const parents: Parent[] = [];
-        // Sales tax + tips live on the Order, not the Payment. Collect them
-        // here (one row per order-having parent) and batch-UPDATE below.
-        const taxTip: { id: number; tax: number; tip: number }[] = [];
+        // Tax / tip / service / discount live on the Order, not the Payment.
+        // Collect them here (one row per order-having parent) + batch-UPDATE.
+        const money: {
+          id: number;
+          tax: number;
+          tip: number;
+          service: number;
+          discount: number;
+        }[] = [];
 
         for (const r of insertRes.rows) {
           const payment = paymentById.get(r.source_ref_id);
@@ -293,10 +299,16 @@ export async function POST() {
             orderId: payment.order_id,
           });
           if (!order) continue;
-          // Capture tax/tip before the line-item check so an order with no
-          // parseable items still records its tax/tip.
-          const tt = extractSquareOrderTaxTip(order);
-          taxTip.push({ id: r.id, tax: tt.tax, tip: tt.tip });
+          // Capture the money breakdown before the line-item check so an
+          // order with no parseable items still records it.
+          const m = extractSquareOrderMoney(order);
+          money.push({
+            id: r.id,
+            tax: m.tax,
+            tip: m.tip,
+            service: m.service,
+            discount: m.discount,
+          });
           const items = extractSquareLineItems(order);
           if (items.length === 0) continue;
           const mapped = mapPaymentToProcessedItem(payment);
@@ -307,19 +319,23 @@ export async function POST() {
           });
         }
 
-        if (taxTip.length > 0) {
+        if (money.length > 0) {
           const tvals: unknown[] = [];
-          const tph = taxTip
+          const tph = money
             .map((u) => {
               const b = tvals.length;
-              tvals.push(u.id, u.tax, u.tip);
-              return `($${b + 1}::int, $${b + 2}::numeric, $${b + 3}::numeric)`;
+              tvals.push(u.id, u.tax, u.tip, u.service, u.discount);
+              return (
+                `($${b + 1}::int, $${b + 2}::numeric, $${b + 3}::numeric, ` +
+                `$${b + 4}::numeric, $${b + 5}::numeric)`
+              );
             })
             .join(",");
           await pool.query(
             `UPDATE processed_items AS p
-                SET tax_amount = v.tax, tip_amount = v.tip
-               FROM (VALUES ${tph}) AS v(id, tax, tip)
+                SET tax_amount = v.tax, tip_amount = v.tip,
+                    service_charge_amount = v.service, discount_amount = v.discount
+               FROM (VALUES ${tph}) AS v(id, tax, tip, service, discount)
               WHERE p.id = v.id AND p.client_id = $${tvals.length + 1}`,
             [...tvals, client.id]
           );

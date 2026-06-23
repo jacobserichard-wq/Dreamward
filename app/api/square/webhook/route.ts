@@ -36,7 +36,7 @@ import {
   verifyWebhookSignature,
   getOrder,
   extractSquareLineItems,
-  extractSquareOrderTaxTip,
+  extractSquareOrderMoney,
   type SquarePayment,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
@@ -282,14 +282,15 @@ export async function POST(req: NextRequest) {
           orderId: payment.order_id,
         });
         if (order) {
-          // Sales tax + tip live on the Order — record them on the parent
-          // (tax is excluded from income downstream; tip stays in).
-          const { tax, tip } = extractSquareOrderTaxTip(order);
+          // The order carries the money breakdown — record it on the parent.
+          // Tax is excluded from income downstream; tip + service stay in.
+          const { tax, tip, service, discount } = extractSquareOrderMoney(order);
           await pool.query(
             `UPDATE processed_items
-                SET tax_amount = $1, tip_amount = $2
-              WHERE id = $3 AND client_id = $4`,
-            [tax, tip, parentId, conn.client_id]
+                SET tax_amount = $1, tip_amount = $2,
+                    service_charge_amount = $3, discount_amount = $4
+              WHERE id = $5 AND client_id = $6`,
+            [tax, tip, service, discount, parentId, conn.client_id]
           );
           const items = extractSquareLineItems(order);
           if (items.length > 0) {

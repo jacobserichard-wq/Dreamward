@@ -31,7 +31,7 @@ import {
   refreshAccessToken,
   getOrder,
   extractSquareLineItems,
-  extractSquareOrderTaxTip,
+  extractSquareOrderMoney,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -144,6 +144,7 @@ export async function POST(req: Request) {
           AND pi.source_ref_id IS NOT NULL
           AND (
             pi.tax_amount IS NULL
+            OR pi.service_charge_amount IS NULL
             OR NOT EXISTS (
               SELECT 1 FROM processed_item_line_items pili
                WHERE pili.processed_item_id = pi.id
@@ -166,14 +167,15 @@ export async function POST(req: Request) {
       if (!parent.order_id) continue; // standalone payment, no order
       const order = await getOrder({ accessToken, orderId: parent.order_id });
       if (!order) continue;
-      // Backfill tax + tip from the order (set even when there are no
-      // parseable line items, so the row stops re-qualifying).
-      const { tax, tip } = extractSquareOrderTaxTip(order);
+      // Backfill the full money breakdown from the order (set even when
+      // there are no parseable line items, so the row stops re-qualifying).
+      const { tax, tip, service, discount } = extractSquareOrderMoney(order);
       await pool.query(
         `UPDATE processed_items
-            SET tax_amount = $1, tip_amount = $2
-          WHERE id = $3 AND client_id = $4`,
-        [tax, tip, parent.id, client.id]
+            SET tax_amount = $1, tip_amount = $2,
+                service_charge_amount = $3, discount_amount = $4
+          WHERE id = $5 AND client_id = $6`,
+        [tax, tip, service, discount, parent.id, client.id]
       );
       const items = extractSquareLineItems(order);
       if (items.length === 0) continue;
@@ -204,6 +206,7 @@ export async function POST(req: Request) {
           AND pi.id > $2
           AND (
             pi.tax_amount IS NULL
+            OR pi.service_charge_amount IS NULL
             OR NOT EXISTS (
               SELECT 1 FROM processed_item_line_items pili
                WHERE pili.processed_item_id = pi.id
