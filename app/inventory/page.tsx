@@ -362,7 +362,8 @@ export default function InventoryPage() {
                       <td className="py-3 px-4">
                         <Link
                           href={`/skus/${item.id}`}
-                          className="no-underline text-slate-900 hover:text-blue-700"
+                          title="Open this SKU — stock history, cost & recipe"
+                          className="no-underline text-slate-900 hover:text-blue-700 hover:underline"
                         >
                           <span className="font-mono text-xs text-slate-500">
                             {item.code}
@@ -428,14 +429,24 @@ export default function InventoryPage() {
                           {badge.label}
                         </span>
                       </td>
-                      <td className="py-3 pr-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setReceiveFor(item)}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer bg-transparent border-0"
-                        >
-                          Receive
-                        </button>
+                      <td className="py-3 pr-4 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setReceiveFor(item)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer bg-transparent border-0"
+                          >
+                            Receive
+                          </button>
+                          <Link
+                            href={`/skus/${item.id}`}
+                            aria-label={`Open ${item.name} — stock history & balances`}
+                            title="See stock history & how the balance changed"
+                            className="text-slate-300 hover:text-blue-600 no-underline text-lg leading-none"
+                          >
+                            {"\u{203A}"}
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
