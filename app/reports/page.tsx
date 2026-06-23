@@ -60,6 +60,7 @@ interface AnnualSummaryResponse {
     cogs: number;
     grossProfit: number;
     operatingExpenses: number;
+    salesTaxCollected: number;
   };
   byCategory: {
     income: Array<{ category: string; count: number; total: number }>;
@@ -570,6 +571,20 @@ export default function ReportsPage() {
               grossProfit={summary.summary.grossProfit}
               operatingExpenses={summary.summary.operatingExpenses}
             />
+
+            {summary.summary.salesTaxCollected > 0 && (
+              <p className="text-xs text-slate-500 mt-2 mb-0">
+                Plus{" "}
+                <span className="font-semibold text-slate-700">
+                  {summary.summary.salesTaxCollected.toLocaleString("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  })}
+                </span>{" "}
+                sales tax collected — excluded from revenue above. It&apos;s a
+                liability you remit to your state, not income.
+              </p>
+            )}
 
             {/* Phase 7c commit 9: quarterly estimates panel. Renders an
                 explanatory message when estimate is null (loss year). */}
