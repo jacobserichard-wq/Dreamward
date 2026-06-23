@@ -22,9 +22,19 @@ import { Pool, types } from "pg";
 // to touch it.
 types.setTypeParser(1082, (val) => val);
 
+// Pool sizing for serverless on a connection-limited managed Postgres.
+// Vercel runs each route as its own (often warm) instance, and every
+// instance opens its OWN pool — so an untuned default (max: 10, no idle
+// release) lets warm instances accumulate connections until the DB's
+// max_connections ceiling is hit and new requests get "too many clients
+// already". Cap each instance small, release idle connections quickly,
+// and fail fast rather than hanging when the pool is momentarily full.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  max: 5,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 // --- Client Management ---
