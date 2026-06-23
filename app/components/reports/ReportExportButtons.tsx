@@ -20,8 +20,13 @@ export default function ReportExportButtons({
   const [pdfBusy, setPdfBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const btn =
-    "py-1.5 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium cursor-pointer hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5";
+  // Soft, palette-tinted to match the Transactions toolbar / Tax pack
+  // actions (CSV → sage, PDF → eucalyptus). Compact size since these sit
+  // inline next to each report title.
+  const base =
+    "py-1.5 px-3 rounded-lg border text-sm font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+  const csvBtn = `${base} border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700`;
+  const pdfBtn = `${base} border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700`;
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -33,9 +38,9 @@ export default function ReportExportButtons({
           setErr(null);
           downloadCsv(buildSpec());
         }}
-        className={btn}
+        className={csvBtn}
       >
-        {"\u{1F4E5}"} CSV
+        <span aria-hidden="true">{"\u{1F4E5}"}</span> CSV
       </button>
       <button
         type="button"
@@ -51,9 +56,10 @@ export default function ReportExportButtons({
             setPdfBusy(false);
           }
         }}
-        className={btn}
+        className={pdfBtn}
       >
-        {"\u{1F4C4}"} {pdfBusy ? "Building…" : "PDF"}
+        <span aria-hidden="true">{"\u{1F4C4}"}</span>{" "}
+        {pdfBusy ? "Building…" : "PDF"}
       </button>
     </div>
   );

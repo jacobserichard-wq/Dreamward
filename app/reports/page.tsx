@@ -486,21 +486,23 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Soft, palette-tinted actions matching the Transactions
+                toolbar (sage / eucalyptus / honey) for a cohesive look. */}
             <a
               href={`/api/reports/annual/csv?year=${year}`}
-              className="py-2 px-4 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium no-underline cursor-pointer hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 no-underline cursor-pointer transition-colors"
               // Browser will treat as download due to Content-Disposition.
             >
-              {"\u{1F4E5}"} Download CSV
+              <span aria-hidden="true">{"\u{1F4E5}"}</span> Download CSV
             </a>
             <a
               href={`/api/reports/annual/pdf?year=${year}`}
-              className="py-2 px-4 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium no-underline cursor-pointer hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 no-underline cursor-pointer transition-colors"
               // Same Content-Disposition: attachment pattern; browser saves
               // instead of inline-renders. PDF route shipped in Phase 7b
               // commit 4.
             >
-              {"\u{1F4C4}"} Download PDF
+              <span aria-hidden="true">{"\u{1F4C4}"}</span> Download PDF
             </a>
             <button
               type="button"
@@ -511,13 +513,19 @@ export default function ReportsPage() {
                   ? "Set your CPA email in Settings first"
                   : `Email the ${year} CSV to your CPA`
               }
-              className={`py-2 px-4 rounded-lg border-0 text-white text-sm font-semibold ${
+              className={`inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-amber-200 bg-amber-50 text-amber-700 transition-colors ${
                 cpaEmailSet && !sending && !reportLoading && summary
-                  ? "bg-blue-500 cursor-pointer"
-                  : "bg-slate-300 cursor-not-allowed"
+                  ? "hover:bg-amber-100 cursor-pointer"
+                  : "opacity-60 cursor-not-allowed"
               }`}
             >
-              {sending ? "Sending..." : `${"\u{1F4E7}"} Send to CPA`}
+              {sending ? (
+                "Sending…"
+              ) : (
+                <>
+                  <span aria-hidden="true">{"\u{1F4E7}"}</span> Send to CPA
+                </>
+              )}
             </button>
             {!cpaEmailSet && (
               <Link
