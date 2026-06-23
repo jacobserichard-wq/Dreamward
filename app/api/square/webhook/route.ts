@@ -36,6 +36,7 @@ import {
   verifyWebhookSignature,
   getOrder,
   extractSquareLineItems,
+  extractSquareOrderTaxTip,
   type SquarePayment,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
@@ -196,15 +197,16 @@ export async function POST(req: NextRequest) {
       `INSERT INTO processed_items (
          vendor, invoice_number, amount, due_date, status,
          category, source, source_ref_id, channel, confidence,
-         summary, extracted_data, client_id
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         summary, extracted_data, tax_amount, tip_amount, client_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT (client_id, source, source_ref_id)
          WHERE source_ref_id IS NOT NULL
        DO UPDATE SET
          status = EXCLUDED.status,
          amount = EXCLUDED.amount,
          summary = EXCLUDED.summary,
-         extracted_data = EXCLUDED.extracted_data
+         extracted_data = EXCLUDED.extracted_data,
+         tip_amount = EXCLUDED.tip_amount
        RETURNING id`,
       [
         row.vendor,
@@ -219,6 +221,8 @@ export async function POST(req: NextRequest) {
         row.confidence,
         row.summary,
         JSON.stringify(row.extracted_data),
+        row.tax_amount,
+        row.tip_amount,
         conn.client_id,
       ]
     );
@@ -278,6 +282,15 @@ export async function POST(req: NextRequest) {
           orderId: payment.order_id,
         });
         if (order) {
+          // Sales tax + tip live on the Order — record them on the parent
+          // (tax is excluded from income downstream; tip stays in).
+          const { tax, tip } = extractSquareOrderTaxTip(order);
+          await pool.query(
+            `UPDATE processed_items
+                SET tax_amount = $1, tip_amount = $2
+              WHERE id = $3 AND client_id = $4`,
+            [tax, tip, parentId, conn.client_id]
+          );
           const items = extractSquareLineItems(order);
           if (items.length > 0) {
             await bulkInsertLineItemsForParent({

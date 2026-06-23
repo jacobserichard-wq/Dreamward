@@ -444,6 +444,14 @@ export interface MappedSquarePaymentRow {
   confidence: number;
   summary: string;
   extracted_data: Record<string, unknown>;
+  /** Sales tax collected — a pass-through liability, excluded from
+   *  income downstream. null until the Order is fetched (tax lives on
+   *  the Order, not the Payment). */
+  tax_amount: number | null;
+  /** Tips — taxable income, kept in revenue. Seeded from
+   *  payment.tip_money; refined from the Order's total_tip_money when
+   *  the order is fetched. */
+  tip_amount: number | null;
 }
 
 /**
@@ -538,6 +546,11 @@ export function mapPaymentToProcessedItem(
       card_last_4: payment.card_details?.card?.last_4 ?? null,
       note: payment.note ?? null,
     },
+    // Tax requires the Order (set during line-item resolution); tip is on
+    // the payment so we can seed it immediately (covers order-less payments).
+    tax_amount: null,
+    tip_amount:
+      payment.tip_money != null ? payment.tip_money.amount / 100 : null,
   };
 }
 
@@ -581,9 +594,31 @@ export interface SquareOrder {
      *  base_price_money depending on order type. */
     variation_total_price_money?: { amount?: number; currency?: string };
   }>;
+  /** Order-level sales tax (cents). Pass-through liability — excluded
+   *  from income downstream. */
+  total_tax_money?: { amount?: number; currency?: string };
+  /** Order-level tips (cents). Taxable income — kept in revenue. */
+  total_tip_money?: { amount?: number; currency?: string };
   /** Currency for the whole order. Line items inherit this when
    *  their own money objects don't carry a currency string. */
   total_money?: { amount?: number; currency?: string };
+}
+
+/**
+ * Pull the sales tax + tip totals off an Order, in dollars. Square
+ * returns these in cents. Missing fields → 0. Sales tax is a
+ * pass-through liability (excluded from income); tips are taxable
+ * income. Kept separate from extractSquareLineItems so the line-item
+ * (product revenue) path stays focused on COGS.
+ */
+export function extractSquareOrderTaxTip(order: SquareOrder): {
+  tax: number;
+  tip: number;
+} {
+  return {
+    tax: (order.total_tax_money?.amount ?? 0) / 100,
+    tip: (order.total_tip_money?.amount ?? 0) / 100,
+  };
 }
 
 interface SquareOrderResponse {

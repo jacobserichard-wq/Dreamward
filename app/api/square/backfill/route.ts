@@ -20,6 +20,7 @@ import {
   refreshAccessToken,
   getOrder,
   extractSquareLineItems,
+  extractSquareOrderTaxTip,
 } from "@/lib/square";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -213,7 +214,7 @@ export async function POST() {
       // Bulk INSERT with the same partial-index-matching ON CONFLICT
       // pattern from Wix backfill (commit 23b42a0). 13 fields per row.
       const rows = page.payments.map(mapPaymentToProcessedItem);
-      const fieldsPerRow = 13;
+      const fieldsPerRow = 15;
       const values: unknown[] = [];
       const placeholders = rows
         .map((r) => {
@@ -231,6 +232,8 @@ export async function POST() {
             r.confidence,
             r.summary,
             JSON.stringify(r.extracted_data),
+            r.tax_amount,
+            r.tip_amount,
             client.id
           );
           return (
@@ -258,7 +261,7 @@ export async function POST() {
         `INSERT INTO processed_items (
            vendor, invoice_number, amount, due_date, status,
            category, source, source_ref_id, channel, confidence,
-           summary, extracted_data, client_id
+           summary, extracted_data, tax_amount, tip_amount, client_id
          ) VALUES ${placeholders}
          ON CONFLICT (client_id, source, source_ref_id)
            WHERE source_ref_id IS NOT NULL
@@ -277,6 +280,9 @@ export async function POST() {
           items: ReturnType<typeof extractSquareLineItems>;
         };
         const parents: Parent[] = [];
+        // Sales tax + tips live on the Order, not the Payment. Collect them
+        // here (one row per order-having parent) and batch-UPDATE below.
+        const taxTip: { id: number; tax: number; tip: number }[] = [];
 
         for (const r of insertRes.rows) {
           const payment = paymentById.get(r.source_ref_id);
@@ -287,6 +293,10 @@ export async function POST() {
             orderId: payment.order_id,
           });
           if (!order) continue;
+          // Capture tax/tip before the line-item check so an order with no
+          // parseable items still records its tax/tip.
+          const tt = extractSquareOrderTaxTip(order);
+          taxTip.push({ id: r.id, tax: tt.tax, tip: tt.tip });
           const items = extractSquareLineItems(order);
           if (items.length === 0) continue;
           const mapped = mapPaymentToProcessedItem(payment);
@@ -295,6 +305,24 @@ export async function POST() {
             soldAt: mapped.due_date,
             items,
           });
+        }
+
+        if (taxTip.length > 0) {
+          const tvals: unknown[] = [];
+          const tph = taxTip
+            .map((u) => {
+              const b = tvals.length;
+              tvals.push(u.id, u.tax, u.tip);
+              return `($${b + 1}::int, $${b + 2}::numeric, $${b + 3}::numeric)`;
+            })
+            .join(",");
+          await pool.query(
+            `UPDATE processed_items AS p
+                SET tax_amount = v.tax, tip_amount = v.tip
+               FROM (VALUES ${tph}) AS v(id, tax, tip)
+              WHERE p.id = v.id AND p.client_id = $${tvals.length + 1}`,
+            [...tvals, client.id]
+          );
         }
 
         if (parents.length > 0) {
