@@ -160,7 +160,9 @@ export async function GET(req: NextRequest) {
     );
 
     // ── Filter to expense-kind rows in JS (cleaner than SQL CASE) ─
-    const LEGACY_INCOME = new Set(["invoice", "ar_followup"]);
+    // "Sales" = the Square + Etsy ingest income category (not seeded) — list
+    // it so those sales are excluded from the expense list, not mis-included.
+    const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
     const LEGACY_EXPENSE = new Set(["expense"]);
     const expenses = result.rows.filter((r) => {
       if (!r.category) return false; // unknown-category rows aren't expenses

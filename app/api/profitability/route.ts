@@ -33,7 +33,9 @@ function isPlanAllowed(plan: string | null | undefined): boolean {
 // Phase 1 umbrella values predating the type-tagged taxonomy. The
 // reclassify cron rewrites these on newly-uploaded rows, but historical
 // rows persist and have to be interpreted at read time.
-const LEGACY_INCOME = new Set(["invoice", "ar_followup"]);
+// "Sales" is what the Square + Etsy ingests tag payments with (not in the
+// seeded taxonomy); without it those sales classify as "unknown".
+const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
 const LEGACY_EXPENSE = new Set(["expense"]);
 
 type CategoryKind = "income" | "expense" | "unknown";

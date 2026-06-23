@@ -29,7 +29,11 @@ import { getInventoryValuation } from "../inventory/valuation";
 const CATEGORY_EVENT_REVENUE = "Event revenue (cash-day)";
 const CATEGORY_AR_COLLECTED = "AR collected (invoices paid)";
 
-const LEGACY_INCOME = new Set(["invoice", "ar_followup"]);
+// "Sales" is the category the Square + Etsy ingests tag payments with (not
+// in the seeded per-industry taxonomy) — without it, those sales classify
+// as "unknown" and get excluded from revenue. Mirror of the fix in
+// lib/profitability/channels.ts buildKindClassifier.
+const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
 const LEGACY_EXPENSE = new Set(["expense"]);
 
 export type CategoryKind = "income" | "expense" | "unknown";
