@@ -365,6 +365,41 @@ export default function SkuDetailPage() {
     [skuId, loadDetail]
   );
 
+  // Hard delete (?hard=1) — permanent. Succeeds only when the SKU has no
+  // sales/recipe-use/production; otherwise the API 409s and we throw a
+  // friendly message (surfaced in the modal) so the user archives instead.
+  const handleDelete = useCallback(async () => {
+    const res = await fetch(`/api/skus/${skuId}?hard=1`, { method: "DELETE" });
+    if (res.ok) {
+      // Gone — leave the now-dead detail page.
+      router.push("/skus");
+      return;
+    }
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      sales?: number;
+      usedInRecipes?: number;
+      productionRuns?: number;
+    };
+    if (res.status === 409 && body.error === "has_history") {
+      const parts: string[] = [];
+      if (body.sales)
+        parts.push(`${body.sales} mapped sale${body.sales === 1 ? "" : "s"}`);
+      if (body.usedInRecipes)
+        parts.push(
+          `is used in ${body.usedInRecipes} recipe${body.usedInRecipes === 1 ? "" : "s"}`
+        );
+      if (body.productionRuns)
+        parts.push(
+          `${body.productionRuns} production run${body.productionRuns === 1 ? "" : "s"}`
+        );
+      throw new Error(
+        `Can't permanently delete — this SKU has ${parts.join(", ")}. Use Archive instead so your history stays intact.`
+      );
+    }
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }, [skuId, router]);
+
   const handleAddCost = useCallback(async () => {
     setError(null);
     const cleaned = newCost.replace(/[$,\s]/g, "");
@@ -1185,6 +1220,7 @@ export default function SkuDetailPage() {
         }}
         onSaveEdit={handleSaveEdit}
         onToggleActive={handleToggleActive}
+        onDelete={handleDelete}
         onClose={() => setEditOpen(false)}
       />
 

@@ -76,6 +76,10 @@ export interface SkuFormProps {
    *  Archive (currently active) or Restore (currently archived).
    *  Required when editing is set. */
   onToggleActive?: (active: boolean) => Promise<void>;
+  /** Hard-delete the SKU (edit mode only). The parent calls
+   *  DELETE ?hard=1 and navigates away on success; on a 409 it throws a
+   *  friendly message that surfaces inline so the user can archive. */
+  onDelete?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -94,6 +98,7 @@ export default function SkuForm({
   onSave,
   onSaveEdit,
   onToggleActive,
+  onDelete,
   onClose,
 }: SkuFormProps) {
   const kindLabel = kind === "component" ? "component" : "product";
@@ -107,6 +112,8 @@ export default function SkuForm({
   const [sellPrice, setSellPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset state every time the modal re-opens. Two paths:
@@ -137,6 +144,7 @@ export default function SkuForm({
       setUnit("each");
     }
     setError(null);
+    setConfirmingDelete(false);
   }, [open, editing]);
 
   // Esc to close (when not saving)
@@ -242,6 +250,23 @@ export default function SkuForm({
       setError(err instanceof Error ? err.message : "Couldn't update SKU");
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setError(null);
+    setDeleting(true);
+    try {
+      await onDelete();
+      // Parent navigates away on success (the SKU is gone).
+    } catch (err) {
+      // 409 "has history" etc. — surface inline + drop back so the user
+      // can see the Archive option instead.
+      setError(err instanceof Error ? err.message : "Couldn't delete SKU");
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -457,28 +482,69 @@ export default function SkuForm({
         </div>
 
         <div className="flex justify-between gap-2 mt-5 flex-wrap">
-          {/* Left side: Archive / Restore (edit mode only) */}
-          <div>
-            {isEdit && onToggleActive && (
-              <button
-                type="button"
-                onClick={handleToggleActive}
-                disabled={saving || toggling}
-                className={`py-2 px-4 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-40 inline-flex items-center gap-2 border ${
-                  editing!.active
-                    ? "text-amber-700 border-amber-200 hover:bg-amber-50"
-                    : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                }`}
-              >
-                {toggling && <Spinner size={12} color="currentColor" />}
-                {editing!.active
-                  ? toggling
-                    ? "Archiving..."
-                    : "Archive"
-                  : toggling
-                  ? "Restoring..."
-                  : "Restore"}
-              </button>
+          {/* Left side: Archive / Restore + Delete permanently (edit mode) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isEdit && confirmingDelete ? (
+              <>
+                <span className="text-xs text-red-700 font-medium">
+                  Delete forever? Can&apos;t be undone.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="py-2 px-3.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+                >
+                  {deleting && <Spinner size={12} color="white" />}
+                  {deleting ? "Deleting..." : "Yes, delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className="py-2 px-3 text-sm text-slate-600 hover:underline bg-transparent border-0 cursor-pointer disabled:opacity-40"
+                >
+                  Keep it
+                </button>
+              </>
+            ) : (
+              <>
+                {isEdit && onToggleActive && (
+                  <button
+                    type="button"
+                    onClick={handleToggleActive}
+                    disabled={saving || toggling}
+                    className={`py-2 px-4 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-40 inline-flex items-center gap-2 border ${
+                      editing!.active
+                        ? "text-amber-700 border-amber-200 hover:bg-amber-50"
+                        : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    {toggling && <Spinner size={12} color="currentColor" />}
+                    {editing!.active
+                      ? toggling
+                        ? "Archiving..."
+                        : "Archive"
+                      : toggling
+                        ? "Restoring..."
+                        : "Restore"}
+                  </button>
+                )}
+                {isEdit && onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmingDelete(true);
+                      setError(null);
+                    }}
+                    disabled={saving || toggling}
+                    title="Permanently delete — only works if this SKU has no sales, recipe use, or production"
+                    className="py-2 px-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg border-0 cursor-pointer disabled:opacity-40"
+                  >
+                    Delete permanently
+                  </button>
+                )}
+              </>
             )}
           </div>
 

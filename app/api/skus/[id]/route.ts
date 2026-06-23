@@ -8,13 +8,23 @@
 //   Returns: { sku: SkuRow }
 //
 // DELETE /api/skus/[id]
-//   Soft delete — sets skus.active = false. Existing
+//   Soft delete (default) — sets skus.active = false. Existing
 //   processed_item_line_items.matched_sku_id rows keep their
 //   reference so historical reports stay intact. The merchant
 //   can later restore by PATCHing active=true (no UI surface
 //   needed; the same edit modal handles both paths).
 //   Returns: { sku: SkuRow } — the archived row, so the client
 //   can flip its chip without re-fetching.
+//
+// DELETE /api/skus/[id]?hard=1
+//   HARD delete — permanently removes the row. Only allowed when
+//   NOTHING depends on the SKU: no mapped sales, not used as an
+//   ingredient in another product's recipe, and no production runs.
+//   This is the "I made it by mistake" escape hatch. If any of those
+//   references exist, returns 409 { error: "has_history", ... } so
+//   the client can fall back to archiving (preserves tax history).
+//   On success the FK cascades clean up the SKU's own cost history,
+//   aliases, recipe (as parent), and inventory adjustments.
 //
 // Code is intentionally NOT mutable. Once a SKU has a code, its
 // identity is locked — alias mappings, cost history rows, and
@@ -460,7 +470,7 @@ export async function PATCH(
 // ---------------------------------------------------------------------
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -482,6 +492,46 @@ export async function DELETE(
     const id = Number(idParam);
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
+    // ── Hard delete (?hard=1) — only when nothing depends on the SKU ──
+    if (req.nextUrl.searchParams.get("hard") === "1") {
+      const refs = await pool.query<{
+        sales: number;
+        used_in_recipes: number;
+        production_runs: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM processed_item_line_items
+             WHERE matched_sku_id = $1)::int AS sales,
+           (SELECT COUNT(*) FROM bom_components
+             WHERE component_sku_id = $1)::int AS used_in_recipes,
+           (SELECT COUNT(*) FROM production_runs
+             WHERE finished_sku_id = $1)::int AS production_runs`,
+        [id]
+      );
+      const r =
+        refs.rows[0] ?? { sales: 0, used_in_recipes: 0, production_runs: 0 };
+      if (r.sales > 0 || r.used_in_recipes > 0 || r.production_runs > 0) {
+        // Has history — refuse the hard delete; the client archives instead.
+        return NextResponse.json(
+          {
+            error: "has_history",
+            sales: r.sales,
+            usedInRecipes: r.used_in_recipes,
+            productionRuns: r.production_runs,
+          },
+          { status: 409 }
+        );
+      }
+      const del = await pool.query<{ id: number }>(
+        `DELETE FROM skus WHERE id = $1 AND client_id = $2 RETURNING id`,
+        [id, client.id]
+      );
+      if (del.rowCount === 0) {
+        return NextResponse.json({ error: "SKU not found" }, { status: 404 });
+      }
+      return NextResponse.json({ deleted: true, id });
     }
 
     const result = await pool.query<{ id: number }>(
