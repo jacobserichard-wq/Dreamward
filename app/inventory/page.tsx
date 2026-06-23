@@ -222,6 +222,14 @@ export default function InventoryPage() {
         <PageHeader
           title="Inventory"
           subtitle="Stock levels, value, and reorder alerts across every SKU"
+          rightSlot={
+            <Link
+              href="/skus"
+              className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-lg text-sm font-semibold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 no-underline whitespace-nowrap transition-colors"
+            >
+              SKUs &amp; Components →
+            </Link>
+          }
         />
 
         <SectionTip id="inventory" title="Your stock at a glance">
