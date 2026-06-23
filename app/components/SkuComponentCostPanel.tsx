@@ -43,6 +43,10 @@ interface CatalogSku {
   id: number;
   code: string;
   name: string;
+  /** Unit of measure (ml, g, oz, each…). The recipe quantity is in this
+   *  unit — surfaced in the picker + next to the qty input so the maker
+   *  enters "30 ml", not an ambiguous "30". */
+  unit: string;
 }
 
 export interface SkuComponentCostPanelProps {
@@ -209,6 +213,8 @@ export default function SkuComponentCostPanel({
   const pickable = catalog.filter(
     (s) => s.id !== skuId && !usedIds.has(s.id)
   );
+  // Unit of the currently-picked component → shown next to the qty input.
+  const pickedUnit = pickable.find((s) => String(s.id) === pickId)?.unit ?? "";
 
   if (loading) {
     return <p className="text-center py-6 text-slate-400 text-sm">Loading recipe…</p>;
@@ -335,23 +341,31 @@ export default function SkuComponentCostPanel({
               {pickable.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code} · {s.name}
+                  {s.unit && s.unit !== "each" ? ` (${s.unit})` : ""}
                 </option>
               ))}
             </select>
           </div>
-          <div className="w-20">
+          <div className="w-28">
             <label className="block text-[11px] font-medium text-slate-500 mb-1">
               Qty / unit
             </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={pickQty}
-              onChange={(e) => setPickQty(e.target.value)}
-              placeholder="1"
-              disabled={busy}
-              className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-100"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={pickQty}
+                onChange={(e) => setPickQty(e.target.value)}
+                placeholder="1"
+                disabled={busy}
+                className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-100"
+              />
+              {pickedUnit && (
+                <span className="text-xs text-slate-500 whitespace-nowrap">
+                  {pickedUnit}
+                </span>
+              )}
+            </div>
           </div>
           <button
             type="button"

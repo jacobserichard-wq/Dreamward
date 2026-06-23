@@ -35,6 +35,9 @@ interface SkuOption {
   /** 'product' (finished good) | 'component' (material). Only components
    *  are offered as recipe ingredients. */
   kind: string;
+  /** Unit of measure (ml, g, oz, each…) — the recipe quantity is in this
+   *  unit. Surfaced in the picker + next to the qty input. */
+  unit: string;
 }
 
 export interface RecipeSectionProps {
@@ -248,6 +251,9 @@ export default function RecipeSection({
   const pickable = skuOptions.filter(
     (s) => s.kind === "component" && s.code !== skuCode && !usedIds.has(s.id)
   );
+  // Unit of the currently-picked component → shown next to the qty input.
+  const pickedUnit =
+    pickable.find((s) => String(s.id) === pickedSkuId)?.unit ?? "";
 
   return (
     <section className="mb-6">
@@ -488,26 +494,34 @@ export default function RecipeSection({
                         {pickable.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.code} · {s.name}
+                            {s.unit && s.unit !== "each" ? ` (${s.unit})` : ""}
                           </option>
                         ))}
                       </select>
                     </div>
-                    <div className="w-28">
+                    <div className="w-32">
                       <label className="block text-xs font-medium text-slate-600 mb-1">
                         Qty per unit
                       </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={qtyPerUnit}
-                        onChange={(e) => {
-                          setQtyPerUnit(e.target.value);
-                          setError(null);
-                        }}
-                        disabled={saving}
-                        placeholder="e.g. 4"
-                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={qtyPerUnit}
+                          onChange={(e) => {
+                            setQtyPerUnit(e.target.value);
+                            setError(null);
+                          }}
+                          disabled={saving}
+                          placeholder="e.g. 4"
+                          className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
+                        />
+                        {pickedUnit && (
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {pickedUnit}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       type="button"
