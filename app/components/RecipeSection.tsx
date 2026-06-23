@@ -32,6 +32,9 @@ interface SkuOption {
   id: number;
   code: string;
   name: string;
+  /** 'product' (finished good) | 'component' (material). Only components
+   *  are offered as recipe ingredients. */
+  kind: string;
 }
 
 export interface RecipeSectionProps {
@@ -178,6 +181,10 @@ export default function RecipeSection({
           unit: newUnit.trim() || "each",
           cost: 0,
           effectiveDate: todayIso,
+          // A recipe ingredient is a material, not a finished good — so it
+          // shows in the (component-only) picker and lands under Raw
+          // materials in inventory.
+          kind: "component",
         }),
       });
       if (!createRes.ok) {
@@ -234,11 +241,12 @@ export default function RecipeSection({
     }
   };
 
-  // Components already in the recipe + the finished SKU itself are
-  // excluded from the picker.
+  // The picker offers only materials (kind='component') — a recipe is
+  // built from raw materials, not other finished products. Also exclude
+  // the finished SKU itself + components already in the recipe.
   const usedIds = new Set(components.map((c) => c.componentSkuId));
   const pickable = skuOptions.filter(
-    (s) => s.code !== skuCode && !usedIds.has(s.id)
+    (s) => s.kind === "component" && s.code !== skuCode && !usedIds.has(s.id)
   );
 
   return (
@@ -476,7 +484,7 @@ export default function RecipeSection({
                         disabled={saving}
                         className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-blue-500"
                       >
-                        <option value="">— pick a SKU —</option>
+                        <option value="">— pick a component —</option>
                         {pickable.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.code} · {s.name}
