@@ -212,6 +212,9 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
 /** One processed_items row (subset of columns needed for aggregation). */
 export interface ChannelTxnRow {
   amount: number;
+  /** Sales tax collected on this row (pass-through liability). Netted
+   *  out of channel revenue; 0 for non-Square / untaxed rows. */
+  tax: number;
   category: string | null;
   source: string | null;
   event_id: number | null;
@@ -283,6 +286,10 @@ export interface ChannelAggregateResult {
   totalDirectExpenses: number;
   /** netAttributable summed across all channels - overhead */
   netProfit: number;
+  /** Sales tax collected across all income rows. A pass-through
+   *  liability — already EXCLUDED from revenue above; surfaced so the
+   *  dashboard can show what's owed to the state. */
+  salesTaxCollected: number;
 }
 
 // ---------------------------------------------------------------------
@@ -454,6 +461,9 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
   }
 
   let overhead = 0;
+  // Sales tax collected — netted out of revenue, reported separately as a
+  // pass-through liability.
+  let salesTaxCollected = 0;
 
   // ── Aggregate processed_items ──────────────────────────────────
   for (const row of opts.txns) {
@@ -461,7 +471,10 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
       const cid = classifyIncomeRow(row);
       const ch = channelMap.get(cid);
       if (!ch) continue; // unknown channel — shouldn't happen but defend
-      ch.revenue += row.amount;
+      // Exclude sales tax from income (liability, not revenue); tips +
+      // service charges stay in (they're income).
+      ch.revenue += row.amount - row.tax;
+      salesTaxCollected += row.tax;
       ch.hasData = true;
     } else if (row.kind === "expense") {
       const cid = classifyExpenseRow(row);
@@ -532,6 +545,7 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
     totalRevenue,
     totalDirectExpenses,
     netProfit: totalRevenue - totalDirectExpenses - overhead,
+    salesTaxCollected,
   };
 }
 

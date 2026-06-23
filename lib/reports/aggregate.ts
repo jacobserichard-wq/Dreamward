@@ -62,6 +62,10 @@ export interface AnnualSummary {
      *  expenses" line on a P&L (booth fees + mileage are still
      *  tracked separately on top of this). */
     operatingExpenses: number;
+    /** Sales tax collected on sales (e.g. Square). A pass-through
+     *  liability owed to the state — EXCLUDED from totalRevenue/income.
+     *  Surfaced so the user knows how much to remit. */
+    salesTaxCollected: number;
   };
   byCategory: {
     income: Array<{ category: string; count: number; total: number }>;
@@ -160,6 +164,7 @@ interface TxnRow {
   category: string | null;
   source: string | null;
   due_date: string | null;
+  tax_amount: string | null;
 }
 
 interface PaymentRow {
@@ -405,7 +410,7 @@ export async function annualSummary(opts: {
       [clientId, start, end]
     ),
     pool.query<TxnRow>(
-      `SELECT amount, category, source, due_date
+      `SELECT amount, category, source, due_date, tax_amount
          FROM processed_items
         WHERE client_id = $1
           AND due_date >= $2 AND due_date < $3`,
@@ -538,6 +543,9 @@ export async function annualSummary(opts: {
   }
 
   // processed_items: linked income, linked + manual expenses.
+  // Sales tax collected is netted out of income and tracked here (it's a
+  // pass-through liability, not revenue).
+  let salesTaxCollected = 0;
   for (const t of txnsResult.rows) {
     const amount = Number(t.amount);
     // Skip only zero/NaN. NEGATIVE income rows are kept on purpose:
@@ -552,12 +560,18 @@ export async function annualSummary(opts: {
     const monthBucket = monthly.get(mKey);
     if (!monthBucket) continue;
     if (kind === "income") {
+      // Exclude sales tax collected from income — it's a pass-through
+      // liability owed to the state, not revenue. Tracked separately so
+      // the user can see what to remit. Non-Square rows have null tax → 0.
+      const tax = Number(t.tax_amount) || 0;
+      const net = amount - tax;
+      salesTaxCollected += tax;
       const cat = t.category ?? "Uncategorized income";
       const bucket = byCategoryIncome.get(cat) ?? { count: 0, total: 0 };
       bucket.count += 1;
-      bucket.total += amount; // may be negative (a refund)
+      bucket.total += net; // may be negative (a refund)
       byCategoryIncome.set(cat, bucket);
-      monthBucket.revenue += amount;
+      monthBucket.revenue += net;
     } else if (kind === "expense") {
       if (amount < 0) continue; // a negative expense is nonsense data
       const cat = t.category ?? "Uncategorized expense";
@@ -669,6 +683,7 @@ export async function annualSummary(opts: {
       cogs,
       grossProfit,
       operatingExpenses,
+      salesTaxCollected,
     },
     byCategory: {
       income: incomeArr,

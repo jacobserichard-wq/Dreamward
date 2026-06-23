@@ -49,6 +49,7 @@ interface TxnRow {
    *  time (or backfilled from existing signals by migration 0011).
    *  When non-null, the channels classifier uses this verbatim. */
   channel: string | null;
+  tax_amount: string | null;
 }
 
 interface SettingsRow {
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
           // (matches /api/reports/annual). Some legacy rows may have
           // null due_date — exclude them from the rollup rather than
           // guess (would skew which year they land in).
-          `SELECT amount, category, source, event_id, channel
+          `SELECT amount, category, source, event_id, channel, tax_amount
              FROM processed_items
             WHERE client_id = $1
               AND due_date IS NOT NULL
@@ -191,6 +192,7 @@ export async function GET(req: NextRequest) {
         if (!Number.isFinite(amount)) return null;
         return {
           amount,
+          tax: Number(r.tax_amount) || 0,
           category: r.category,
           source: r.source,
           event_id: r.event_id,
