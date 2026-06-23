@@ -581,6 +581,7 @@ function DashboardInner() {
     sales: number;
     expenses: number;
     net: number;
+    salesTax: number;
   } | null>(null);
   const [totalsLoading, setTotalsLoading] = useState(true);
 
@@ -591,7 +592,7 @@ function DashboardInner() {
       return;
     }
     if (totalsMonths.length === 0) {
-      setTotalsAgg({ sales: 0, expenses: 0, net: 0 });
+      setTotalsAgg({ sales: 0, expenses: 0, net: 0, salesTax: 0 });
       setTotalsLoading(false);
       return;
     }
@@ -613,18 +614,21 @@ function DashboardInner() {
               overhead: number;
               totalRevenue: number;
               netProfit: number;
+              salesTaxCollected?: number;
             };
           })
         );
         if (cancelled) return;
         let sales = 0;
         let expenses = 0;
+        let salesTax = 0;
         for (const p of parts) {
           sales += p.totalRevenue;
+          salesTax += p.salesTaxCollected ?? 0;
           expenses +=
             p.channels.reduce((s, c) => s + c.directExpenses, 0) + p.overhead;
         }
-        setTotalsAgg({ sales, expenses, net: sales - expenses });
+        setTotalsAgg({ sales, expenses, net: sales - expenses, salesTax });
       } catch {
         if (!cancelled) setTotalsAgg(null);
       } finally {
@@ -1229,6 +1233,7 @@ function DashboardInner() {
   const bannerSales = totalsAgg?.sales ?? 0;
   const bannerExpenses = totalsAgg?.expenses ?? 0;
   const bannerNet = totalsAgg?.net ?? 0;
+  const bannerSalesTax = totalsAgg?.salesTax ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -2198,6 +2203,7 @@ function DashboardInner() {
               totalSales={bannerSales}
               totalExpenses={bannerExpenses}
               netProfit={bannerNet}
+              salesTaxCollected={bannerSalesTax}
               year={channelYear}
               loading={totalsLoading}
               onDrill={setDrillKind}

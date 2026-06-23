@@ -25,6 +25,10 @@ interface SalesBannerProps {
   totalSales: number;
   totalExpenses: number;
   netProfit: number;
+  /** Sales tax collected over the period (e.g. Square). A pass-through
+   *  liability already EXCLUDED from totalSales — shown as a footnote so
+   *  the user knows it's set aside to remit, not lost revenue. */
+  salesTaxCollected?: number;
   /** Year shown in the sub-text under each stat. Defaults to YTD
    *  framing; future enhancement: pass period label
    *  ("Last 30 days" / "Q2 2026" / etc.) as Phase 9.2 evolves. */
@@ -62,6 +66,7 @@ export default function SalesBanner({
   totalSales,
   totalExpenses,
   netProfit,
+  salesTaxCollected = 0,
   year,
   loading = false,
   onDrill,
@@ -135,6 +140,15 @@ export default function SalesBanner({
           onClick={onDrill ? () => onDrill("net") : undefined}
         />
       </div>
+      {salesTaxCollected > 0 && (
+        <p className="text-[11px] text-slate-400 m-0 mt-2.5">
+          Sales excludes{" "}
+          <span className="font-semibold text-slate-500">
+            {fmtUsd(salesTaxCollected)}
+          </span>{" "}
+          sales tax collected — set aside to remit, not income.
+        </p>
+      )}
     </div>
   );
 }
