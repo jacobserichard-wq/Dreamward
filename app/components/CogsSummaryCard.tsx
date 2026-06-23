@@ -446,13 +446,13 @@ export default function CogsSummaryCard() {
       ) : (
         <>
           <p className="text-xs text-slate-500 m-0 mb-2">
-            Revenue, cost &amp; profit margin for{" "}
+            Product sales, cost &amp; profit margin for{" "}
             {periodLabel.replace(/ · .*/, "")}.
           </p>
           {/* Headline strip */}
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-3 gap-3 mb-2">
             <Stat
-              label="Revenue"
+              label="Product sales"
               value={fmtUsd(totals.revenue)}
               onClick={() => setDrillFocus("revenue")}
             />
@@ -469,6 +469,13 @@ export default function CogsSummaryCard() {
               onClick={() => setDrillFocus("margin")}
             />
           </div>
+          {/* Why this can differ from Total Sales — green-user clarity. */}
+          <p className="text-[11px] text-slate-400 m-0 mb-3">
+            Just your <strong className="font-semibold text-slate-500">products</strong>,
+            measured against what they cost you. Your{" "}
+            <strong className="font-semibold text-slate-500">Total Sales</strong>{" "}
+            (above) also includes any shipping &amp; service fees you charge.
+          </p>
 
           {/* Warning chips */}
           {(underwaterCount > 0 || totals.unmatchedLineItemCount > 0) && (
