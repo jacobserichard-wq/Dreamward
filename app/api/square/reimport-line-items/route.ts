@@ -31,6 +31,7 @@ import {
   refreshAccessToken,
   getOrder,
   extractSquareLineItems,
+  extractSquareOrderTaxTip,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -141,9 +142,12 @@ export async function POST(req: Request) {
           AND pi.source = 'square'
           AND pi.id > $2
           AND pi.source_ref_id IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM processed_item_line_items pili
-             WHERE pili.processed_item_id = pi.id
+          AND (
+            pi.tax_amount IS NULL
+            OR NOT EXISTS (
+              SELECT 1 FROM processed_item_line_items pili
+               WHERE pili.processed_item_id = pi.id
+            )
           )
         ORDER BY pi.id ASC
         LIMIT $3`,
@@ -162,6 +166,15 @@ export async function POST(req: Request) {
       if (!parent.order_id) continue; // standalone payment, no order
       const order = await getOrder({ accessToken, orderId: parent.order_id });
       if (!order) continue;
+      // Backfill tax + tip from the order (set even when there are no
+      // parseable line items, so the row stops re-qualifying).
+      const { tax, tip } = extractSquareOrderTaxTip(order);
+      await pool.query(
+        `UPDATE processed_items
+            SET tax_amount = $1, tip_amount = $2
+          WHERE id = $3 AND client_id = $4`,
+        [tax, tip, parent.id, client.id]
+      );
       const items = extractSquareLineItems(order);
       if (items.length === 0) continue;
       const added = await bulkInsertLineItemsForParent({
@@ -189,9 +202,12 @@ export async function POST(req: Request) {
           AND pi.source = 'square'
           AND pi.source_ref_id IS NOT NULL
           AND pi.id > $2
-          AND NOT EXISTS (
-            SELECT 1 FROM processed_item_line_items pili
-             WHERE pili.processed_item_id = pi.id
+          AND (
+            pi.tax_amount IS NULL
+            OR NOT EXISTS (
+              SELECT 1 FROM processed_item_line_items pili
+               WHERE pili.processed_item_id = pi.id
+            )
           )`,
       [client.id, lastTouchedId]
     );
