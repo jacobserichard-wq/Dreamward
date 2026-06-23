@@ -225,6 +225,17 @@ export function AnnualPdfDocument({
               {fmtUsd(s.netProfit)}
             </Text>
           </View>
+
+          {s.salesTaxCollected > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                Sales tax collected (remit, not income)
+              </Text>
+              <Text style={styles.summaryValue}>
+                {fmtUsd(s.salesTaxCollected)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* By Category — two columns. NO wrap={false} since long

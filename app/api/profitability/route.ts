@@ -55,6 +55,7 @@ interface TxnRow {
   amount: string;
   category: string | null;
   source: string | null;
+  tax_amount: string | null;
 }
 
 interface SettingsRow {
@@ -134,7 +135,7 @@ export async function GET() {
           [client.id]
         ),
         pool.query<TxnRow>(
-          `SELECT event_id, amount, category, source
+          `SELECT event_id, amount, category, source, tax_amount
              FROM processed_items
             WHERE client_id = $1 AND event_id IS NOT NULL`,
           [client.id]
@@ -209,7 +210,9 @@ export async function GET() {
       if (!Number.isFinite(amount)) continue;
       const kind = classify(t.category);
       if (kind === "income") {
-        acc.linkedIncome += amount;
+        // Exclude sales tax (liability, not revenue) for consistency with
+        // the dashboard + tax pack.
+        acc.linkedIncome += amount - (Number(t.tax_amount) || 0);
       } else if (kind === "expense") {
         if (t.source === "manual") acc.manualExpense += amount;
         else acc.linkedExpense += amount;

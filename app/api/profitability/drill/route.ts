@@ -46,6 +46,7 @@ interface TxnRow {
   event_id: number | null;
   channel: string | null;
   due_date: string | null;
+  tax_amount: string | null;
 }
 
 interface SettingsRow {
@@ -149,7 +150,8 @@ export async function GET(req: NextRequest) {
         [client.id, rangeStart, rangeEnd]
       ),
       pool.query<TxnRow>(
-        `SELECT amount, category, vendor, source, event_id, channel, due_date
+        `SELECT amount, category, vendor, source, event_id, channel, due_date,
+                tax_amount
            FROM processed_items
           WHERE client_id = $1
             AND due_date IS NOT NULL
@@ -185,11 +187,15 @@ export async function GET(req: NextRequest) {
       if (!Number.isFinite(amount)) continue;
       const k = classify(r.category);
       if (k !== kind) continue; // 'unknown' + the other kind are excluded
+      // Income rows exclude sales tax (liability, not revenue) so the drill
+      // reconciles to the tax-net Total Sales header. Expenses have no tax.
+      const displayAmount =
+        kind === "income" ? amount - (Number(r.tax_amount) || 0) : amount;
       rows.push({
         label: r.vendor || r.category || (kind === "income" ? "Sale" : "Expense"),
         sublabel:
           kind === "income" ? incomeChannelLabel(r) : expenseChannelLabel(r),
-        amount,
+        amount: displayAmount,
         date: r.due_date,
         kind: "txn",
       });

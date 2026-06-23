@@ -51,6 +51,7 @@ interface CsvTxnRow {
   due_date: string | null;
   source: string | null;
   summary: string | null;
+  tax_amount: string | null;
 }
 
 interface CsvPaymentJoinRow {
@@ -99,7 +100,8 @@ export async function renderAnnualCsvBody(opts: {
       [clientId, start, end]
     ),
     pool.query<CsvTxnRow>(
-      `SELECT id, vendor, amount, category, status, due_date, source, summary
+      `SELECT id, vendor, amount, category, status, due_date, source, summary,
+              tax_amount
          FROM processed_items
         WHERE client_id = $1
           AND due_date >= $2 AND due_date < $3
@@ -157,6 +159,8 @@ export async function renderAnnualCsvBody(opts: {
   let totalExpenses = 0;
   let boothFees = 0;
   let totalMiles = 0;
+  // Sales tax collected — netted out of income (liability, not revenue).
+  let salesTaxCollected = 0;
 
   // Events → cash-day revenue, booth fee, mileage.
   for (const e of eventsResult.rows) {
@@ -237,7 +241,12 @@ export async function renderAnnualCsvBody(opts: {
     const kind = classify(t.category);
     if (!t.due_date) continue;
     if (kind === "income") {
-      totalRevenue += amount; // may be negative (a refund)
+      // Gross receipts (Schedule C line 1) exclude sales tax collected —
+      // it's a pass-through liability, tracked separately below.
+      const tax = Number(t.tax_amount) || 0;
+      const net = amount - tax;
+      salesTaxCollected += tax;
+      totalRevenue += net; // may be negative (a refund)
       // Income → Schedule C line 1 (Gross receipts or sales) by
       // convention (design §1 #7). All income types map to line 1
       // for sole-prop filings. A negative row is a refund — label it
@@ -251,7 +260,7 @@ export async function renderAnnualCsvBody(opts: {
           t.summary ?? "",
           t.category ?? "Uncategorized income",
           "1",
-          formatMoney2(amount),
+          formatMoney2(net),
           `Item #${t.id}`,
         ])
       );
@@ -351,6 +360,21 @@ export async function renderAnnualCsvBody(opts: {
       "",
     ])
   );
+  if (salesTaxCollected > 0) {
+    summarySection.push(
+      csvRow([
+        "Summary",
+        eoy,
+        "Sales tax collected",
+        "",
+        "Pass-through liability — excluded from revenue; remit to your state",
+        "",
+        "",
+        formatMoney2(salesTaxCollected),
+        "",
+      ])
+    );
+  }
   if (cogs > 0) {
     summarySection.push(
       csvRow([
