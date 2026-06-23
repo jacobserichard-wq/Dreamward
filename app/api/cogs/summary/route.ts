@@ -23,6 +23,7 @@ import {
   computeMargin,
   computeMarginByChannel,
   computeMarginBySku,
+  computeFeesAndTips,
 } from "@/lib/cogs/compute";
 import { isPayingTier } from "@/lib/plans";
 
@@ -64,8 +65,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Three parallel queries — none depends on the others.
-    const [totals, byChannel, bySku] = await Promise.all([
+    // Parallel queries — none depends on the others.
+    const [totals, byChannel, bySku, feesAndTips] = await Promise.all([
       computeMargin({
         clientId: client.id,
         periodStart: from,
@@ -82,6 +83,11 @@ export async function GET(req: NextRequest) {
         periodEnd: to,
         limit: 100,
       }),
+      computeFeesAndTips({
+        clientId: client.id,
+        periodStart: from,
+        periodEnd: to,
+      }),
     ]);
 
     return NextResponse.json({
@@ -89,6 +95,10 @@ export async function GET(req: NextRequest) {
       totals,
       byChannel,
       bySku,
+      // Service charges + tips for the period (income not in product line
+      // items). >0 means Total Sales > Product sales; the card uses this to
+      // decide whether to show the "why they differ" note.
+      feesAndTips,
     });
   } catch (err) {
     console.error("COGS summary GET error:", err);

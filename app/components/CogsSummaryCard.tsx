@@ -43,11 +43,15 @@ interface SummaryResponse {
   totals: MarginTotals;
   byChannel: unknown[];
   bySku: SkuMarginRow[];
+  feesAndTips?: number;
 }
 
 interface Aggregated {
   totals: MarginTotals;
   bySku: SkuMarginRow[];
+  /** Service charges + tips in the period — when >0, Total Sales exceeds
+   *  Product sales and the card explains why. */
+  feesAndTips: number;
 }
 
 const MONTHS = [
@@ -115,10 +119,12 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
     totalLineItemCount: 0,
   };
   const skuMap = new Map<number, SkuMarginRow>();
+  let feesAndTips = 0;
 
   for (const p of parts) {
     totals.revenue += p.totals.revenue;
     totals.cogs += p.totals.cogs;
+    feesAndTips += p.feesAndTips ?? 0;
     totals.unmatchedRevenue += p.totals.unmatchedRevenue;
     totals.unmatchedLineItemCount += p.totals.unmatchedLineItemCount;
     totals.totalLineItemCount += p.totals.totalLineItemCount;
@@ -149,7 +155,7 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
     })
     .sort((a, b) => b.revenue - a.revenue);
 
-  return { totals, bySku };
+  return { totals, bySku, feesAndTips };
 }
 
 export default function CogsSummaryCard() {
@@ -195,6 +201,7 @@ export default function CogsSummaryCard() {
           totalLineItemCount: 0,
         },
         bySku: [],
+        feesAndTips: 0,
       });
       setLoading(false);
       return;
@@ -469,13 +476,19 @@ export default function CogsSummaryCard() {
               onClick={() => setDrillFocus("margin")}
             />
           </div>
-          {/* Why this can differ from Total Sales — green-user clarity. */}
-          <p className="text-[11px] text-slate-400 m-0 mb-3">
-            Just your <strong className="font-semibold text-slate-500">products</strong>,
-            measured against what they cost you. Your{" "}
-            <strong className="font-semibold text-slate-500">Total Sales</strong>{" "}
-            (above) also includes any shipping &amp; service fees you charge.
-          </p>
+          {/* Why this differs from Total Sales — shown only when there
+              actually IS a gap (service charges / tips in the period), so
+              makers who just sell products don't see needless noise. */}
+          {(data?.feesAndTips ?? 0) > 0 && (
+            <p className="text-[11px] text-slate-400 m-0 mb-3">
+              Just your{" "}
+              <strong className="font-semibold text-slate-500">products</strong>,
+              measured against what they cost you. Your{" "}
+              <strong className="font-semibold text-slate-500">Total Sales</strong>{" "}
+              (above) is higher because it also includes the shipping &amp;
+              service fees you charge.
+            </p>
+          )}
 
           {/* Warning chips */}
           {(underwaterCount > 0 || totals.unmatchedLineItemCount > 0) && (

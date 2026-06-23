@@ -177,6 +177,32 @@ export async function computeMargin(opts: {
 }
 
 /**
+ * Period total of fees + tips collected on paid sales — service charges
+ * + tips, the income that lives on the payment but NOT in the product
+ * line items. Summed over PARENT processed_items (not the line-item
+ * join) so a multi-line order isn't counted once per line. Drives the
+ * "Total Sales vs Product sales" explanation: when this is 0 the two are
+ * equal, so the card hides the note.
+ */
+export async function computeFeesAndTips(opts: {
+  clientId: number;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<number> {
+  const res = await pool.query<{ total: string }>(
+    `SELECT COALESCE(SUM(COALESCE(service_charge_amount, 0)
+                       + COALESCE(tip_amount, 0)), 0)::text AS total
+       FROM processed_items
+      WHERE client_id = $1
+        AND status = 'paid'
+        AND due_date >= $2
+        AND due_date <= $3`,
+    [opts.clientId, opts.periodStart, opts.periodEnd]
+  );
+  return Number(res.rows[0]?.total) || 0;
+}
+
+/**
  * Per-channel breakdown. Groups by processed_items.channel.
  * Includes a null-channel row when there are uncategorized sales.
  */
