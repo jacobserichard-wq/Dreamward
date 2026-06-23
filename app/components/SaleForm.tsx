@@ -29,6 +29,16 @@ export interface SaleFormSubmit {
   channel: string | null;
   eventId: number | null;
   notes: string | null;
+  /** Optional product this sale is for. When set, the sale draws the
+   *  product's stock down by `quantity` and feeds COGS/margin. */
+  skuId: number | null;
+  quantity: number;
+}
+
+interface SaleSkuOption {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export interface SaleFormProps {
@@ -71,6 +81,9 @@ export default function SaleForm({
   const [channel, setChannel] = useState("direct");
   const [eventId, setEventId] = useState("");
   const [notes, setNotes] = useState("");
+  const [skus, setSkus] = useState<SaleSkuOption[]>([]);
+  const [skuId, setSkuId] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,8 +96,37 @@ export default function SaleForm({
     setChannel("direct");
     setEventId("");
     setNotes("");
+    setSkuId("");
+    setQuantity("1");
     setError(null);
   }, [open]);
+
+  // Load sellable products (finished goods) for the optional product link.
+  useEffect(() => {
+    if (!open || skus.length > 0) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/skus");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          skus: {
+            id: number;
+            code: string;
+            name: string;
+            active: boolean;
+            kind: string;
+          }[];
+        };
+        setSkus(
+          (data.skus || [])
+            .filter((s) => s.active && s.kind === "product")
+            .map((s) => ({ id: s.id, code: s.code, name: s.name }))
+        );
+      } catch {
+        // non-fatal — the product picker just stays hidden
+      }
+    })();
+  }, [open, skus.length]);
 
   useEffect(() => {
     if (!open || saving) return;
@@ -115,6 +157,11 @@ export default function SaleForm({
       setError("Pick a category.");
       return;
     }
+    const qtyNum = Number(quantity);
+    if (skuId && (!Number.isFinite(qtyNum) || qtyNum <= 0)) {
+      setError("Quantity must be a positive number.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -125,6 +172,8 @@ export default function SaleForm({
         channel: channel || null,
         eventId: showEventPicker && eventId ? Number(eventId) : null,
         notes: notes.trim() || null,
+        skuId: skuId ? Number(skuId) : null,
+        quantity: skuId ? qtyNum : 1,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save");
@@ -235,6 +284,54 @@ export default function SaleForm({
               </p>
             )}
           </Field>
+
+          {/* Optional product link — draws stock down + feeds COGS/margin.
+              Hidden when the maker has no finished-good SKUs yet. */}
+          {skus.length > 0 && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
+                <Field label="Product (optional)" htmlFor="sale-sku">
+                  <select
+                    id="sale-sku"
+                    value={skuId}
+                    onChange={(e) => {
+                      setSkuId(e.target.value);
+                      setError(null);
+                    }}
+                    disabled={saving}
+                    className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+                  >
+                    <option value="">— none —</option>
+                    {skus.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.code} · {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Qty" htmlFor="sale-qty">
+                  <input
+                    id="sale-qty"
+                    type="text"
+                    inputMode="decimal"
+                    value={quantity}
+                    onChange={(e) => {
+                      setQuantity(e.target.value);
+                      setError(null);
+                    }}
+                    disabled={saving || !skuId}
+                    className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                  />
+                </Field>
+              </div>
+              {skuId && (
+                <p className="text-[11px] text-slate-400 m-0">
+                  Links this sale to the product — draws {quantity || "1"} from
+                  its stock and counts toward its cost &amp; margin.
+                </p>
+              )}
+            </>
+          )}
 
           <Field label="Channel" htmlFor="sale-channel">
             <select
