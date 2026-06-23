@@ -220,7 +220,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
                   className={MENU_ITEM}
                   title="Your product catalog — costs, stock, and recipes"
                 >
-                  SKUs
+                  SKUs &amp; Components
                 </Link>
                 <Link
                   href="/cogs"
@@ -327,7 +327,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               )}
               {paying && (
                 <Link href="/skus" className={MENU_ITEM}>
-                  SKUs
+                  SKUs &amp; Components
                 </Link>
               )}
               {paying && (
