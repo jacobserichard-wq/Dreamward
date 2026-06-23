@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
+import RestoreTipsButton from "../components/RestoreTipsButton";
 
 export default function SettingsPage() {
   const [industry, setIndustry] = useState<string | null>(null);
@@ -1174,6 +1175,28 @@ export default function SettingsPage() {
               <strong>Not tax advice.</strong> Quarterly estimates are a
               rough planning aid based on linear projection of YTD profit.
               Verify with your CPA before making payments.
+            </p>
+          </div>
+        </div>
+
+        {/* Help tips — restore the SectionTip callouts dismissed via
+            localStorage. Dismissals are device-local + permanent
+            otherwise, so this is the only way to bring them back. */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Help tips</h2>
+            <p className="text-sm text-slate-500 m-0">
+              The blue {"\u{1F4A1}"} how-to callouts at the top of each page can
+              be dismissed once you know your way around. Changed your mind?
+              Bring them all back here.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <RestoreTipsButton />
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              Tips are remembered per device, so this restores them on this
+              browser.
             </p>
           </div>
         </div>
