@@ -67,6 +67,8 @@ export default function RecipeSection({
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [savingQtyId, setSavingQtyId] = useState<number | null>(null);
+  // Briefly flag the row that just saved so a "✓ Saved" cue can flash.
+  const [justSavedId, setJustSavedId] = useState<number | null>(null);
 
   // "Create new material" sub-mode — make the ingredient SKU inline
   // instead of bouncing out to the catalog.
@@ -254,6 +256,11 @@ export default function RecipeSection({
         return;
       }
       await loadRecipe();
+      // Flash a "✓ Saved" cue on this row for a moment.
+      setJustSavedId(componentSkuId);
+      window.setTimeout(() => {
+        setJustSavedId((cur) => (cur === componentSkuId ? null : cur));
+      }, 1800);
     } finally {
       setSavingQtyId(null);
     }
@@ -369,6 +376,15 @@ export default function RecipeSection({
                           <span className="text-xs text-slate-500 w-8 text-left">
                             {c.componentUnit}
                           </span>
+                          <span className="w-14 text-left text-xs leading-none">
+                            {savingQtyId === c.componentSkuId ? (
+                              <Spinner size={11} color="#94a3b8" />
+                            ) : justSavedId === c.componentSkuId ? (
+                              <span className="text-emerald-600 font-medium">
+                                {"✓"} Saved
+                              </span>
+                            ) : null}
+                          </span>
                         </div>
                       </td>
                       <td
@@ -399,6 +415,13 @@ export default function RecipeSection({
                   ))}
                 </tbody>
               </table>
+            )}
+
+            {components.length > 0 && (
+              <p className="text-[11px] text-slate-400 m-0 px-4 pt-2">
+                Amounts save automatically — type a new value and click away
+                (or press Enter).
+              </p>
             )}
 
             {/* Add component */}
