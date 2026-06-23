@@ -66,6 +66,7 @@ export default function RecipeSection({
   const [qtyPerUnit, setQtyPerUnit] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [savingQtyId, setSavingQtyId] = useState<number | null>(null);
 
   // "Create new material" sub-mode — make the ingredient SKU inline
   // instead of bouncing out to the catalog.
@@ -227,6 +228,37 @@ export default function RecipeSection({
     }
   };
 
+  // Inline-edit a component's quantity per finished unit. The POST /bom
+  // endpoint upserts, so re-posting an existing component updates its qty.
+  const handleQtyCommit = async (
+    componentSkuId: number,
+    raw: string,
+    prev: number
+  ) => {
+    const qty = Number(raw);
+    if (!Number.isFinite(qty) || qty <= 0 || qty === prev) {
+      await loadRecipe(); // invalid/unchanged → snap back to stored value
+      return;
+    }
+    setSavingQtyId(componentSkuId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/skus/${skuId}/bom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ componentSkuId, quantityPerUnit: qty }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `HTTP ${res.status}`);
+        return;
+      }
+      await loadRecipe();
+    } finally {
+      setSavingQtyId(null);
+    }
+  };
+
   const handleRemove = async (componentSkuId: number) => {
     setRemovingId(componentSkuId);
     try {
@@ -313,8 +345,31 @@ export default function RecipeSection({
                         </span>{" "}
                         {c.componentName}
                       </td>
-                      <td className="py-2.5 px-4 text-right tabular-nums text-slate-700 whitespace-nowrap">
-                        {c.quantityPerUnit.toLocaleString()} {c.componentUnit}
+                      <td className="py-2.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <input
+                            key={`q-${c.id}-${c.quantityPerUnit}`}
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={String(c.quantityPerUnit)}
+                            disabled={savingQtyId === c.componentSkuId}
+                            onBlur={(e) =>
+                              handleQtyCommit(
+                                c.componentSkuId,
+                                e.target.value,
+                                c.quantityPerUnit
+                              )
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                            title="Quantity per finished unit — edit to update"
+                            className="w-16 py-1 px-2 text-sm text-right tabular-nums border border-slate-200 rounded outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                          />
+                          <span className="text-xs text-slate-500 w-8 text-left">
+                            {c.componentUnit}
+                          </span>
+                        </div>
                       </td>
                       <td
                         className={`py-2.5 px-4 text-right tabular-nums whitespace-nowrap ${

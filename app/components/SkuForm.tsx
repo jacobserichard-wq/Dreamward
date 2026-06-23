@@ -23,6 +23,22 @@
 import { useEffect, useState } from "react";
 import Spinner from "./Spinner";
 
+// Units of measure — shared by the create form + the edit form's
+// (guarded) unit selector.
+const UNIT_OPTIONS: { value: string; label: string }[] = [
+  { value: "each", label: "each (whole items)" },
+  { value: "oz", label: "oz — ounces" },
+  { value: "g", label: "g — grams" },
+  { value: "lb", label: "lb — pounds" },
+  { value: "kg", label: "kg — kilograms" },
+  { value: "ml", label: "ml — milliliters" },
+  { value: "L", label: "L — liters" },
+  { value: "ft", label: "ft — feet" },
+  { value: "in", label: "in — inches" },
+  { value: "yd", label: "yd — yards" },
+  { value: "pcs", label: "pcs — pieces" },
+];
+
 export interface SkuFormSubmit {
   code: string;
   name: string;
@@ -47,6 +63,10 @@ export interface SkuFormEditSubmit {
   /** Market-day booth price. null clears it (and re-hides a raw
    *  material from the /market-day grid). */
   defaultSellPrice: number | null;
+  /** Unit of measure (ml, g, each…). Only changes when the material has
+   *  no stock/sales yet — the parent passes canEditUnit to gate the UI,
+   *  and the API enforces the same guard. */
+  unit: string;
 }
 
 export interface SkuFormEditing {
@@ -56,6 +76,10 @@ export interface SkuFormEditing {
   description: string | null;
   active: boolean;
   defaultSellPrice: number | null;
+  unit: string;
+  /** True when the unit can still be changed (no stock/sales recorded
+   *  against it yet). When false the field is shown read-only. */
+  canEditUnit: boolean;
 }
 
 export interface SkuFormProps {
@@ -135,6 +159,7 @@ export default function SkuForm({
           ? String(editing.defaultSellPrice)
           : ""
       );
+      setUnit(editing.unit || "each");
     } else {
       setCode("");
       setName("");
@@ -190,6 +215,7 @@ export default function SkuForm({
           name: trimmedName,
           description: description.trim() || null,
           defaultSellPrice: sellPriceNum,
+          unit: unit.trim() || "each",
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't save SKU");
@@ -397,6 +423,45 @@ export default function SkuForm({
             </Field>
           )}
 
+          {/* Unit of measure — edit mode. Locked once any stock or sales
+              exist, since existing quantities are already counted in the
+              current unit (changing it would silently relabel them). */}
+          {isEdit && (
+            <Field label="Unit of measure" htmlFor="sku-unit-edit">
+              {editing!.canEditUnit ? (
+                <select
+                  id="sku-unit-edit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  disabled={saving}
+                  className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                >
+                  {UNIT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <input
+                    id="sku-unit-edit"
+                    type="text"
+                    value={unit}
+                    readOnly
+                    disabled
+                    className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 outline-none box-border"
+                  />
+                  <p className="text-xs text-slate-500 m-0 mt-1">
+                    Locked — this material already has stock or sales, so its
+                    unit can&apos;t change (existing quantities are counted in{" "}
+                    <strong>{unit}</strong>).
+                  </p>
+                </>
+              )}
+            </Field>
+          )}
+
           {/* Cost + Effective date — create mode only. Edit mode
               hides these to enforce "add a new cost row" via the
               SKU detail page (Phase 12b commit 4). */}
@@ -455,17 +520,11 @@ export default function SkuForm({
                   disabled={saving}
                   className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
                 >
-                  <option value="each">each (whole items)</option>
-                  <option value="oz">oz — ounces</option>
-                  <option value="g">g — grams</option>
-                  <option value="lb">lb — pounds</option>
-                  <option value="kg">kg — kilograms</option>
-                  <option value="ml">ml — milliliters</option>
-                  <option value="L">L — liters</option>
-                  <option value="ft">ft — feet</option>
-                  <option value="in">in — inches</option>
-                  <option value="yd">yd — yards</option>
-                  <option value="pcs">pcs — pieces</option>
+                  {UNIT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </Field>
 

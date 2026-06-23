@@ -1214,6 +1214,11 @@ export default function SkuDetailPage() {
           description: sku.description,
           active: sku.active,
           defaultSellPrice: sku.defaultSellPrice,
+          unit: sku.unit,
+          // Unit is only changeable before the material is used to count
+          // anything — no stock on hand and no mapped sales. The API
+          // enforces the same guard.
+          canEditUnit: sku.quantityOnHand === 0 && sku.salesCount === 0,
         }}
         onSave={async () => {
           // Unreachable in edit mode — onSaveEdit is what runs.

@@ -283,6 +283,7 @@ interface PatchSkuBody {
   reorderPoint?: unknown;
   defaultSellPrice?: unknown;
   costingMethod?: unknown;
+  unit?: unknown;
 }
 
 export async function PATCH(
@@ -405,6 +406,47 @@ export async function PATCH(
       updates.push(`costing_method = $${p++}`);
       values.push(body.costingMethod);
       switchedToComponents = body.costingMethod === "components";
+    }
+
+    // Unit of measure. Changing it relabels every quantity recorded
+    // against the SKU, so it's only allowed before any stock or mapped
+    // sales exist (mirrors the client's canEditUnit gate).
+    if (body.unit !== undefined) {
+      if (!isNonEmptyString(body.unit)) {
+        return NextResponse.json(
+          { error: "Unit cannot be empty" },
+          { status: 400 }
+        );
+      }
+      const newUnit = body.unit.trim().slice(0, 16);
+      const guard = await pool.query<{
+        current_unit: string;
+        qoh: string;
+        sales: number;
+      }>(
+        `SELECT s.unit AS current_unit,
+                s.quantity_on_hand AS qoh,
+                (SELECT COUNT(*) FROM processed_item_line_items pili
+                  WHERE pili.matched_sku_id = s.id)::int AS sales
+           FROM skus s
+          WHERE s.id = $1 AND s.client_id = $2`,
+        [id, client.id]
+      );
+      const g = guard.rows[0];
+      if (!g) {
+        return NextResponse.json({ error: "SKU not found" }, { status: 404 });
+      }
+      if (g.current_unit !== newUnit && (Number(g.qoh) !== 0 || g.sales > 0)) {
+        return NextResponse.json(
+          {
+            error:
+              "Can't change the unit — this material already has stock or sales, and its quantities are counted in the current unit.",
+          },
+          { status: 400 }
+        );
+      }
+      updates.push(`unit = $${p++}`);
+      values.push(newUnit);
     }
 
     if (updates.length === 0) {
