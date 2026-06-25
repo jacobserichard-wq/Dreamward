@@ -101,7 +101,7 @@ function platformMeta(p: Platform): {
  *  external id (UUIDs/numeric ids look ugly but unique). */
 function suggestCode(row: CatalogRow): string {
   if (row.sku && row.sku.trim().length > 0) return row.sku.trim();
-  const id = row.externalId;
+  const id = row.externalId ?? "";
   return id.length > 12 ? id.slice(-12) : id;
 }
 

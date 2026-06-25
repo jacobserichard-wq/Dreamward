@@ -102,7 +102,23 @@ export async function GET() {
       );
     }
 
-    const rows = await listCatalog({ accessToken });
+    const variations = await listCatalog({ accessToken });
+
+    // Map to the bulk-import client's CatalogRow shape. listCatalog returns
+    // variationId/itemId, but the client (and the Shopify/Wix/Etsy routes)
+    // expect externalId/productId — without this rename row.externalId is
+    // undefined and the preview crashes on `id.length`. externalId =
+    // variationId is also the right alias key: Square line items reference
+    // the variation via catalog_object_id (= this id), so future orders
+    // auto-match.
+    const rows = variations.map((v) => ({
+      externalId: v.variationId,
+      productId: v.itemId,
+      displayName: v.displayName,
+      sku: v.sku,
+      cost: v.cost,
+      currency: v.currency,
+    }));
 
     return NextResponse.json({ rows });
   } catch (err) {
