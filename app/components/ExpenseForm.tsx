@@ -590,7 +590,7 @@ export default function ExpenseForm({
                 // Clear event_id when channel moves off markets
                 if (e.target.value !== "markets") setEventId("");
               }}
-              disabled={saving}
+              disabled={saving || !!receiveSkuId}
               className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
             >
               <option value="">Overhead (not tied to a channel)</option>
@@ -601,8 +601,9 @@ export default function ExpenseForm({
               ))}
             </select>
             <p className="text-xs text-slate-500 mt-1 m-0">
-              Pick the channel this expense supports. &quot;Overhead&quot;
-              for things like rent, software, accounting fees.
+              {receiveSkuId
+                ? "Locked to Overhead — a material you're receiving into stock feeds products across all channels, so it isn't tied to one."
+                : "Pick the channel this expense supports. Overhead is for things like rent, software, accounting fees."}
             </p>
           </Field>
 
@@ -620,6 +621,10 @@ export default function ExpenseForm({
                 value={receiveSkuId}
                 onChange={(e) => {
                   setReceiveSkuId(e.target.value);
+                  // A material you're receiving isn't tied to a sales
+                  // channel — force Overhead so the cost can't be
+                  // mis-attributed.
+                  if (e.target.value) setChannel("");
                   setError(null);
                 }}
                 disabled={saving}
