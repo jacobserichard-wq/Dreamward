@@ -183,9 +183,10 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       : []),
     // ── COGS onboarding (Sub-session 33). The gross-margin story is
     //    the headline value prop, so it gets first-class onboarding
-    //    presence. "Connect your store" populates the SKU catalog
-    //    automatically; "Add product costs" turns those SKUs into
-    //    gross-margin tracking. Both skippable — market-only sellers
+    //    presence. "Connect your store" starts the sales sync (line items
+    //    arrive unmatched — the catalog is built via bulk-import / paste /
+    //    mapping, NOT auto-created); "Add product costs" turns those SKUs
+    //    into gross-margin tracking. Both skippable — market-only sellers
     //    without an online store can skip the store-connect step. ──
     {
       id: "connect_store",

@@ -349,8 +349,10 @@ export default function SkusPage() {
         />
 
         <SectionTip id="skus" title="Costs, stock, and recipes live here">
-          SKUs appear automatically when a connected store syncs orders —
-          or add them manually / by paste. Set a SKU&apos;s{" "}
+          Build your catalog with <strong>Bulk import</strong> (one click
+          pulls products from a connected store), <strong>Paste from
+          spreadsheet</strong>, by mapping unmatched items as they sell, or by
+          hand. Set a SKU&apos;s{" "}
           <strong>cost</strong> by receiving a purchase into inventory (it
           records what you paid as a cost layer); sales then draw down your
           oldest stock first (<strong>FIFO</strong>), so margins follow what

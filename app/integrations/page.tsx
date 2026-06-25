@@ -250,12 +250,12 @@ function IntegrationsPageInner() {
 
         <SectionTip id="integrations" title="Connect a store to automate everything">
           Connecting Shopify, Wix, Square, or Etsy pulls in your order
-          history and keeps it synced — no manual uploads. Each
-          order&apos;s line items flow into per-product margin, and your
-          products auto-populate the <strong>SKUs</strong> catalog. Square
-          even imports the costs you&apos;ve already set in its catalog.
-          After connecting, set costs on your SKUs — receive your material
-          purchases into inventory — to see gross margin.
+          history and keeps it synced — no manual uploads. To build your{" "}
+          <strong>SKUs</strong> catalog from it, use <strong>Bulk import</strong>{" "}
+          — one click pulls every product from the platform (Square even brings
+          the costs from its Item Library) — or map items from the Unmatched
+          queue as they sell. Then cost your SKUs (receive purchases into
+          inventory) to see gross margin.
         </SectionTip>
 
         {error && (

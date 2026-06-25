@@ -147,9 +147,9 @@ export default function GettingStartedGuide() {
           <ul className="list-disc pl-6 space-y-2">
             <li>
               <strong>Online seller</strong> (Shopify, Wix, Square Online, or
-              Etsy): start by connecting your store — line items pull
-              automatically and per-SKU margin appears once you set your
-              costs.
+              Etsy): start by connecting your store — your sales pull in
+              automatically. Then import your products (one click) and set
+              their costs, and per-SKU margin appears.
             </li>
             <li>
               <strong>Market or event vendor</strong> (booth at the farmer&apos;s
@@ -203,11 +203,13 @@ export default function GettingStartedGuide() {
           </ol>
           <Callout variant="info">
             Each platform pulls slightly different data. Shopify, Wix, and
-            Etsy give you line items by SKU, which is what powers per-product
-            margin. Square gives you line items too, and pulls{" "}
+            Etsy tag line items with a SKU code — so once you add those
+            products as SKUs (step 4), every future order matches to them
+            automatically. Square line items come through too, and Square&apos;s
+            catalog carries{" "}
             <code className="bg-slate-100 px-1.5 py-0.5 rounded text-sm">default_unit_cost</code>{" "}
-            straight from your Square catalog — meaning if you set costs in
-            Square, you don&apos;t have to re-enter them here.
+            — so when you import your Square products in step 4, the costs you
+            set in Square come with them.
           </Callout>
           <p>
             <strong>No online store?</strong> You have three other ways to get
@@ -228,8 +230,17 @@ export default function GettingStartedGuide() {
             <strong>SKUs &amp; Components</strong> in the header — your catalog
             of <strong>products</strong> (the finished goods you sell) and{" "}
             <strong>components</strong> (the raw materials they&apos;re made
-            from). Connected stores populate it automatically; you can also add
-            items by hand.
+            from). Connecting a store pulls your <strong>sales</strong> in
+            automatically — but it doesn&apos;t build this catalog for you;
+            those products first arrive <em>unmatched</em>. You populate the
+            catalog yourself, fastest via{" "}
+            <Link href="/skus/bulk-import" className="text-blue-600 no-underline hover:underline">
+              Bulk import
+            </Link>{" "}
+            (one click pulls every product from Square, Shopify, Wix, or Etsy —
+            Square even brings the costs you set in its Item Library). You can
+            also paste from a spreadsheet, map products from the Unmatched
+            queue as they sell, or add SKUs by hand.
           </p>
           <p>
             <strong>How costing works — FIFO.</strong> Dreamward costs your
