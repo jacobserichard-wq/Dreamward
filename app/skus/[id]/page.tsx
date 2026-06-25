@@ -83,10 +83,23 @@ interface AliasRow {
   createdAt: string;
 }
 
+/** One open FIFO cost layer — what's left of a batch acquired at a known
+ *  unit cost. Drained in acquired-at order (oldest first). */
+interface CostLayerRow {
+  id: number;
+  source: string;
+  acquiredAt: string;
+  originalQty: number;
+  remainingQty: number;
+  unitCost: number;
+  notes: string | null;
+}
+
 interface SkuDetailResponse {
   sku: SkuRow;
   costHistory: CostHistoryRow[];
   aliases: AliasRow[];
+  costLayers: CostLayerRow[];
 }
 
 // Sub-session 33 Tier 1 commit 4: stock history row shape mirrors
@@ -161,6 +174,21 @@ function platformLabel(p: string): { label: string; icon: string } {
       return { label: "Square", icon: "\u{25A0}" };
     default:
       return { label: p, icon: "" };
+  }
+}
+
+function layerSourceLabel(source: string): string {
+  switch (source) {
+    case "receive":
+      return "Received";
+    case "production":
+      return "Made";
+    case "opening":
+      return "Opening balance";
+    case "manual":
+      return "Manual";
+    default:
+      return source;
   }
 }
 
@@ -673,6 +701,12 @@ export default function SkuDetailPage() {
   }
 
   const { sku, costHistory, aliases } = data;
+  const costLayers = data.costLayers ?? [];
+  const layersValue = costLayers.reduce(
+    (sum, l) => sum + l.remainingQty * l.unitCost,
+    0
+  );
+  const unitLabel = sku.unit && sku.unit !== "each" ? sku.unit : "";
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -934,6 +968,94 @@ export default function SkuDetailPage() {
             setInventoryRefreshKey((k) => k + 1);
           }}
         />
+
+        {/* Cost layers (FIFO) — open batches, drained oldest-first. The
+            live consumption order behind COGS. */}
+        <section className="mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-base font-semibold text-slate-900 m-0">
+              Cost layers{" "}
+              <span className="text-slate-400 font-normal text-sm">(FIFO)</span>
+            </h2>
+            {costLayers.length > 0 && (
+              <span className="text-xs text-slate-500">
+                On-hand value{" "}
+                <span className="font-semibold text-slate-700 tabular-nums">
+                  {fmtMoney(layersValue, "USD")}
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+                  <th className="text-left py-2.5 px-4 font-medium">Acquired</th>
+                  <th className="text-left py-2.5 px-4 font-medium">Source</th>
+                  <th className="text-right py-2.5 px-4 font-medium">
+                    Remaining
+                  </th>
+                  <th className="text-right py-2.5 px-4 font-medium">
+                    Unit cost
+                  </th>
+                  <th className="text-right py-2.5 px-4 font-medium">
+                    Layer value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {costLayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-slate-500">
+                      No open cost layers. Receiving stock with a unit cost, or
+                      a production run, creates them.
+                    </td>
+                  </tr>
+                ) : (
+                  costLayers.map((l, i) => (
+                    <tr
+                      key={l.id}
+                      className="border-b border-slate-100 last:border-b-0"
+                    >
+                      <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
+                        {i === 0 && (
+                          <span className="inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 align-middle">
+                            Next out
+                          </span>
+                        )}
+                        {fmtDate(l.acquiredAt)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        {layerSourceLabel(l.source)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-900 tabular-nums whitespace-nowrap">
+                        {l.remainingQty.toLocaleString()}
+                        <span className="text-slate-400">
+                          {" "}
+                          / {l.originalQty.toLocaleString()}
+                          {unitLabel ? ` ${unitLabel}` : ""}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
+                        {fmtMoney(l.unitCost, "USD")}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-700 tabular-nums whitespace-nowrap">
+                        {fmtMoney(l.remainingQty * l.unitCost, "USD")}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {costLayers.length > 0 && (
+            <p className="text-[11px] text-slate-400 m-0 mt-2">
+              Sales and production draw from the top layer first; when it runs
+              out the next one takes over — so COGS follows the price you
+              actually paid.
+            </p>
+          )}
+        </section>
 
         {/* Cost history */}
         <section className="mb-6">

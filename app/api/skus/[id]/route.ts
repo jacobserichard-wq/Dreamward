@@ -213,7 +213,7 @@ export async function GET(
     // engine: for each cost row, count the line items whose
     // sold_at falls in the row's "reign" (sold_at >= effective_date
     // AND no later cost row also has effective_date <= sold_at).
-    const [costRes, aliasRes] = await Promise.all([
+    const [costRes, aliasRes, layerRes] = await Promise.all([
       pool.query<CostHistoryRowDb>(
         `SELECT ch.id, ch.cost, ch.currency, ch.effective_date,
                 ch.notes, ch.created_at,
@@ -242,6 +242,24 @@ export async function GET(
           ORDER BY platform ASC, created_at ASC`,
         [id]
       ),
+      // Open FIFO cost layers — what's left of each batch, oldest first
+      // (= the order they'll be consumed). Drained layers are omitted.
+      pool.query<{
+        id: number;
+        source: string;
+        acquired_at: string;
+        original_qty: string;
+        remaining_qty: string;
+        unit_cost: string;
+        notes: string | null;
+      }>(
+        `SELECT id, source, acquired_at::text AS acquired_at,
+                original_qty::text, remaining_qty::text, unit_cost::text, notes
+           FROM cost_layers
+          WHERE sku_id = $1 AND remaining_qty > 0
+          ORDER BY acquired_at ASC, id ASC`,
+        [id]
+      ),
     ]);
 
     return NextResponse.json({
@@ -261,6 +279,15 @@ export async function GET(
         externalId: r.external_id,
         externalSku: r.external_sku,
         createdAt: r.created_at,
+      })),
+      costLayers: layerRes.rows.map((r) => ({
+        id: r.id,
+        source: r.source,
+        acquiredAt: r.acquired_at,
+        originalQty: Number(r.original_qty),
+        remainingQty: Number(r.remaining_qty),
+        unitCost: Number(r.unit_cost),
+        notes: r.notes,
       })),
     });
   } catch (err) {
