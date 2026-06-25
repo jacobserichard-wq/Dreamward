@@ -47,6 +47,7 @@ export default function ReceiveStockModal({
   const unitLabel = (n: number) =>
     unit && unit !== "each" ? unit : n === 1 ? "unit" : "units";
   const [quantity, setQuantity] = useState<string>("");
+  const [unitCost, setUnitCost] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function ReceiveStockModal({
   useEffect(() => {
     if (!open) return;
     setQuantity("");
+    setUnitCost("");
     setNotes("");
     setError(null);
   }, [open, skuId]);
@@ -88,6 +90,9 @@ export default function ReceiveStockModal({
     setSaving(true);
     setError(null);
     try {
+      const parsedCost = Number(unitCost);
+      const hasCost =
+        unitCost.trim().length > 0 && Number.isFinite(parsedCost) && parsedCost >= 0;
       const res = await fetch(`/api/skus/${skuId}/inventory`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,6 +100,7 @@ export default function ReceiveStockModal({
           delta: parsed,
           reason: "receive",
           notes: notes.trim() || null,
+          ...(hasCost ? { unitCost: parsedCost } : {}),
         }),
       });
       if (!res.ok) {
@@ -183,6 +189,33 @@ export default function ReceiveStockModal({
             {unitLabel(projectedTotal)}.
           </p>
         )}
+
+        <label
+          htmlFor="receive-cost"
+          className="block text-xs font-medium text-slate-700 mb-1 mt-4"
+        >
+          Unit cost{" "}
+          <span className="text-slate-400 font-normal">(optional)</span>
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+            $
+          </span>
+          <input
+            id="receive-cost"
+            type="text"
+            inputMode="decimal"
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            disabled={saving}
+            placeholder="what you paid per unit"
+            className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+          />
+        </div>
+        <p className="text-xs text-slate-500 mt-1 mb-0">
+          Sets the cost basis for this batch (FIFO). Leave blank to reuse the
+          last known cost.
+        </p>
 
         <label
           htmlFor="receive-notes"

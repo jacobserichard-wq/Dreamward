@@ -31,6 +31,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import { recordManualAdjustment } from "@/lib/inventory/adjustments";
+import {
+  addCostLayer,
+  consumeFifo,
+  lastKnownUnitCost,
+} from "@/lib/inventory/costLayers";
 import pool from "@/lib/db";
 import { isPayingTier } from "@/lib/plans";
 
@@ -38,6 +43,9 @@ interface PostBody {
   delta?: unknown;
   reason?: unknown;
   notes?: unknown;
+  /** Optional per-unit cost for a positive receive — sets the FIFO
+   *  layer's cost. Omitted → falls back to the SKU's last-known cost. */
+  unitCost?: unknown;
 }
 
 const ALLOWED_REASONS = new Set([
@@ -114,6 +122,19 @@ export async function POST(
         ? body.notes.trim()
         : null;
 
+    // ── Validate optional unit cost (positive receive only) ──────
+    let unitCost: number | undefined;
+    if (body.unitCost != null && body.unitCost !== "") {
+      const uc = Number(body.unitCost);
+      if (!Number.isFinite(uc) || uc < 0) {
+        return NextResponse.json(
+          { error: "unitCost must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+      unitCost = uc;
+    }
+
     // ── Tenant scope: confirm the SKU belongs to this client
     // BEFORE the adjustment runs, so a forged id can't credit
     // someone else's stock. recordManualAdjustment doesn't
@@ -126,14 +147,54 @@ export async function POST(
       return NextResponse.json({ error: "SKU not found" }, { status: 404 });
     }
 
-    const quantityOnHand = await recordManualAdjustment({
-      skuId,
-      delta,
-      reason,
-      notes,
-    });
+    // Quantity and FIFO cost move together in one transaction so the two
+    // ledgers (inventory_adjustments quantity, cost_layers cost) can't
+    // drift: adding stock creates a cost layer; removing stock drains
+    // layers oldest-first.
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      const quantityOnHand = await recordManualAdjustment({
+        dbClient: db,
+        skuId,
+        delta,
+        reason,
+        notes,
+      });
 
-    return NextResponse.json({ quantityOnHand });
+      if (delta > 0) {
+        const layerCost = unitCost ?? (await lastKnownUnitCost(db, skuId));
+        await addCostLayer({
+          dbClient: db,
+          clientId: client.id,
+          skuId,
+          source: reason === "receive" ? "receive" : "manual",
+          acquiredAt: new Date().toISOString().slice(0, 10),
+          quantity: delta,
+          unitCost: layerCost,
+          notes:
+            unitCost == null
+              ? `${notes ? notes + " — " : ""}cost estimated from last known`
+              : notes,
+        });
+      } else {
+        await consumeFifo({
+          dbClient: db,
+          clientId: client.id,
+          skuId,
+          quantity: -delta,
+          reason: reason === "manual" ? "manual_out" : "correction",
+        });
+      }
+
+      await db.query("COMMIT");
+      return NextResponse.json({ quantityOnHand });
+    } catch (txErr) {
+      await db.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      db.release();
+    }
   } catch (err) {
     console.error("SKU inventory POST error:", err);
     return NextResponse.json(
