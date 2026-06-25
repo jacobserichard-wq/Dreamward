@@ -100,7 +100,7 @@ export default function GettingStartedGuide() {
             <li><a href="#what-dreamward-is" className="text-blue-600 no-underline hover:underline">What Dreamward is (and what it isn&apos;t)</a></li>
             <li><a href="#pick-your-path" className="text-blue-600 no-underline hover:underline">Pick your starting path</a></li>
             <li><a href="#connect-revenue-source" className="text-blue-600 no-underline hover:underline">Connect your first revenue source</a></li>
-            <li><a href="#cogs-setup" className="text-blue-600 no-underline hover:underline">Set up SKUs and cost history</a></li>
+            <li><a href="#cogs-setup" className="text-blue-600 no-underline hover:underline">Set up SKUs, costs &amp; recipes</a></li>
             <li><a href="#log-market-day" className="text-blue-600 no-underline hover:underline">Log your first market day</a></li>
             <li><a href="#track-expenses" className="text-blue-600 no-underline hover:underline">Track expenses and attach receipts</a></li>
             <li><a href="#processed-inbox" className="text-blue-600 no-underline hover:underline">Understand the Processed inbox</a></li>
@@ -128,9 +128,11 @@ export default function GettingStartedGuide() {
             question without making you re-enter every order by hand.
           </p>
           <Callout variant="info">
-            Dreamward keeps your historical margins honest. If you raise a
-            wholesale price today, last month&apos;s sales keep their old cost
-            — they don&apos;t get retroactively rewritten the way most
+            Dreamward keeps your historical margins honest. Each sale&apos;s
+            cost is locked in the moment it sells — using FIFO, it draws down
+            your oldest stock at the price you actually paid. Raise a price
+            today and last month&apos;s sales keep the cost they were booked
+            at; they don&apos;t get retroactively rewritten the way most
             accounting tools handle a cost change. That&apos;s the
             single-biggest reason makers move here from spreadsheets or from
             other inventory tools.
@@ -146,8 +148,8 @@ export default function GettingStartedGuide() {
             <li>
               <strong>Online seller</strong> (Shopify, Wix, Square Online, or
               Etsy): start by connecting your store — line items pull
-              automatically and per-SKU margin appears once you set cost
-              history.
+              automatically and per-SKU margin appears once you set your
+              costs.
             </li>
             <li>
               <strong>Market or event vendor</strong> (booth at the farmer&apos;s
@@ -220,68 +222,83 @@ export default function GettingStartedGuide() {
           </p>
         </Section>
 
-        <Section id="cogs-setup" title="4. Set up SKUs and cost history">
+        <Section id="cogs-setup" title="4. Set up SKUs, costs &amp; recipes">
           <p>
-            This is the section that makes Dreamward worth paying for. Open the{" "}
-            <strong>COGS</strong> link in the header (included on every
-            plan). The page lists every SKU it has seen from your connected
-            stores. Each row needs two things to produce gross margin: a
-            cost, and an effective date.
+            This is the section that makes Dreamward worth paying for. Open{" "}
+            <strong>SKUs &amp; Components</strong> in the header — your catalog
+            of <strong>products</strong> (the finished goods you sell) and{" "}
+            <strong>components</strong> (the raw materials they&apos;re made
+            from). Connected stores populate it automatically; you can also add
+            items by hand.
           </p>
           <p>
-            Click a SKU to open its detail page. You&apos;ll see a{" "}
-            <strong>Cost history</strong> table. Click &ldquo;Add cost&rdquo;
-            and enter:
+            <strong>How costing works — FIFO.</strong> Dreamward costs your
+            sales first-in, first-out: it draws down your oldest stock at the
+            price you actually paid for it, and only moves to a newer purchase
+            price once that older batch runs out. If a single sale — or a
+            single production batch — spans two purchase prices, it blends them
+            automatically. Your cost of goods always reflects the real money
+            that left your bank.
           </p>
-          <ul className="list-disc pl-6 space-y-1">
-            <li><strong>Cost</strong>: what you pay your supplier per unit, all-in (materials + packaging + shipping inbound if you want it included)</li>
-            <li><strong>Effective date</strong>: the date this cost started applying — usually the date you placed the wholesale order, or the date the new shipment arrived</li>
-            <li><strong>Notes</strong> (optional): supplier name, PO number, anything you&apos;d want to see when reviewing later</li>
+          <p>
+            <strong>Where costs come from.</strong> Two ways a cost basis gets
+            set:
+          </p>
+          <ul className="list-disc pl-6 space-y-2">
+            <li>
+              <strong>Receive a purchase into stock</strong> (the main way for
+              makers). When you buy materials — a bank transaction, an uploaded
+              supplier invoice, or a manual expense — open it and choose{" "}
+              <strong>Receive into inventory</strong>. Pick the component and
+              the quantity it bought; Dreamward adds that quantity as a cost
+              layer priced at what you paid (amount ÷ quantity), and keeps the
+              expense and the inventory in sync.
+            </li>
+            <li>
+              <strong>Type a cost directly</strong> on a SKU&apos;s detail page
+              — handy for a starting count, or for a product you cost as a flat
+              estimate rather than from a recipe.
+            </li>
           </ul>
           <Callout variant="tip">
-            The effective date is the magic. If you sold 12 units in March at a
-            cost of $4.50 each, and then in April your supplier raised the
-            price to $5.25, you add a second cost row dated April 1. March
-            margin stays calculated with the $4.50 cost. April sales use $5.25.
-            Your historical numbers are correct. This is what spreadsheets and
-            most accounting tools get wrong.
+            You don&apos;t have to cost everything at once. Un-costed items show
+            $0 and a small {"“estimated”"} flag until you fill them in — most
+            people start with their top sellers and work down. Once a component
+            has a cost, every product that uses it picks it up automatically.
           </Callout>
           <p>
-            Repeat for any SKU you want margin on. You don&apos;t have to do
-            every SKU at once — un-costed SKUs just show $0 margin until you
-            fill them in. Most people start with their top 10 by revenue and
-            work down.
+            <strong>For makers — recipes &amp; production runs.</strong> If you
+            build products from raw materials, define a <strong>recipe</strong>{" "}
+            on the product&apos;s detail page: list each component and how much
+            goes into one finished unit, in its own unit of measure (grams, ml,
+            each). When you make a batch, click{" "}
+            <strong>Log production run</strong> — Dreamward draws down the
+            component stock (oldest cost layers first) and stamps the finished
+            batch with its real blended cost. A {"“can make ~N”"} readout tells
+            you how many more you can build with the materials on hand.
           </p>
           <p>
-            <strong>Editing a past cost?</strong> Dreamward warns you. Any
-            change to a cost row dated in the past will silently rewrite the
-            margin on every sale that used it — so you have to explicitly
-            confirm you meant to do that. If you&apos;re fixing a typo, fine.
-            If you&apos;re trying to back-rate a price increase, stop and add a
-            new row with a future effective date instead.
+            <strong>Tracking stock on hand.</strong> Every SKU tracks its unit
+            count. Sales auto-decrement finished goods as they sync from
+            Shopify, Wix, Square, or Etsy. The SKU detail page shows a{" "}
+            <strong>Cost layers</strong> panel — each open batch, oldest first,
+            with how much is left and what it cost — plus a full history of
+            every stock adjustment.
           </p>
           <p>
-            <strong>Tracking stock on hand.</strong> Each SKU also tracks
-            how many units you have in stock. Click &ldquo;+ Receive
-            stock&rdquo; on the SKU detail page to record a shipment or
-            your starting count. Every sale auto-decrements stock as it
-            flows in from Shopify, Wix, Square, or Etsy — you&apos;ll see a
-            running history of every adjustment with a balance-after column
-            so you can trace exactly how the current count got there.
-          </p>
-          <p>
-            <strong>For makers — recipes &amp; production runs.</strong> If
-            you build your products from raw materials, define a{" "}
-            <strong>recipe</strong> on the SKU detail page: list each
-            ingredient (another SKU) and how much goes into one finished
-            unit. Then when you make a batch, click &ldquo;+ Log production
-            run&rdquo; — Dreamward adds the finished goods to stock and draws
-            down the raw materials automatically. A &ldquo;can make ~N&rdquo;
-            readout tells you how many more you can build with the materials
-            you have on hand.
+            <strong>Pricing for your time (optional).</strong> Set a labor rate
+            in{" "}
+            <Link href="/settings" className="text-blue-600 no-underline hover:underline">
+              Settings
+            </Link>
+            , then enter the minutes-per-unit on a product, and its detail page
+            shows a <strong>fully-loaded cost</strong> and{" "}
+            <strong>margin after labor</strong> — so you can tell whether a
+            price actually pays for your time. This is a pricing aid only; it
+            never touches your taxes, Net Profit, or cost of goods.
           </p>
           <Callout variant="tip">
-            The stock badge on the SKU list page is color-coded:{" "}
+            The stock badge on the SKUs list is color-coded:{" "}
             <span className="text-emerald-700 font-semibold">green</span> for
             healthy (over 10),{" "}
             <span className="text-amber-700 font-semibold">amber</span> for
@@ -289,9 +306,9 @@ export default function GettingStartedGuide() {
             <span className="text-slate-700 font-semibold">slate</span> for
             zero, and{" "}
             <span className="text-red-700 font-semibold">red</span> for
-            negative — which means the SKU sold more than it has on record,
-            usually because you never set a starting count. Click into the
-            SKU and use &ldquo;+ Receive stock&rdquo; to fix it.
+            negative — the SKU sold more than it has on record, usually because
+            you never set a starting count. Click in and receive stock to fix
+            it.
           </Callout>
         </Section>
 
@@ -449,15 +466,18 @@ export default function GettingStartedGuide() {
             <strong>COGS &amp; Gross Margin</strong> is the bottom
             section. It shows the last 30 days of mapped line items, grouped
             by SKU, with Revenue / COGS / Gross Margin per row. This is where
-            the cost history you set in section 4 pays off — you can see
-            which products have the fattest margins and which are barely
-            breaking even.
+            the costs you set in section 4 pay off — you can see which products
+            have the fattest margins and which are barely breaking even. Click
+            any figure to drill into the exact sales and the FIFO cost layers
+            behind it.
           </p>
           <Callout variant="warn">
-            If a SKU shows $0 COGS but real Revenue, you haven&apos;t added a
-            cost row that covers the sale date. Go back to{" "}
+            If a SKU shows $0 COGS — or an <strong>estimated COGS</strong> flag
+            — that stock has no cost basis yet, so the margin is incomplete.
+            Give it one: receive the materials with a price, or set a cost on
+            the SKU. Open{" "}
             <Link href="/cogs" className="text-blue-600 no-underline hover:underline">COGS</Link>{" "}
-            and add one with an effective date before the sale.
+            to see which sales are flagged.
           </Callout>
         </Section>
 
