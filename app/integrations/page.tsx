@@ -254,8 +254,8 @@ function IntegrationsPageInner() {
           order&apos;s line items flow into per-product margin, and your
           products auto-populate the <strong>SKUs</strong> catalog. Square
           even imports the costs you&apos;ve already set in its catalog.
-          After connecting, set cost history on your SKUs to see gross
-          margin.
+          After connecting, set costs on your SKUs — receive your material
+          purchases into inventory — to see gross margin.
         </SectionTip>
 
         {error && (

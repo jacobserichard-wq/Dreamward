@@ -350,14 +350,14 @@ export default function SkusPage() {
 
         <SectionTip id="skus" title="Costs, stock, and recipes live here">
           SKUs appear automatically when a connected store syncs orders —
-          or add them manually / by paste. Click a SKU to set its{" "}
-          <strong>cost history</strong> (what you pay per unit + the date
-          it took effect — raised a price? add a new dated row, don&apos;t
-          edit the old one). Each SKU also tracks <strong>stock</strong>,
-          and for makers, a <strong>recipe</strong>: define what a product
-          is made of, then log a production run to draw down materials
-          automatically. The {"\u{1F9EA}"} icon marks products that have a
-          recipe.
+          or add them manually / by paste. Set a SKU&apos;s{" "}
+          <strong>cost</strong> by receiving a purchase into inventory (it
+          records what you paid as a cost layer); sales then draw down your
+          oldest stock first (<strong>FIFO</strong>), so margins follow what
+          you actually paid. Each SKU also tracks <strong>stock</strong>, and
+          for makers, a <strong>recipe</strong>: define what a product is made
+          of, then log a production run to draw down materials automatically.
+          The {"\u{1F9EA}"} icon marks products that have a recipe.
         </SectionTip>
 
         {error && (

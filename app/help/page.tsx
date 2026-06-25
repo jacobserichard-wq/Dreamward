@@ -102,7 +102,7 @@ export default function HelpHubPage() {
             <GuideCard
               href="/help/cogs"
               title="Tracking COGS &amp; gross margin"
-              description="How per-SKU cost history works, the effective-date discipline that keeps historical margins honest, and how to read the COGS dashboard."
+              description="How FIFO costing works (your oldest stock drains first), setting costs by receiving purchases into inventory, recipes &amp; production runs, and reading the COGS dashboard."
               badge="coming-soon"
             />
             <GuideCard
