@@ -18,6 +18,13 @@
 // production run is a self-contained unit of work.
 
 import pool from "@/lib/db";
+import {
+  addCostLayer,
+  consumeFifo,
+  lastKnownUnitCost,
+  restoreConsumptions,
+  productionOutputConsumed,
+} from "./costLayers";
 
 export interface ProductionRunResult {
   runId: number;
@@ -103,7 +110,13 @@ export async function recordProductionRun(opts: {
     );
 
     // 3. Each component −(quantityProduced × qtyPerUnit) (production_out).
+    //    Quantity moves via inventory_adjustments; cost drains the
+    //    component's oldest FIFO layers (consumeFifo) so the finished
+    //    batch is costed at the real price of the stock actually used —
+    //    blended automatically when a draw spans old + new layers.
     const componentsConsumed: ProductionRunResult["componentsConsumed"] = [];
+    let totalComponentCost = 0;
+    let anyEstimated = false;
     for (const c of recipe.rows) {
       const perUnit = parseFloat(c.quantity_per_unit);
       const consumed = quantityProduced * perUnit;
@@ -117,6 +130,16 @@ export async function recordProductionRun(opts: {
         `UPDATE skus SET quantity_on_hand = quantity_on_hand - $1 WHERE id = $2`,
         [consumed, c.component_sku_id]
       );
+      const draw = await consumeFifo({
+        dbClient: db,
+        clientId,
+        skuId: c.component_sku_id,
+        quantity: consumed,
+        reason: "production_out",
+        productionRunId: runId,
+      });
+      totalComponentCost += draw.totalCost;
+      if (draw.isEstimated) anyEstimated = true;
       componentsConsumed.push({
         componentSkuId: c.component_sku_id,
         code: c.code,
@@ -125,6 +148,30 @@ export async function recordProductionRun(opts: {
         consumed,
       });
     }
+
+    // 4. Stamp the finished batch as its own FIFO layer at the real
+    //    blended cost (Σ component FIFO cost ÷ units produced). A sale
+    //    later drains these finished layers oldest-first. With no recipe,
+    //    fall back to the finished SKU's last-known cost so an estimated-
+    //    cost product still gets a sensible basis.
+    let finishedUnitCost =
+      quantityProduced > 0 ? totalComponentCost / quantityProduced : 0;
+    if (recipe.rowCount! === 0) {
+      finishedUnitCost = await lastKnownUnitCost(db, finishedSkuId);
+    }
+    await addCostLayer({
+      dbClient: db,
+      clientId,
+      skuId: finishedSkuId,
+      source: "production",
+      sourceRefId: runId,
+      acquiredAt: runDate,
+      quantity: quantityProduced,
+      unitCost: finishedUnitCost,
+      notes: anyEstimated
+        ? "Cost partly estimated (a component had no cost basis)"
+        : null,
+    });
 
     await db.query("COMMIT");
 
@@ -171,6 +218,15 @@ export async function reverseProductionRun(opts: {
       return false;
     }
 
+    // Guard: if this run's finished output has already been (partly) sold,
+    // its FIFO layer is consumed — reversing would orphan a sale's COGS.
+    if (await productionOutputConsumed(db, runId)) {
+      await db.query("ROLLBACK");
+      throw new Error(
+        "Can't reverse this run — some of its finished goods have already been sold."
+      );
+    }
+
     // Reverse each adjustment's stock effect, then delete the
     // adjustments — BEFORE deleting the run (the FK is ON DELETE
     // SET NULL, so deleting the run first would orphan the link).
@@ -189,6 +245,14 @@ export async function reverseProductionRun(opts: {
     }
     await db.query(
       `DELETE FROM inventory_adjustments WHERE production_run_id = $1`,
+      [runId]
+    );
+    // FIFO: credit consumed component layers back, then drop the
+    // finished-goods layer this run created (the guard above ensured it's
+    // untouched, so deleting it loses nothing).
+    await restoreConsumptions({ dbClient: db, productionRunId: runId });
+    await db.query(
+      `DELETE FROM cost_layers WHERE source = 'production' AND source_ref_id = $1`,
       [runId]
     );
     await db.query(

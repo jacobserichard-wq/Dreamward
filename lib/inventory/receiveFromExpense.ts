@@ -13,6 +13,7 @@
 import type { PoolClient } from "pg";
 import { recordManualAdjustment } from "./adjustments";
 import { recomputeParentsUsing } from "./costRollup";
+import { addCostLayer } from "./costLayers";
 
 export async function receiveExpenseIntoInventory(opts: {
   dbClient: PoolClient;
@@ -47,10 +48,15 @@ export async function receiveExpenseIntoInventory(opts: {
     notes: `Received from ${vendor}`,
   });
 
-  // 2. Set the component's per-unit cost from this purchase.
+  // 2. Set the component's per-unit cost from this purchase (the "current
+  //    cost" display row). UNIQUE(sku_id, effective_date) means a second
+  //    same-day receipt would collide — upsert to the latest price rather
+  //    than crash. The distinct FIFO layers below are what get consumed.
   await db.query(
     `INSERT INTO sku_cost_history (sku_id, cost, currency, effective_date, notes)
-     VALUES ($1, $2, 'USD', $3, $4)`,
+     VALUES ($1, $2, 'USD', $3, $4)
+     ON CONFLICT (sku_id, effective_date)
+       DO UPDATE SET cost = EXCLUDED.cost, notes = EXCLUDED.notes`,
     [
       skuId,
       unitCost,
@@ -58,6 +64,21 @@ export async function receiveExpenseIntoInventory(opts: {
       `From ${vendor} ($${amount.toFixed(2)} ÷ ${quantity})`,
     ]
   );
+
+  // 2b. FIFO: record this receipt as a cost layer so COGS drains it
+  //     oldest-first. The sku_cost_history row above stays for the
+  //     "current cost" display; this layer is what actually gets consumed.
+  await addCostLayer({
+    dbClient: db,
+    clientId,
+    skuId,
+    source: "receive",
+    sourceRefId: processedItemId,
+    acquiredAt: effectiveDate,
+    quantity,
+    unitCost,
+    notes: `From ${vendor}`,
+  });
 
   // 3. Refresh rolled-up cost of any products using this component
   //    (best-effort — reconciles on the next recipe touch if it hiccups).
