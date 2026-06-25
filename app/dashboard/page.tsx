@@ -8,6 +8,7 @@ import AppHeader from "../components/AppHeader";
 import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import SaleForm, { type SaleFormSubmit } from "../components/SaleForm";
+import ReceiveToInventoryModal from "../components/ReceiveToInventoryModal";
 import RefundForm, {
   type RefundFormSubmit,
   type RefundPrefill,
@@ -77,6 +78,8 @@ interface ProcessedItem {
   // Receipt/invoice files attached to this transaction (e.g. an
   // uploaded PDF invoice) — surfaced as a download link on the card.
   attachments?: { id: number; filename: string; mimeType: string }[];
+  // Component SKU this purchase was received into (null = not received).
+  receivedSkuId?: number | null;
 }
 
 type Label = "Invoices" | "AR Follow Up" | "Expenses";
@@ -155,6 +158,13 @@ function DashboardInner() {
   // "+ Add a sale" — manual income entry (income counterpart to the
   // "+ New expense" path). Income categories loaded from /api/sales.
   const [showSaleForm, setShowSaleForm] = useState(false);
+  // "Receive into inventory" — the expense row being received into a
+  // component's stock (null = modal closed).
+  const [receiveForItem, setReceiveForItem] = useState<{
+    id: number;
+    vendor: string;
+    amount: number;
+  } | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   // "Log a refund" / "Refund this" — both open RefundForm. refundPrefill
@@ -246,6 +256,9 @@ function DashboardInner() {
         channel: item.channel ?? null,
         eventId: item.event_id ?? null,
         attachments: item.attachments || [],
+        // Set once this expense has been received into a component's stock
+        // (drives the "✓ Received" state vs. the "Receive into inventory" button).
+        receivedSkuId: item.received_sku_id ?? null,
       }));
       setProcessedItems(mapped);
     } catch (err) {
@@ -2131,8 +2144,25 @@ function DashboardInner() {
                         >
                           {"\u{21A9}"} Refund this
                         </button>
+                      ) : item.receivedSkuId ? (
+                        <span className="text-emerald-600 text-xs px-2 py-1 inline-flex items-center gap-1">
+                          {"\u{2705}"} Received to inventory
+                        </span>
                       ) : (
-                        <span />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReceiveForItem({
+                              id: Number(item.id),
+                              vendor: item.vendor || "Purchase",
+                              amount: Number(item.amount) || 0,
+                            })
+                          }
+                          title="Add this purchase to a component's stock"
+                          className="bg-transparent text-blue-600 hover:text-blue-700 hover:underline text-xs cursor-pointer px-2 py-1 inline-flex items-center gap-1"
+                        >
+                          {"\u{1F4E6}"} Receive into inventory
+                        </button>
                       )}
                       <button
                         onClick={() => deleteItem(item.id)}
@@ -2460,6 +2490,16 @@ function DashboardInner() {
           events={availableEvents}
           onSave={handleSaveSale}
           onClose={() => setShowSaleForm(false)}
+        />
+
+        <ReceiveToInventoryModal
+          open={!!receiveForItem}
+          transaction={receiveForItem}
+          onClose={() => setReceiveForItem(null)}
+          onReceived={async () => {
+            await loadItems();
+            setSuccessMsg("Received into inventory.");
+          }}
         />
 
         <RefundForm
