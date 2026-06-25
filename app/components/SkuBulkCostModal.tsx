@@ -213,9 +213,11 @@ export default function SkuBulkCostModal({
           Update cost on {items.length} SKU{items.length === 1 ? "" : "s"}
         </h2>
         <p className="text-xs text-slate-500 m-0 mb-4">
-          A new cost-history row is added on the effective date.{" "}
-          <strong>Historical sales keep their prior cost</strong> — only sales
-          on or after the effective date will use the new number.
+          Sets a flat <strong>estimated</strong> per-unit cost on these SKUs —
+          the simple option for products you don&apos;t track
+          component-by-component. For SKUs you track in detail, COGS comes from
+          the inventory you receive (FIFO) and this stays the reference cost.
+          Sales already booked keep the cost they sold at.
         </p>
 
         {error && (

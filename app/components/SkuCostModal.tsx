@@ -363,6 +363,13 @@ export default function SkuCostModal({
               disabled={adding}
               className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
             />
+            <p className="text-xs text-slate-500 m-0 mt-3">
+              This is your flat <strong>estimated</strong> cost for the product
+              — the simple option when you don&rsquo;t want to track every
+              component. If you do track components and receive stock, COGS
+              uses the inventory you actually received (FIFO) and this stays the
+              reference cost.
+            </p>
             <div className="flex justify-end gap-2 mt-3">
               <button
                 type="button"

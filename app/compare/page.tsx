@@ -18,7 +18,7 @@ import SignInButton from "../components/SignInButton";
 export const metadata = {
   title: "How Dreamward compares — real gross margin, no legacy quirks",
   description:
-    "How Dreamward is different from the usual maker COGS + inventory tools: effective-date costing that never rewrites your past numbers, a visible audit trail, one-click bulk updates, and every feature on every plan.",
+    "How Dreamward is different from the usual maker COGS + inventory tools: FIFO costing that values each sale at the price you actually paid and never rewrites your past numbers, a visible audit trail, one-click bulk updates, and every feature on every plan.",
   openGraph: {
     title: "How Dreamward compares",
     description:
@@ -165,14 +165,14 @@ export default function ComparePage() {
               num="1"
               title="Your past numbers stay put"
               theirCopy="Change a recipe or a cost today and many tools quietly rewrite what your past items cost — which wrecks the tax numbers you already filed."
-              ourCopy="Every cost is dated. A sale keeps the cost it had, forever. If you do edit an old cost, we tell you exactly how many past sales it touches before anything changes."
+              ourCopy="Each sale's cost is locked in the moment it sells, using FIFO — it draws down your oldest stock at the price you actually paid. A sale keeps that cost forever, so changing a cost today never rewrites a number you already filed."
               highlight
             />
             <CompareSection
               num="2"
               title="You can see the math"
               theirCopy="You get a final cost-of-goods number with no way to see how it was reached — so you're stuck trusting a black box at tax time."
-              ourCopy="Click any number on your COGS dashboard and see every sale behind it, the exact cost used, and the date it applied. You could re-create it by hand in a spreadsheet."
+              ourCopy="Click any number on your COGS dashboard and see every sale behind it and the exact cost layers it drew from. You could re-create it by hand in a spreadsheet."
             />
             <CompareSection
               num="3"
