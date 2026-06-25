@@ -40,6 +40,7 @@ interface ClientInfo {
 
 interface SettingsResponse {
   homeAddress?: string | null;
+  laborHourlyRate?: number | null;
   settings?: {
     preferences?: Record<string, unknown>;
   };
@@ -68,6 +69,7 @@ export default function OnboardingPage() {
   const [hasSku, setHasSku] = useState(false);
   const [hasCostedSku, setHasCostedSku] = useState(false);
   const [storeConnected, setStoreConnected] = useState(false);
+  const [laborRateSet, setLaborRateSet] = useState(false);
 
   // Skip flow state.
   const [pendingSkipId, setPendingSkipId] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export default function OnboardingPage() {
       if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
         const data = (await settingsRes.value.json()) as SettingsResponse;
         setHomeAddress(typeof data.homeAddress === "string" ? data.homeAddress : "");
+        setLaborRateSet(typeof data.laborHourlyRate === "number");
         setPreferences(
           data.settings?.preferences &&
             typeof data.settings.preferences === "object"
@@ -374,6 +377,7 @@ export default function OnboardingPage() {
           hasSku={hasSku}
           hasCostedSku={hasCostedSku}
           storeConnected={storeConnected}
+          laborRateSet={laborRateSet}
           businessName={clientInfo.businessName ?? ""}
           industry={clientInfo.industry ?? ""}
           skipped={skipped as Record<string, string>}

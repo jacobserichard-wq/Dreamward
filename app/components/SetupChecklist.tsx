@@ -69,6 +69,9 @@ export interface SetupChecklistProps {
   /** Sub-session 33: true when at least one SKU has a cost-history
    *  row — the action that turns SKUs into gross-margin tracking. */
   hasCostedSku?: boolean;
+  /** True when the maker has set a labor rate (clients.labor_hourly_rate)
+   *  — unlocks the "margin after labor" pricing lens on each product. */
+  laborRateSet?: boolean;
 
   // Form state for the inline business-info item (onboarding mode):
   businessName?: string;
@@ -249,6 +252,17 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       id: "tax_bracket",
       label: "Set your tax bracket for quarterly estimates",
       done: props.taxBracketSet,
+      action: { kind: "link", href: "/settings" },
+      buttonLabel: "Open Settings",
+      visibleOn: ["trial", "dream", "maker", "growth", "pro"],
+    },
+    // Optional pricing aid: a labor rate turns on the "margin after labor"
+    // view on each product (pure pricing lens — never touches taxes/COGS),
+    // so it's skippable for makers who only care about material margin.
+    {
+      id: "labor_rate",
+      label: "Set your labor rate to price for your time",
+      done: props.laborRateSet ?? false,
       action: { kind: "link", href: "/settings" },
       buttonLabel: "Open Settings",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],
