@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SetupChecklist from "../components/SetupChecklist";
+import OnboardingFlow from "../components/OnboardingFlow";
 import ConfirmModal from "../components/ConfirmModal";
 import Spinner from "../components/Spinner";
 import ErrorBanner from "../components/ErrorBanner";
@@ -340,21 +341,10 @@ export default function OnboardingPage() {
           </Link>
         </div>
 
-        {/* Optional explainer — prominent but not a hard gate. New users
-            get the whole model up front without being forced through a
-            wall (forced gates get clicked past + hurt activation). */}
-        <Link
-          href="/how-it-works"
-          className="mb-6 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap text-sm no-underline hover:bg-blue-100"
-        >
-          <span>
-            {"\u{1F44B}"} New to Dreamward? See how it all works in four quick
-            steps.
-          </span>
-          <span className="font-semibold whitespace-nowrap">
-            How it works {"\u{2192}"}
-          </span>
-        </Link>
+        {/* The whole-system flow up front. New users get the model before
+            the checklist — what they set up (steps 1–3) vs what runs on its
+            own (4–5) — without a forced gate. */}
+        <OnboardingFlow />
 
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
