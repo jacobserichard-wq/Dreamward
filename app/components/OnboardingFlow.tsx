@@ -6,9 +6,18 @@
 // items); the last two happen automatically as you work. Same visual
 // language as HowItWorks — numbered pills, cards, chevron arrows, the
 // Sage & Rose palette.
+//
+// Collapsible: expanded by default (orientation matters for a new user),
+// but the header toggles it shut, and the choice persists in localStorage
+// so a returning user who collapsed it keeps the checklist front-and-
+// center.
 
-import { Fragment } from "react";
+"use client";
+
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
+
+const STORAGE_KEY = "dw-onboarding-flow-collapsed";
 
 interface Stage {
   n: number;
@@ -66,84 +75,129 @@ const STAGES: Stage[] = [
 ];
 
 export default function OnboardingFlow() {
+  // Default expanded so a first-time user gets the orientation; a stored
+  // preference (set when they collapse it) wins on the next visit.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "1") setCollapsed(true);
+    } catch {
+      /* localStorage unavailable (private mode) — stay expanded */
+    }
+  }, []);
+
+  const toggle = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   return (
     <section className="bg-white border border-sand rounded-2xl p-5 sm:p-6 mb-6">
-      <div className="mb-5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-eucalyptus-dark bg-eucalyptus-soft px-3 py-1 rounded-full">
-          How Dreamward works
-        </span>
-        <h2 className="font-serif text-xl sm:text-2xl font-semibold text-forest m-0 mt-3 mb-1 tracking-tight">
-          From your first sale to a tax-ready number
-        </h2>
-        <p className="text-sm text-bark m-0">
-          Five steps. You set up the first three — that&apos;s the checklist
-          below — and the last two run on their own as you work.
-        </p>
-      </div>
-
-      <div>
-        {STAGES.map((stage, i) => (
-          <Fragment key={stage.n}>
-            {/* Labeled divider where "you set up" hands off to "automatic". */}
-            {stage.n === 4 && (
-              <div className="flex items-center gap-2 my-3" aria-hidden="true">
-                <div className="h-px bg-sand flex-1" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-stone whitespace-nowrap">
-                  then, automatically
-                </span>
-                <div className="h-px bg-sand flex-1" />
-              </div>
-            )}
-            <div
-              className={`bg-oat border border-sand ${stage.accent} border-l-4 rounded-xl p-4 flex gap-3 items-start`}
-            >
-              <span
-                className={`flex-shrink-0 w-7 h-7 rounded-full ${stage.pill} text-white text-sm font-bold inline-flex items-center justify-center`}
-              >
-                {stage.n}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-forest m-0 mb-0.5">
-                  <span className="mr-1.5">{stage.icon}</span>
-                  {stage.title}
-                  {stage.auto && (
-                    <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide text-honey-dark bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                      Automatic
-                    </span>
-                  )}
-                </p>
-                <p className="text-[13px] text-bark leading-relaxed m-0">
-                  {stage.desc}
-                </p>
-              </div>
-            </div>
-            {/* Chevron between cards, except where the divider already sits
-                (before step 4) and after the last card. */}
-            {i < STAGES.length - 1 && stage.n !== 3 && (
-              <div className="flex justify-center py-2" aria-hidden="true">
-                <svg
-                  viewBox="0 0 16 11"
-                  className="w-3.5 h-2.5 text-eucalyptus"
-                  fill="currentColor"
-                >
-                  <polygon points="1,0 15,0 8,11" />
-                </svg>
-              </div>
-            )}
-          </Fragment>
-        ))}
-      </div>
-
-      <p className="text-xs text-bark m-0 mt-5 pt-4 border-t border-sand">
-        Want the deep version?{" "}
-        <Link
-          href="/help/getting-started"
-          className="text-eucalyptus-dark font-semibold no-underline hover:underline"
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        className="w-full flex items-start justify-between gap-3 text-left bg-transparent border-0 p-0 cursor-pointer"
+      >
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-eucalyptus-dark bg-eucalyptus-soft px-3 py-1 rounded-full">
+            How Dreamward works
+          </span>
+          <h2 className="font-serif text-xl sm:text-2xl font-semibold text-forest m-0 mt-3 mb-1 tracking-tight">
+            From your first sale to a tax-ready number
+          </h2>
+          <p className="text-sm text-bark m-0">
+            {collapsed
+              ? "The five steps from a sale to a tax-ready number — tap to expand."
+              : "Five steps. You set up the first three — that's the checklist below — and the last two run on their own as you work."}
+          </p>
+        </div>
+        <span
+          aria-hidden="true"
+          className="flex-shrink-0 mt-1 text-stone text-lg leading-none select-none"
         >
-          Read the full getting-started guide
-        </Link>{" "}
-        — about 15 minutes, start to finish.
-      </p>
+          {collapsed ? "▾" : "▴"}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <>
+          <div className="mt-5">
+            {STAGES.map((stage, i) => (
+              <Fragment key={stage.n}>
+                {/* Labeled divider where "you set up" hands off to "automatic". */}
+                {stage.n === 4 && (
+                  <div
+                    className="flex items-center gap-2 my-3"
+                    aria-hidden="true"
+                  >
+                    <div className="h-px bg-sand flex-1" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-stone whitespace-nowrap">
+                      then, automatically
+                    </span>
+                    <div className="h-px bg-sand flex-1" />
+                  </div>
+                )}
+                <div
+                  className={`bg-oat border border-sand ${stage.accent} border-l-4 rounded-xl p-4 flex gap-3 items-start`}
+                >
+                  <span
+                    className={`flex-shrink-0 w-7 h-7 rounded-full ${stage.pill} text-white text-sm font-bold inline-flex items-center justify-center`}
+                  >
+                    {stage.n}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-forest m-0 mb-0.5">
+                      <span className="mr-1.5">{stage.icon}</span>
+                      {stage.title}
+                      {stage.auto && (
+                        <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide text-honey-dark bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          Automatic
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[13px] text-bark leading-relaxed m-0">
+                      {stage.desc}
+                    </p>
+                  </div>
+                </div>
+                {/* Chevron between cards, except where the divider already
+                    sits (before step 4) and after the last card. */}
+                {i < STAGES.length - 1 && stage.n !== 3 && (
+                  <div className="flex justify-center py-2" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 16 11"
+                      className="w-3.5 h-2.5 text-eucalyptus"
+                      fill="currentColor"
+                    >
+                      <polygon points="1,0 15,0 8,11" />
+                    </svg>
+                  </div>
+                )}
+              </Fragment>
+            ))}
+          </div>
+
+          <p className="text-xs text-bark m-0 mt-5 pt-4 border-t border-sand">
+            Want the deep version?{" "}
+            <Link
+              href="/help/getting-started"
+              className="text-eucalyptus-dark font-semibold no-underline hover:underline"
+            >
+              Read the full getting-started guide
+            </Link>{" "}
+            — about 15 minutes, start to finish.
+          </p>
+        </>
+      )}
     </section>
   );
 }
