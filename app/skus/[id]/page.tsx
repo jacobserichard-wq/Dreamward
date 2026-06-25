@@ -58,6 +58,8 @@ interface SkuRow {
   // Market-day mode (0026): booth selling price. null = not set;
   // unpriced raw materials hide from the /market-day tap grid.
   defaultSellPrice: number | null;
+  // Labor minutes to make one unit (pricing lens only). null = not tracked.
+  laborMinutesPerUnit: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +102,8 @@ interface SkuDetailResponse {
   costHistory: CostHistoryRow[];
   aliases: AliasRow[];
   costLayers: CostLayerRow[];
+  /** The maker's labor rate ($/hr) for the pricing lens; null = unset. */
+  laborHourlyRate: number | null;
 }
 
 // Sub-session 33 Tier 1 commit 4: stock history row shape mirrors
@@ -255,6 +259,11 @@ export default function SkuDetailPage() {
   } | null>(null);
   const [historicalConfirmBusy, setHistoricalConfirmBusy] = useState(false);
 
+  // ── Labor minutes/unit inline edit (pricing lens) ─────────────
+  const [laborMins, setLaborMins] = useState("");
+  const [savingLabor, setSavingLabor] = useState(false);
+  const [laborSaved, setLaborSaved] = useState(false);
+
   const loadDetail = useCallback(async () => {
     if (!Number.isFinite(skuId)) return;
     try {
@@ -282,6 +291,34 @@ export default function SkuDetailPage() {
       setError(err instanceof Error ? err.message : "Couldn't load SKU");
     }
   }, [skuId, router]);
+
+  // Keep the labor-minutes input synced with the loaded SKU (and after a
+  // save re-fetches).
+  useEffect(() => {
+    const v = data?.sku.laborMinutesPerUnit;
+    setLaborMins(v != null ? String(v) : "");
+  }, [data?.sku.laborMinutesPerUnit]);
+
+  const saveLaborMins = useCallback(async () => {
+    const trimmed = laborMins.trim();
+    const payload = trimmed === "" ? null : Number(trimmed);
+    if (payload !== null && (!Number.isFinite(payload) || payload < 0)) return;
+    setSavingLabor(true);
+    try {
+      const res = await fetch(`/api/skus/${skuId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ laborMinutesPerUnit: payload }),
+      });
+      if (res.ok) {
+        await loadDetail();
+        setLaborSaved(true);
+        window.setTimeout(() => setLaborSaved(false), 1500);
+      }
+    } finally {
+      setSavingLabor(false);
+    }
+  }, [laborMins, skuId, loadDetail]);
 
   // Sub-session 33 Tier 1 commit 4: stock history loader. Separate
   // from loadDetail so the Stock section can refresh after a receive
@@ -708,6 +745,31 @@ export default function SkuDetailPage() {
   );
   const unitLabel = sku.unit && sku.unit !== "each" ? sku.unit : "";
 
+  // Pricing lens (informational only — never taxes): fully-loaded cost =
+  // material cost + labor, and the resulting margin at the sell price.
+  const materialCost = sku.currentCost; // may be null
+  const laborRate = data.laborHourlyRate; // $/hr, may be null
+  const laborMinsNum = sku.laborMinutesPerUnit; // may be null
+  const laborCost =
+    laborRate != null && laborMinsNum != null
+      ? (laborMinsNum / 60) * laborRate
+      : null;
+  const fullyLoaded =
+    materialCost != null || laborCost != null
+      ? (materialCost ?? 0) + (laborCost ?? 0)
+      : null;
+  const sellPrice = sku.defaultSellPrice;
+  const materialMarginPct =
+    sellPrice != null && sellPrice > 0 && materialCost != null
+      ? ((sellPrice - materialCost) / sellPrice) * 100
+      : null;
+  const afterLaborMarginPct =
+    sellPrice != null && sellPrice > 0 && fullyLoaded != null
+      ? ((sellPrice - fullyLoaded) / sellPrice) * 100
+      : null;
+  const showPricingCard =
+    materialCost != null || sellPrice != null || laborMinsNum != null;
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <AppHeader />
@@ -1056,6 +1118,139 @@ export default function SkuDetailPage() {
             </p>
           )}
         </section>
+
+        {/* Full cost & pricing — material + labor = fully-loaded cost, and
+            the margin at the sell price. Informational pricing lens only;
+            labor never touches COGS / Net Profit / taxes. */}
+        {showPricingCard && (
+          <section className="mb-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className="text-base font-semibold text-slate-900 m-0">
+                Full cost &amp; pricing
+              </h2>
+              <span className="text-[11px] text-slate-400">
+                Pricing aid — not used for taxes
+              </span>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              {/* Material cost */}
+              <div className="flex items-center justify-between gap-3 text-sm py-1">
+                <span className="text-slate-600">Material cost / unit</span>
+                <span className="tabular-nums text-slate-900">
+                  {materialCost != null ? fmtMoney(materialCost, "USD") : "—"}
+                </span>
+              </div>
+
+              {/* Labor — inline minutes editor × the client rate */}
+              <div className="flex items-start justify-between gap-3 text-sm py-1">
+                <div className="text-slate-600">
+                  Labor / unit
+                  <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={laborMins}
+                      onChange={(e) => setLaborMins(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void saveLaborMins();
+                      }}
+                      placeholder="0"
+                      className="w-16 py-1 px-2 text-xs text-right tabular-nums border border-slate-200 rounded outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <span>min ×</span>
+                    {laborRate != null ? (
+                      <span>{fmtMoney(laborRate, "USD")}/hr</span>
+                    ) : (
+                      <Link
+                        href="/settings"
+                        className="text-blue-600 hover:underline"
+                      >
+                        set your rate
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void saveLaborMins()}
+                      disabled={savingLabor}
+                      className="ml-1 py-0.5 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-40"
+                    >
+                      {savingLabor ? "Saving…" : "Save"}
+                    </button>
+                    {laborSaved && (
+                      <span className="text-green-600 font-medium">✓ Saved</span>
+                    )}
+                  </div>
+                </div>
+                <span className="tabular-nums text-slate-900 whitespace-nowrap">
+                  {laborCost != null ? fmtMoney(laborCost, "USD") : "—"}
+                </span>
+              </div>
+
+              {/* Fully-loaded */}
+              <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 mt-1">
+                <span className="font-semibold text-slate-800 text-sm">
+                  Fully-loaded cost / unit
+                </span>
+                <span className="font-bold tabular-nums text-slate-900">
+                  {fullyLoaded != null ? fmtMoney(fullyLoaded, "USD") : "—"}
+                </span>
+              </div>
+
+              {/* Margins at the sell price */}
+              {sellPrice != null ? (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-0.5">
+                      Margin (materials)
+                    </p>
+                    <p className="text-base font-bold text-slate-900 m-0 tabular-nums">
+                      {materialCost != null
+                        ? fmtMoney(sellPrice - materialCost, "USD")
+                        : "—"}
+                    </p>
+                    <p className="text-[10px] text-slate-500 m-0">
+                      {materialMarginPct != null
+                        ? `${materialMarginPct.toFixed(1)}% of ${fmtMoney(sellPrice, "USD")}`
+                        : `at ${fmtMoney(sellPrice, "USD")}`}
+                    </p>
+                  </div>
+                  <div
+                    className={`rounded-lg p-3 border ${
+                      afterLaborMarginPct != null && afterLaborMarginPct < 0
+                        ? "bg-red-50 border-red-200"
+                        : "bg-emerald-50 border-emerald-200"
+                    }`}
+                  >
+                    <p className="text-[10px] uppercase tracking-wide text-slate-500 m-0 mb-0.5">
+                      Margin after labor
+                    </p>
+                    <p
+                      className={`text-base font-bold m-0 tabular-nums ${
+                        afterLaborMarginPct != null && afterLaborMarginPct < 0
+                          ? "text-red-700"
+                          : "text-emerald-800"
+                      }`}
+                    >
+                      {fullyLoaded != null
+                        ? fmtMoney(sellPrice - fullyLoaded, "USD")
+                        : "—"}
+                    </p>
+                    <p className="text-[10px] text-slate-500 m-0">
+                      {afterLaborMarginPct != null
+                        ? `${afterLaborMarginPct.toFixed(1)}% of ${fmtMoney(sellPrice, "USD")}`
+                        : "set labor + rate"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400 mt-3 m-0">
+                  Set a sell price (Market-day price) to see your margin after
+                  labor.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Cost history */}
         <section className="mb-6">

@@ -47,6 +47,14 @@ export default function SettingsPage() {
   const [cpaEmailSaved, setCpaEmailSaved] = useState(false);
   const [cpaEmailError, setCpaEmailError] = useState<string | null>(null);
 
+  // Labor rate (clients.labor_hourly_rate) — drives the product "margin
+  // after labor" pricing lens only. Never used for taxes.
+  const [laborRate, setLaborRate] = useState("");
+  const [savedLaborRate, setSavedLaborRate] = useState("");
+  const [laborRateSaving, setLaborRateSaving] = useState(false);
+  const [laborRateSaved, setLaborRateSaved] = useState(false);
+  const [laborRateError, setLaborRateError] = useState<string | null>(null);
+
   // Phase 4 commit 8: hide/un-hide industry-default categories. Persisted
   // under client_settings.preferences.hidden_industry_defaults: string[].
   // The full preferences object is round-tripped through PATCH so other
@@ -106,6 +114,11 @@ export default function SettingsPage() {
   const cpaEmailDirty = useMemo(
     () => cpaEmail.trim() !== savedCpaEmail.trim(),
     [cpaEmail, savedCpaEmail]
+  );
+
+  const laborRateDirty = useMemo(
+    () => laborRate.trim() !== savedLaborRate.trim(),
+    [laborRate, savedLaborRate]
   );
 
   const bracketDirty = useMemo(
@@ -203,6 +216,13 @@ export default function SettingsPage() {
 
         setCpaEmail(initialCpaEmail);
         setSavedCpaEmail(initialCpaEmail);
+
+        const initialLaborRate =
+          typeof data.laborHourlyRate === "number"
+            ? String(data.laborHourlyRate)
+            : "";
+        setLaborRate(initialLaborRate);
+        setSavedLaborRate(initialLaborRate);
         // IRS rate is global, returned at the top level. Read-only display.
         if (typeof data.irsMileageRate === "number") {
           setSavedIrsRate(data.irsMileageRate);
@@ -248,6 +268,7 @@ export default function SettingsPage() {
       !hiddenDefaultsDirty &&
       !incomeCategoriesDirty &&
       !cpaEmailDirty &&
+      !laborRateDirty &&
       !bracketDirty &&
       !vehicleDirty
     )
@@ -264,6 +285,7 @@ export default function SettingsPage() {
     hiddenDefaultsDirty,
     incomeCategoriesDirty,
     cpaEmailDirty,
+    laborRateDirty,
     bracketDirty,
     vehicleDirty,
   ]);
@@ -548,6 +570,40 @@ export default function SettingsPage() {
       setCpaEmailError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setCpaEmailSaving(false);
+    }
+  };
+
+  const saveLaborRate = async () => {
+    setLaborRateSaving(true);
+    setLaborRateError(null);
+    const trimmed = laborRate.trim();
+    let payload: number | null = null;
+    if (trimmed !== "") {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || n < 0) {
+        setLaborRateError("Enter a non-negative number, or leave blank.");
+        setLaborRateSaving(false);
+        return;
+      }
+      payload = n;
+    }
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ laborHourlyRate: payload }),
+      });
+      if (res.ok) {
+        setSavedLaborRate(trimmed);
+        setLaborRateSaved(true);
+      } else {
+        setLaborRateError(`Couldn't save: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      setLaborRateError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setLaborRateSaving(false);
     }
   };
 
@@ -1066,6 +1122,89 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-3 m-0">
               Optional. Leave blank to disable the {"“"}Send to CPA{"”"} button
               on the Tax Reports page.
+            </p>
+          </div>
+        </div>
+
+        {/* Labor rate — drives the per-product "margin after labor" pricing
+            lens (skus carry minutes/unit; this is the rate they multiply by).
+            Pricing aid ONLY — never enters COGS, Net Profit, or the tax
+            pack, since a sole prop's own labor isn't deductible. */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">
+              Your labor rate
+            </h2>
+            <p className="text-sm text-slate-500 m-0">
+              What your time is worth per hour. Combined with the
+              minutes-per-unit you set on each product, it powers the{" "}
+              <strong>{"“margin after labor”"}</strong> view on your SKUs — so
+              you can tell whether a product actually pays for your time.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            {laborRateError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3.5 py-2.5 rounded-lg mb-3 text-sm">
+                {laborRateError}
+              </div>
+            )}
+
+            <label
+              htmlFor="settings-labor-rate"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Hourly rate
+            </label>
+            <div className="relative max-w-[220px] mb-4">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                $
+              </span>
+              <input
+                id="settings-labor-rate"
+                type="text"
+                inputMode="decimal"
+                value={laborRate}
+                onChange={(e) => {
+                  setLaborRate(e.target.value);
+                  setLaborRateSaved(false);
+                  setLaborRateError(null);
+                }}
+                placeholder="e.g. 25"
+                className="w-full py-2.5 pl-7 pr-14 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                / hr
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={saveLaborRate}
+                disabled={laborRateSaving || !laborRateDirty}
+                className={`py-2.5 px-6 rounded-lg border-0 text-white text-sm font-semibold ${
+                  laborRateDirty
+                    ? "bg-blue-500 cursor-pointer"
+                    : "bg-slate-300 cursor-not-allowed"
+                } ${laborRateSaving ? "opacity-50" : ""}`}
+              >
+                {laborRateSaving ? "Saving..." : "Save labor rate"}
+              </button>
+              {laborRateDirty && (
+                <span className="text-sm text-amber-600 font-medium">
+                  Unsaved changes
+                </span>
+              )}
+              {!laborRateDirty && laborRateSaved && (
+                <span className="text-sm text-green-600 font-medium">
+                  {"✓ Saved"}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-3 m-0">
+              Pricing aid only — this never affects your taxes, Net Profit, or
+              cost of goods sold. Leave blank to hide labor from product
+              margins.
             </p>
           </div>
         </div>
