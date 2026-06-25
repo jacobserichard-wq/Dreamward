@@ -54,6 +54,18 @@ export interface ExpenseFormSubmit {
    *  expense's id (or editing.id in edit mode). Empty array when
    *  the merchant didn't attach anything. */
   files: File[];
+  /** Optional: receive this purchase into a component's stock in the
+   *  same save (adds quantity + sets the component's unit cost). Null
+   *  when the purchase isn't a material. Create mode only. */
+  receiveSkuId: number | null;
+  receiveQuantity: number | null;
+}
+
+interface ExpenseComponentSku {
+  id: number;
+  code: string;
+  name: string;
+  unit: string;
 }
 
 export interface ExpenseFormProps {
@@ -136,6 +148,12 @@ export default function ExpenseForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Optional "receive into inventory" (create mode only). Components
+  // (raw materials) loaded lazily when the form opens.
+  const [components, setComponents] = useState<ExpenseComponentSku[]>([]);
+  const [receiveSkuId, setReceiveSkuId] = useState("");
+  const [receiveQuantity, setReceiveQuantity] = useState("");
+
   // Phase 9.4: staged receipt files. Validated client-side as
   // they're added (size + mime); parent uploads them after the
   // expense save succeeds.
@@ -177,7 +195,38 @@ export default function ExpenseForm({
     setNewCategoryName("");
     setFiles([]);
     setIsDragOver(false);
+    setReceiveSkuId("");
+    setReceiveQuantity("");
   }, [open, editing, defaultChannel, defaultEventId]);
+
+  // Load components (raw materials) for the optional inventory-receive
+  // section. Create mode only; lazy on first open.
+  useEffect(() => {
+    if (!open || editing || components.length > 0) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/skus");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          skus: {
+            id: number;
+            code: string;
+            name: string;
+            unit: string;
+            active: boolean;
+            kind: string;
+          }[];
+        };
+        setComponents(
+          (data.skus || [])
+            .filter((s) => s.active && s.kind === "component")
+            .map((s) => ({ id: s.id, code: s.code, name: s.name, unit: s.unit }))
+        );
+      } catch {
+        // non-fatal — section just won't show
+      }
+    })();
+  }, [open, editing, components.length]);
 
   // Phase 9.3.2: handle the "+ Create new category..." submit.
   // Parent's onCreateCategory persists via PATCH /api/settings,
@@ -333,6 +382,12 @@ export default function ExpenseForm({
       setError("Pick a category.");
       return;
     }
+    const wantsReceive = !editing && !!receiveSkuId;
+    const rq = Number(receiveQuantity);
+    if (wantsReceive && (!Number.isFinite(rq) || rq <= 0)) {
+      setError("Enter a positive quantity to receive into inventory.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -345,6 +400,8 @@ export default function ExpenseForm({
         eventId: showEventPicker && eventId ? Number(eventId) : null,
         notes: notes.trim() || null,
         files,
+        receiveSkuId: wantsReceive ? Number(receiveSkuId) : null,
+        receiveQuantity: wantsReceive ? rq : null,
       });
       // Parent handles closing on success
     } catch (err) {
@@ -548,6 +605,81 @@ export default function ExpenseForm({
               for things like rent, software, accounting fees.
             </p>
           </Field>
+
+          {/* Optional: receive a material purchase straight into a
+              component's stock. Create mode only; hidden when there are no
+              components yet. Inventory/margin-side only — the expense still
+              counts as your cash cost (net profit unchanged). */}
+          {!editing && components.length > 0 && (
+            <Field
+              label="Receive into inventory (optional)"
+              htmlFor="expense-receive-sku"
+            >
+              <select
+                id="expense-receive-sku"
+                value={receiveSkuId}
+                onChange={(e) => {
+                  setReceiveSkuId(e.target.value);
+                  setError(null);
+                }}
+                disabled={saving}
+                className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+              >
+                <option value="">— not a material / skip —</option>
+                {components.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} · {c.name}
+                    {c.unit && c.unit !== "each" ? ` (${c.unit})` : ""}
+                  </option>
+                ))}
+              </select>
+              {receiveSkuId &&
+                (() => {
+                  const picked = components.find(
+                    (c) => String(c.id) === receiveSkuId
+                  );
+                  const amt = Number(amount.replace(/[$,\s]/g, ""));
+                  const q = Number(receiveQuantity);
+                  const preview =
+                    Number.isFinite(amt) && amt > 0 && Number.isFinite(q) && q > 0;
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={receiveQuantity}
+                          onChange={(e) => {
+                            setReceiveQuantity(e.target.value);
+                            setError(null);
+                          }}
+                          placeholder="Quantity received (e.g. 5000)"
+                          disabled={saving}
+                          className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                        />
+                        {picked?.unit && (
+                          <span className="text-sm text-slate-500 whitespace-nowrap">
+                            {picked.unit}
+                          </span>
+                        )}
+                      </div>
+                      {preview && picked && (
+                        <p className="text-[11px] text-slate-500 m-0 mt-1">
+                          Adds {q.toLocaleString()} {picked.unit} to {picked.code}{" "}
+                          stock at <strong>${(amt / q).toFixed(4)}</strong> /{" "}
+                          {picked.unit}.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              <p className="text-xs text-slate-500 mt-1 m-0">
+                Bought a raw material? Pick it + the quantity to add it to stock
+                and set its unit cost. Doesn&apos;t change this expense or your
+                net profit.
+              </p>
+            </Field>
+          )}
 
           {/* Conditional event picker */}
           {showEventPicker && (

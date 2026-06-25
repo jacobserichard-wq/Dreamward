@@ -19,8 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
-import { recordManualAdjustment } from "@/lib/inventory/adjustments";
-import { recomputeParentsUsing } from "@/lib/inventory/costRollup";
+import { receiveExpenseIntoInventory } from "@/lib/inventory/receiveFromExpense";
 
 interface Body {
   transactionId?: unknown;
@@ -94,7 +93,6 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = Number(txn.rows[0].amount) || 0;
-    const unitCost = amount / quantity;
     const effectiveDate = txn.rows[0].due_date;
     const vendor = txn.rows[0].vendor || "purchase";
 
@@ -103,39 +101,18 @@ export async function POST(req: NextRequest) {
     const db = await pool.connect();
     try {
       await db.query("BEGIN");
-      const quantityOnHand = await recordManualAdjustment({
+      const result = await receiveExpenseIntoInventory({
         dbClient: db,
+        clientId: client.id,
+        processedItemId: transactionId,
         skuId,
-        delta: quantity, // positive = receive
-        reason: "receive",
-        notes: `Received from ${vendor}`,
+        quantity,
+        amount,
+        vendor,
+        effectiveDate,
       });
-      await db.query(
-        `INSERT INTO sku_cost_history (sku_id, cost, currency, effective_date, notes)
-         VALUES ($1, $2, 'USD', $3, $4)`,
-        [
-          skuId,
-          unitCost,
-          effectiveDate,
-          `From ${vendor} ($${amount.toFixed(2)} ÷ ${quantity})`,
-        ]
-      );
-      // Products that use this component get their rolled-up cost refreshed.
-      // Best-effort — a hiccup shouldn't fail the receive (cost reconciles
-      // on the next recipe touch).
-      try {
-        await recomputeParentsUsing(skuId, client.id, db);
-      } catch (rollupErr) {
-        console.error("Cost rollup after receive failed:", rollupErr);
-      }
-      await db.query(
-        `UPDATE processed_items
-            SET received_sku_id = $1, received_quantity = $2, updated_at = NOW()
-          WHERE id = $3 AND client_id = $4`,
-        [skuId, quantity, transactionId, client.id]
-      );
       await db.query("COMMIT");
-      return NextResponse.json({ quantityOnHand, unitCost });
+      return NextResponse.json(result);
     } catch (txErr) {
       await db.query("ROLLBACK").catch(() => {});
       throw txErr;

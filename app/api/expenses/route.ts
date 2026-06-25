@@ -39,6 +39,7 @@ import {
   type Industry,
 } from "@/lib/categories";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
+import { receiveExpenseIntoInventory } from "@/lib/inventory/receiveFromExpense";
 
 const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
@@ -268,6 +269,10 @@ interface CreateExpenseBody {
   channel?: unknown;
   eventId?: unknown;
   notes?: unknown;
+  /** Optional: receive this purchase into a component's stock on save
+   *  (adds quantity + sets the component's unit cost). */
+  receiveSkuId?: unknown;
+  receiveQuantity?: unknown;
 }
 
 function isNonEmptyString(v: unknown): v is string {
@@ -392,9 +397,30 @@ export async function POST(req: NextRequest) {
       channel = "markets";
     }
 
-    // ── Insert ──────────────────────────────────────────────────
-    const result = await pool.query<ProcessedItemRow>(
-      `INSERT INTO processed_items (
+    // ── Optional: receive this purchase into a component's stock ──
+    let receiveSkuId: number | null = null;
+    if (body.receiveSkuId != null && body.receiveSkuId !== "") {
+      const parsed = Number(body.receiveSkuId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return NextResponse.json({ error: "Invalid component" }, { status: 400 });
+      }
+      receiveSkuId = parsed;
+    }
+    let receiveQuantity = 0;
+    if (receiveSkuId !== null) {
+      const q = Number(body.receiveQuantity);
+      if (!Number.isFinite(q) || q <= 0) {
+        return NextResponse.json(
+          { error: "Quantity to receive must be a positive number" },
+          { status: 400 }
+        );
+      }
+      receiveQuantity = q;
+    }
+
+    const vendorTrim = body.vendor.trim();
+    const notesVal = typeof body.notes === "string" ? body.notes.trim() : null;
+    const insertSql = `INSERT INTO processed_items (
          client_id, vendor, amount, due_date, category,
          source, channel, event_id, status, notes,
          invoice_number, confidence, summary, processed_at, updated_at
@@ -404,22 +430,20 @@ export async function POST(req: NextRequest) {
          '', 100, $9, NOW(), NOW()
        )
        RETURNING id, vendor, amount, due_date, category, source,
-                 channel, event_id, status, notes, processed_at`,
-      [
-        client.id,
-        body.vendor.trim(),
-        amount,
-        body.dueDate,
-        body.category,
-        channel,
-        eventId,
-        typeof body.notes === "string" ? body.notes.trim() : null,
-        `Manual expense: ${body.vendor.trim()} — $${amount.toFixed(2)}`,
-      ]
-    );
+                 channel, event_id, status, notes, processed_at`;
+    const insertParams = [
+      client.id,
+      vendorTrim,
+      amount,
+      body.dueDate,
+      body.category,
+      channel,
+      eventId,
+      notesVal,
+      `Manual expense: ${vendorTrim} — $${amount.toFixed(2)}`,
+    ];
 
-    const row = result.rows[0];
-    return NextResponse.json({
+    const toResponse = (row: ProcessedItemRow) => ({
       expense: {
         id: row.id,
         vendor: row.vendor,
@@ -434,6 +458,45 @@ export async function POST(req: NextRequest) {
         createdAt: row.processed_at,
       },
     });
+
+    // No inventory receive → plain insert.
+    if (receiveSkuId === null) {
+      const result = await pool.query<ProcessedItemRow>(insertSql, insertParams);
+      return NextResponse.json(toResponse(result.rows[0]));
+    }
+
+    // Receive path → validate the component, then create the expense +
+    // receive it in one transaction so a crash can't half-apply.
+    const sku = await pool.query<{ id: number }>(
+      `SELECT id FROM skus WHERE id = $1 AND client_id = $2`,
+      [receiveSkuId, client.id]
+    );
+    if (sku.rowCount === 0) {
+      return NextResponse.json({ error: "Component not found" }, { status: 400 });
+    }
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      const result = await db.query<ProcessedItemRow>(insertSql, insertParams);
+      const row = result.rows[0];
+      await receiveExpenseIntoInventory({
+        dbClient: db,
+        clientId: client.id,
+        processedItemId: row.id,
+        skuId: receiveSkuId,
+        quantity: receiveQuantity,
+        amount,
+        vendor: vendorTrim,
+        effectiveDate: body.dueDate as string,
+      });
+      await db.query("COMMIT");
+      return NextResponse.json(toResponse(row));
+    } catch (txErr) {
+      await db.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      db.release();
+    }
   } catch (err) {
     console.error("Expenses POST error:", err);
     return NextResponse.json(
