@@ -24,6 +24,7 @@ import { getSessionClient } from "@/lib/getClient";
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
 import { ensureFreshToken, fetchListingsPage } from "@/lib/etsy";
 import { isPayingTier } from "@/lib/plans";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 // fetchListingsPage requests 100 per page; a short page ends the
 // loop. The page cap is a runaway guard for enormous shops — if it
@@ -150,7 +151,7 @@ export async function GET() {
       rows,
       ...(truncated
         ? {
-            warning: `Showing your first ${rows.length.toLocaleString()} active listings — your shop has more. Email hello@godreamward.com and we'll raise the limit for you.`,
+            warning: `Showing your first ${rows.length.toLocaleString()} active listings — your shop has more. Email ${SUPPORT_EMAIL} and we'll raise the limit for you.`,
           }
         : {}),
     });

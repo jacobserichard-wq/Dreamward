@@ -18,6 +18,7 @@ import { useState } from "react";
 import Link from "next/link";
 import AppHeader from "../components/AppHeader";
 import PageHeader from "../components/PageHeader";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import {
   MARKET_REGISTER,
   CRAFT_FAIR_SOURCES,
@@ -415,7 +416,7 @@ export default function MarketsPage() {
         <p className="text-xs text-stone mt-8 text-center">
           Know a market we should verify?{" "}
           <a
-            href="mailto:hello@godreamward.com?subject=Market%20to%20add"
+            href={`mailto:${SUPPORT_EMAIL}?subject=Market%20to%20add`}
             className="text-eucalyptus-dark hover:underline"
           >
             Tell us

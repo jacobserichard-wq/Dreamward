@@ -40,6 +40,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 // Wrap inner component in Suspense — useSearchParams requires it for
 // static rendering (Next 15+ pattern, same as /integrations).
@@ -187,10 +188,10 @@ function WixBridgeInner() {
           This might be a temporary issue. Try refreshing this page, or
           contact{" "}
           <a
-            href="mailto:hello@godreamward.com"
+            href={`mailto:${SUPPORT_EMAIL}`}
             className="text-blue-600 hover:underline"
           >
-            hello@godreamward.com
+            {SUPPORT_EMAIL}
           </a>{" "}
           if it keeps happening.
         </p>

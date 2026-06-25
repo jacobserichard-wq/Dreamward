@@ -28,6 +28,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "../components/PageHeader";
 import AppHeader from "../components/AppHeader";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
 import EtsyConnectionCard from "../components/EtsyConnectionCard";
@@ -313,7 +314,7 @@ function IntegrationsPageInner() {
         <p className="text-xs text-slate-400 mt-8 text-center">
           Want a platform we don&apos;t support yet?{" "}
           <a
-            href="mailto:hello@godreamward.com?subject=Integration%20request"
+            href={`mailto:${SUPPORT_EMAIL}?subject=Integration%20request`}
             className="text-blue-600 hover:underline"
           >
             Let us know
