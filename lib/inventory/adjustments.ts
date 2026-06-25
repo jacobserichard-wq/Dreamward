@@ -31,6 +31,7 @@
 
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
+import { consumeFifo, restoreConsumptions } from "./costLayers";
 
 export type AdjustmentReason =
   | "sale"
@@ -105,11 +106,15 @@ export async function recordSaleAdjustments(opts: {
   // delta comes back as a STRING (pg serializes NUMERIC as text) —
   // parseFloat before any arithmetic, or "+= row.delta" would
   // string-concatenate.
-  const inserted = await db.query<{ sku_id: number; delta: string }>(
+  const inserted = await db.query<{
+    sku_id: number;
+    delta: string;
+    source_line_item_id: number;
+  }>(
     `INSERT INTO inventory_adjustments (sku_id, delta, reason, source_line_item_id)
      VALUES ${insertPlaceholders}
      ON CONFLICT (source_line_item_id) WHERE source_line_item_id IS NOT NULL DO NOTHING
-     RETURNING sku_id, delta`,
+     RETURNING sku_id, delta, source_line_item_id`,
     insertValues
   );
 
@@ -132,6 +137,32 @@ export async function recordSaleAdjustments(opts: {
     await db.query(
       `UPDATE skus SET quantity_on_hand = quantity_on_hand + $1 WHERE id = $2`,
       [totalDelta, skuId]
+    );
+  }
+
+  // ── 3. Stamp FIFO COGS on each newly-inserted line item ──────
+  // Only genuinely-new rows are costed (ON CONFLICT skipped re-deliveries),
+  // so a webhook retry or backfill resume can't double-consume layers.
+  // consumeFifo drains the finished good's layers oldest-first; a product
+  // sold without a logged production run has no layers, so it falls back to
+  // the rolled-up cost and flags the line item estimated. Each line item is
+  // costed independently and in order, so two lines of the same SKU drain
+  // sequentially (correct FIFO).
+  for (const row of inserted.rows) {
+    const qty = Math.abs(parseFloat(row.delta));
+    if (!(qty > 0)) continue;
+    const draw = await consumeFifo({
+      dbClient: db,
+      skuId: row.sku_id,
+      quantity: qty,
+      reason: "sale",
+      lineItemId: row.source_line_item_id,
+    });
+    await db.query(
+      `UPDATE processed_item_line_items
+          SET cogs_amount = $1, cogs_is_estimated = $2
+        WHERE id = $3`,
+      [draw.totalCost, draw.isEstimated, row.source_line_item_id]
     );
   }
 
@@ -189,6 +220,18 @@ export async function reverseSaleAdjustments(opts: {
       [credit, skuId]
     );
   }
+
+  // FIFO: restore the layers each reversed line item consumed and clear
+  // its stamped COGS, so re-mapping later re-costs cleanly.
+  for (const id of opts.lineItemIds) {
+    await restoreConsumptions({ dbClient: db, lineItemId: id });
+  }
+  await db.query(
+    `UPDATE processed_item_line_items
+        SET cogs_amount = NULL, cogs_is_estimated = FALSE
+      WHERE id = ANY($1)`,
+    [opts.lineItemIds]
+  );
 
   return deleted.rowCount ?? 0;
 }

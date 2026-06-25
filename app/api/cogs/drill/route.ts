@@ -57,9 +57,19 @@ interface DrillRowDb {
   matched_sku_id: number | null;
   matched_sku_code: string | null;
   matched_sku_name: string | null;
-  cost_history_id: number | null;
-  cost_effective_date: string | null;
-  cost_per_unit: string | null;
+  cogs_amount: string | null;
+  cogs_is_estimated: boolean;
+  /** FIFO layers this line item drained — the audit trail. */
+  layers:
+    | Array<{
+        layerId: number;
+        source: string;
+        acquiredAt: string;
+        unitCost: string;
+        quantity: string;
+        isEstimated: boolean;
+      }>
+    | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -137,25 +147,7 @@ export async function GET(req: NextRequest) {
     const ROW_CAP = 1000;
 
     const rows = await pool.query<DrillRowDb>(
-      `WITH chosen_cost AS (
-         SELECT pili.id AS line_item_id,
-                ch.id   AS cost_history_id,
-                ch.effective_date,
-                ch.cost AS cost_per_unit
-           FROM processed_item_line_items pili
-           LEFT JOIN LATERAL (
-             SELECT id, effective_date, cost
-               FROM sku_cost_history
-              WHERE sku_id = pili.matched_sku_id
-                AND effective_date <= pili.sold_at
-              ORDER BY effective_date DESC
-              LIMIT 1
-           ) ch ON true
-          WHERE pili.client_id = $1
-            AND pili.sold_at >= $2
-            AND pili.sold_at <= $3
-       )
-       SELECT pili.id,
+      `SELECT pili.id,
               pi.id                  AS parent_id,
               pi.source              AS parent_source,
               pi.source_ref_id       AS parent_source_ref_id,
@@ -173,13 +165,28 @@ export async function GET(req: NextRequest) {
               pili.matched_sku_id,
               s.code                 AS matched_sku_code,
               s.name                 AS matched_sku_name,
-              cc.cost_history_id,
-              cc.effective_date::text AS cost_effective_date,
-              cc.cost_per_unit::text  AS cost_per_unit
+              pili.cogs_amount::text AS cogs_amount,
+              pili.cogs_is_estimated,
+              lyr.layers
          FROM processed_item_line_items pili
          JOIN processed_items pi ON pi.id = pili.processed_item_id
          LEFT JOIN skus s ON s.id = pili.matched_sku_id
-         LEFT JOIN chosen_cost cc ON cc.line_item_id = pili.id
+         LEFT JOIN LATERAL (
+           SELECT json_agg(
+                    json_build_object(
+                      'layerId',    cl.id,
+                      'source',     cl.source,
+                      'acquiredAt', cl.acquired_at::text,
+                      'unitCost',   cc.unit_cost::text,
+                      'quantity',   cc.consumed_qty::text,
+                      'isEstimated', cc.is_estimated
+                    )
+                    ORDER BY cl.acquired_at, cl.id
+                  ) AS layers
+             FROM cost_consumptions cc
+             JOIN cost_layers cl ON cl.id = cc.layer_id
+            WHERE cc.line_item_id = pili.id
+         ) lyr ON true
         WHERE pili.client_id = $1
           AND pili.sold_at >= $2
           AND pili.sold_at <= $3
@@ -198,18 +205,30 @@ export async function GET(req: NextRequest) {
     let cogs = 0;
     let unmatchedRevenue = 0;
     let unmatchedLineItemCount = 0;
+    let cogsEstimatedLineItemCount = 0;
     const lineItems = used.map((r) => {
       const qty = Number(r.quantity) || 0;
       const unitPrice = Number(r.unit_price) || 0;
       const lineRevenue = qty * unitPrice;
-      const costPerUnit = r.cost_per_unit != null ? Number(r.cost_per_unit) : 0;
-      const lineCogs = qty * costPerUnit;
+      // FIFO COGS is the amount stamped on the line item at sale time, not
+      // a recomputed date lookup — keeps the drill identical to the
+      // headline number. The layer list is the audit trail.
+      const lineCogs = r.cogs_amount != null ? Number(r.cogs_amount) : 0;
       revenue += lineRevenue;
       cogs += lineCogs;
       if (r.matched_sku_id === null) {
         unmatchedRevenue += lineRevenue;
         unmatchedLineItemCount += 1;
       }
+      if (r.cogs_is_estimated) cogsEstimatedLineItemCount += 1;
+      const layers = (r.layers ?? []).map((l) => ({
+        layerId: l.layerId,
+        source: l.source,
+        acquiredAt: l.acquiredAt,
+        unitCost: Number(l.unitCost) || 0,
+        quantity: Number(l.quantity) || 0,
+        isEstimated: l.isEstimated,
+      }));
       return {
         id: r.id,
         parentId: r.parent_id,
@@ -230,14 +249,11 @@ export async function GET(req: NextRequest) {
         matchedSkuId: r.matched_sku_id,
         matchedSkuCode: r.matched_sku_code,
         matchedSkuName: r.matched_sku_name,
-        costSource:
-          r.cost_history_id != null
-            ? {
-                historyId: r.cost_history_id,
-                effectiveDate: r.cost_effective_date!,
-                costPerUnit,
-              }
-            : null,
+        // FIFO audit trail: the exact layers this sale drained, oldest
+        // first. cogsIsEstimated = part of the cost is a fallback (stock
+        // went negative / no layer), so the layers may not sum to cogs.
+        costLayers: layers,
+        cogsIsEstimated: r.cogs_is_estimated,
         cogs: lineCogs,
       };
     });
@@ -252,6 +268,7 @@ export async function GET(req: NextRequest) {
         marginPercent: revenue > 0 ? (margin / revenue) * 100 : null,
         unmatchedRevenue,
         unmatchedLineItemCount,
+        cogsEstimatedLineItemCount,
         totalLineItemCount: lineItems.length,
       },
       truncated,

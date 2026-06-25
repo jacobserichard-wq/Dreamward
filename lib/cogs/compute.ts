@@ -9,12 +9,15 @@
 //
 // Architecture notes — what makes this different from Crafty Base:
 //
-//   1. Effective-date discipline. The cost we use for each line
-//      item is the newest sku_cost_history row whose effective_date
-//      is <= the line item's sold_at. NOT the SKU's current cost.
-//      This means changing a SKU's cost today doesn't retroactively
-//      rewrite historical COGS — directly opposite to Crafty Base's
-//      "Historical Data Nightmare" complaint.
+//   1. FIFO cost layers. COGS is stamped onto each line item at sale
+//      time by draining the SKU's oldest cost layers first
+//      (lib/inventory/costLayers.ts), and recorded in
+//      processed_item_line_items.cogs_amount. This engine just SUMs
+//      that column — it never recomputes cost from a date lookup, so
+//      changing a SKU's cost today can't retroactively rewrite a
+//      historical sale's COGS. cogs_is_estimated marks any sale whose
+//      cost fell back (stock went negative / no layer), surfaced so the
+//      merchant knows that figure is approximate.
 //
 //   2. Unmatched items contribute zero COGS (and are flagged in
 //      the unmatchedRevenue field separately) instead of being
@@ -44,6 +47,10 @@ export interface MarginTotals {
   unmatchedRevenue: number;
   unmatchedLineItemCount: number;
   totalLineItemCount: number;
+  /** Count of sold line items whose COGS is a fallback estimate (stock
+   *  went negative, or the product had no cost layer). > 0 means the
+   *  COGS/margin figure is approximate — the dashboard can flag it. */
+  cogsEstimatedLineItemCount: number;
 }
 
 export interface ChannelMarginRow extends MarginTotals {
@@ -70,6 +77,7 @@ interface RawMarginRow {
   cogs: string;
   unmatched_revenue: string;
   unmatched_line_item_count: number;
+  cogs_estimated_line_item_count: number;
   total_line_item_count: number;
 }
 
@@ -89,30 +97,10 @@ function toMarginTotals(r: RawMarginRow): MarginTotals {
     marginPercent: revenue > 0 ? (margin / revenue) * 100 : null,
     unmatchedRevenue: Number(r.unmatched_revenue) || 0,
     unmatchedLineItemCount: r.unmatched_line_item_count ?? 0,
+    cogsEstimatedLineItemCount: r.cogs_estimated_line_item_count ?? 0,
     totalLineItemCount: r.total_line_item_count ?? 0,
   };
 }
-
-/**
- * Reusable SQL fragment for the cost-on-sale-date lookup. Implemented
- * as a correlated subquery so each line item resolves to the right
- * cost-history row independently. The (sku_id, effective_date DESC)
- * partial index from migration 0017 makes the LIMIT 1 lookup cheap.
- *
- * The COALESCE wraps the entire subquery so unmatched line items
- * (matched_sku_id IS NULL) contribute 0 to COGS — they're surfaced
- * separately via unmatched_revenue.
- */
-const COST_LOOKUP_SQL = `
-  COALESCE(
-    (SELECT ch.cost FROM sku_cost_history ch
-      WHERE ch.sku_id = pili.matched_sku_id
-        AND ch.effective_date <= pili.sold_at
-      ORDER BY ch.effective_date DESC
-      LIMIT 1),
-    0
-  )
-`.trim();
 
 /**
  * Build the period base CTE — the SUM clauses shared by every
@@ -128,7 +116,7 @@ function buildAggregateSql(opts: {
     SELECT
       ${opts.groupKeyExpr} AS group_key,
       COALESCE(SUM(pili.quantity * pili.unit_price), 0)::text AS revenue,
-      COALESCE(SUM(pili.quantity * ${COST_LOOKUP_SQL}), 0)::text AS cogs,
+      COALESCE(SUM(pili.cogs_amount), 0)::text AS cogs,
       COALESCE(
         SUM(CASE WHEN pili.matched_sku_id IS NULL
                  THEN pili.quantity * pili.unit_price
@@ -136,6 +124,7 @@ function buildAggregateSql(opts: {
         0
       )::text AS unmatched_revenue,
       COUNT(*) FILTER (WHERE pili.matched_sku_id IS NULL)::int AS unmatched_line_item_count,
+      COUNT(*) FILTER (WHERE pili.cogs_is_estimated)::int AS cogs_estimated_line_item_count,
       COUNT(*)::int AS total_line_item_count
     FROM processed_item_line_items pili
     JOIN processed_items pi ON pi.id = pili.processed_item_id
@@ -171,6 +160,7 @@ export async function computeMargin(opts: {
       cogs: "0",
       unmatched_revenue: "0",
       unmatched_line_item_count: 0,
+      cogs_estimated_line_item_count: 0,
       total_line_item_count: 0,
     }
   );

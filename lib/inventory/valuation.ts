@@ -3,35 +3,32 @@
 // Inventory valuation — total stock value + point-in-time snapshots
 // for Schedule-C / Form 1125-A beginning + ending inventory.
 //
-// computeInventoryValue is "as of now": SUM(quantity_on_hand ×
-// current_cost) across the client's active SKUs. It can't
+// computeInventoryValue is "as of now": the FIFO value of stock still on
+// hand = SUM(remaining_qty × unit_cost) across the client's open cost
+// layers. This is the true ending-inventory cost basis (Form 1125-A) —
+// the un-sold tail of every purchase at the price actually paid. It can't
 // reconstruct historical stock, so beginning/ending inventory for a
-// report year comes from inventory_snapshots — point-in-time records
-// the cron lays down monthly. Going forward those build the history;
-// for the current year's ending we fall back to the live value.
+// report year comes from inventory_snapshots — point-in-time records the
+// cron lays down monthly. Going forward those build the history; for the
+// current year's ending we fall back to the live value.
 
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
 
-/** Current total inventory value for a client (stock × current
- *  cost). Materials with no cost contribute 0; negative stock
- *  contributes negative (honest — flags a data issue). */
+/** Current total inventory value for a client = the FIFO cost of stock
+ *  still on hand (Σ remaining cost layers). Stock with no cost layer
+ *  contributes 0. */
 export async function computeInventoryValue(
   clientId: number,
   dbClient?: PoolClient
 ): Promise<number> {
   const db = dbClient ?? pool;
   const res = await db.query<{ total: string }>(
-    `SELECT COALESCE(SUM(s.quantity_on_hand * COALESCE(ch.cost, 0)), 0) AS total
-       FROM skus s
-       LEFT JOIN LATERAL (
-         SELECT cost FROM sku_cost_history
-          WHERE sku_id = s.id
-            AND effective_date <= CURRENT_DATE
-          ORDER BY effective_date DESC
-          LIMIT 1
-       ) ch ON true
-      WHERE s.client_id = $1
+    `SELECT COALESCE(SUM(cl.remaining_qty * cl.unit_cost), 0) AS total
+       FROM cost_layers cl
+       JOIN skus s ON s.id = cl.sku_id
+      WHERE cl.client_id = $1
+        AND cl.remaining_qty > 0
         AND s.active`,
     [clientId]
   );

@@ -16,7 +16,12 @@
 // inside that caller's transaction, so a stock move + its cost move + its
 // consumption ledger all commit or roll back together.
 
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
+
+/** Either a pooled client (inside a transaction) or the shared pool.
+ *  Both expose .query; consumeFifo's FOR UPDATE is only meaningful inside
+ *  a transaction, so callers that mutate should pass a PoolClient. */
+type Db = Pool | PoolClient;
 
 /** Round a quantity to the DB's NUMERIC(14,4) scale to avoid FP drift. */
 function q4(n: number): number {
@@ -40,7 +45,7 @@ export type ConsumeReason =
  * is a no-op caller error and throws.
  */
 export async function addCostLayer(opts: {
-  dbClient: PoolClient;
+  dbClient: Db;
   clientId: number;
   skuId: number;
   source: LayerSource;
@@ -84,7 +89,7 @@ export async function addCostLayer(opts: {
  * is_estimated flag — never a silent zero.
  */
 export async function lastKnownUnitCost(
-  db: PoolClient,
+  db: Db,
   skuId: number
 ): Promise<number> {
   const layer = await db.query<{ unit_cost: string }>(
@@ -138,8 +143,10 @@ export interface ConsumeResult {
  * the same layer.
  */
 export async function consumeFifo(opts: {
-  dbClient: PoolClient;
-  clientId: number;
+  dbClient: Db;
+  /** Not used in SQL (layers scope by sku_id) — accepted for symmetry
+   *  with addCostLayer and so callers can pass it harmlessly. */
+  clientId?: number;
   skuId: number;
   quantity: number;
   reason: ConsumeReason;
@@ -221,7 +228,7 @@ export async function consumeFifo(opts: {
  * consumption rows. Idempotent: a second call finds no rows and no-ops.
  */
 export async function restoreConsumptions(opts: {
-  dbClient: PoolClient;
+  dbClient: Db;
   productionRunId?: number;
   lineItemId?: number;
 }): Promise<void> {
@@ -250,7 +257,7 @@ export async function restoreConsumptions(opts: {
  * any production-sourced layer for that run has remaining_qty < original_qty.
  */
 export async function productionOutputConsumed(
-  db: PoolClient,
+  db: Db,
   productionRunId: number
 ): Promise<boolean> {
   const res = await db.query<{ consumed: boolean }>(

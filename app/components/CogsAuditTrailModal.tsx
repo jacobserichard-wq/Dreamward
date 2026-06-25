@@ -25,10 +25,14 @@ export interface CogsDrillScopeOpts {
   label: string;
 }
 
-interface CostSource {
-  historyId: number;
-  effectiveDate: string;
-  costPerUnit: number;
+/** One FIFO layer this sale drained, oldest first. */
+interface CostLayer {
+  layerId: number;
+  source: string;
+  acquiredAt: string;
+  unitCost: number;
+  quantity: number;
+  isEstimated: boolean;
 }
 
 interface AuditLineItem {
@@ -51,7 +55,8 @@ interface AuditLineItem {
   matchedSkuId: number | null;
   matchedSkuCode: string | null;
   matchedSkuName: string | null;
-  costSource: CostSource | null;
+  costLayers: CostLayer[];
+  cogsIsEstimated: boolean;
   cogs: number;
 }
 
@@ -246,7 +251,7 @@ export default function CogsAuditTrailModal({
                     <th className="text-right py-2 px-3 font-medium">Revenue</th>
                     <th className="text-left py-2 px-3 font-medium">SKU</th>
                     <th className="text-left py-2 px-3 font-medium">
-                      Cost source
+                      FIFO layers
                     </th>
                     <th className="text-right py-2 px-3 font-medium">
                       Cost/unit
@@ -291,22 +296,37 @@ export default function CogsAuditTrailModal({
                         )}
                       </td>
                       <td className="py-2 px-3 text-slate-500 text-[10px]">
-                        {r.costSource ? (
-                          <>
-                            cost_history #{r.costSource.historyId}
-                            <br />
-                            effective {fmtDate(r.costSource.effectiveDate)}
-                          </>
+                        {r.costLayers.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {r.costLayers.map((l) => (
+                              <div key={l.layerId}>
+                                {l.quantity} @ {fmtUsd(l.unitCost)}
+                                <span className="text-slate-400">
+                                  {" "}
+                                  · {fmtDate(l.acquiredAt)}
+                                </span>
+                              </div>
+                            ))}
+                            {r.cogsIsEstimated && (
+                              <div className="text-amber-700 italic">
+                                + estimated (low stock)
+                              </div>
+                            )}
+                          </div>
                         ) : r.matchedSkuId == null ? (
                           <span className="italic">no SKU mapped</span>
-                        ) : (
-                          <span className="italic">
-                            no cost row on/before sale date
+                        ) : r.cogsIsEstimated ? (
+                          <span className="text-amber-700 italic">
+                            estimated — no cost layer
                           </span>
+                        ) : (
+                          <span className="italic">—</span>
                         )}
                       </td>
                       <td className="py-2 px-3 text-right text-slate-700 tabular-nums whitespace-nowrap">
-                        {r.costSource ? fmtUsd(r.costSource.costPerUnit) : "—"}
+                        {r.quantity > 0 && r.cogs > 0
+                          ? fmtUsd(r.cogs / r.quantity)
+                          : "—"}
                       </td>
                       <td className="py-2 px-3 text-right text-slate-900 font-semibold tabular-nums whitespace-nowrap">
                         {fmtUsd(r.cogs)}
