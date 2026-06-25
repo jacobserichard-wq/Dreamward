@@ -28,6 +28,7 @@ interface MarginTotals {
   marginPercent: number | null;
   unmatchedRevenue: number;
   unmatchedLineItemCount: number;
+  cogsEstimatedLineItemCount: number;
   totalLineItemCount: number;
 }
 
@@ -116,6 +117,7 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
     marginPercent: null,
     unmatchedRevenue: 0,
     unmatchedLineItemCount: 0,
+    cogsEstimatedLineItemCount: 0,
     totalLineItemCount: 0,
   };
   const skuMap = new Map<number, SkuMarginRow>();
@@ -127,6 +129,8 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
     feesAndTips += p.feesAndTips ?? 0;
     totals.unmatchedRevenue += p.totals.unmatchedRevenue;
     totals.unmatchedLineItemCount += p.totals.unmatchedLineItemCount;
+    totals.cogsEstimatedLineItemCount +=
+      p.totals.cogsEstimatedLineItemCount ?? 0;
     totals.totalLineItemCount += p.totals.totalLineItemCount;
     for (const s of p.bySku) {
       if (s.skuId == null) continue; // skip the unmatched bucket here
@@ -198,6 +202,7 @@ export default function CogsSummaryCard() {
           marginPercent: null,
           unmatchedRevenue: 0,
           unmatchedLineItemCount: 0,
+          cogsEstimatedLineItemCount: 0,
           totalLineItemCount: 0,
         },
         bySku: [],
@@ -491,7 +496,9 @@ export default function CogsSummaryCard() {
           )}
 
           {/* Warning chips */}
-          {(underwaterCount > 0 || totals.unmatchedLineItemCount > 0) && (
+          {(underwaterCount > 0 ||
+            totals.unmatchedLineItemCount > 0 ||
+            totals.cogsEstimatedLineItemCount > 0) && (
             <div className="flex gap-2 flex-wrap mb-3">
               {underwaterCount > 0 && (
                 <Link
@@ -509,6 +516,15 @@ export default function CogsSummaryCard() {
                 >
                   {totals.unmatchedLineItemCount} unmatched line item
                   {totals.unmatchedLineItemCount === 1 ? "" : "s"}
+                </Link>
+              )}
+              {totals.cogsEstimatedLineItemCount > 0 && (
+                <Link
+                  href="/cogs"
+                  title="These sales have no cost basis yet, so their COGS is an estimate. Add costs to the SKUs to make these margins exact."
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 no-underline hover:bg-sky-100"
+                >
+                  {"\u{2248}"} {totals.cogsEstimatedLineItemCount} estimated COGS
                 </Link>
               )}
             </div>

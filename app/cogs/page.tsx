@@ -44,6 +44,7 @@ interface MarginTotals {
   marginPercent: number | null;
   unmatchedRevenue: number;
   unmatchedLineItemCount: number;
+  cogsEstimatedLineItemCount: number;
   totalLineItemCount: number;
 }
 
@@ -247,13 +248,14 @@ export default function CogsPage() {
         />
 
         <SectionTip id="cogs" title="How gross margin gets calculated">
-          Margin = revenue minus the cost of goods sold. For each sale,
-          Dreamward looks up the SKU&apos;s cost on the date it sold (its
-          effective-dated cost row) — so a price change today never
-          rewrites last month&apos;s margin. If a SKU shows $0 COGS, it
-          has no cost row covering the sale date; add one on the{" "}
-          <strong>SKUs</strong> page. Click any number here to see the
-          exact line items and cost rows behind it.
+          Margin = revenue minus the cost of goods sold. Dreamward costs
+          each sale <strong>FIFO</strong> — it drains your oldest stock at
+          the price you actually paid for it, then moves to the next
+          purchase&apos;s price once that batch runs out. A sale that spans
+          two purchase prices blends them. If a SKU shows $0 or an{" "}
+          <em>estimated</em> COGS, that stock has no recorded cost basis;
+          add a cost (via a receive or on the <strong>SKUs</strong> page).
+          Click any number here to see the exact cost layers behind it.
         </SectionTip>
 
         {error && (
@@ -361,6 +363,29 @@ export default function CogsPage() {
                   >
                     Map them now →
                   </Link>
+                </p>
+              </div>
+            )}
+
+            {/* Estimated-COGS warning — sales whose stock had no cost basis,
+                so FIFO fell back to a last-known/zero cost. */}
+            {totals.cogsEstimatedLineItemCount > 0 && (
+              <div className="bg-sky-50 border border-sky-200 text-sky-900 rounded-xl px-4 py-3 mb-4">
+                <p className="text-sm font-semibold m-0 mb-1">
+                  {"\u{2248}"} {totals.cogsEstimatedLineItemCount} sale
+                  {totals.cogsEstimatedLineItemCount === 1 ? "" : "s"} have an
+                  estimated COGS
+                </p>
+                <p className="text-xs m-0 text-sky-800">
+                  These products had no cost layer when they sold, so their
+                  cost is a fallback estimate (or $0) — the margin shown is
+                  approximate. Receive stock with a unit cost, or set a cost on
+                  the{" "}
+                  <Link href="/skus" className="text-sky-900 underline font-medium">
+                    SKUs page
+                  </Link>
+                  , to make these exact going forward. Click <em>Cost of
+                  goods</em> above to see which.
                 </p>
               </div>
             )}
@@ -581,10 +606,10 @@ export default function CogsPage() {
             </div>
 
             <p className="text-xs text-slate-400 text-center mt-6">
-              <strong>Effective-date discipline:</strong> Each line item&apos;s
-              COGS uses the cost-history row that was active on the sale&apos;s
-              date — never today&apos;s cost. Changing a SKU&apos;s price now
-              never rewrites your historical margin.
+              <strong>FIFO costing:</strong> Each sale&apos;s COGS is locked in
+              when it sells, by draining your oldest stock at the price you
+              paid for it. Changing a SKU&apos;s cost now never rewrites your
+              historical margin.
             </p>
           </>
         )}
