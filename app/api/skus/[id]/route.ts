@@ -63,6 +63,8 @@ interface SkuRowDb {
   // booth. Distinct from cost history (what the merchant pays).
   // NUMERIC → string from pg, nullable.
   default_sell_price: string | null;
+  // Labor minutes to make one unit (pricing lens only). NUMERIC → string.
+  labor_minutes_per_unit: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +90,7 @@ async function loadEnrichedSku(
             s.unit,
             s.costing_method,
             s.default_sell_price,
+            s.labor_minutes_per_unit,
             s.created_at, s.updated_at
        FROM skus s
        LEFT JOIN LATERAL (
@@ -127,6 +130,10 @@ function serializeSku(row: SkuRowDb) {
     defaultSellPrice:
       row.default_sell_price != null
         ? Number(row.default_sell_price)
+        : null,
+    laborMinutesPerUnit:
+      row.labor_minutes_per_unit != null
+        ? Number(row.labor_minutes_per_unit)
         : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -289,6 +296,12 @@ export async function GET(
         unitCost: Number(r.unit_cost),
         notes: r.notes,
       })),
+      // The maker's labor rate (pricing lens) so the page can value labor
+      // without a second round trip. Set on the Settings page.
+      laborHourlyRate:
+        client.labor_hourly_rate != null
+          ? Number(client.labor_hourly_rate)
+          : null,
     });
   } catch (err) {
     console.error("SKU GET error:", err);
@@ -311,6 +324,7 @@ interface PatchSkuBody {
   defaultSellPrice?: unknown;
   costingMethod?: unknown;
   unit?: unknown;
+  laborMinutesPerUnit?: unknown;
 }
 
 export async function PATCH(
@@ -474,6 +488,26 @@ export async function PATCH(
       }
       updates.push(`unit = $${p++}`);
       values.push(newUnit);
+    }
+
+    // Labor minutes to make one unit (pricing lens only — never touches
+    // COGS/tax). Non-negative number to set; null/empty clears it.
+    if (body.laborMinutesPerUnit !== undefined) {
+      if (body.laborMinutesPerUnit === null || body.laborMinutesPerUnit === "") {
+        updates.push(`labor_minutes_per_unit = NULL`);
+      } else {
+        const mins = Number(body.laborMinutesPerUnit);
+        if (!Number.isFinite(mins) || mins < 0) {
+          return NextResponse.json(
+            {
+              error: "laborMinutesPerUnit must be a non-negative number or null",
+            },
+            { status: 400 }
+          );
+        }
+        updates.push(`labor_minutes_per_unit = $${p++}`);
+        values.push(mins);
+      }
     }
 
     if (updates.length === 0) {

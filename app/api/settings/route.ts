@@ -49,6 +49,11 @@ export async function GET() {
       homeAddress: client.home_address ?? null,
       irsMileageRate,
       rateSource,
+      // Optional labor rate for the product pricing/margin lens (NOT taxes).
+      laborHourlyRate:
+        client.labor_hourly_rate != null
+          ? Number(client.labor_hourly_rate)
+          : null,
     });
   } catch (error) {
     console.error("Settings GET error:", error);
@@ -64,7 +69,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { activeModules, customCategories, preferences, homeAddress } = body;
+    const { activeModules, customCategories, preferences, homeAddress, laborHourlyRate } =
+      body;
 
     await pool.query(
       `INSERT INTO client_settings (client_id, active_modules, custom_categories, preferences)
@@ -86,6 +92,25 @@ export async function PATCH(req: NextRequest) {
     // for the whole app). It is intentionally NOT writable here — letting
     // any authenticated customer PATCH it would rewrite the rate for every
     // tenant. It's read-only in Settings and set system-wide instead.
+
+    // Labor hourly rate (per-client; pricing lens only). undefined = no
+    // change; null/empty clears it. Reject negatives.
+    if (laborHourlyRate !== undefined) {
+      const rate =
+        laborHourlyRate === null || laborHourlyRate === ""
+          ? null
+          : Number(laborHourlyRate);
+      if (rate !== null && (!Number.isFinite(rate) || rate < 0)) {
+        return NextResponse.json(
+          { error: "Labor rate must be a non-negative number" },
+          { status: 400 }
+        );
+      }
+      await pool.query(
+        `UPDATE clients SET labor_hourly_rate = $1, updated_at = NOW() WHERE id = $2`,
+        [rate, client.id]
+      );
+    }
 
     // Phase 4: home address change. Only handles the field when it's
     // explicitly in the body (undefined means "no change"). null/""
