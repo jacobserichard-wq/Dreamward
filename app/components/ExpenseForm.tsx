@@ -28,6 +28,7 @@ import {
   CANONICAL_CHANNELS,
   type ChannelMeta,
 } from "@/lib/profitability/channels";
+import { COGS_CATEGORY_NAMES, DEFAULT_COGS_CATEGORY } from "@/lib/categories";
 
 export interface ExpenseFormCategory {
   name: string;
@@ -275,6 +276,16 @@ export default function ExpenseForm({
   // away from markets (avoids stale event_id sticking to a non-
   // markets expense).
   const showEventPicker = channel === "markets";
+
+  // While receiving a material into inventory, restrict the category to
+  // COGS/materials so the cost can't be mis-booked as, say, Marketing.
+  // Falls back to the full list if the user has no COGS categories.
+  const receivingInventory = !editing && !!receiveSkuId;
+  const cogsCategories = categories.filter((c) =>
+    COGS_CATEGORY_NAMES.has(c.name)
+  );
+  const categoryOptions =
+    receivingInventory && cogsCategories.length > 0 ? cogsCategories : categories;
 
   // ── File-handling helpers (Phase 9.4) ────────────────────────
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -566,17 +577,22 @@ export default function ExpenseForm({
                 className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
               >
                 <option value="">— pick a category —</option>
-                {categories.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.name}
                   </option>
                 ))}
-                {onCreateCategory && (
+                {onCreateCategory && !receivingInventory && (
                   <option value="__create__">
                     {"\u{2795}"} Create new category...
                   </option>
                 )}
               </select>
+            )}
+            {receivingInventory && (
+              <p className="text-xs text-slate-500 mt-1 m-0">
+                Materials only — you&apos;re receiving this into inventory.
+              </p>
             )}
           </Field>
 
@@ -620,11 +636,25 @@ export default function ExpenseForm({
                 id="expense-receive-sku"
                 value={receiveSkuId}
                 onChange={(e) => {
-                  setReceiveSkuId(e.target.value);
-                  // A material you're receiving isn't tied to a sales
-                  // channel — force Overhead so the cost can't be
-                  // mis-attributed.
-                  if (e.target.value) setChannel("");
+                  const v = e.target.value;
+                  setReceiveSkuId(v);
+                  if (v) {
+                    // A material you're receiving isn't tied to a sales
+                    // channel — force Overhead so the cost can't be
+                    // mis-attributed.
+                    setChannel("");
+                    // And force a materials/COGS category so it books as
+                    // COGS, not as some unrelated expense.
+                    if (!COGS_CATEGORY_NAMES.has(category)) {
+                      const cogs = categories.filter((c) =>
+                        COGS_CATEGORY_NAMES.has(c.name)
+                      );
+                      const preferred =
+                        cogs.find((c) => c.name === DEFAULT_COGS_CATEGORY) ??
+                        cogs[0];
+                      if (preferred) setCategory(preferred.name);
+                    }
+                  }
                   setError(null);
                 }}
                 disabled={saving}

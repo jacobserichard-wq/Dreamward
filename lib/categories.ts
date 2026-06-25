@@ -778,3 +778,21 @@ export function getCategoriesForIndustry(industry: Industry): Category[] {
 export function getCategoryNamesForIndustry(industry: Industry): string[] {
   return getCategoriesForIndustry(industry).map((c) => c.name);
 }
+
+/**
+ * Every category name flagged isCogs, across the universal set + all
+ * industry overlays. Used industry-agnostically (e.g. the expense form
+ * restricting the category to materials/COGS when receiving a purchase
+ * into inventory — picking "Marketing" there would mis-book the cost).
+ */
+export const COGS_CATEGORY_NAMES: Set<string> = new Set(
+  [
+    ...UNIVERSAL_CATEGORIES,
+    ...Object.values(INDUSTRY_OVERLAY).flat(),
+  ]
+    .filter((c) => c.isCogs)
+    .map((c) => c.name)
+);
+
+/** The preferred default COGS category for the maker persona. */
+export const DEFAULT_COGS_CATEGORY = "Raw Materials & Inventory";
