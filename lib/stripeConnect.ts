@@ -157,3 +157,68 @@ export function chargeToLineItem(charge: Stripe.Charge): InternalLineItem {
 export function chargeSoldAtIso(charge: Stripe.Charge): string {
   return new Date((charge.created ?? 0) * 1000).toISOString();
 }
+
+export interface MappedStripeChargeRow {
+  vendor: string;
+  invoice_number: string;
+  amount: number;
+  due_date: string; // YYYY-MM-DD
+  status: string; // 'paid'
+  category: string; // 'Sales' (recognized as income by the classifier)
+  source: string; // 'stripe'
+  source_ref_id: string; // charge id — dedup key with (client_id, source)
+  channel: string; // 'stripe'
+  confidence: number;
+  summary: string;
+  extracted_data: Record<string, unknown>;
+}
+
+/** Map a Stripe charge → the processed_items (parent transaction) row.
+ *  Mirrors mapPaymentToProcessedItem (Square). Only called for ingestible
+ *  charges, so status is always 'paid'. Amount is net of refunds. */
+export function chargeToProcessedItem(charge: Stripe.Charge): MappedStripeChargeRow {
+  const card = charge.payment_method_details?.card;
+  let vendor = "Stripe customer";
+  if (charge.billing_details?.email) vendor = charge.billing_details.email;
+  else if (charge.receipt_email) vendor = charge.receipt_email;
+  else if (card?.last4) vendor = `${card.brand ?? "Card"} ending in ${card.last4}`;
+
+  const dueDate = chargeSoldAtIso(charge).slice(0, 10);
+  const captured = charge.amount_captured ?? charge.amount ?? 0;
+  const net = (captured - (charge.amount_refunded ?? 0)) / 100;
+  const currency = (charge.currency || "usd").toUpperCase();
+  const invoiceNumber = charge.receipt_number
+    ? `#${charge.receipt_number}`
+    : `#${charge.id.slice(-8)}`;
+
+  return {
+    vendor,
+    invoice_number: invoiceNumber,
+    amount: net,
+    due_date: dueDate,
+    status: "paid",
+    category: "Sales",
+    source: "stripe",
+    source_ref_id: charge.id,
+    channel: "stripe",
+    confidence: 100,
+    summary: `Stripe charge ${invoiceNumber} — ${currency} ${net.toFixed(2)}`,
+    extracted_data: {
+      stripe_charge_id: charge.id,
+      receipt_number: charge.receipt_number ?? null,
+      receipt_url: charge.receipt_url ?? null,
+      currency,
+      amount_cents: charge.amount ?? 0,
+      amount_captured_cents: captured,
+      amount_refunded_cents: charge.amount_refunded ?? 0,
+      stripe_status: charge.status,
+      payment_intent:
+        typeof charge.payment_intent === "string" ? charge.payment_intent : null,
+      customer: typeof charge.customer === "string" ? charge.customer : null,
+      billing_email: charge.billing_details?.email ?? null,
+      card_brand: card?.brand ?? null,
+      card_last4: card?.last4 ?? null,
+      description: charge.description ?? null,
+    },
+  };
+}
