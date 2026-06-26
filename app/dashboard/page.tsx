@@ -9,6 +9,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import CsvReviewModal from "../components/CsvReviewModal";
 import SaleForm, { type SaleFormSubmit } from "../components/SaleForm";
 import ReceiveToInventoryModal from "../components/ReceiveToInventoryModal";
+import ExpenseRefundModal from "../components/ExpenseRefundModal";
 import RefundForm, {
   type RefundFormSubmit,
   type RefundPrefill,
@@ -165,6 +166,14 @@ function DashboardInner() {
     id: number;
     vendor: string;
     amount: number;
+  } | null>(null);
+  // "Got money back" — the expense row a vendor refunded, logged as a
+  // contra-expense credit (null = modal closed).
+  const [creditForItem, setCreditForItem] = useState<{
+    id: number;
+    vendor: string;
+    amount: number;
+    category: string | null;
   } | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
@@ -2086,9 +2095,21 @@ function DashboardInner() {
                       </div>
                       <div className="flex justify-between py-1.5 border-b border-slate-50">
                         <span className="text-[13px] text-slate-500">Amount</span>
-                        <span className="text-[15px] font-bold text-slate-900">
-                          ${item.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                        </span>
+                        {item.amount < 0 ? (
+                          <span className="text-[15px] font-bold text-emerald-600">
+                            {"−"}$
+                            {Math.abs(item.amount).toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                            })}
+                            <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-500">
+                              credit
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-[15px] font-bold text-slate-900">
+                            ${item.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
                       </div>
                       <div className="flex justify-between py-1.5 border-b border-slate-50">
                         <span className="text-[13px] text-slate-500">Due Date</span>
@@ -2210,7 +2231,7 @@ function DashboardInner() {
                         })}
                       </div>
                     </div>
-                    <div className="px-4 pb-3 flex items-center justify-between gap-2">
+                    <div className="px-4 pb-3 flex items-center flex-wrap justify-between gap-x-2 gap-y-1">
                       {/* "Refund this" — only on income/sale rows (an
                           expense or an existing refund can't be refunded).
                           Pre-fills the refund with this sale's customer,
@@ -2273,6 +2294,28 @@ function DashboardInner() {
                             }}
                           />
                         </label>
+                      )}
+                      {/* "Got money back" — vendor refund on an expense.
+                          Only on positive expense rows (not on a credit
+                          row itself). Logs a contra-expense in the same
+                          category; nets spend down, not counted as
+                          income. */}
+                      {typeOf(item) === "expense" && item.amount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCreditForItem({
+                              id: Number(item.id),
+                              vendor: item.vendor || "Vendor",
+                              amount: Number(item.amount) || 0,
+                              category: item.category,
+                            })
+                          }
+                          title="Log a vendor refund/credit on this expense"
+                          className="bg-transparent text-emerald-600 hover:text-emerald-700 hover:underline text-xs cursor-pointer px-2 py-1 inline-flex items-center gap-1"
+                        >
+                          {"\u{21A9}"} Got money back
+                        </button>
                       )}
                       <button
                         onClick={() => deleteItem(item.id)}
@@ -2609,6 +2652,16 @@ function DashboardInner() {
           onReceived={async () => {
             await loadItems();
             setSuccessMsg("Received into inventory.");
+          }}
+        />
+
+        <ExpenseRefundModal
+          open={!!creditForItem}
+          transaction={creditForItem}
+          onClose={() => setCreditForItem(null)}
+          onSaved={async () => {
+            await loadItems();
+            setSuccessMsg("Refund logged — that expense is netted down.");
           }}
         />
 

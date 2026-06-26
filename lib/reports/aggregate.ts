@@ -552,11 +552,15 @@ export async function annualSummary(opts: {
   let salesTaxCollected = 0;
   for (const t of txnsResult.rows) {
     const amount = Number(t.amount);
-    // Skip only zero/NaN. NEGATIVE income rows are kept on purpose:
-    // platform refunds are stored as negative "income" (e.g. Shopify),
-    // so letting them through makes revenue NET of refunds — the cash
-    // actually kept. Negative expense/unknown rows are nonsense data
-    // and get dropped in their branches below.
+    // Skip only zero/NaN. NEGATIVE rows are kept on purpose:
+    //  • income: platform refunds are stored as negative "income"
+    //    (e.g. Shopify), so letting them through makes revenue NET of
+    //    refunds — the cash actually kept.
+    //  • expense: a vendor refund/credit is logged as a negative
+    //    expense in the same category (a contra-expense), so netting it
+    //    reduces that category's spend — the cash actually paid out.
+    // Only the *unknown* branch still drops negatives (can't sign-guess
+    // an unclassified refund).
     if (!Number.isFinite(amount) || amount === 0) continue;
     const kind = classify(t.category);
     if (!t.due_date) continue;
@@ -577,7 +581,8 @@ export async function annualSummary(opts: {
       byCategoryIncome.set(cat, bucket);
       monthBucket.revenue += net;
     } else if (kind === "expense") {
-      if (amount < 0) continue; // a negative expense is nonsense data
+      // Negative = a vendor refund/credit (contra-expense); netting it
+      // reduces this category's spend. See the note above.
       const cat = t.category ?? "Uncategorized expense";
       const bucket = byCategoryExpense.get(cat) ?? { count: 0, total: 0 };
       bucket.count += 1;
