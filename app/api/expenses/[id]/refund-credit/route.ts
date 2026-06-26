@@ -157,6 +157,12 @@ export async function POST(
       original.vendor
     })`;
 
+    // status='pending' (not 'paid') so the credit lands in the active
+    // transactions list rather than the default-hidden "Settled" group —
+    // the user wanted to see logged refunds alongside their other rows.
+    // Nothing auto-flips pending→overdue (overdue is only ever set by the
+    // AI at processing time) and no reminder cron keys on pending, so this
+    // won't false-alarm. The user can mark it Paid to archive it.
     const inserted = await pool.query<InsertedRow>(
       `INSERT INTO processed_items (
          client_id, vendor, amount, due_date, category,
@@ -164,7 +170,7 @@ export async function POST(
          invoice_number, confidence, summary, processed_at, updated_at
        ) VALUES (
          $1, $2, $3, $4, $5,
-         'manual', $6, $7, 'paid', $8,
+         'manual', $6, $7, 'pending', $8,
          '', 100, $9, NOW(), NOW()
        )
        RETURNING id, vendor, amount, due_date, category, source,
