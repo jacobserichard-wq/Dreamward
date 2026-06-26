@@ -18,6 +18,8 @@ interface Client {
   updated_at: string;
   total_items: string;
   items_this_month: string;
+  trailing_revenue: number;
+  would_be_band: string;
 }
 
 interface Cost {
@@ -430,7 +432,7 @@ export default function AdminPage() {
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  {["Business", "Email", "Plan", "Items", "This Month", "Joined"].map(
+                  {["Business", "Email", "Plan", "Revenue (12mo)", "Band", "Items", "Joined"].map(
                     (h) => (
                       <th
                         key={h}
@@ -468,11 +470,16 @@ export default function AdminPage() {
                         {planDisplayLabel(client.plan)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-700">
-                      {client.total_items}
+                    <td className="py-3.5 px-4 text-slate-900 tabular-nums">
+                      {fmtUsd(client.trailing_revenue)}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="text-[13px] text-slate-600">
+                        {planDisplayLabel(client.would_be_band)}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-700">
-                      {client.items_this_month}
+                      {client.total_items}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="text-[13px] text-slate-500">
