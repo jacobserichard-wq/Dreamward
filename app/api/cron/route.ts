@@ -23,7 +23,11 @@ import {
   refreshAccessToken as squareRefreshAccessToken,
 } from "@/lib/square";
 import { decryptFromDb, encryptForDb } from "@/lib/crypto";
-import { reconcileAllTiers, isFirstOfMonthUtc } from "@/lib/revenueTier";
+import {
+  reconcileAllTiers,
+  isFirstOfMonthUtc,
+  cacheAllRevenue,
+} from "@/lib/revenueTier";
 import { recordInventorySnapshot } from "@/lib/inventory/valuation";
 import {
   ensureFreshToken as etsyEnsureFreshToken,
@@ -96,6 +100,16 @@ export async function GET(req: NextRequest) {
           failed++;
         }
       }
+    }
+
+    // Daily: refresh the owner-dashboard revenue cache for every account
+    // (trailing-12-month revenue + would-be band) so /admin reads stored
+    // values instead of recomputing per account on every page load.
+    let revenueCached = 0;
+    try {
+      ({ cached: revenueCached } = await cacheAllRevenue());
+    } catch (err) {
+      console.error("Revenue cache pass failed:", err);
     }
 
     // Sub-session 33: the Pro onboarding-call offering was removed,
@@ -888,6 +902,7 @@ export async function GET(req: NextRequest) {
       success: true,
       emailsSent: sent,
       emailsFailed: failed,
+      revenueCached,
       reclassifyClientsProcessed,
       reclassifyItemsTotal,
       reclassifyErrors,

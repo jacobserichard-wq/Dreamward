@@ -119,6 +119,51 @@ export async function computeTrailingRevenue(
   return revenue;
 }
 
+/** Compute a client's trailing revenue + band and persist them to the
+ *  clients cache columns (revenue_cached_at = now). Returns the fresh
+ *  figures. Used nightly by cacheAllRevenue + read-through by the owner
+ *  dashboard for a never-cached account. */
+export async function cacheClientRevenue(
+  clientId: number,
+  industry: Industry
+): Promise<{ revenue: number; band: PaidPlanName }> {
+  const revenue = await computeTrailingRevenue(clientId, industry);
+  const band = tierForAnnualRevenue(revenue);
+  await pool.query(
+    `UPDATE clients
+        SET cached_trailing_revenue = $1,
+            cached_would_be_band = $2,
+            revenue_cached_at = NOW()
+      WHERE id = $3`,
+    [revenue, band, clientId]
+  );
+  return { revenue, band };
+}
+
+/** Nightly pass (daily cron): refresh the revenue cache for every account
+ *  so the owner dashboard never recomputes on page load. Per-account
+ *  failures are logged + skipped, not fatal. */
+export async function cacheAllRevenue(): Promise<{
+  cached: number;
+  errors: number;
+}> {
+  const clients = await pool.query<{ id: number; industry: string | null }>(
+    `SELECT id, industry FROM clients`
+  );
+  let cached = 0;
+  let errors = 0;
+  for (const c of clients.rows) {
+    try {
+      await cacheClientRevenue(c.id, (c.industry ?? "other") as Industry);
+      cached++;
+    } catch (err) {
+      console.error(`cacheClientRevenue failed for client ${c.id}:`, err);
+      errors++;
+    }
+  }
+  return { cached, errors };
+}
+
 export interface TierReconcileResult {
   clientId: number;
   email: string;

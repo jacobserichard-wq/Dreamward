@@ -3,8 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
 import { isAdminEmail } from "@/lib/admin";
-import { tierForAnnualRevenue } from "@/lib/plans";
-import { computeTrailingRevenue } from "@/lib/revenueTier";
+import { cacheClientRevenue } from "@/lib/revenueTier";
 import { type Industry } from "@/lib/categories";
 
 interface AdminClientRow {
@@ -20,6 +19,9 @@ interface AdminClientRow {
   updated_at: string;
   total_items: string;
   items_this_month: string;
+  cached_trailing_revenue: string | null;
+  cached_would_be_band: string | null;
+  revenue_cached_at: string | null;
 }
 
 export async function GET() {
@@ -40,6 +42,7 @@ export async function GET() {
          c.id, c.email, c.business_name, c.industry, c.plan,
          c.stripe_customer_id, c.onboarding_completed,
          c.trial_ends_at, c.created_at, c.updated_at,
+         c.cached_trailing_revenue, c.cached_would_be_band, c.revenue_cached_at,
          COUNT(pi.id) as total_items,
          COUNT(pi.id) FILTER (WHERE pi.processed_at >= date_trunc('month', CURRENT_DATE)) as items_this_month
        FROM clients c
@@ -48,21 +51,33 @@ export async function GET() {
        ORDER BY c.created_at DESC`
     );
 
-    // Enrich each account with its trailing-12-month revenue (the same
-    // net-of-refunds figure the pricing bands key off) + the band that
-    // revenue would land them on. Per-account computeTrailingRevenue is a
-    // few queries each — fine at owner-dashboard scale (a handful of
-    // accounts); revisit if the account count grows large.
+    // Read the nightly-cached trailing-12-month revenue + would-be band
+    // (refreshed by the daily cron). A never-cached account (new signup, or
+    // before the first cron run) is computed read-through and persisted
+    // once here — so the page stays fast (no per-load recompute) without an
+    // empty-until-tonight gap.
     const clients = await Promise.all(
       result.rows.map(async (c) => {
-        const trailingRevenue = await computeTrailingRevenue(
-          c.id,
-          (c.industry || "other") as Industry
-        );
+        let revenue =
+          c.cached_trailing_revenue == null
+            ? null
+            : Number(c.cached_trailing_revenue);
+        let band = c.cached_would_be_band;
+        let cachedAt = c.revenue_cached_at;
+        if (revenue == null || band == null) {
+          const fresh = await cacheClientRevenue(
+            c.id,
+            (c.industry || "other") as Industry
+          );
+          revenue = fresh.revenue;
+          band = fresh.band;
+          cachedAt = new Date().toISOString();
+        }
         return {
           ...c,
-          trailing_revenue: trailingRevenue,
-          would_be_band: tierForAnnualRevenue(trailingRevenue),
+          trailing_revenue: revenue,
+          would_be_band: band,
+          revenue_cached_at: cachedAt,
         };
       })
     );

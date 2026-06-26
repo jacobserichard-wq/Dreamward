@@ -427,6 +427,9 @@ export default function AdminPage() {
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="py-4 px-6 border-b border-slate-200">
             <h2 className="text-lg font-bold text-slate-900 m-0">All accounts</h2>
+            <p className="text-xs text-slate-400 m-0 mt-0.5">
+              Revenue = trailing‑12‑month, net of refunds · refreshed nightly
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
