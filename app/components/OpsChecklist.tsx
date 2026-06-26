@@ -18,6 +18,9 @@ interface Item {
   id: string;
   label: string;
   how: string;
+  /** If set, this item is watched automatically — the string names what
+   *  does the watching (e.g. "Monday digest"). Absent = manual check. */
+  auto?: string;
 }
 const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[] }[] = [
   {
@@ -28,7 +31,7 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
       { id: "d-deploys", label: "Deploys green, no 500 spike", how: "Vercel → Deployments + Logs" },
       { id: "d-cron", label: "Nightly cron ran", how: "Vercel → Crons / Logs (/api/cron)" },
       { id: "d-support", label: "Support inbox", how: "Gmail: dreamwardsystems@gmail.com" },
-      { id: "d-stripe", label: "Stripe failed charges / disputes", how: "Stripe → Payments (live mode)" },
+      { id: "d-stripe", label: "Stripe failed charges / disputes", how: "Stripe → Payments (live mode)", auto: "Stripe emails disputes" },
     ],
   },
   {
@@ -36,12 +39,12 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
     cadence: "weekly",
     resets: "each week",
     items: [
-      { id: "w-sync", label: "Integration sync health", how: "Emailed Mondays — or SQL: *_connections last_sync_status='failed'" },
-      { id: "w-plaid", label: "Plaid re-auth needed?", how: "Plaid → Items (ITEM_LOGIN_REQUIRED)" },
-      { id: "w-signups", label: "Signups & conversions", how: "Metrics above ↑" },
+      { id: "w-sync", label: "Integration sync health", how: "Emailed Mondays — or SQL: *_connections last_sync_status='failed'", auto: "Monday digest" },
+      { id: "w-plaid", label: "Plaid re-auth needed?", how: "Plaid → Items (ITEM_LOGIN_REQUIRED)", auto: "Monday digest" },
+      { id: "w-signups", label: "Signups & conversions", how: "Metrics above ↑", auto: "Monday digest" },
       { id: "w-email", label: "Email deliverability", how: "Resend → Logs (bounce rate)" },
-      { id: "w-db", label: "DB connections + backups", how: "SQL: pg_stat_activity; Railway → Backups" },
-      { id: "w-deps", label: "Dependabot alerts", how: "GitHub → Security" },
+      { id: "w-db", label: "DB connections + backups", how: "SQL: pg_stat_activity; Railway → Backups", auto: "Monday digest (conn. count)" },
+      { id: "w-deps", label: "Dependabot alerts", how: "GitHub → Security", auto: "GitHub Dependabot" },
     ],
   },
   {
@@ -161,6 +164,13 @@ export default function OpsChecklist() {
 
       {!collapsed && (
         <div className="mt-4 space-y-5">
+          <p className="text-xs text-slate-500 m-0 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">
+              Auto
+            </span>
+            = the system or a provider already watches this and alerts you; the
+            rest are manual checks.
+          </p>
           {CHECKLIST.map((g) => {
             const groupDone = g.items.filter((i) => isDone(i.id, g.cadence)).length;
             return (
@@ -196,6 +206,16 @@ export default function OpsChecklist() {
                             >
                               {i.label}
                             </span>
+                            {i.auto && (
+                              <span className="ml-1.5 align-middle whitespace-nowrap">
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">
+                                  Auto
+                                </span>
+                                <span className="text-[10px] text-slate-400 ml-1">
+                                  {i.auto}
+                                </span>
+                              </span>
+                            )}
                             <span className="block text-xs text-slate-400">{i.how}</span>
                           </span>
                         </label>
