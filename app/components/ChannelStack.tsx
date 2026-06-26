@@ -6,9 +6,13 @@
 //
 // Per Jacob's call: "I want the Channels to be Vertical and I only
 // want to see Shopify, Market places, with the options to add new
-// verticals". Default collapsed set is wider than before — only
-// Shopify + Markets visible by default; user can restore others
-// from the "Show N collapsed" expander.
+// verticals".
+//
+// Visibility is "openness"-based (2026-06-26): only channels that are
+// OPEN — have activity this period (hasData) or a live connection — get a
+// card. Closed placeholders ("Connect Shopify", "Add your first event")
+// live in the "Add another channel" expander, each linking to its CTA.
+// A manual collapse-X still hides an open channel; a live connection pins.
 //
 // Each card: icon + label + revenue + net (color-coded) +
 // horizontal mini-bar + collapse-X + empty-state CTA when no data.
@@ -65,14 +69,16 @@ export default function ChannelStack({
 }: ChannelStackProps) {
   const collapsed = new Set(collapsedChannels);
   const connected = new Set(connectedChannelIds);
-  // A connected channel is force-visible — it overrides the collapsed
-  // preference so a freshly-connected store can't hide in the expander.
-  const visible = channels.filter(
-    (c) => !collapsed.has(c.id) || connected.has(c.id)
-  );
-  const hidden = channels.filter(
-    (c) => collapsed.has(c.id) && !connected.has(c.id)
-  );
+  // Only "open" channels get a card: ones with activity this period
+  // (hasData) or a live integration connection. Everything else — the
+  // "Connect me / Add your first" placeholders — is tucked into the
+  // "Add another channel" expander. A manual collapse-X still hides an
+  // open channel; a live connection always pins it visible.
+  const isOpen = (c: ChannelRow) => c.hasData || connected.has(c.id);
+  const isVisible = (c: ChannelRow) =>
+    isOpen(c) && (connected.has(c.id) || !collapsed.has(c.id));
+  const visible = channels.filter(isVisible);
+  const hidden = channels.filter((c) => !isVisible(c));
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -90,7 +96,8 @@ export default function ChannelStack({
       <div className="space-y-2">
         {visible.length === 0 && (
           <p className="text-sm text-slate-500 italic py-3 text-center">
-            No channels visible. Restore one from the collapsed list below.
+            No open channels yet — add one below to start tracking where your
+            money comes from.
           </p>
         )}
         {visible.map((ch) => (
@@ -137,7 +144,8 @@ export default function ChannelStack({
                       </p>
                     )}
                   </div>
-                  {!ch.comingSoon && (
+                  {ch.comingSoon ? null : ch.hasData ? (
+                    // An open channel you manually hid — restore it to a card.
                     <button
                       type="button"
                       onClick={() => onToggleCollapse(ch.id)}
@@ -145,6 +153,19 @@ export default function ChannelStack({
                     >
                       + Add
                     </button>
+                  ) : (
+                    // A closed channel — link to its connect/add CTA so this
+                    // expander is where you "open" a new channel.
+                    <Link
+                      href={
+                        ch.proGated && !isPro
+                          ? "/billing"
+                          : ch.emptyAddHref ?? "/integrations"
+                      }
+                      className="text-blue-600 hover:underline cursor-pointer text-xs whitespace-nowrap pt-0.5"
+                    >
+                      + Add
+                    </Link>
                   )}
                 </li>
               ))}
