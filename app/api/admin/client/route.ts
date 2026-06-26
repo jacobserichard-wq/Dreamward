@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
-
-function getAdminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || "meridian.supply.test@gmail.com")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
+import { getAdminSessionEmail } from "@/lib/admin";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email?.toLowerCase();
-    if (!email || !getAdminEmails().includes(email)) {
+    const admin = await getAdminSessionEmail();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
