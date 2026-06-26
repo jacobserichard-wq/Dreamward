@@ -24,6 +24,7 @@ import {
   ensureFreshToken,
   fetchReceiptsPage,
   mapReceiptToProcessedItem,
+  mapReceiptRefundsToRows,
   mapTransactionsToLineItems,
   ETSY_RECEIPTS_PAGE_SIZE,
 } from "@/lib/etsy";
@@ -168,7 +169,14 @@ export async function POST() {
 
       // Bulk INSERT with the cross-source dedup ON CONFLICT — the
       // same partial-index pattern the Wix/Square backfills use.
-      const rows = page.receipts.map(mapReceiptToProcessedItem);
+      // Refund rows (negative, from each receipt's refunds[]) ride the
+      // same insert — identical 13-col shape, deduped by their own
+      // 'etsy-refund-...' source_ref_id, and skipped by the line-item
+      // fanout below (their source_ref_id never matches a receipt id).
+      const rows = [
+        ...page.receipts.map(mapReceiptToProcessedItem),
+        ...page.receipts.flatMap(mapReceiptRefundsToRows),
+      ];
       const fieldsPerRow = 13;
       const values: unknown[] = [];
       const placeholders = rows
@@ -244,7 +252,11 @@ export async function POST() {
             parents,
           });
         }
-        receiptsImported += insertRes.rowCount;
+        // Count receipts only (exclude refund rows) so the progress
+        // figure keeps meaning "orders imported".
+        receiptsImported += insertRes.rows.filter(
+          (r) => !r.source_ref_id.startsWith("etsy-refund-")
+        ).length;
       }
 
       offset += page.receipts.length;

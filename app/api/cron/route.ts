@@ -33,6 +33,7 @@ import {
   ensureFreshToken as etsyEnsureFreshToken,
   fetchReceiptsPage as etsyFetchReceiptsPage,
   mapReceiptToProcessedItem as etsyMapReceipt,
+  mapReceiptRefundsToRows as etsyMapRefunds,
   mapTransactionsToLineItems as etsyMapLineItems,
 } from "@/lib/etsy";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
@@ -580,7 +581,12 @@ export async function GET(req: NextRequest) {
           });
           if (page.receipts.length === 0) continue;
 
-          const rows = page.receipts.map(etsyMapReceipt);
+          // Receipts + their refunds (negative rows) share one insert —
+          // same 13-col shape, deduped by 'etsy-refund-...' source_ref_id.
+          const rows = [
+            ...page.receipts.map(etsyMapReceipt),
+            ...page.receipts.flatMap(etsyMapRefunds),
+          ];
           const fieldsPerRow = 13;
           const values: unknown[] = [];
           const placeholders = rows
@@ -654,7 +660,10 @@ export async function GET(req: NextRequest) {
                 parents,
               });
             }
-            etsyReceiptsUpserted += insertRes.rowCount;
+            // Count receipts only (exclude refund rows).
+            etsyReceiptsUpserted += insertRes.rows.filter(
+              (r) => !r.source_ref_id.startsWith("etsy-refund-")
+            ).length;
           }
         } catch (err) {
           etsyReconcileErrors++;

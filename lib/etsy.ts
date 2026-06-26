@@ -280,6 +280,18 @@ export interface EtsyTransaction {
   price: EtsyMoney;
 }
 
+/** A refund issued on a receipt. Etsy v3 returns these inline on the
+ *  receipt (no separate id field), so we key the row on receipt_id +
+ *  created_timestamp. Defensive: the field may be absent on older API
+ *  shapes — callers treat undefined as "no refunds". */
+export interface EtsyRefund {
+  amount: EtsyMoney;
+  created_timestamp?: number; // unix seconds
+  reason?: string | null;
+  note_from_issuer?: string | null;
+  status?: string | null;
+}
+
 export interface EtsyReceipt {
   receipt_id: number;
   status: string | null; // "Paid" | "Completed" | "Open" | "Canceled" | ...
@@ -289,6 +301,7 @@ export interface EtsyReceipt {
   create_timestamp: number; // unix seconds
   grandtotal: EtsyMoney;
   transactions: EtsyTransaction[];
+  refunds?: EtsyRefund[]; // present on Etsy v3 receipts; may be absent
 }
 
 interface EtsyReceiptsResponse {
@@ -395,6 +408,61 @@ export function mapReceiptToProcessedItem(
       line_item_count: receipt.transactions?.length ?? 0,
     },
   };
+}
+
+/**
+ * Flatten a receipt's refunds into NEGATIVE processed_items rows that
+ * net against the original Etsy sale (same category "Sales" + channel
+ * "etsy" + source). Etsy refunds carry no stable id, so the dedup key
+ * is receipt_id + created_timestamp (falling back to the array index).
+ * Etsy sale rows fold tax into the grandtotal (no separate tax_amount),
+ * so a full refund nets the sale to zero — we mirror that here.
+ *
+ * Returns [] when the receipt has no refunds (or the field is absent).
+ *
+ * NOTE: we ingest every refund present in the array. Etsy generally
+ * only lists issued refunds, but the exact `status` semantics aren't
+ * verified against live data yet (Etsy commercial access pending) —
+ * revisit the status filter once a real refunded receipt is available.
+ */
+export function mapReceiptRefundsToRows(
+  receipt: EtsyReceipt
+): MappedEtsyReceiptRow[] {
+  const vendor = receipt.name || receipt.buyer_email || "Etsy buyer";
+  const rows: MappedEtsyReceiptRow[] = [];
+  (receipt.refunds ?? []).forEach((refund, idx) => {
+    const refundAmount = moneyToDecimal(refund.amount);
+    if (!(refundAmount > 0)) return; // skip zero / unparseable
+    const ts = refund.created_timestamp ?? null;
+    const isoDate = new Date(
+      ((ts ?? receipt.create_timestamp) || 0) * 1000
+    ).toISOString();
+    const currency =
+      refund.amount?.currency_code ??
+      receipt.grandtotal?.currency_code ??
+      "USD";
+    rows.push({
+      vendor,
+      invoice_number: `#${receipt.receipt_id}-refund`,
+      amount: -refundAmount, // NEGATIVE — nets against Etsy income
+      due_date: isoDate.slice(0, 10),
+      status: "paid",
+      category: "Sales",
+      source: "etsy",
+      source_ref_id: `etsy-refund-${receipt.receipt_id}-${ts ?? idx}`,
+      channel: "etsy",
+      confidence: 100,
+      summary: `Etsy refund for order #${receipt.receipt_id} — ${currency} ${refundAmount.toFixed(2)}`,
+      extracted_data: {
+        etsy_receipt_id: receipt.receipt_id,
+        refund_amount: refundAmount,
+        refund_reason: refund.reason ?? null,
+        refund_status: refund.status ?? null,
+        currency,
+      },
+    });
+  });
+  return rows;
 }
 
 /** Receipt transactions → the platform-agnostic line-item shape that
