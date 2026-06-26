@@ -6,17 +6,20 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-/** The owner email allowlist. Defaults to Jacob's two logins so the owner
- *  dashboard works out of the box; override in prod via the ADMIN_EMAILS
- *  env var (comma-separated). */
+/** The founder's logins ALWAYS have owner access — baked in so a misset (or
+ *  leftover) ADMIN_EMAILS env var can never lock the owner out of their own
+ *  dashboard. ADMIN_EMAILS just *adds* extra admins on top. */
+const OWNER_EMAILS = [
+  "jacobse.richard@gmail.com",
+  "dreamwardsystems@gmail.com",
+];
+
 export function getAdminEmails(): string[] {
-  return (
-    process.env.ADMIN_EMAILS ||
-    "jacobse.richard@gmail.com,dreamwardsystems@gmail.com"
-  )
+  const fromEnv = (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+  return Array.from(new Set([...OWNER_EMAILS, ...fromEnv]));
 }
 
 export function isAdminEmail(email?: string | null): boolean {

@@ -76,7 +76,14 @@ export default function AdminPage() {
       try {
         const res = await fetch("/api/admin");
         if (res.status === 403) {
-          setError("Access denied. Owner only.");
+          const body = (await res.json().catch(() => ({}))) as {
+            email?: string;
+          };
+          setError(
+            body.email
+              ? `Signed in as ${body.email} — that account isn't an owner.`
+              : "Access denied. Owner only."
+          );
           return;
         }
         if (!res.ok) throw new Error("Failed to load");

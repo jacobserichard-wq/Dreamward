@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
-import { getAdminSessionEmail } from "@/lib/admin";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   try {
-    const admin = await getAdminSessionEmail();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const session = await getServerSession(authOptions);
+    const email = session?.user?.email?.toLowerCase() ?? null;
+    if (!isAdminEmail(email)) {
+      // Echo the signed-in email so the denial screen can show what the
+      // gate actually checked (catches "wrong account logged in").
+      return NextResponse.json(
+        { error: "Unauthorized", email: email ?? "(not signed in)" },
+        { status: 403 }
+      );
     }
 
     const result = await pool.query(
