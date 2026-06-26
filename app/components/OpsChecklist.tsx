@@ -4,12 +4,13 @@
 // monthly / yearly "keep it running" items from the ops runbook
 // (session-notes/founder-ops-runbook.md), as tickable boxes.
 //
-// Period-aware: instead of a manual reset, each check stores the PERIOD
-// KEY it was ticked in (e.g. a daily item stores today's date, a monthly
-// item stores "2026-06"). An item only reads as done when its stored key
-// matches the CURRENT period — so a daily item auto-clears tomorrow, a
-// weekly one next week, etc. No resetting by hand. The weekly health
-// signals are also emailed every Monday (/api/cron/founder-digest).
+// Period-aware: each check stores the PERIOD KEY it was ticked in, and an
+// item only reads as done while that key matches the CURRENT period — so a
+// daily item auto-clears tomorrow, a weekly one next week, etc. No manual
+// reset. Items the system/a provider already watches carry an "Auto" badge.
+// Manual items are clickable ("how? ▸") to reveal step-by-step directions.
+// The weekly health signals are also emailed every Monday
+// (/api/cron/founder-digest).
 
 import { useState, useEffect } from "react";
 
@@ -17,10 +18,12 @@ type Cadence = "daily" | "weekly" | "monthly" | "yearly";
 interface Item {
   id: string;
   label: string;
-  how: string;
-  /** If set, this item is watched automatically — the string names what
-   *  does the watching (e.g. "Monday digest"). Absent = manual check. */
+  /** Short pointer shown under AUTO items. */
+  how?: string;
+  /** If set, this item is watched automatically — names what watches it. */
   auto?: string;
+  /** Step-by-step directions for a MANUAL item; revealed on click. */
+  desc?: string[];
 }
 const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[] }[] = [
   {
@@ -28,10 +31,38 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
     cadence: "daily",
     resets: "each day",
     items: [
-      { id: "d-deploys", label: "Deploys green, no 500 spike", how: "Vercel → Deployments + Logs" },
-      { id: "d-cron", label: "Nightly cron ran", how: "Vercel → Crons / Logs (/api/cron)" },
-      { id: "d-support", label: "Support inbox", how: "Gmail: dreamwardsystems@gmail.com" },
-      { id: "d-stripe", label: "Stripe failed charges / disputes", how: "Stripe → Payments (live mode)", auto: "Stripe emails disputes" },
+      {
+        id: "d-deploys",
+        label: "Deploys green, no 500 spike",
+        desc: [
+          "Vercel → open the Dreamward project → Deployments tab.",
+          "Newest deploy on main should read Ready (green). A red Error → click it and read the build log.",
+          "Open Logs / Observability → filter to Errors or status 500. A spike over your normal baseline means investigate that route.",
+        ],
+      },
+      {
+        id: "d-cron",
+        label: "Nightly cron ran",
+        desc: [
+          "The daily cron is /api/cron (runs 14:00 UTC — Etsy reconciliation + Plaid sync).",
+          "Vercel → project → Crons tab → confirm /api/cron shows a recent run.",
+          "Or Logs → filter path /api/cron → confirm a 200 in the last 24h with no thrown error.",
+        ],
+      },
+      {
+        id: "d-support",
+        label: "Support inbox",
+        desc: [
+          "Open Gmail for dreamwardsystems@gmail.com — all app reply-to lands here.",
+          "Scan for customer questions or replies; respond or triage.",
+        ],
+      },
+      {
+        id: "d-stripe",
+        label: "Stripe failed charges / disputes",
+        how: "Stripe → Payments (live mode)",
+        auto: "Stripe emails disputes",
+      },
     ],
   },
   {
@@ -39,12 +70,45 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
     cadence: "weekly",
     resets: "each week",
     items: [
-      { id: "w-sync", label: "Integration sync health", how: "Emailed Mondays — or SQL: *_connections last_sync_status='failed'", auto: "Monday digest" },
-      { id: "w-plaid", label: "Plaid re-auth needed?", how: "Plaid → Items (ITEM_LOGIN_REQUIRED)", auto: "Monday digest" },
-      { id: "w-signups", label: "Signups & conversions", how: "Metrics above ↑", auto: "Monday digest" },
-      { id: "w-email", label: "Email deliverability", how: "Resend → Logs (bounce rate)" },
-      { id: "w-db", label: "DB connections + backups", how: "SQL: pg_stat_activity; Railway → Backups", auto: "Monday digest (conn. count)" },
-      { id: "w-deps", label: "Dependabot alerts", how: "GitHub → Security", auto: "GitHub Dependabot" },
+      {
+        id: "w-sync",
+        label: "Integration sync health",
+        how: "Emailed Mondays — or SQL: *_connections last_sync_status='failed'",
+        auto: "Monday digest",
+      },
+      {
+        id: "w-plaid",
+        label: "Plaid re-auth needed?",
+        how: "Plaid → Items (ITEM_LOGIN_REQUIRED)",
+        auto: "Monday digest",
+      },
+      {
+        id: "w-signups",
+        label: "Signups & conversions",
+        how: "Metrics above ↑",
+        auto: "Monday digest",
+      },
+      {
+        id: "w-email",
+        label: "Email deliverability",
+        desc: [
+          "resend.com → Emails / Logs.",
+          "Check the week's delivered-vs-bounced ratio — a rising bounce/complaint rate hurts sender reputation.",
+          "Spot-check that a recent app email shows Delivered.",
+        ],
+      },
+      {
+        id: "w-db",
+        label: "DB connections + backups",
+        how: "SQL: pg_stat_activity; Railway → Backups",
+        auto: "Monday digest (conn. count)",
+      },
+      {
+        id: "w-deps",
+        label: "Dependabot alerts",
+        how: "GitHub → Security",
+        auto: "GitHub Dependabot",
+      },
     ],
   },
   {
@@ -52,10 +116,42 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
     cadence: "monthly",
     resets: "each month",
     items: [
-      { id: "m-pnl", label: "Costs vs revenue", how: "Metrics above + provider billing (Plaid $0.30/acct)" },
-      { id: "m-ai", label: "AI features still alive", how: "Trigger one AI feature; 'AI processing failed' = retired model" },
-      { id: "m-books", label: "Books spot-check", how: "A customer's Reports: revenue − refunds, COGS, tax" },
-      { id: "m-house", label: "Housekeeping", how: "DB size, churn, token/secret expiries" },
+      {
+        id: "m-pnl",
+        label: "Costs vs revenue",
+        desc: [
+          "Revenue: the MRR + bands at the top of this page.",
+          "Costs: tally Vercel, Railway, Resend, Plaid (Billing — $0.30 × connected accounts), Anthropic (console Usage) into the Operating costs card.",
+          "Confirm Net / mo is positive and each band stays margin-positive.",
+        ],
+      },
+      {
+        id: "m-ai",
+        label: "AI features still alive",
+        desc: [
+          "Trigger one AI feature — e.g. upload a PDF invoice and let it parse, or run a categorize.",
+          "If it works, the pinned Anthropic model is live.",
+          "If you see 'AI processing failed' everywhere, the model id was likely retired (404) — a code fix (~5 files); send it to me.",
+        ],
+      },
+      {
+        id: "m-books",
+        label: "Books spot-check",
+        desc: [
+          "Open one real customer's account (or the admin client view).",
+          "Reports → check: revenue = sales − refunds, COGS / margin sane, sales tax separated.",
+          "Catches silent calc regressions before customers do.",
+        ],
+      },
+      {
+        id: "m-house",
+        label: "Housekeeping",
+        desc: [
+          "DB size: SELECT pg_size_pretty(pg_database_size(current_database())); and SELECT count(*) FROM processed_items;.",
+          "Churn: review cancellations / downgrades in Stripe.",
+          "Note upcoming token / key expiries; rotate if warranted.",
+        ],
+      },
     ],
   },
   {
@@ -63,11 +159,47 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
     cadence: "yearly",
     resets: "each year",
     items: [
-      { id: "y-taxes", label: "Year-end taxes / 1099s", how: "Export reports; CPA handoff" },
-      { id: "y-domain", label: "Renew domain + verify registrant email", how: "Namecheap — avoids the Whois-hold outage" },
-      { id: "y-secrets", label: "Rotate keys / review secrets", how: "Stripe, Resend, Plaid, token-encryption key" },
-      { id: "y-pricing", label: "Review pricing vs costs", how: "Bands vs infra spend (this page)" },
-      { id: "y-policies", label: "Review Terms & Privacy currency", how: "Subprocessors: Plaid, Stripe, Resend" },
+      {
+        id: "y-taxes",
+        label: "Year-end taxes / 1099s",
+        desc: [
+          "Export year-end reports for your accountant.",
+          "Send 1099s to any contractor paid over $600.",
+          "Hand off to your CPA.",
+        ],
+      },
+      {
+        id: "y-domain",
+        label: "Renew domain + verify registrant email",
+        desc: [
+          "Namecheap → Domain List → godreamward.com → confirm auto-renew is on (or renew).",
+          "Verify the registrant email is current and verified — an unverified Whois email triggers a hold that parks the whole site offline.",
+        ],
+      },
+      {
+        id: "y-secrets",
+        label: "Rotate keys / review secrets",
+        desc: [
+          "Review Stripe, Resend, Plaid keys + the token-encryption key.",
+          "Rotate anything old or possibly exposed and update it in Vercel env vars.",
+        ],
+      },
+      {
+        id: "y-pricing",
+        label: "Review pricing vs costs",
+        desc: [
+          "Compare the band ladder to your actual per-customer costs (Plaid, infra, AI).",
+          "Adjust bands if margins have drifted.",
+        ],
+      },
+      {
+        id: "y-policies",
+        label: "Review Terms & Privacy currency",
+        desc: [
+          "Re-read Terms + Privacy for accuracy.",
+          "Confirm subprocessors are current (Plaid, Stripe, Resend) — update as integrations change.",
+        ],
+      },
     ],
   },
 ];
@@ -78,18 +210,17 @@ const COLLAPSE = "dw-ops-checklist-collapsed";
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
-/** The current period key for a cadence. Stored on a check; an item is
- *  "done" only while its stored key still equals this — so it auto-clears
- *  when the period rolls over. */
+/** Current period key for a cadence. Stored on a check; an item is "done"
+ *  only while its stored key still equals this — auto-clears when the
+ *  period rolls over. */
 function periodKey(cadence: Cadence, d: Date): string {
   const y = d.getFullYear();
   switch (cadence) {
     case "daily":
       return `D${y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     case "weekly": {
-      // Key on the Monday of the current week (no ISO-week edge cases).
       const m = new Date(d);
-      m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+      m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); // Monday of this week
       return `W${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`;
     }
     case "monthly":
@@ -100,9 +231,9 @@ function periodKey(cadence: Cadence, d: Date): string {
 }
 
 export default function OpsChecklist() {
-  // id -> the period key it was last checked in.
   const [checked, setChecked] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState(true);
+  const [openDesc, setOpenDesc] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
@@ -130,6 +261,8 @@ export default function OpsChecklist() {
     else next[id] = periodKey(cadence, new Date());
     persist(next);
   };
+  const toggleDesc = (id: string) =>
+    setOpenDesc((o) => ({ ...o, [id]: !o[id] }));
   const setCollapse = (v: boolean) => {
     setCollapsed(v);
     try {
@@ -168,8 +301,8 @@ export default function OpsChecklist() {
             <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">
               Auto
             </span>
-            = the system or a provider already watches this and alerts you; the
-            rest are manual checks.
+            = the system or a provider already watches this and alerts you;
+            tap any other item for how to do it.
           </p>
           {CHECKLIST.map((g) => {
             const groupDone = g.items.filter((i) => isDone(i.id, g.cadence)).length;
@@ -188,37 +321,76 @@ export default function OpsChecklist() {
                 </div>
                 <ul className="m-0 p-0 list-none space-y-1.5">
                   {g.items.map((i) => {
-                    const done = isDone(i.id, g.cadence);
+                    const isChecked = isDone(i.id, g.cadence);
+                    const open = !!openDesc[i.id];
                     return (
                       <li key={i.id}>
-                        <label className="flex items-start gap-2.5 cursor-pointer">
+                        <div className="flex items-start gap-2.5">
                           <input
                             type="checkbox"
-                            checked={done}
+                            checked={isChecked}
                             onChange={() => toggle(i.id, g.cadence)}
-                            className="mt-1 cursor-pointer accent-emerald-600"
+                            aria-label={i.label}
+                            className="mt-1 cursor-pointer accent-emerald-600 flex-shrink-0"
                           />
-                          <span className="leading-snug">
-                            <span
-                              className={`text-sm ${
-                                done ? "line-through text-slate-400" : "text-slate-700"
-                              }`}
-                            >
-                              {i.label}
-                            </span>
-                            {i.auto && (
-                              <span className="ml-1.5 align-middle whitespace-nowrap">
-                                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">
-                                  Auto
+                          <div className="leading-snug flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {i.desc ? (
+                                <button
+                                  onClick={() => toggleDesc(i.id)}
+                                  className="bg-transparent border-0 p-0 cursor-pointer text-left"
+                                  aria-expanded={open}
+                                >
+                                  <span
+                                    className={`text-sm ${
+                                      isChecked
+                                        ? "line-through text-slate-400"
+                                        : "text-slate-700"
+                                    }`}
+                                  >
+                                    {i.label}
+                                  </span>
+                                  <span className="text-[11px] text-blue-600 ml-1.5">
+                                    {open ? "hide ▾" : "how? ▸"}
+                                  </span>
+                                </button>
+                              ) : (
+                                <span
+                                  className={`text-sm ${
+                                    isChecked
+                                      ? "line-through text-slate-400"
+                                      : "text-slate-700"
+                                  }`}
+                                >
+                                  {i.label}
                                 </span>
-                                <span className="text-[10px] text-slate-400 ml-1">
-                                  {i.auto}
+                              )}
+                              {i.auto && (
+                                <span className="whitespace-nowrap">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-px">
+                                    Auto
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 ml-1">
+                                    {i.auto}
+                                  </span>
                                 </span>
-                              </span>
-                            )}
-                            <span className="block text-xs text-slate-400">{i.how}</span>
-                          </span>
-                        </label>
+                              )}
+                            </div>
+                            {i.desc
+                              ? open && (
+                                  <ol className="mt-1 mb-1 ml-4 list-decimal text-xs text-slate-500 space-y-0.5">
+                                    {i.desc.map((s, k) => (
+                                      <li key={k}>{s}</li>
+                                    ))}
+                                  </ol>
+                                )
+                              : i.how && (
+                                  <span className="block text-xs text-slate-400">
+                                    {i.how}
+                                  </span>
+                                )}
+                          </div>
+                        </div>
                       </li>
                     );
                   })}
