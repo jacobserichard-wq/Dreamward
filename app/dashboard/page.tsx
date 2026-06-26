@@ -1211,6 +1211,13 @@ function DashboardInner() {
     UMBRELLA_VALUES.includes(i.category)
   ).length;
 
+  // Channels that actually appear in the transactions, so the Channel
+  // filter only lists ones you can filter to — an empty channel returns
+  // nothing, so it shouldn't clutter the dropdown.
+  const activeChannelIds = new Set(
+    processedItems.map((i) => i.channel).filter(Boolean)
+  );
+
   // Sub-session 33: the Pro onboarding-call offering was removed.
   // The dashboard book-your-call prompt + scheduled-call
   // confirmation banners are gone with it.
@@ -1764,7 +1771,13 @@ function DashboardInner() {
                   className="py-1 px-2 text-xs border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
                 >
                   <option value="">All channels</option>
-                  {CANONICAL_CHANNELS.filter((c) => !c.comingSoon).map((c) => (
+                  {CANONICAL_CHANNELS.filter(
+                    (c) =>
+                      !c.comingSoon &&
+                      // only channels present in the data (keep the current
+                      // selection visible so the dropdown never goes blank)
+                      (activeChannelIds.has(c.id) || c.id === txnChannelFilter)
+                  ).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.icon} {c.label}
                     </option>
