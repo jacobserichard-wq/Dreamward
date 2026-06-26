@@ -302,8 +302,9 @@ export default function PlaidConnectionCard() {
                 : "Connect a bank"}
           </button>
           <span className="text-xs text-slate-500">
-            We pull spending only — deposits and sales stay with your store
-            integrations.
+            <strong>Bank = your spending.</strong> Sales come from your shops +
+            &ldquo;Add a sale&rdquo; — we don&apos;t count deposits as income
+            (that would double-count your shop payouts).
           </span>
         </div>
       </div>

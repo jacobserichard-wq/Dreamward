@@ -25,6 +25,7 @@ import type { ChannelRow } from "../components/ChannelTable";
 import SalesBanner from "../components/SalesBanner";
 import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
+import SectionTip from "../components/SectionTip";
 import CogsSummaryCard from "../components/CogsSummaryCard";
 import TotalsDrillModal from "../components/TotalsDrillModal";
 import MonthFilterPill, {
@@ -1217,6 +1218,9 @@ function DashboardInner() {
   const activeChannelIds = new Set(
     processedItems.map((i) => i.channel).filter(Boolean)
   );
+  // Bank (Plaid) expenses present → show the "where income comes from" tip,
+  // since that's exactly when the deposits-aren't-income question comes up.
+  const hasBankExpenses = processedItems.some((i) => i.source === "plaid");
 
   // Sub-session 33: the Pro onboarding-call offering was removed.
   // The dashboard book-your-call prompt + scheduled-call
@@ -1726,6 +1730,18 @@ function DashboardInner() {
                 {"\u{2B07}\u{FE0F}"} Download CSV template
               </a>
             </div>
+            {hasBankExpenses && (
+              <SectionTip
+                id="bank-income-model"
+                title="Where your income comes from"
+              >
+                Your bank feed pulls <strong>spending only</strong>. Sales
+                aren&apos;t counted from deposits — that would double-count your
+                shop payouts — so income comes from your connected shops and the{" "}
+                <strong>Add a sale</strong> button. Your bank&apos;s money‑in
+                won&apos;t equal your revenue, and that&apos;s correct.
+              </SectionTip>
+            )}
             {/* Search box: locate a specific transaction without scrolling.
                 Only shown once there's something to search. Filters
                 vendor/customer, category, channel, invoice #, status, and
