@@ -38,6 +38,7 @@ export type ChannelId =
   | "etsy"        // coming soon (Phase 10 — not the one we shipped)
   | "square"      // live as of Phase 11b
   | "wix"         // live as of Phase 10b (this fix backfills the missing channel registration)
+  | "stripe"      // Stripe Connect — a customer's own Stripe sales (June 2026)
   | "woocommerce" // coming soon
   ;
 
@@ -190,6 +191,18 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     comingSoon: false,
     emptyAddHref: "/integrations",
     emptyAddLabel: "Connect Wix",
+    proGated: true,
+    drillHref: "/dashboard?tab=processed",
+  },
+  {
+    // Stripe CONNECT — a customer's own Stripe sales sync in as income.
+    // Separate from billing Stripe. (June 2026)
+    id: "stripe",
+    label: "Stripe",
+    icon: "\u{1F4B3}",
+    comingSoon: false,
+    emptyAddHref: "/integrations",
+    emptyAddLabel: "Connect Stripe",
     proGated: true,
     drillHref: "/dashboard?tab=processed",
   },
