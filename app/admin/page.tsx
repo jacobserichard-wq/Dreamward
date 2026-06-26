@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import PageHeader from "../components/PageHeader";
+import OpsChecklist from "../components/OpsChecklist";
 import { planColor } from "@/lib/planColor";
 import { BANDS, planDisplayLabel } from "@/lib/plans";
 
@@ -422,6 +423,9 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {/* Founder ops checklist */}
+        <OpsChecklist />
 
         {/* Client table */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
