@@ -1,23 +1,29 @@
 "use client";
 
-// Founder operations checklist for the owner dashboard. The daily /
-// weekly / monthly "keep it running" items from the ops runbook
-// (session-notes/founder-ops-runbook.md), as tickable boxes. Checks
-// persist in localStorage; each group has a Reset to clear it at the
-// start of a new day/week/month. The weekly health signals are ALSO
-// emailed every Monday (/api/cron/founder-digest) — this is the manual
-// reference + tick-off companion.
+// Founder operations checklist for the owner dashboard. Daily / weekly /
+// monthly / yearly "keep it running" items from the ops runbook
+// (session-notes/founder-ops-runbook.md), as tickable boxes.
+//
+// Period-aware: instead of a manual reset, each check stores the PERIOD
+// KEY it was ticked in (e.g. a daily item stores today's date, a monthly
+// item stores "2026-06"). An item only reads as done when its stored key
+// matches the CURRENT period — so a daily item auto-clears tomorrow, a
+// weekly one next week, etc. No resetting by hand. The weekly health
+// signals are also emailed every Monday (/api/cron/founder-digest).
 
 import { useState, useEffect } from "react";
 
+type Cadence = "daily" | "weekly" | "monthly" | "yearly";
 interface Item {
   id: string;
   label: string;
   how: string;
 }
-const CHECKLIST: { group: string; items: Item[] }[] = [
+const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[] }[] = [
   {
     group: "Daily",
+    cadence: "daily",
+    resets: "each day",
     items: [
       { id: "d-deploys", label: "Deploys green, no 500 spike", how: "Vercel → Deployments + Logs" },
       { id: "d-cron", label: "Nightly cron ran", how: "Vercel → Crons / Logs (/api/cron)" },
@@ -27,6 +33,8 @@ const CHECKLIST: { group: string; items: Item[] }[] = [
   },
   {
     group: "Weekly",
+    cadence: "weekly",
+    resets: "each week",
     items: [
       { id: "w-sync", label: "Integration sync health", how: "Emailed Mondays — or SQL: *_connections last_sync_status='failed'" },
       { id: "w-plaid", label: "Plaid re-auth needed?", how: "Plaid → Items (ITEM_LOGIN_REQUIRED)" },
@@ -38,6 +46,8 @@ const CHECKLIST: { group: string; items: Item[] }[] = [
   },
   {
     group: "Monthly",
+    cadence: "monthly",
+    resets: "each month",
     items: [
       { id: "m-pnl", label: "Costs vs revenue", how: "Metrics above + provider billing (Plaid $0.30/acct)" },
       { id: "m-ai", label: "AI features still alive", how: "Trigger one AI feature; 'AI processing failed' = retired model" },
@@ -45,26 +55,63 @@ const CHECKLIST: { group: string; items: Item[] }[] = [
       { id: "m-house", label: "Housekeeping", how: "DB size, churn, token/secret expiries" },
     ],
   },
+  {
+    group: "Yearly",
+    cadence: "yearly",
+    resets: "each year",
+    items: [
+      { id: "y-taxes", label: "Year-end taxes / 1099s", how: "Export reports; CPA handoff" },
+      { id: "y-domain", label: "Renew domain + verify registrant email", how: "Namecheap — avoids the Whois-hold outage" },
+      { id: "y-secrets", label: "Rotate keys / review secrets", how: "Stripe, Resend, Plaid, token-encryption key" },
+      { id: "y-pricing", label: "Review pricing vs costs", how: "Bands vs infra spend (this page)" },
+      { id: "y-policies", label: "Review Terms & Privacy currency", how: "Subprocessors: Plaid, Stripe, Resend" },
+    ],
+  },
 ];
 
 const STORE = "dw-ops-checklist";
 const COLLAPSE = "dw-ops-checklist-collapsed";
 
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+/** The current period key for a cadence. Stored on a check; an item is
+ *  "done" only while its stored key still equals this — so it auto-clears
+ *  when the period rolls over. */
+function periodKey(cadence: Cadence, d: Date): string {
+  const y = d.getFullYear();
+  switch (cadence) {
+    case "daily":
+      return `D${y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    case "weekly": {
+      // Key on the Monday of the current week (no ISO-week edge cases).
+      const m = new Date(d);
+      m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+      return `W${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`;
+    }
+    case "monthly":
+      return `M${y}-${pad(d.getMonth() + 1)}`;
+    case "yearly":
+      return `Y${y}`;
+  }
+}
+
 export default function OpsChecklist() {
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  // id -> the period key it was last checked in.
+  const [checked, setChecked] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORE);
-      if (raw) setChecked(JSON.parse(raw) as Record<string, boolean>);
+      if (raw) setChecked(JSON.parse(raw) as Record<string, string>);
       if (localStorage.getItem(COLLAPSE) === "false") setCollapsed(false);
     } catch {
       /* ignore */
     }
   }, []);
 
-  const persist = (next: Record<string, boolean>) => {
+  const persist = (next: Record<string, string>) => {
     setChecked(next);
     try {
       localStorage.setItem(STORE, JSON.stringify(next));
@@ -72,10 +119,12 @@ export default function OpsChecklist() {
       /* ignore */
     }
   };
-  const toggle = (id: string) => persist({ ...checked, [id]: !checked[id] });
-  const resetGroup = (ids: string[]) => {
+  const isDone = (id: string, cadence: Cadence): boolean =>
+    checked[id] === periodKey(cadence, new Date());
+  const toggle = (id: string, cadence: Cadence) => {
     const next = { ...checked };
-    ids.forEach((id) => delete next[id]);
+    if (isDone(id, cadence)) delete next[id];
+    else next[id] = periodKey(cadence, new Date());
     persist(next);
   };
   const setCollapse = (v: boolean) => {
@@ -89,7 +138,7 @@ export default function OpsChecklist() {
 
   const total = CHECKLIST.reduce((n, g) => n + g.items.length, 0);
   const done = CHECKLIST.reduce(
-    (n, g) => n + g.items.filter((i) => checked[i.id]).length,
+    (n, g) => n + g.items.filter((i) => isDone(i.id, g.cadence)).length,
     0
   );
 
@@ -113,58 +162,54 @@ export default function OpsChecklist() {
       {!collapsed && (
         <div className="mt-4 space-y-5">
           {CHECKLIST.map((g) => {
-            const ids = g.items.map((i) => i.id);
-            const groupDone = ids.filter((id) => checked[id]).length;
+            const groupDone = g.items.filter((i) => isDone(i.id, g.cadence)).length;
             return (
               <div key={g.group}>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-baseline justify-between mb-2">
                   <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider m-0">
                     {g.group}{" "}
                     <span className="text-slate-400 font-normal normal-case tracking-normal">
-                      ({groupDone}/{ids.length})
+                      ({groupDone}/{g.items.length})
                     </span>
                   </h3>
-                  <button
-                    onClick={() => resetGroup(ids)}
-                    className="text-xs text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer"
-                  >
-                    Reset
-                  </button>
+                  <span className="text-[11px] text-slate-400 normal-case">
+                    ↻ resets {g.resets}
+                  </span>
                 </div>
                 <ul className="m-0 p-0 list-none space-y-1.5">
-                  {g.items.map((i) => (
-                    <li key={i.id}>
-                      <label className="flex items-start gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!checked[i.id]}
-                          onChange={() => toggle(i.id)}
-                          className="mt-1 cursor-pointer accent-emerald-600"
-                        />
-                        <span className="leading-snug">
-                          <span
-                            className={`text-sm ${
-                              checked[i.id]
-                                ? "line-through text-slate-400"
-                                : "text-slate-700"
-                            }`}
-                          >
-                            {i.label}
+                  {g.items.map((i) => {
+                    const done = isDone(i.id, g.cadence);
+                    return (
+                      <li key={i.id}>
+                        <label className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={done}
+                            onChange={() => toggle(i.id, g.cadence)}
+                            className="mt-1 cursor-pointer accent-emerald-600"
+                          />
+                          <span className="leading-snug">
+                            <span
+                              className={`text-sm ${
+                                done ? "line-through text-slate-400" : "text-slate-700"
+                              }`}
+                            >
+                              {i.label}
+                            </span>
+                            <span className="block text-xs text-slate-400">{i.how}</span>
                           </span>
-                          <span className="block text-xs text-slate-400">
-                            {i.how}
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
+                        </label>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );
           })}
           <p className="text-xs text-slate-400 m-0 pt-1 border-t border-slate-100">
-            Full directions in <code>session-notes/founder-ops-runbook.md</code>.
-            The weekly health signals are also emailed every Monday.
+            Checks clear themselves as each period rolls over — no manual reset.
+            Full directions in <code>session-notes/founder-ops-runbook.md</code>;
+            weekly health signals are also emailed every Monday.
           </p>
         </div>
       )}
