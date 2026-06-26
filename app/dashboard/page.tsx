@@ -2062,7 +2062,10 @@ function DashboardInner() {
                           title="Reclassify channel"
                           className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-0 cursor-pointer p-0 inline-flex items-center gap-1"
                         >
-                          {item.channel ?? "Uncategorized"}
+                          {item.channel ??
+                            (typeOf(item) === "expense"
+                              ? "Overhead"
+                              : "Uncategorized")}
                           <span className="text-[10px]" aria-hidden="true">{"\u{270E}"}</span>
                         </button>
                       </div>
