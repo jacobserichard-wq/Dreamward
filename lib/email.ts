@@ -1,4 +1,5 @@
 import { BANDS } from "./plans";
+import { SUPPORT_EMAIL } from "./support";
 
 const FROM_EMAIL = "Dreamward <hello@godreamward.com>";
 const baseUrl = process.env.NEXTAUTH_URL ?? "https://godreamward.com";
@@ -47,11 +48,12 @@ export async function sendEmail({
     subject,
     html,
   };
-  if (replyTo) {
-    // Resend's REST API uses `reply_to` (snake_case) — accepts string or
-    // array. We pass the single user email through.
-    payload.reply_to = replyTo;
-  }
+  // Default replies to the monitored support inbox (Dreamwardsystems@gmail.com)
+  // so they don't vanish into the From address, which isn't watched for
+  // inbound mail. Callers that need a different reply target — AR reminders
+  // (→ the vendor) and CPA handoff (→ the business owner) — pass their own
+  // replyTo, which wins. Resend's REST API uses `reply_to` (snake_case).
+  payload.reply_to = replyTo ?? SUPPORT_EMAIL;
   if (attachments && attachments.length > 0) {
     // Resend's REST API expects `attachments: [{filename, content,
     // content_type?}]`. `content` is base64-encoded; the API decodes
