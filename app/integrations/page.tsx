@@ -35,6 +35,7 @@ import EtsyConnectionCard from "../components/EtsyConnectionCard";
 import PlaidConnectionCard from "../components/PlaidConnectionCard";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
+import StripeConnectionCard from "../components/StripeConnectionCard";
 import WixConnectionCard from "../components/WixConnectionCard";
 import { isPayingTier } from "@/lib/plans";
 
@@ -89,6 +90,7 @@ function IntegrationsPageInner() {
     // The shop param is shared with Shopify's flow, but Shopify also
     // sets connected=1 — the branch order below keeps them apart.
     const connectedEtsy = params.get("connected_etsy");
+    const connectedStripe = params.get("connected_stripe");
     const errParam = params.get("error");
     const upgrade = params.get("upgrade");
     // Auto-bind handoff from the Wix Dashboard Extension bridge page
@@ -110,6 +112,10 @@ function IntegrationsPageInner() {
     } else if (connectedSquare === "1") {
       setSuccessMsg(
         merchant ? `Connected to ${merchant}!` : "Square account connected!"
+      );
+    } else if (connectedStripe === "1") {
+      setSuccessMsg(
+        merchant ? `Connected to ${merchant}!` : "Stripe account connected!"
       );
     } else if (connectedWix === "1") {
       // siteDisplayName is best-effort — Wix's Sites API call can fail
@@ -287,6 +293,7 @@ function IntegrationsPageInner() {
             <WixConnectionCard />
             <SquareConnectionCard />
             <EtsyConnectionCard />
+            <StripeConnectionCard />
           </div>
         </div>
 
