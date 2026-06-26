@@ -5,6 +5,7 @@ import {
   trialExpiringEmail,
   cogsDailyDigestEmail,
 } from "@/lib/email";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import {
   computeMargin,
   computeMarginBySku,
@@ -59,31 +60,41 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Find clients whose trial expires in 3 days or 1 day
-    const result = await pool.query(
-      `SELECT id, email, business_name, trial_ends_at 
-       FROM clients 
-       WHERE plan = 'trial' 
-       AND trial_ends_at IS NOT NULL
-       AND (
-         DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '3 days'
-         OR DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '1 day'
-       )`
-    );
+    // Trial-expiry emails are PAUSED pre-launch: every account is still a
+    // tester/internal, and a salesy "upgrade now" nag shouldn't go to them.
+    // Flip to true at launch — and add a test-account exclusion to the query
+    // first, so internal accounts never receive it.
+    const TRIAL_EXPIRY_EMAILS_ENABLED = false;
 
     let sent = 0;
     let failed = 0;
-    for (const client of result.rows) {
-      const daysLeft = Math.ceil(
-        (new Date(client.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    if (TRIAL_EXPIRY_EMAILS_ENABLED) {
+      // Find clients whose trial expires in 3 days or 1 day
+      const result = await pool.query(
+        `SELECT id, email, business_name, trial_ends_at
+         FROM clients
+         WHERE plan = 'trial'
+         AND trial_ends_at IS NOT NULL
+         AND (
+           DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '3 days'
+           OR DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '1 day'
+         )`
       );
-      const email = trialExpiringEmail(client.business_name, daysLeft);
-      try {
-        await sendEmail({ to: client.email, ...email });
-        sent++;
-      } catch (err) {
-        console.error(`Trial-expiring email failed for ${client.email}:`, err);
-        failed++;
+
+      for (const client of result.rows) {
+        const daysLeft = Math.ceil(
+          (new Date(client.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+        const email = trialExpiringEmail(client.business_name, daysLeft);
+        try {
+          // reply_to = monitored inbox, so "just reply to this email" works
+          // (the From is hello@godreamward.com, not yet wired for inbound).
+          await sendEmail({ to: client.email, replyTo: SUPPORT_EMAIL, ...email });
+          sent++;
+        } catch (err) {
+          console.error(`Trial-expiring email failed for ${client.email}:`, err);
+          failed++;
+        }
       }
     }
 

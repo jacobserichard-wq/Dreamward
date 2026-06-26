@@ -1,3 +1,5 @@
+import { BANDS } from "./plans";
+
 const FROM_EMAIL = "Dreamward <hello@godreamward.com>";
 const baseUrl = process.env.NEXTAUTH_URL ?? "https://godreamward.com";
 
@@ -108,6 +110,9 @@ export function welcomeEmail(businessName: string) {
 }
 
 export function trialExpiringEmail(businessName: string, daysLeft: number) {
+  // Floor of the revenue-band ladder (single source of truth in plans.ts),
+  // so this never drifts from real pricing again.
+  const startingPrice = BANDS[0].price;
   return {
     subject: "Your Dreamward trial expires in " + daysLeft + " day" + (daysLeft === 1 ? "" : "s"),
     html: `
@@ -115,9 +120,9 @@ export function trialExpiringEmail(businessName: string, daysLeft: number) {
         <h1 style="font-size: 24px; color: #0f172a; margin: 0 0 16px;">Your trial is ending soon</h1>
         <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 24px;">
           Hey ${businessName || "there"}, your Dreamward trial expires in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong>.
-          Upgrade now to keep your data and continue automating your accounting.
+          Upgrade to keep your gross-margin tracking, inventory, and Schedule-C-ready books — and pick up right where you left off.
         </p>
-        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">Plans start at just $19/month.</p>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">Pricing is based on your sales — plans start at just $${startingPrice}/month and scale as you grow.</p>
         <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #16a34a; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">View Plans</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">Questions? Just reply to this email.</p>
       </div>
