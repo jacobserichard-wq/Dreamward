@@ -8,9 +8,15 @@
 // Subscription:
 //   - URL: https://godreamward.com/api/square/webhook
 //   - API Version: 2025-04-16 (matches our lib/square Square-Version)
-//   - Event types: payment.created, payment.updated
+//   - Event types: payment.created, payment.updated,
+//     refund.created, refund.updated
 //   - Signature key: copy from the subscription details + add to
 //     Vercel as SQUARE_WEBHOOK_SIGNATURE_KEY
+//
+// Refunds (refund.created / refund.updated) → a separate NEGATIVE
+// income row that nets against the original sale (see
+// handleRefundEvent + lib/square.mapRefundToProcessedItem). Only
+// COMPLETED refunds count.
 //
 // Flow per delivery:
 //   1. Read raw body (HMAC verification needs the unmodified text)
@@ -33,11 +39,14 @@ import { decryptFromDb } from "@/lib/crypto";
 import {
   getSquareEnvironment,
   mapPaymentToProcessedItem,
+  mapRefundToProcessedItem,
+  isCompletedRefund,
   verifyWebhookSignature,
   getOrder,
   extractSquareLineItems,
   extractSquareOrderMoney,
   type SquarePayment,
+  type SquareRefund,
 } from "@/lib/square";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 
@@ -105,7 +114,7 @@ export async function POST(req: NextRequest) {
     data?: {
       type?: string;
       id?: string;
-      object?: { payment?: SquarePayment };
+      object?: { payment?: SquarePayment; refund?: SquareRefund };
     };
   };
   try {
@@ -162,10 +171,21 @@ export async function POST(req: NextRequest) {
   const isPaymentEvent =
     eventType === "payment.created" ||
     eventType === "payment.updated";
+  const isRefundEvent =
+    eventType === "refund.created" ||
+    eventType === "refund.updated";
+
+  // Refunds → a separate NEGATIVE income row that nets against the
+  // original Square sale (mirrors Shopify). No line-item fan-out.
+  if (isRefundEvent) {
+    await handleRefundEvent(conn, eventType, envelope.data?.object?.refund ?? null);
+    await touchSyncState(conn.id, eventType);
+    return NextResponse.json({ acknowledged: true, action: "refund" });
+  }
 
   if (!isPaymentEvent) {
     console.log(
-      `Square webhook: event=${eventType} not a payment event — no-op`
+      `Square webhook: event=${eventType} not a payment/refund event — no-op`
     );
     await touchSyncState(conn.id, eventType);
     return NextResponse.json({ acknowledged: true, action: "no_op" });
@@ -316,6 +336,114 @@ export async function POST(req: NextRequest) {
 
   await touchSyncState(conn.id, eventType);
   return NextResponse.json({ acknowledged: true, action: "upserted" });
+}
+
+/**
+ * Handle a refund.created / refund.updated event. Inserts a NEGATIVE
+ * income row that nets against the original Square sale. Only COMPLETED
+ * refunds count (PENDING is followed by an update when it settles).
+ * Always swallows errors — the webhook must still return 200 so Square
+ * doesn't disable the subscription; the backfill path re-syncs misses.
+ */
+async function handleRefundEvent(
+  conn: SquareConnectionLookupRow,
+  eventType: string,
+  refund: SquareRefund | null
+): Promise<void> {
+  if (!refund || typeof refund.id !== "string") {
+    console.warn(`Square webhook: event=${eventType} has no parseable refund`);
+    return;
+  }
+  // Only COMPLETED refunds represent money actually returned. A PENDING
+  // refund.created is followed by a refund.updated when it settles — we
+  // ingest then. REJECTED/FAILED never count.
+  if (!isCompletedRefund(refund)) {
+    console.log(
+      `Square webhook: refund=${refund.id} status=${refund.status} not completed — skipping`
+    );
+    return;
+  }
+
+  // Look up the original payment row (by source_ref_id = payment_id) to
+  // inherit the buyer label + the tax slice to reverse. Square sale rows
+  // exclude tax from income, so the refund must carry a negative
+  // tax_amount for revenue AND salesTaxCollected to net back out.
+  let original:
+    | { vendor: string; amount: number; taxAmount: number | null }
+    | null = null;
+  if (refund.payment_id) {
+    try {
+      const res = await pool.query<{
+        vendor: string;
+        amount: string;
+        tax_amount: string | null;
+      }>(
+        `SELECT vendor, amount, tax_amount
+           FROM processed_items
+          WHERE client_id = $1 AND source = 'square' AND source_ref_id = $2`,
+        [conn.client_id, refund.payment_id]
+      );
+      if (res.rows[0]) {
+        original = {
+          vendor: res.rows[0].vendor,
+          amount: Number(res.rows[0].amount),
+          taxAmount:
+            res.rows[0].tax_amount != null
+              ? Number(res.rows[0].tax_amount)
+              : null,
+        };
+      }
+    } catch (err) {
+      console.warn(
+        `Square webhook: original-payment lookup failed for refund=${refund.id}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  const row = mapRefundToProcessedItem({ refund, original });
+  try {
+    await pool.query(
+      `INSERT INTO processed_items (
+         vendor, invoice_number, amount, due_date, status,
+         category, source, source_ref_id, channel, confidence,
+         summary, extracted_data, tax_amount, tip_amount, client_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ON CONFLICT (client_id, source, source_ref_id)
+         WHERE source_ref_id IS NOT NULL
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         amount = EXCLUDED.amount,
+         summary = EXCLUDED.summary,
+         extracted_data = EXCLUDED.extracted_data,
+         tax_amount = EXCLUDED.tax_amount`,
+      [
+        row.vendor,
+        row.invoice_number,
+        row.amount,
+        row.due_date,
+        row.status,
+        row.category,
+        row.source,
+        row.source_ref_id,
+        row.channel,
+        row.confidence,
+        row.summary,
+        JSON.stringify(row.extracted_data),
+        row.tax_amount,
+        row.tip_amount,
+        conn.client_id,
+      ]
+    );
+    console.log(
+      `Square webhook: refund=${refund.id} → client_id=${conn.client_id} upserted (amount=${row.amount})`
+    );
+  } catch (err) {
+    console.error(
+      `Square webhook: refund upsert failed for ${refund.id}:`,
+      err
+    );
+  }
 }
 
 /**

@@ -555,6 +555,141 @@ export function mapPaymentToProcessedItem(
 }
 
 // ---------------------------------------------------------------------
+// Refunds (ListPaymentRefunds + mapper)
+// ---------------------------------------------------------------------
+//
+// A Square refund is money returned to the buyer. We mirror the
+// Shopify refund pattern (lib/shopify.ts): a refund becomes a separate
+// NEGATIVE-amount processed_items row in the SAME category ("Sales") +
+// channel ("square") + source ("square") as the original payment, so
+// the revenue calc, channel rollup, and tax report all net it
+// automatically (the income branch already sums negatives). The
+// original payment row is left untouched.
+
+/** Minimal Square Refund schema (ListPaymentRefunds / refund webhook
+ *  object). Square returns more; we ignore what we don't use. */
+export interface SquareRefund {
+  id: string;
+  status: string;                 // 'PENDING' | 'COMPLETED' | 'REJECTED' | 'FAILED'
+  created_at: string;             // ISO timestamp
+  updated_at?: string;
+  amount_money: {
+    amount: number;               // INTEGER cents (smallest currency unit)
+    currency: string;
+  };
+  payment_id?: string;            // the original payment this refunds
+  order_id?: string;
+  reason?: string;
+}
+
+interface SquareRefundsListResponse {
+  refunds?: SquareRefund[];
+  cursor?: string;
+  errors?: Array<{ category?: string; code?: string; detail?: string }>;
+}
+
+/**
+ * Fetch one page of refunds for the connected merchant. Same cursor-
+ * pagination + begin_time incremental shape as fetchPaymentsPage, so
+ * the backfill loop can reuse the import-range cutoff.
+ */
+export async function fetchRefundsPage(opts: {
+  accessToken: string;
+  cursor?: string | null;
+  limit?: number;                 // Square max 100
+  sortOrder?: "ASC" | "DESC";
+  beginTime?: string;             // ISO; for incremental sync
+}): Promise<{ refunds: SquareRefund[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  params.set("limit", String(Math.min(opts.limit ?? 100, 100)));
+  params.set("sort_order", opts.sortOrder ?? "ASC");
+  if (opts.beginTime) params.set("begin_time", opts.beginTime);
+
+  const data = await squareGet<SquareRefundsListResponse>({
+    accessToken: opts.accessToken,
+    path: `/v2/refunds?${params.toString()}`,
+  });
+
+  if (data.errors && data.errors.length > 0) {
+    const first = data.errors[0];
+    throw new Error(
+      `Square refunds listing returned errors: ${first.category}/${first.code} ${first.detail ?? ""}`
+    );
+  }
+
+  return {
+    refunds: data.refunds ?? [],
+    nextCursor: data.cursor ?? null,
+  };
+}
+
+/** A COMPLETED refund is the only state where money actually moved
+ *  back to the buyer — PENDING/REJECTED/FAILED don't count yet. */
+export function isCompletedRefund(refund: SquareRefund): boolean {
+  return refund.status?.toUpperCase() === "COMPLETED";
+}
+
+/**
+ * Map a Square Refund into a NEGATIVE processed_items row.
+ *
+ * `original` (the looked-up original payment row, by source_ref_id =
+ * refund.payment_id) is optional but lets us (a) inherit the buyer's
+ * vendor label and (b) reverse the right slice of sales tax. Square
+ * sale rows exclude tax from income and track it in tax_amount, so a
+ * refund must carry a NEGATIVE tax_amount (proportional to the refund)
+ * for both revenue AND salesTaxCollected to net back out. Without the
+ * original (order-less payment, or original not yet ingested), tax is
+ * left null — the amount still nets revenue, only the tax slice is
+ * approximate.
+ */
+export function mapRefundToProcessedItem(opts: {
+  refund: SquareRefund;
+  original?: { vendor: string; amount: number; taxAmount: number | null } | null;
+}): MappedSquarePaymentRow {
+  const { refund, original } = opts;
+  const refundAmount = refund.amount_money.amount / 100; // positive dollars
+  const currency = refund.amount_money.currency;
+  const isoDate = refund.updated_at || refund.created_at || new Date().toISOString();
+  const dueDate = isoDate.slice(0, 10);
+
+  // Proportional tax reversal. Full refund (refundAmount == original
+  // total) → proportion 1 → reverses the whole tax. Partial → pro-rata.
+  let taxAmount: number | null = null;
+  if (original && original.taxAmount != null && original.amount > 0) {
+    const proportion = Math.min(1, refundAmount / original.amount);
+    taxAmount = -(original.taxAmount * proportion);
+  }
+
+  return {
+    vendor: original?.vendor ?? "Square refund",
+    invoice_number: `#${refund.id.slice(0, 8)}-refund`,
+    amount: -refundAmount, // NEGATIVE — nets against Square income
+    due_date: dueDate,
+    status: "paid", // refund completed = settled
+    category: "Sales", // same category as the sale so it nets
+    source: "square",
+    source_ref_id: `square-refund-${refund.id}`,
+    channel: "square",
+    confidence: 100,
+    summary: `Square refund — ${currency} ${refundAmount.toFixed(2)}${
+      refund.payment_id ? ` (payment ${refund.payment_id.slice(0, 8)})` : ""
+    }`,
+    extracted_data: {
+      square_refund_id: refund.id,
+      square_payment_id: refund.payment_id ?? null,
+      order_id: refund.order_id ?? null,
+      currency,
+      refund_amount_cents: refund.amount_money.amount,
+      square_status: refund.status,
+      reason: refund.reason ?? null,
+    },
+    tax_amount: taxAmount,
+    tip_amount: null,
+  };
+}
+
+// ---------------------------------------------------------------------
 // Phase 12c: Orders API (line-item resolution)
 // ---------------------------------------------------------------------
 //
