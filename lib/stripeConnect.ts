@@ -23,8 +23,12 @@ import type { InternalLineItem } from "./cogs/lineItems";
 const CONNECT_CLIENT_ID = process.env.STRIPE_CONNECT_CLIENT_ID;
 
 /** Build the Connect OAuth authorize URL the customer is sent to. `state`
- *  is the CSRF/identity token we verify on the callback. Read-only scope —
- *  we never write to the customer's Stripe account. */
+ *  is the CSRF/identity token we verify on the callback.
+ *
+ *  Scope is `read_write` because Stripe doesn't grant the `read_only` scope
+ *  without per-platform approval ("Please use the read_write scope…"). We
+ *  only ever READ charges — the integration never writes to the customer's
+ *  account — but the OAuth grant has to request read_write to connect. */
 export function buildConnectAuthorizeUrl(opts: {
   state: string;
   redirectUri: string;
@@ -35,7 +39,7 @@ export function buildConnectAuthorizeUrl(opts: {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: CONNECT_CLIENT_ID,
-    scope: "read_only",
+    scope: "read_write",
     redirect_uri: opts.redirectUri,
     state: opts.state,
   });
