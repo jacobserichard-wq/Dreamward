@@ -43,8 +43,11 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import {
   mapWixOrderToProcessedItem,
+  mapWixRefundToProcessedItem,
   extractWixLineItems,
   verifyAppInstalledWebhook,
+  mintAccessToken,
+  fetchWixOrder,
   type WixOrder,
 } from "@/lib/wix";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
@@ -260,6 +263,17 @@ export async function POST(req: NextRequest) {
     console.log(
       `Wix webhook: event=${eventType} order=${order.id} → client_id=${conn.client_id} upserted`
     );
+
+    // ── Refund detection ────────────────────────────────────────
+    // A (partial) refund shows up as paymentStatus REFUNDED /
+    // PARTIALLY_REFUNDED. The original sale row above stays at its
+    // full amount; mirror the refund as a separate negative row. The
+    // webhook payload lacks the refunded amount, so syncWixRefund
+    // fetches the order detail for the authoritative cumulative total.
+    const ps = order.paymentStatus?.toUpperCase() ?? "";
+    if (ps === "REFUNDED" || ps === "PARTIALLY_REFUNDED") {
+      await syncWixRefund(conn.client_id, instanceId, order);
+    }
   } catch (err) {
     console.error("Wix webhook: upsert failed:", err);
     return NextResponse.json({ acknowledged: true, dbError: true });
@@ -267,6 +281,82 @@ export async function POST(req: NextRequest) {
 
   await touchSyncState(conn.id, eventType);
   return NextResponse.json({ acknowledged: true, action: "upserted" });
+}
+
+/**
+ * Sync a Wix refund to a NEGATIVE processed_items row. The order
+ * payload doesn't carry the refunded amount, so we mint a token and
+ * fetch the order detail for the authoritative CUMULATIVE
+ * balanceSummary.refunded. One row per order (source_ref_id =
+ * 'wix-refund-{orderId}'), upserted to the cumulative total so repeated
+ * partial refunds stay correct. Swallows its own errors — the webhook
+ * must still return 200.
+ */
+async function syncWixRefund(
+  clientId: number,
+  instanceId: string,
+  order: WixOrder
+): Promise<void> {
+  try {
+    const { accessToken } = await mintAccessToken({ instanceId });
+    const detail = await fetchWixOrder({ accessToken, orderId: order.id });
+    const refundedAmount =
+      Number(detail?.balanceSummary?.refunded?.amount ?? "0") || 0;
+    if (refundedAmount <= 0) {
+      console.log(
+        `Wix webhook: order=${order.id} status=${order.paymentStatus} but cumulative refunded is 0 — skipping`
+      );
+      return;
+    }
+    const currency =
+      detail?.priceSummary?.total?.currency ||
+      detail?.currency ||
+      order.priceSummary?.total?.currency ||
+      order.currency ||
+      "USD";
+    const row = mapWixRefundToProcessedItem({
+      order: detail ?? order,
+      refundedAmount,
+      currency,
+    });
+    await pool.query(
+      `INSERT INTO processed_items (
+         vendor, invoice_number, amount, due_date, status,
+         category, source, source_ref_id, channel, confidence,
+         summary, extracted_data, client_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (client_id, source, source_ref_id)
+         WHERE source_ref_id IS NOT NULL
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         amount = EXCLUDED.amount,
+         summary = EXCLUDED.summary,
+         extracted_data = EXCLUDED.extracted_data`,
+      [
+        row.vendor,
+        row.invoice_number,
+        row.amount,
+        row.due_date,
+        row.status,
+        row.category,
+        row.source,
+        row.source_ref_id,
+        row.channel,
+        row.confidence,
+        row.summary,
+        JSON.stringify(row.extracted_data),
+        clientId,
+      ]
+    );
+    console.log(
+      `Wix webhook: refund for order=${order.id} → client_id=${clientId} upserted (cumulative -${refundedAmount})`
+    );
+  } catch (err) {
+    console.warn(
+      `Wix webhook: refund sync failed for order=${order.id} (non-fatal):`,
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 /**

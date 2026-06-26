@@ -323,6 +323,14 @@ export interface WixOrder {
   };
   // Top-level currency may also appear separately from priceSummary
   currency?: string;
+  // Present on the Get Order detail (not the search list / webhook
+  // payload). balanceSummary.refunded.amount is the CUMULATIVE amount
+  // refunded on the order — the authoritative source for refund sync.
+  balanceSummary?: {
+    balance?: { amount?: string; formattedAmount?: string };
+    paid?: { amount?: string; formattedAmount?: string };
+    refunded?: { amount?: string; formattedAmount?: string };
+  };
   buyerInfo?: {
     email?: string | null;
     contactId?: string | null;
@@ -532,6 +540,73 @@ export function mapWixOrderToProcessedItem(
         catalog_app_id: li.catalogReference?.appId ?? null,
         sku: li.physicalProperties?.sku ?? null,
       })),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------
+// Refunds (Phase 10d — wired up)
+// ---------------------------------------------------------------------
+//
+// A Wix refund arrives as an order_updated event whose paymentStatus
+// becomes REFUNDED / PARTIALLY_REFUNDED. The webhook order payload does
+// NOT carry the refunded amount — only the status. So we fetch the
+// Get Order detail for the authoritative CUMULATIVE
+// balanceSummary.refunded.amount, and record ONE negative row per order
+// (source_ref_id = 'wix-refund-{orderId}') holding the total refunded.
+// Upserting to the cumulative total is idempotent and naturally correct
+// across multiple partial refunds + corrections. Mirrors how Wix sale
+// rows treat tax (folded into the total, no separate tax_amount), so a
+// full refund nets the sale to zero.
+
+/**
+ * Fetch a single order's full detail (includes balanceSummary, absent
+ * from the search list + webhook payload). Returns null if not found.
+ * Throws on transport/HTTP errors (caller decides how to handle).
+ */
+export async function fetchWixOrder(opts: {
+  accessToken: string;
+  orderId: string;
+}): Promise<WixOrder | null> {
+  const raw = await wixGet<{ order?: WixOrder }>({
+    accessToken: opts.accessToken,
+    path: `/ecom/v1/orders/${encodeURIComponent(opts.orderId)}`,
+  });
+  return raw.order ?? null;
+}
+
+/**
+ * Map a Wix refund into a NEGATIVE processed_items row that nets
+ * against the original sale. `refundedAmount` is the positive
+ * cumulative total refunded (from balanceSummary.refunded). The row's
+ * amount is set to the negative of that total, so re-running on a later
+ * partial refund just updates the same row to the new cumulative.
+ */
+export function mapWixRefundToProcessedItem(opts: {
+  order: WixOrder;
+  refundedAmount: number; // positive, cumulative, major units
+  currency: string;
+}): MappedWixOrderRow {
+  const base = mapWixOrderToProcessedItem(opts.order);
+  const dueDate = new Date().toISOString().slice(0, 10);
+  return {
+    vendor: base.vendor,
+    invoice_number: `${base.invoice_number}-refund`,
+    amount: -opts.refundedAmount, // NEGATIVE — nets against Wix income
+    due_date: dueDate,
+    status: "paid", // refund completed = settled
+    category: base.category, // "Online Sales" — same as the sale so it nets
+    source: "wix",
+    source_ref_id: `wix-refund-${opts.order.id}`,
+    channel: "wix",
+    confidence: 100,
+    summary: `Wix refund for order ${base.invoice_number} — ${opts.currency} ${opts.refundedAmount.toFixed(2)}`,
+    extracted_data: {
+      wix_order_id: opts.order.id,
+      refunded_amount: opts.refundedAmount,
+      currency: opts.currency,
+      payment_status: opts.order.paymentStatus ?? null,
+      cumulative: true,
     },
   };
 }
