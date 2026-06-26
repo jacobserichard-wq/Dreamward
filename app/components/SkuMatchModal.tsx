@@ -414,12 +414,18 @@ export default function SkuMatchModal({
               the item. Otherwise leave today — historical sales keep their
               prior cost.
             </p>
-            <p className="text-xs text-slate-500 m-0 pt-2 border-t border-slate-100">
-              Need <strong>component-based</strong> costs (a recipe that feeds
-              FIFO)? Create it here with a flat cost for now, then build it from
-              components on the product&apos;s page under{" "}
-              <strong>SKUs &amp; Components</strong>.
-            </p>
+            <div className="flex items-start gap-2 mt-1 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-slate-700">
+              <span aria-hidden="true" className="flex-shrink-0">
+                {"\u{2139}\u{FE0F}"}
+              </span>
+              <span>
+                <strong>Make this product from materials you track?</strong> Add
+                a simple cost now — you can set up its <strong>recipe</strong>{" "}
+                later on the product&apos;s page (under{" "}
+                <strong>SKUs &amp; Components</strong>) to cost it from its
+                components automatically.
+              </span>
+            </div>
           </div>
         )}
 
