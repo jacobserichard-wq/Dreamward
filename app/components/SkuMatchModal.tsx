@@ -414,6 +414,12 @@ export default function SkuMatchModal({
               the item. Otherwise leave today — historical sales keep their
               prior cost.
             </p>
+            <p className="text-xs text-slate-500 m-0 pt-2 border-t border-slate-100">
+              Need <strong>component-based</strong> costs (a recipe that feeds
+              FIFO)? Create it here with a flat cost for now, then build it from
+              components on the product&apos;s page under{" "}
+              <strong>SKUs &amp; Components</strong>.
+            </p>
           </div>
         )}
 
