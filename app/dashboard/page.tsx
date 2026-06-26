@@ -889,6 +889,53 @@ function DashboardInner() {
   // Channel filter for the Transactions view (ported from the Expenses
   // tab). "" = all channels.
   const [txnChannelFilter, setTxnChannelFilter] = useState<string>("");
+  // Per-card receipt upload — id of the item currently uploading (for the
+  // spinner/disabled state). Reuses POST /api/expenses/[id]/attachments.
+  const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(
+    null
+  );
+
+  const handleReceiptUpload = useCallback(
+    async (itemId: string, file: File | undefined) => {
+      if (!file) return;
+      setUploadingReceiptId(itemId);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`/api/expenses/${itemId}/attachments`, {
+          method: "POST",
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "Couldn't upload that receipt.");
+          return;
+        }
+        const a = data.attachment;
+        setProcessedItems((prev) =>
+          prev.map((i) =>
+            i.id === itemId
+              ? {
+                  ...i,
+                  attachments: [
+                    ...(i.attachments ?? []),
+                    { id: a.id, filename: a.filename, mimeType: a.mimeType },
+                  ],
+                }
+              : i
+          )
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Couldn't upload that receipt."
+        );
+      } finally {
+        setUploadingReceiptId(null);
+      }
+    },
+    []
+  );
   // Transaction-type filter: "" (all) | income (sales) | expense | refund.
   const [txnTypeFilter, setTxnTypeFilter] = useState<string>("");
 
@@ -2195,6 +2242,37 @@ function DashboardInner() {
                         >
                           {"\u{1F4E6}"} Receive into inventory
                         </button>
+                      )}
+                      {typeOf(item) === "expense" && (
+                        <label
+                          title="Attach a receipt or invoice (JPG, PNG, PDF)"
+                          className={`bg-transparent text-blue-600 hover:text-blue-700 hover:underline text-xs cursor-pointer px-2 py-1 inline-flex items-center gap-1 ${
+                            uploadingReceiptId === item.id
+                              ? "opacity-50 pointer-events-none"
+                              : ""
+                          }`}
+                        >
+                          {uploadingReceiptId === item.id && (
+                            <Spinner size={11} color="#2563eb" />
+                          )}
+                          {"\u{1F4CE}"}{" "}
+                          {uploadingReceiptId === item.id
+                            ? "Uploading..."
+                            : item.attachments && item.attachments.length > 0
+                              ? "Add receipt"
+                              : "Attach receipt"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/heic,image/webp,application/pdf"
+                            className="hidden"
+                            disabled={uploadingReceiptId === item.id}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              void handleReceiptUpload(item.id, f);
+                            }}
+                          />
+                        </label>
                       )}
                       <button
                         onClick={() => deleteItem(item.id)}
