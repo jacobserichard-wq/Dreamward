@@ -21,6 +21,7 @@ import {
   getOrder,
   extractSquareLineItems,
   extractSquareOrderMoney,
+  bareSquarePaymentLineItem,
 } from "@/lib/square";
 import { bulkInsertLineItemsAcrossParents } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -293,7 +294,18 @@ export async function POST() {
         for (const r of insertRes.rows) {
           const payment = paymentById.get(r.source_ref_id);
           if (!payment) continue;
-          if (!payment.order_id) continue;
+          if (!payment.order_id) {
+            // Bare payment — no Order. Emit one unmatched line item for the
+            // full amount so its revenue surfaces in COGS + the unmatched
+            // bucket instead of being silently uncosted.
+            const mappedBare = mapPaymentToProcessedItem(payment);
+            parents.push({
+              parentId: r.id,
+              soldAt: mappedBare.due_date,
+              items: [bareSquarePaymentLineItem(payment)],
+            });
+            continue;
+          }
           const order = await getOrder({
             accessToken,
             orderId: payment.order_id,

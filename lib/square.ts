@@ -1006,3 +1006,31 @@ export function extractSquareLineItems(
       };
     });
 }
+
+/**
+ * A synthetic line item for a BARE payment — a Square charge with no
+ * Order attached (raw Payments-API charge, donation / payment-link, etc.),
+ * so there's no itemization to fetch. We still want the sale's revenue to
+ * surface in the COGS view + the unmatched bucket instead of vanishing, so
+ * we emit ONE line item for the full amount with no catalog reference
+ * (externalItemId = null) → it lands unmatched/uncosted, exactly like a
+ * "Custom Amount" line item from an order does. Stable externalId so
+ * webhook redelivery / re-import dedups via the
+ * (processed_item_id, external_id) unique index.
+ */
+export function bareSquarePaymentLineItem(
+  payment: SquarePayment
+): import("./cogs/lineItems").InternalLineItem {
+  const cents = payment.total_money?.amount ?? payment.amount_money.amount;
+  const currency =
+    payment.total_money?.currency ?? payment.amount_money.currency;
+  return {
+    externalId: `square-payment-${payment.id}`,
+    externalItemId: null,
+    externalSku: null,
+    name: "Square sale (no item detail)",
+    quantity: 1,
+    unitPrice: cents / 100,
+    currency,
+  };
+}

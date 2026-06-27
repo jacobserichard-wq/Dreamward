@@ -45,6 +45,7 @@ import {
   getOrder,
   extractSquareLineItems,
   extractSquareOrderMoney,
+  bareSquarePaymentLineItem,
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/square";
@@ -330,6 +331,25 @@ export async function POST(req: NextRequest) {
       console.warn(
         `Square webhook: line-item fan-out failed for payment=${payment.id}:`,
         lineItemErr instanceof Error ? lineItemErr.message : lineItemErr
+      );
+    }
+  } else if (parentId && row && !payment.order_id) {
+    // Bare payment — no Order to itemize (raw Payments-API charge,
+    // donation / payment-link, etc.). Emit one unmatched line item for the
+    // full amount so the sale surfaces in the COGS view + the unmatched
+    // bucket instead of being silently uncosted.
+    try {
+      await bulkInsertLineItemsForParent({
+        parentId,
+        clientId: conn.client_id,
+        platform: "square",
+        soldAt: row.due_date,
+        items: [bareSquarePaymentLineItem(payment)],
+      });
+    } catch (bareErr) {
+      console.warn(
+        `Square webhook: bare-payment line item failed for payment=${payment.id}:`,
+        bareErr instanceof Error ? bareErr.message : bareErr
       );
     }
   }
