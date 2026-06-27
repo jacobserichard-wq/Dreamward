@@ -27,6 +27,7 @@ import SalesBanner from "../components/SalesBanner";
 import ActionItemsStrip from "../components/ActionItemsStrip";
 import ChannelStack from "../components/ChannelStack";
 import SectionTip from "../components/SectionTip";
+import AttachmentViewer from "../components/AttachmentViewer";
 import CogsSummaryCard from "../components/CogsSummaryCard";
 import TotalsDrillModal from "../components/TotalsDrillModal";
 import MonthFilterPill, {
@@ -903,6 +904,12 @@ function DashboardInner() {
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(
     null
   );
+  // Attachment viewer — preview + download + delete an uploaded PDF/receipt
+  // without deleting the whole transaction.
+  const [viewerExpense, setViewerExpense] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
 
   const handleReceiptUpload = useCallback(
     async (itemId: string, file: File | undefined) => {
@@ -2172,17 +2179,21 @@ function DashboardInner() {
                           <span className="text-[13px] text-slate-500">
                             Invoice file
                           </span>
-                          <a
-                            href={`/api/expenses/${item.id}/attachments/${item.attachments[0].id}/raw`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerExpense({
+                                id: Number(item.id),
+                                label: item.vendor || "Attachment",
+                              })
+                            }
+                            className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 bg-transparent border-0 cursor-pointer p-0"
                           >
                             <span aria-hidden="true">{"\u{1F4CE}"}</span>
                             {item.attachments.length > 1
-                              ? `Download (${item.attachments.length})`
-                              : "Download"}
-                          </a>
+                              ? `View / delete (${item.attachments.length})`
+                              : "View / delete"}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2683,6 +2694,16 @@ function DashboardInner() {
           onSave={handleSaveExpense}
           onClose={() => setShowExpenseForm(false)}
           onCreateCategory={handleCreateExpenseCategory}
+        />
+
+        {/* View / download / delete an uploaded PDF or receipt. Deleting
+            here removes just the file (the transaction stays). */}
+        <AttachmentViewer
+          open={viewerExpense !== null}
+          expenseId={viewerExpense?.id ?? null}
+          expenseLabel={viewerExpense?.label}
+          onClose={() => setViewerExpense(null)}
+          onChanged={loadItems}
         />
 
         {/* Drill-down for the SalesBanner totals (income/expense/net). */}

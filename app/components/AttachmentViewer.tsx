@@ -4,7 +4,10 @@
 // attachments for an expense — image previews + PDF embed +
 // per-attachment delete + download link.
 //
-// Opens from the expense-row's 📎 N badge on /expenses.
+// Opens from the "View / delete" action on a transaction card
+// (Dashboard › Transactions). (Was the 📎 badge on the old /expenses
+// page, which merged into Transactions — left this orphaned until re-
+// mounted on the card.)
 // Self-fetches via GET /api/expenses/[id]/attachments on every
 // open (cheap; bounded by the per-expense attachment count
 // which is typically 1-3 in practice).
