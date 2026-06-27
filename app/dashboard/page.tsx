@@ -19,7 +19,7 @@ import ExpenseForm, {
   type ExpenseFormCategory,
   type ExpenseFormSubmit,
 } from "../components/ExpenseForm";
-import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
+import { CANONICAL_CHANNELS, channelIdForRow } from "@/lib/profitability/channels";
 import ConfirmModal from "../components/ConfirmModal";
 import EventCreateForm, { type EventResponse } from "../components/EventCreateForm";
 import type { ChannelRow } from "../components/ChannelTable";
@@ -138,6 +138,9 @@ function DashboardInner() {
   // review" attention pill) — applied to the Transactions status filter
   // once that view is showing (see effect below).
   const filterParam = searchParams.get("filter");
+  // Optional ?channel=<id> deep-link (from a channel card) → scopes the
+  // Transactions list to that channel.
+  const channelParam = searchParams.get("channel");
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -970,6 +973,17 @@ function DashboardInner() {
     }
   }, [showTransactions, filterParam]);
 
+  // Apply a ?channel=<id> deep-link (clicking a channel card) to the
+  // Transactions channel filter. Also reveal settled rows: synced + manual
+  // sales are status='paid' (settled, hidden by default), so a channel's
+  // list would otherwise look empty.
+  useEffect(() => {
+    if (showTransactions && channelParam) {
+      setTxnChannelFilter(channelParam);
+      setHideSettled(false);
+    }
+  }, [showTransactions, channelParam]);
+
 
 
   const requestClearSample = useCallback(() => {
@@ -1116,10 +1130,17 @@ function DashboardInner() {
         body: JSON.stringify(data),
       });
       setShowSaleForm(false);
-      setSuccessMsg("Sale added.");
       await loadItems();
+      // A logged sale is money received → status='paid' (settled), which
+      // the inbox hides by default. Take the user to Transactions with
+      // settled revealed + filters cleared so they actually see the row
+      // they just added (otherwise it silently lands in the hidden bucket).
+      setHideSettled(false);
+      setTxnChannelFilter("");
+      setSuccessMsg("Sale added — showing it in Transactions below.");
+      router.replace("/dashboard?view=transactions");
     },
-    [loadItems]
+    [loadItems, router]
   );
 
   // A refund is a "Returns & Refunds" expense — the revenue/band calc and
@@ -1278,8 +1299,27 @@ function DashboardInner() {
   // Channels that actually appear in the transactions, so the Channel
   // filter only lists ones you can filter to — an empty channel returns
   // nothing, so it shouldn't clutter the dropdown.
+  // Roll a row up into its channel the SAME way the channel cards do (the
+  // lib classifier), so the channel filter + the dropdown's active-channel
+  // list match what each card counts — e.g. a Shopify order carries
+  // channel=null but classifies to "shopify" via its source.
+  const channelOf = (i: ProcessedItem): string | null =>
+    channelIdForRow({
+      amount: i.amount,
+      tax: 0,
+      category: i.category,
+      source: i.source,
+      event_id: i.eventId,
+      channel: i.channel,
+      kind:
+        i.category === "Returns & Refunds"
+          ? "expense"
+          : incomeCategories.includes(i.category)
+            ? "income"
+            : "expense",
+    });
   const activeChannelIds = new Set(
-    processedItems.map((i) => i.channel).filter(Boolean)
+    processedItems.map((i) => channelOf(i)).filter(Boolean)
   );
   // Bank (Plaid) expenses present → show the "where income comes from" tip,
   // since that's exactly when the deposits-aren't-income question comes up.
@@ -1969,7 +2009,7 @@ function DashboardInner() {
               // whatever the other filters / search leave.
               const byChannel = (items: ProcessedItem[]) =>
                 txnChannelFilter
-                  ? items.filter((i) => (i.channel ?? "") === txnChannelFilter)
+                  ? items.filter((i) => channelOf(i) === txnChannelFilter)
                   : items;
               // Transaction type: a "Returns & Refunds" row is a refund;
               // a seeded/custom income category is a sale; everything else

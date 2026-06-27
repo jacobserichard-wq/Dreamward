@@ -424,6 +424,22 @@ function classifyExpenseRow(row: ChannelTxnRow): ChannelId | null {
   return null;
 }
 
+/**
+ * The channel a row rolls up into — the single source of truth shared by
+ * the channel cards (this file's aggregation) AND the Transactions
+ * channel filter, so clicking a channel card shows exactly the rows that
+ * card counted. Income → classifyIncomeRow; expense/refund →
+ * classifyExpenseRow (null = overhead, i.e. not attributable to a
+ * channel). Without this the dashboard filter would match on raw
+ * row.channel and miss source-classified rows (e.g. Shopify orders carry
+ * channel=null but classify to "shopify").
+ */
+export function channelIdForRow(row: ChannelTxnRow): ChannelId | null {
+  return row.kind === "income"
+    ? classifyIncomeRow(row)
+    : classifyExpenseRow(row);
+}
+
 // ---------------------------------------------------------------------
 // The aggregation function
 // ---------------------------------------------------------------------
@@ -468,7 +484,14 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
       emptyAddHref: meta.emptyAddHref,
       emptyAddLabel: meta.emptyAddLabel,
       proGated: meta.proGated,
-      drillHref: meta.drillHref,
+      // Drill into THIS channel's transactions, uniformly. The old
+      // per-channel meta.drillHrefs were inconsistent (some → /events or
+      // /invoices, several → a stale ?tab=processed that the current
+      // dashboard ignores → dumped you on the overview). Coming-soon
+      // channels have nothing to show.
+      drillHref: meta.comingSoon
+        ? null
+        : `/dashboard?view=transactions&channel=${meta.id}`,
       description: meta.description,
     });
   }
