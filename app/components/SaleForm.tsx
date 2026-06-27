@@ -21,6 +21,12 @@ export interface SaleFormEvent {
   startDate: string;
 }
 
+export interface SaleLineItem {
+  skuId: number;
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface SaleFormSubmit {
   customer: string;
   amount: number;
@@ -29,16 +35,17 @@ export interface SaleFormSubmit {
   channel: string | null;
   eventId: number | null;
   notes: string | null;
-  /** Optional product this sale is for. When set, the sale draws the
-   *  product's stock down by `quantity` and feeds COGS/margin. */
-  skuId: number | null;
-  quantity: number;
+  /** Products on this sale (cart-style). Empty for a product-less cash
+   *  sale. Each line draws its SKU's stock down + feeds COGS/margin; the
+   *  amount is the sum of the lines when any are present. */
+  items: SaleLineItem[];
 }
 
 interface SaleSkuOption {
   id: number;
   code: string;
   name: string;
+  sellPrice: number | null;
 }
 
 export interface SaleFormProps {
@@ -82,8 +89,11 @@ export default function SaleForm({
   const [eventId, setEventId] = useState("");
   const [notes, setNotes] = useState("");
   const [skus, setSkus] = useState<SaleSkuOption[]>([]);
-  const [skuId, setSkuId] = useState("");
-  const [quantity, setQuantity] = useState("1");
+  // Cart-style product lines. Empty = a product-less cash sale (amount is
+  // entered manually). Each line: product + qty + per-unit price.
+  const [lines, setLines] = useState<
+    { skuId: string; quantity: string; unitPrice: string }[]
+  >([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,8 +106,7 @@ export default function SaleForm({
     setChannel("direct");
     setEventId("");
     setNotes("");
-    setSkuId("");
-    setQuantity("1");
+    setLines([]);
     setError(null);
   }, [open]);
 
@@ -115,12 +124,18 @@ export default function SaleForm({
             name: string;
             active: boolean;
             kind: string;
+            defaultSellPrice: number | null;
           }[];
         };
         setSkus(
           (data.skus || [])
             .filter((s) => s.active && s.kind === "product")
-            .map((s) => ({ id: s.id, code: s.code, name: s.name }))
+            .map((s) => ({
+              id: s.id,
+              code: s.code,
+              name: s.name,
+              sellPrice: s.defaultSellPrice ?? null,
+            }))
         );
       } catch {
         // non-fatal — the product picker just stays hidden
@@ -141,14 +156,46 @@ export default function SaleForm({
 
   const showEventPicker = channel === "markets";
 
+  // ── Cart math ────────────────────────────────────────────────────
+  const productLines = lines.filter((l) => l.skuId);
+  const hasProducts = productLines.length > 0;
+  const lineTotal = (l: { quantity: string; unitPrice: string }) =>
+    (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
+  const productsSubtotal = productLines.reduce((s, l) => s + lineTotal(l), 0);
+
+  const addLine = () =>
+    setLines((ls) => [...ls, { skuId: "", quantity: "1", unitPrice: "" }]);
+  const removeLine = (idx: number) =>
+    setLines((ls) => ls.filter((_, i) => i !== idx));
+  const updateLine = (
+    idx: number,
+    patch: Partial<{ skuId: string; quantity: string; unitPrice: string }>
+  ) => {
+    setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+    setError(null);
+  };
+  // Picking a product pre-fills its price from the SKU's sell price when
+  // the price field is still blank (the user can override).
+  const pickProduct = (idx: number, picked: string) => {
+    const sku = skus.find((s) => String(s.id) === picked);
+    setLines((ls) =>
+      ls.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              skuId: picked,
+              unitPrice:
+                l.unitPrice ||
+                (sku?.sellPrice != null ? String(sku.sellPrice) : ""),
+            }
+          : l
+      )
+    );
+    setError(null);
+  };
+
   const handleSave = async () => {
     setError(null);
-    const cleaned = amount.replace(/[$,\s]/g, "");
-    const amt = Number(cleaned);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setError("Amount must be a positive number.");
-      return;
-    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
       setError("Date must be valid.");
       return;
@@ -157,11 +204,37 @@ export default function SaleForm({
       setError("Pick a category.");
       return;
     }
-    const qtyNum = Number(quantity);
-    if (skuId && (!Number.isFinite(qtyNum) || qtyNum <= 0)) {
-      setError("Quantity must be a positive number.");
+
+    // Validate the product lines (if any) + build items[].
+    const items: SaleLineItem[] = [];
+    for (const l of productLines) {
+      const qty = Number(l.quantity);
+      const price = Number(l.unitPrice);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        setError("Each product needs a quantity greater than 0.");
+        return;
+      }
+      if (!Number.isFinite(price) || price < 0) {
+        setError("Each product needs a valid price.");
+        return;
+      }
+      items.push({ skuId: Number(l.skuId), quantity: qty, unitPrice: price });
+    }
+
+    // Amount: the cart subtotal when products are present; otherwise the
+    // manually-entered total (a quick cash sale with no products).
+    const amt = hasProducts
+      ? Math.round(productsSubtotal * 100) / 100
+      : Number(amount.replace(/[$,\s]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError(
+        hasProducts
+          ? "Add a qty and price so the total is greater than 0."
+          : "Amount must be a positive number."
+      );
       return;
     }
+
     setSaving(true);
     try {
       await onSave({
@@ -172,8 +245,7 @@ export default function SaleForm({
         channel: channel || null,
         eventId: showEventPicker && eventId ? Number(eventId) : null,
         notes: notes.trim() || null,
-        skuId: skuId ? Number(skuId) : null,
-        quantity: skuId ? qtyNum : 1,
+        items,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save");
@@ -181,6 +253,9 @@ export default function SaleForm({
       setSaving(false);
     }
   };
+
+  const money = (n: number) =>
+    n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div
@@ -228,24 +303,35 @@ export default function SaleForm({
             </Field>
 
             <Field label="Amount" htmlFor="sale-amount">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-                  {"$"}
-                </span>
-                <input
-                  id="sale-amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="0.00"
-                  disabled={saving}
-                  className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
-                />
-              </div>
+              {hasProducts ? (
+                <>
+                  <div className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg bg-slate-50 text-slate-900 tabular-nums">
+                    ${money(productsSubtotal)}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 m-0">
+                    from products below
+                  </p>
+                </>
+              ) : (
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                    {"$"}
+                  </span>
+                  <input
+                    id="sale-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="0.00"
+                    disabled={saving}
+                    className="w-full py-2 pl-7 pr-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                  />
+                </div>
+              )}
             </Field>
           </div>
 
@@ -285,52 +371,99 @@ export default function SaleForm({
             )}
           </Field>
 
-          {/* Optional product link — draws stock down + feeds COGS/margin.
-              Hidden when the maker has no finished-good SKUs yet. */}
+          {/* Cart-style product lines — each draws stock down + feeds
+              COGS/margin, and the lines drive the Amount above. Hidden when
+              the maker has no finished-good SKUs yet. */}
           {skus.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
-                <Field label="Product (optional)" htmlFor="sale-sku">
-                  <select
-                    id="sale-sku"
-                    value={skuId}
-                    onChange={(e) => {
-                      setSkuId(e.target.value);
-                      setError(null);
-                    }}
-                    disabled={saving}
-                    className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
-                  >
-                    <option value="">— none —</option>
-                    {skus.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.code} · {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Qty" htmlFor="sale-qty">
-                  <input
-                    id="sale-qty"
-                    type="text"
-                    inputMode="decimal"
-                    value={quantity}
-                    onChange={(e) => {
-                      setQuantity(e.target.value);
-                      setError(null);
-                    }}
-                    disabled={saving || !skuId}
-                    className="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
-                  />
-                </Field>
-              </div>
-              {skuId && (
-                <p className="text-[11px] text-slate-400 m-0">
-                  Links this sale to the product — draws {quantity || "1"} from
-                  its stock and counts toward its cost &amp; margin.
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Products (optional)
+              </label>
+              {lines.length === 0 && (
+                <p className="text-[11px] text-slate-400 m-0 mb-2">
+                  Add the products on this sale to draw down stock + track cost
+                  &amp; margin. Leave empty for a quick cash sale.
                 </p>
               )}
-            </>
+              {lines.length > 0 && (
+                <div className="space-y-2">
+                  {lines.map((l, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[1fr_56px_76px_24px] gap-1.5 items-center"
+                    >
+                      <select
+                        value={l.skuId}
+                        onChange={(e) => pickProduct(idx, e.target.value)}
+                        disabled={saving}
+                        aria-label="Product"
+                        className="w-full py-2 px-2 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50 bg-white"
+                      >
+                        <option value="">— pick a product —</option>
+                        {skus.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.code} · {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={l.quantity}
+                        onChange={(e) =>
+                          updateLine(idx, { quantity: e.target.value })
+                        }
+                        inputMode="decimal"
+                        aria-label="Quantity"
+                        placeholder="Qty"
+                        disabled={saving}
+                        className="w-full py-2 px-2 text-sm text-center border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                      />
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                          {"$"}
+                        </span>
+                        <input
+                          value={l.unitPrice}
+                          onChange={(e) =>
+                            updateLine(idx, { unitPrice: e.target.value })
+                          }
+                          inputMode="decimal"
+                          aria-label="Price each"
+                          placeholder="Price"
+                          disabled={saving}
+                          className="w-full py-2 pl-5 pr-1 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeLine(idx)}
+                        disabled={saving}
+                        aria-label="Remove product"
+                        className="text-slate-400 hover:text-red-600 bg-transparent border-0 cursor-pointer text-lg leading-none"
+                      >
+                        {"×"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={addLine}
+                disabled={saving}
+                className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-0 cursor-pointer"
+              >
+                + Add {lines.length > 0 ? "another " : ""}product
+              </button>
+              {hasProducts && (
+                <p className="text-[11px] text-slate-400 m-0 mt-2">
+                  Each line draws its product&apos;s stock down + counts toward
+                  cost &amp; margin. Total:{" "}
+                  <strong className="text-slate-600">
+                    ${money(productsSubtotal)}
+                  </strong>
+                </p>
+              )}
+            </div>
           )}
 
           <Field label="Channel" htmlFor="sale-channel">

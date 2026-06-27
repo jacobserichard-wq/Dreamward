@@ -80,9 +80,12 @@ interface CreateSaleBody {
   notes?: unknown;
   /** Optional product this sale is for. When set, a line item is created
    *  (matched to the SKU) so the sale feeds COGS/margin + draws the SKU's
-   *  stock down by `quantity`. */
+   *  stock down by `quantity`. Legacy single-product path. */
   skuId?: unknown;
   quantity?: unknown;
+  /** Cart-style multi-product sale: one line item per entry, amount =
+   *  sum of (quantity × unitPrice). Takes precedence over skuId/quantity. */
+  items?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -162,6 +165,142 @@ export async function POST(req: NextRequest) {
     }
     if (!channel && eventId !== null) {
       channel = "markets";
+    }
+
+    // ── Multi-product (cart-style) sale ─────────────────────────
+    // The form sends items[] (product + qty + per-unit price). Create the
+    // sale + one line item per product + draw each product's stock, all in
+    // one transaction so the ledger can't desync. The sale amount is the
+    // authoritative sum of the line totals (not trusted from the client).
+    if (Array.isArray(body.items) && body.items.length > 0) {
+      const parsed: { skuId: number; quantity: number; unitPrice: number }[] = [];
+      for (const raw of body.items) {
+        const r = raw as {
+          skuId?: unknown;
+          quantity?: unknown;
+          unitPrice?: unknown;
+        };
+        const sid = Number(r?.skuId);
+        const qty = Number(r?.quantity);
+        const price = Number(r?.unitPrice);
+        if (!Number.isInteger(sid) || sid <= 0) {
+          return NextResponse.json(
+            { error: "Invalid product in the sale" },
+            { status: 400 }
+          );
+        }
+        if (!Number.isFinite(qty) || qty <= 0) {
+          return NextResponse.json(
+            { error: "Each product needs a positive quantity" },
+            { status: 400 }
+          );
+        }
+        if (!Number.isFinite(price) || price < 0) {
+          return NextResponse.json(
+            { error: "Each product needs a valid price" },
+            { status: 400 }
+          );
+        }
+        parsed.push({
+          skuId: sid,
+          quantity: qty,
+          unitPrice: Math.round(price * 100) / 100,
+        });
+      }
+      const itemsAmount =
+        Math.round(
+          parsed.reduce((s, it) => s + it.quantity * it.unitPrice, 0) * 100
+        ) / 100;
+      if (itemsAmount <= 0) {
+        return NextResponse.json(
+          { error: "Sale total must be greater than 0" },
+          { status: 400 }
+        );
+      }
+      const notesVal =
+        typeof body.notes === "string" ? body.notes.trim() : null;
+
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        const ids = parsed.map((it) => it.skuId);
+        const skuRows = await db.query<{ id: number; name: string }>(
+          `SELECT id, name FROM skus WHERE client_id = $1 AND id = ANY($2::int[])`,
+          [client.id, ids]
+        );
+        const nameById = new Map(skuRows.rows.map((r) => [r.id, r.name]));
+        if (nameById.size !== new Set(ids).size) {
+          await db.query("ROLLBACK");
+          return NextResponse.json(
+            { error: "One or more products not found" },
+            { status: 400 }
+          );
+        }
+        const saleRes = await db.query(
+          `INSERT INTO processed_items (
+             client_id, vendor, amount, due_date, category,
+             source, channel, event_id, status, notes,
+             invoice_number, confidence, summary, processed_at, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5,
+             'manual', $6, $7, 'paid', $8,
+             '', 100, $9, NOW(), NOW()
+           )
+           RETURNING id, vendor, amount, due_date, category, channel, status`,
+          [
+            client.id, // $1 client_id
+            customer, // $2 vendor
+            itemsAmount, // $3 amount
+            body.dueDate, // $4 due_date
+            body.category, // $5 category
+            channel, // $6 channel
+            eventId, // $7 event_id
+            notesVal, // $8 notes
+            `Manual sale: ${customer} — $${itemsAmount.toFixed(2)} (${
+              parsed.length
+            } product${parsed.length === 1 ? "" : "s"})`, // $9 summary
+          ]
+        );
+        const parentId = saleRes.rows[0].id as number;
+        const adjustments: {
+          lineItemId: number;
+          skuId: number;
+          quantity: number;
+        }[] = [];
+        for (let i = 0; i < parsed.length; i++) {
+          const it = parsed[i];
+          const li = await db.query<{ id: number }>(
+            `INSERT INTO processed_item_line_items (
+               processed_item_id, client_id, platform, external_id, name,
+               quantity, unit_price, currency, sold_at, matched_sku_id
+             ) VALUES ($1, $2, 'manual', $3, $4, $5, $6, 'USD', $7, $8)
+             RETURNING id`,
+            [
+              parentId,
+              client.id,
+              `manual-${parentId}-${i}`,
+              nameById.get(it.skuId) ?? "Item",
+              it.quantity,
+              it.unitPrice,
+              body.dueDate,
+              it.skuId,
+            ]
+          );
+          adjustments.push({
+            lineItemId: li.rows[0].id,
+            skuId: it.skuId,
+            quantity: it.quantity,
+          });
+        }
+        await recordSaleAdjustments({ dbClient: db, items: adjustments });
+        await db.query("COMMIT");
+        return NextResponse.json({ sale: saleRes.rows[0] });
+      } catch (txErr) {
+        await db.query("ROLLBACK").catch(() => {});
+        throw txErr;
+      } finally {
+        db.release();
+      }
     }
 
     // Optional product link + quantity. When a SKU is chosen we also write

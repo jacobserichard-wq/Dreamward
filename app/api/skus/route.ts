@@ -50,6 +50,9 @@ interface SkuRowDb {
   // warning without a second round trip. NUMERIC since Tier 2 →
   // pg returns it as a string.
   quantity_on_hand: string;
+  // Default booth/sell price — used to pre-fill line prices in the
+  // multi-product sale form. NUMERIC → string, null when unset.
+  default_sell_price: string | null;
   // Tier 2: true when the SKU has a recipe (≥1 bom_components row).
   has_recipe: boolean;
   kind: string;
@@ -116,6 +119,7 @@ export async function GET(req: NextRequest) {
               COALESCE(sales.sales_count, 0)::int AS sales_count,
               sales.last_sale_date,
               s.quantity_on_hand,
+              s.default_sell_price,
               EXISTS (
                 SELECT 1 FROM bom_components b WHERE b.parent_sku_id = s.id
               ) AS has_recipe,
@@ -173,6 +177,8 @@ export async function GET(req: NextRequest) {
         salesCount: r.sales_count,
         lastSaleDate: r.last_sale_date,
         quantityOnHand: Number(r.quantity_on_hand),
+        defaultSellPrice:
+          r.default_sell_price != null ? Number(r.default_sell_price) : null,
         hasRecipe: r.has_recipe,
         kind: r.kind,
         costingMethod: r.costing_method,
