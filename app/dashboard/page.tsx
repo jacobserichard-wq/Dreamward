@@ -101,6 +101,12 @@ const STATUS_BUTTON_META: Record<
   needs_review: { icon: "\u{1F440}", label: "Review", title: "Needs review — something looks off, check later" },
 };
 
+// Channels a market sale plausibly comes through (in person): card via
+// Square, or a manual / cash / direct entry. Online marketplaces
+// (Shopify / Etsy / Wix / Stripe) are never in-person market sales, so
+// they never get the "assign to event" nudge.
+const IN_PERSON_CHANNELS = new Set(["square", "direct", "uploads"]);
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 // useSearchParams (for the ?view=transactions deep-link) requires a
@@ -913,6 +919,8 @@ function DashboardInner() {
     id: number;
     label: string;
   } | null>(null);
+  // The transaction currently being linked to a market event (nudge action).
+  const [assigningEventId, setAssigningEventId] = useState<string | null>(null);
 
   const handleReceiptUpload = useCallback(
     async (itemId: string, file: File | undefined) => {
@@ -1143,6 +1151,28 @@ function DashboardInner() {
     [loadItems, router]
   );
 
+  // Link a transaction to a market event (the date-overlap nudge). Sets
+  // ONLY event_id — channel, amount, category, and COGS are untouched, so
+  // the global dashboard totals don't move; the event just gains a tracked
+  // sale (a separate in-person lens over the same row).
+  const handleAssignEvent = useCallback(
+    async (itemId: string, eventId: number) => {
+      setAssigningEventId(itemId);
+      try {
+        await apiFetch(`/api/expenses/${itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId }),
+        });
+        setSuccessMsg("Linked to the market event.");
+        await loadItems();
+      } finally {
+        setAssigningEventId(null);
+      }
+    },
+    [loadItems]
+  );
+
   // A refund is a "Returns & Refunds" expense — the revenue/band calc and
   // the tax report both subtract that category, so this nets out of
   // revenue and reduces the tagged channel's (and event's) profit.
@@ -1321,6 +1351,17 @@ function DashboardInner() {
   const activeChannelIds = new Set(
     processedItems.map((i) => channelOf(i)).filter(Boolean)
   );
+  // The market event (if any) whose date range covers a transaction's date —
+  // powers the "assign to event" nudge on unlinked in-person sales.
+  const eventForDate = (dueDate: string | null): EventResponse | null => {
+    if (!dueDate) return null;
+    const d = dueDate.slice(0, 10);
+    return (
+      availableEvents.find(
+        (e) => e.startDate <= d && (e.endDate || e.startDate) >= d
+      ) ?? null
+    );
+  };
   // Bank (Plaid) expenses present → show the "where income comes from" tip,
   // since that's exactly when the deposits-aren't-income question comes up.
   const hasBankExpenses = processedItems.some((i) => i.source === "plaid");
@@ -2271,6 +2312,36 @@ function DashboardInner() {
 
                     {/* Summary */}
                     <p className="pt-2 px-5 pb-3 text-xs text-slate-500 leading-normal m-0">{item.summary}</p>
+
+                    {/* Market-event nudge: an unlinked in-person sale dated
+                        inside an event's window. Suggests linking it (sets
+                        event_id only — doesn't move any global total). Online
+                        channels never qualify (IN_PERSON_CHANNELS). */}
+                    {(() => {
+                      if (typeOf(item) !== "income") return null;
+                      if (item.eventId != null) return null;
+                      const ch = channelOf(item);
+                      if (!ch || !IN_PERSON_CHANNELS.has(ch)) return null;
+                      const ev = eventForDate(item.dueDate);
+                      if (!ev) return null;
+                      const busy = assigningEventId === item.id;
+                      return (
+                        <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-[12px] text-blue-900 flex items-center justify-between gap-2 flex-wrap">
+                          <span>
+                            {"\u{1F4CD}"} Looks like a sale at{" "}
+                            <strong>{ev.name}</strong> — track it for that market?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAssignEvent(item.id, ev.id)}
+                            disabled={busy}
+                            className="font-semibold text-blue-700 hover:text-blue-900 hover:underline bg-transparent border-0 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {busy ? "Assigning…" : "Assign to event"}
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {/* Status actions. Sub-session 33: each button
                         carries a title tooltip + the row has a small
