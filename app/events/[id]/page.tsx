@@ -53,6 +53,12 @@ interface ProfitabilityPerEvent {
   /** Mileage cost at the IRS standard rate. Surfaced as the
    *  Schedule C deduction value alongside the operating cost. */
   irsMileageCost?: number;
+  /** COGS of products sold at this event (FIFO cost stamped on the line
+   *  items). Optional for deploy-gap safety with older API responses. */
+  cogs?: number;
+  grossProfit?: number;
+  /** Sold line items not yet costed (unmatched SKU) — flags partial COGS. */
+  uncostedLines?: number;
   profit: number;
   unknownAmount: number;
 }
@@ -670,6 +676,11 @@ export default function EventDetailPage({ params }: PageProps) {
     totalMiles,
     mileageCost: localMileageCost,
     irsMileageCost: localIrsMileageCost,
+    // Local mode can't compute COGS (no line-item access here) — leave it
+    // 0 and let the "local estimate" notice flag the limitation.
+    cogs: 0,
+    grossProfit: manualRevenue + linkedTotal,
+    uncostedLines: 0,
     profit:
       manualRevenue + linkedTotal - event.boothFee - localMileageCost,
     unknownAmount: 0,
@@ -684,6 +695,14 @@ export default function EventDetailPage({ params }: PageProps) {
       : pnl.totalMiles !== null
         ? pnl.totalMiles * irsMileageRate
         : 0;
+
+  // COGS of products sold at this market + gross margin (revenue − COGS).
+  const eventCogs = pnl.cogs ?? 0;
+  const eventUncosted = pnl.uncostedLines ?? 0;
+  const grossMargin =
+    pnl.revenue.total > 0
+      ? ((pnl.revenue.total - eventCogs) / pnl.revenue.total) * 100
+      : null;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -747,6 +766,31 @@ export default function EventDetailPage({ params }: PageProps) {
                 +${formatMoney(pnl.revenue.total)}
               </dd>
             </div>
+
+            {(eventCogs > 0 || eventUncosted > 0) && (
+              <>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-600">
+                    COGS
+                    {eventUncosted > 0 && (
+                      <span className="text-xs text-amber-600 ml-2">
+                        {eventUncosted} item{eventUncosted === 1 ? "" : "s"} not
+                        costed yet
+                      </span>
+                    )}
+                  </dt>
+                  <dd className="font-semibold text-slate-900 whitespace-nowrap">
+                    −${formatMoney(eventCogs)}
+                  </dd>
+                </div>
+                {grossMargin !== null && (
+                  <div className="flex justify-between gap-3 text-xs text-slate-400">
+                    <dt>Gross margin</dt>
+                    <dd className="whitespace-nowrap">{grossMargin.toFixed(0)}%</dd>
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="flex justify-between gap-3">
               <dt className="text-slate-600">Booth fee</dt>

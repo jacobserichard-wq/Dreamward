@@ -120,8 +120,13 @@ export async function GET() {
     // total_miles uses the same §8.2 conditional that /api/events GET
     // does: returns_home_nightly multiplies by day_count, else single
     // trip. Null round_trip_miles propagates to null total_miles.
-    const [eventsResult, txnsResult, settingsResult, appSettingResult] =
-      await Promise.all([
+    const [
+      eventsResult,
+      txnsResult,
+      settingsResult,
+      appSettingResult,
+      cogsResult,
+    ] = await Promise.all([
         pool.query<EventRow>(
           `SELECT id, name, start_date, end_date, venue, address,
                   revenue, booth_fee,
@@ -150,6 +155,22 @@ export async function GET() {
         ),
         pool.query<AppSettingRow>(
           `SELECT value FROM app_settings WHERE key = 'irs_mileage_rate'`
+        ),
+        // Per-event COGS: sum the cost-of-goods stamped on the line items
+        // of every transaction linked to an event. cogs_amount is NULL for
+        // not-yet-costed lines (unmatched SKU / pre-FIFO) — counted so the
+        // UI can flag that a market's COGS is still partial. This is a
+        // read over the SAME rows the dashboard uses; it doesn't change
+        // any global total.
+        pool.query<{ event_id: number; cogs: number; uncosted_lines: number }>(
+          `SELECT pi.event_id AS event_id,
+                  COALESCE(SUM(li.cogs_amount), 0)::float8 AS cogs,
+                  COUNT(*) FILTER (WHERE li.cogs_amount IS NULL)::int AS uncosted_lines
+             FROM processed_item_line_items li
+             JOIN processed_items pi ON pi.id = li.processed_item_id
+            WHERE pi.client_id = $1 AND pi.event_id IS NOT NULL
+            GROUP BY pi.event_id`,
+          [client.id]
         ),
       ]);
 
@@ -227,6 +248,14 @@ export async function GET() {
       }
     }
 
+    const cogsByEvent = new Map<number, { cogs: number; uncosted: number }>();
+    for (const r of cogsResult.rows) {
+      cogsByEvent.set(r.event_id, {
+        cogs: Number(r.cogs) || 0,
+        uncosted: Number(r.uncosted_lines) || 0,
+      });
+    }
+
     const perEvent = eventsResult.rows.map((e) => {
       const acc = accumulators.get(e.id)!;
       const totalMiles = e.total_miles == null ? null : Number(e.total_miles);
@@ -241,7 +270,14 @@ export async function GET() {
       const revenue = acc.manualRevenue + acc.linkedIncome;
       const expenses = acc.linkedExpense + acc.manualExpense;
       const boothFee = Number(e.booth_fee);
-      const profit = revenue - boothFee - expenses - mileageCost;
+      // COGS of the products sold at this event (FIFO cost stamped on the
+      // line items). gross profit = revenue − COGS; the event net then
+      // also nets booth fee, linked expenses, and mileage.
+      const cogsInfo = cogsByEvent.get(e.id);
+      const cogs = cogsInfo?.cogs ?? 0;
+      const uncostedLines = cogsInfo?.uncosted ?? 0;
+      const grossProfit = revenue - cogs;
+      const profit = revenue - cogs - boothFee - expenses - mileageCost;
       return {
         id: e.id,
         name: e.name,
@@ -260,6 +296,9 @@ export async function GET() {
           manual: acc.manualExpense,
         },
         boothFee,
+        cogs,
+        grossProfit,
+        uncostedLines,
         totalMiles,
         // Mileage costs at BOTH rates. mileageCost is the operating-
         // rate value used in the profit math; irsMileageCost is the
@@ -278,6 +317,7 @@ export async function GET() {
         totalBoothFees: agg.totalBoothFees + e.boothFee,
         totalMiles: agg.totalMiles + (e.totalMiles ?? 0),
         totalMileageCost: agg.totalMileageCost + e.mileageCost,
+        totalCogs: agg.totalCogs + e.cogs,
         netProfit: agg.netProfit + e.profit,
         eventCount: agg.eventCount + 1,
         unknownAmount: agg.unknownAmount + e.unknownAmount,
@@ -288,6 +328,7 @@ export async function GET() {
         totalBoothFees: 0,
         totalMiles: 0,
         totalMileageCost: 0,
+        totalCogs: 0,
         netProfit: 0,
         eventCount: 0,
         unknownAmount: 0,
