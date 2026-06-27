@@ -2174,11 +2174,15 @@ function DashboardInner() {
                           {item.confidence}%
                         </span>
                       </div>
-                      {item.attachments && item.attachments.length > 0 && (
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                          <span className="text-[13px] text-slate-500">
-                            Invoice file
-                          </span>
+                      {/* Attachment row — shown on every card. Has a file →
+                          view/delete via the viewer; empty → + Add (same
+                          upload path the PDF-invoice flow uses). Unifies the
+                          old "Invoice file" row + the bottom "Add receipt". */}
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-[13px] text-slate-500">
+                          Attachment
+                        </span>
+                        {item.attachments && item.attachments.length > 0 ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -2194,8 +2198,35 @@ function DashboardInner() {
                               ? `View / delete (${item.attachments.length})`
                               : "View / delete"}
                           </button>
-                        </div>
-                      )}
+                        ) : (
+                          <label
+                            title="Attach a file (JPG, PNG, PDF)"
+                            className={`text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer ${
+                              uploadingReceiptId === item.id
+                                ? "opacity-50 pointer-events-none"
+                                : ""
+                            }`}
+                          >
+                            {uploadingReceiptId === item.id ? (
+                              <Spinner size={11} color="#2563eb" />
+                            ) : (
+                              <span aria-hidden="true">{"\u{1F4CE}"}</span>
+                            )}
+                            {uploadingReceiptId === item.id ? "Uploading..." : "+ Add"}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/heic,image/webp,application/pdf"
+                              className="hidden"
+                              disabled={uploadingReceiptId === item.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = "";
+                                void handleReceiptUpload(item.id, f);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
 
                     {/* Summary */}
@@ -2275,37 +2306,9 @@ function DashboardInner() {
                           {"\u{1F4E6}"} Receive into inventory
                         </button>
                       )}
-                      {typeOf(item) === "expense" && (
-                        <label
-                          title="Attach a receipt or invoice (JPG, PNG, PDF)"
-                          className={`bg-transparent text-blue-600 hover:text-blue-700 hover:underline text-xs cursor-pointer px-2 py-1 inline-flex items-center gap-1 ${
-                            uploadingReceiptId === item.id
-                              ? "opacity-50 pointer-events-none"
-                              : ""
-                          }`}
-                        >
-                          {uploadingReceiptId === item.id && (
-                            <Spinner size={11} color="#2563eb" />
-                          )}
-                          {"\u{1F4CE}"}{" "}
-                          {uploadingReceiptId === item.id
-                            ? "Uploading..."
-                            : item.attachments && item.attachments.length > 0
-                              ? "Add receipt"
-                              : "Attach receipt"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/heic,image/webp,application/pdf"
-                            className="hidden"
-                            disabled={uploadingReceiptId === item.id}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              e.target.value = "";
-                              void handleReceiptUpload(item.id, f);
-                            }}
-                          />
-                        </label>
-                      )}
+                      {/* (Attachment add/view/delete moved to the
+                          "Attachment" row in the card details above — no
+                          separate receipt action.) */}
                       {/* "Got money back" — vendor refund on an expense.
                           Only on positive expense rows (not on a credit
                           row itself). Logs a contra-expense in the same
