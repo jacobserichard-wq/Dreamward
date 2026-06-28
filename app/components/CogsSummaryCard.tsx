@@ -26,6 +26,7 @@ interface MarginTotals {
   cogs: number;
   margin: number;
   marginPercent: number | null;
+  refunds: number;
   unmatchedRevenue: number;
   unmatchedLineItemCount: number;
   cogsEstimatedLineItemCount: number;
@@ -115,6 +116,7 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
     cogs: 0,
     margin: 0,
     marginPercent: null,
+    refunds: 0,
     unmatchedRevenue: 0,
     unmatchedLineItemCount: 0,
     cogsEstimatedLineItemCount: 0,
@@ -126,6 +128,7 @@ function aggregate(parts: SummaryResponse[]): Aggregated {
   for (const p of parts) {
     totals.revenue += p.totals.revenue;
     totals.cogs += p.totals.cogs;
+    totals.refunds += p.totals.refunds ?? 0;
     feesAndTips += p.feesAndTips ?? 0;
     totals.unmatchedRevenue += p.totals.unmatchedRevenue;
     totals.unmatchedLineItemCount += p.totals.unmatchedLineItemCount;
@@ -200,6 +203,7 @@ export default function CogsSummaryCard() {
           cogs: 0,
           margin: 0,
           marginPercent: null,
+          refunds: 0,
           unmatchedRevenue: 0,
           unmatchedLineItemCount: 0,
           cogsEstimatedLineItemCount: 0,
@@ -459,7 +463,10 @@ export default function CogsSummaryCard() {
         <>
           <p className="text-xs text-slate-500 m-0 mb-2">
             Product sales, cost &amp; profit margin for{" "}
-            {periodLabel.replace(/ · .*/, "")}.
+            {periodLabel.replace(/ · .*/, "")}
+            {(totals.refunds ?? 0) > 0
+              ? `, net of ${fmtUsd(totals.refunds)} refunded.`
+              : "."}
           </p>
           {/* Headline strip */}
           <div className="grid grid-cols-3 gap-3 mb-2">

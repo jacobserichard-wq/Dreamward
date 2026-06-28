@@ -40,6 +40,12 @@ export interface MarginTotals {
   cogs: number;
   margin: number;             // revenue - cogs
   marginPercent: number | null; // null when revenue=0
+  /** Product value refunded in the period (net of tax), ALREADY
+   *  subtracted from `revenue` on the headline totals. 0 on per-channel
+   *  / per-SKU rows (a refund row carries no line item, so it can't be
+   *  attributed to a SKU/channel). Surfaced so the card can show
+   *  "net of $X refunds". */
+  refunds: number;
   /** Line items with no matched_sku_id contribute to revenue but
    *  zero to COGS. Surfaced so the dashboard can show "of this
    *  total, $X is from unmatched items — your margin reading is
@@ -95,6 +101,7 @@ function toMarginTotals(r: RawMarginRow): MarginTotals {
     cogs,
     margin,
     marginPercent: revenue > 0 ? (margin / revenue) * 100 : null,
+    refunds: 0, // populated only on the headline (computeMargin)
     unmatchedRevenue: Number(r.unmatched_revenue) || 0,
     unmatchedLineItemCount: r.unmatched_line_item_count ?? 0,
     cogsEstimatedLineItemCount: r.cogs_estimated_line_item_count ?? 0,
@@ -137,7 +144,50 @@ function buildAggregateSql(opts: {
 }
 
 /**
- * The overall totals for a period (no grouping).
+ * Product value refunded in the period (net of sales tax) — the channel
+ * refund rows (negative "Sales"/"Online Sales") plus manual "Returns &
+ * Refunds" entries. Both are recorded as separate processed_items with
+ * NO line items, so the line-item margin engine above can't see them; we
+ * subtract this from the headline revenue so the margin reflects money
+ * actually kept.
+ *
+ * Why this is correct in BOTH refund cases: reverseSaleAdjustments nulls
+ * the original line's cogs_amount when stock is restocked, so
+ *  - restocked (item returned): COGS already gone → netting the revenue
+ *    leaves that sale at ~0 margin (right — nothing kept, nothing spent);
+ *  - kept/comped (no restock): COGS stays → netting the revenue surfaces
+ *    the real loss (right — money refunded, cost eaten).
+ * Filtered to status='paid' + due_date, matching the revenue/COGS query.
+ */
+export async function computeRefundsNet(opts: {
+  clientId: number;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<number> {
+  const res = await pool.query<{ total: string }>(
+    `SELECT COALESCE(SUM(
+        CASE
+          WHEN category = 'Returns & Refunds'
+            THEN amount - COALESCE(tax_amount, 0)
+          WHEN category IN ('Sales', 'Online Sales') AND amount < 0
+            THEN -(amount - COALESCE(tax_amount, 0))
+          ELSE 0
+        END
+      ), 0)::text AS total
+       FROM processed_items
+      WHERE client_id = $1
+        AND status = 'paid'
+        AND due_date >= $2
+        AND due_date <= $3`,
+    [opts.clientId, opts.periodStart, opts.periodEnd]
+  );
+  return Number(res.rows[0]?.total) || 0;
+}
+
+/**
+ * The overall totals for a period (no grouping). Revenue is net of
+ * refunds (see computeRefundsNet) so the headline margin matches the
+ * dashboard's net-cash Total Sales basis.
  */
 export async function computeMargin(opts: {
   clientId: number;
@@ -148,12 +198,15 @@ export async function computeMargin(opts: {
     groupExpr: null,
     groupKeyExpr: "NULL",
   });
-  const res = await pool.query<RawMarginRow>(sql, [
-    opts.clientId,
-    opts.periodStart,
-    opts.periodEnd,
+  const [res, refunds] = await Promise.all([
+    pool.query<RawMarginRow>(sql, [
+      opts.clientId,
+      opts.periodStart,
+      opts.periodEnd,
+    ]),
+    computeRefundsNet(opts),
   ]);
-  return toMarginTotals(
+  const base = toMarginTotals(
     res.rows[0] ?? {
       group_key: null,
       revenue: "0",
@@ -164,6 +217,17 @@ export async function computeMargin(opts: {
       total_line_item_count: 0,
     }
   );
+  // Net refunds out of the gross line-item revenue. COGS is left as-is
+  // (restock already nulled the returned items' cogs_amount).
+  const revenue = base.revenue - refunds;
+  const margin = revenue - base.cogs;
+  return {
+    ...base,
+    revenue,
+    refunds,
+    margin,
+    marginPercent: revenue > 0 ? (margin / revenue) * 100 : null,
+  };
 }
 
 /**
