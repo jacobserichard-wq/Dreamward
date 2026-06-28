@@ -88,6 +88,7 @@ function serializeInvoice(row: InvoiceRow, today: Date = new Date()) {
     notes: row.notes,
     lastReminderSentAt: row.last_reminder_sent_at,
     reminderCount: row.reminder_count,
+    sentAt: row.invoice_sent_at,
     // Phase 6.5 commit 6: ingest-source columns surfaced for the
     // detail-page banner + "view original email" deep-link.
     source: row.source,
@@ -139,7 +140,7 @@ export async function GET(
     const invoiceResult = await pool.query<InvoiceRow>(
       `SELECT id, client_id, customer_name, customer_email, invoice_number,
               invoice_date, due_date, amount_total, amount_paid, status,
-              notes, last_reminder_sent_at, reminder_count,
+              notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
               source, gmail_message_id, needs_review,
               created_at, updated_at
          FROM invoices
@@ -446,7 +447,7 @@ export async function PATCH(
           WHERE id = $${i++} AND client_id = $${i++}
         RETURNING id, client_id, customer_name, customer_email, invoice_number,
                   invoice_date, due_date, amount_total, amount_paid, status,
-                  notes, last_reminder_sent_at, reminder_count,
+                  notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
                   source, gmail_message_id, needs_review,
                   created_at, updated_at`,
         [...values, invoiceId, client.id]

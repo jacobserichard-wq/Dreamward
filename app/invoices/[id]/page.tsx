@@ -38,6 +38,7 @@ interface InvoiceDetail {
   notes: string | null;
   lastReminderSentAt: string | null;
   reminderCount: number;
+  sentAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -629,9 +630,19 @@ export default function InvoiceDetailPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-slate-900 m-0 mb-2">
               Send invoice
             </h2>
-            <p className="text-sm text-slate-600 m-0 mb-4">
+            <p className="text-sm text-slate-600 m-0 mb-2">
               Email this invoice to the customer — amount due, due date, and your
               details. (Different from a reminder, which is an overdue nudge.)
+            </p>
+            <p className="text-sm text-slate-600 m-0 mb-4">
+              Last sent:{" "}
+              {invoice.sentAt ? (
+                <span className="text-emerald-700 font-medium">
+                  ✓ {timeAgo(invoice.sentAt)}
+                </span>
+              ) : (
+                <span className="text-slate-400">never</span>
+              )}
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               <button

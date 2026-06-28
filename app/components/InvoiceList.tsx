@@ -29,6 +29,8 @@ export interface InvoiceListEntry {
   agingBucket: AgingBucket;
   lastReminderSentAt: string | null;
   reminderCount: number;
+  /** When the invoice was last emailed to the customer via "Send invoice". */
+  sentAt: string | null;
   // Phase 6.5 commit 6 — source + review state from migration 0009.
   // source='email-auto' shows an "Auto" badge; needsReview=true swaps
   // the reminder button for Approve / Dismiss inline actions.
@@ -323,6 +325,14 @@ export default function InvoiceList({
                               className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300"
                             >
                               Review
+                            </span>
+                          )}
+                          {inv.sentAt && (
+                            <span
+                              title={`Invoice emailed ${inv.sentAt.slice(0, 10)}`}
+                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            >
+                              ✓ Sent
                             </span>
                           )}
                         </div>

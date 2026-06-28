@@ -90,6 +90,7 @@ function serializeInvoice(row: InvoiceRow, today: Date = new Date()) {
     notes: row.notes,
     lastReminderSentAt: row.last_reminder_sent_at,
     reminderCount: row.reminder_count,
+    sentAt: row.invoice_sent_at,
     // Phase 6.5 commit 6: surface the new columns so the UI can badge
     // auto-detected rows and the review-queue filter chip can count
     // needs_review separately from the aging buckets.
@@ -226,7 +227,7 @@ export async function GET(req: NextRequest) {
     const result = await pool.query<InvoiceRow>(
       `SELECT id, client_id, customer_name, customer_email, invoice_number,
               invoice_date, due_date, amount_total, amount_paid, status,
-              notes, last_reminder_sent_at, reminder_count,
+              notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
               source, gmail_message_id, needs_review,
               created_at, updated_at
          FROM invoices
@@ -354,7 +355,7 @@ export async function POST(req: NextRequest) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, client_id, customer_name, customer_email, invoice_number,
                  invoice_date, due_date, amount_total, amount_paid, status,
-                 notes, last_reminder_sent_at, reminder_count,
+                 notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
                  created_at, updated_at`,
       [
         client.id,

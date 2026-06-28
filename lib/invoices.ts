@@ -39,6 +39,9 @@ export interface InvoiceRow {
   notes: string | null;
   last_reminder_sent_at: string | null;
   reminder_count: number;
+  // When the invoice itself was last emailed to the customer via "Send
+  // invoice" (distinct from the reminder clock above).
+  invoice_sent_at: string | null;
   created_at: string;
   updated_at: string;
   // Phase 6.5 (sub-session 24): three columns from migration 0009.

@@ -109,6 +109,13 @@ export async function POST(
       );
     }
 
+    // Stamp when the invoice was sent (powers the "Sent <when>" indicator).
+    await pool.query(
+      `UPDATE invoices SET invoice_sent_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND client_id = $2`,
+      [invoiceId, client.id]
+    );
+
     return NextResponse.json({ sent: true, to: inv.customer_email });
   } catch (error) {
     console.error("Invoice send POST error:", error);
