@@ -64,6 +64,11 @@ interface InvoiceListProps {
   /** ID of the invoice whose reminder is currently being sent (for the
    *  in-flight spinner state). null when no send is in progress. */
   sendingReminderId: number | null;
+  /** Send-invoice click handler (emails the customer their invoice —
+   *  distinct from a reminder). Parent does the fetch + refresh. */
+  onSendInvoice: (invoiceId: number) => void;
+  /** ID of the invoice currently being sent (spinner state). */
+  sendingInvoiceId: number | null;
   // Phase 6.5 commit 6 — review-queue actions. Parent handles the
   // PATCH /api/invoices/[id]/review fetch + list refresh.
   onApprove: (invoiceId: number) => void;
@@ -120,6 +125,8 @@ export default function InvoiceList({
   onToggleNeedsReview,
   onSendReminder,
   sendingReminderId,
+  onSendInvoice,
+  sendingInvoiceId,
   onApprove,
   onDismiss,
   reviewingId,
@@ -391,20 +398,37 @@ export default function InvoiceList({
                             const reason = reminderDisabledReason(inv);
                             const isSending = sendingReminderId === inv.id;
                             const disabled = reason !== null || isSending;
+                            const invSending = sendingInvoiceId === inv.id;
+                            const noEmail = !inv.customerEmail;
                             return (
-                              <button
-                                type="button"
-                                onClick={() => onSendReminder(inv.id)}
-                                disabled={disabled}
-                                title={
-                                  reason
-                                    ? `Can't send: ${reason}`
-                                    : `Send reminder to ${inv.customerEmail}`
-                                }
-                                className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                              >
-                                {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
-                              </button>
+                              <div className="flex gap-1.5 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => onSendInvoice(inv.id)}
+                                  disabled={noEmail || invSending}
+                                  title={
+                                    noEmail
+                                      ? "Add a customer email first"
+                                      : `Send invoice to ${inv.customerEmail}`
+                                  }
+                                  className="text-xs py-1 px-2 rounded border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                >
+                                  {invSending ? "Sending..." : `${"\u{1F4E7}"} Send`}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onSendReminder(inv.id)}
+                                  disabled={disabled}
+                                  title={
+                                    reason
+                                      ? `Can't send: ${reason}`
+                                      : `Send reminder to ${inv.customerEmail}`
+                                  }
+                                  className="text-xs py-1 px-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                >
+                                  {isSending ? "Sending..." : `${"\u{1F4E9}"} Remind`}
+                                </button>
+                              </div>
                             );
                           })()
                         )}

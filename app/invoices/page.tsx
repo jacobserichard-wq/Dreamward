@@ -33,6 +33,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<AgingBucket | null>(null);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<number | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<number | null>(
     null
   );
@@ -165,6 +166,26 @@ export default function InvoicesPage() {
       setError(err instanceof Error ? err.message : "Failed to send reminder");
     } finally {
       setSendingReminderId(null);
+    }
+  };
+
+  const handleSendInvoice = async (invoiceId: number) => {
+    setSendingInvoiceId(invoiceId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/send`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg("Invoice sent.");
+      await loadInvoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send invoice");
+    } finally {
+      setSendingInvoiceId(null);
     }
   };
 
@@ -315,6 +336,8 @@ export default function InvoicesPage() {
           }
           onSendReminder={handleSendReminder}
           sendingReminderId={sendingReminderId}
+          onSendInvoice={handleSendInvoice}
+          sendingInvoiceId={sendingInvoiceId}
           onApprove={handleApprove}
           onDismiss={handleDismiss}
           reviewingId={reviewingId}
