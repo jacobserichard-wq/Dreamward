@@ -69,9 +69,15 @@ function stockBadgeClasses(qty: number): string {
   return "text-emerald-600";
 }
 
+interface LastImport {
+  batchId: string;
+  count: number;
+  importedAt: string;
+}
 interface SkusResponse {
   skus: SkuRow[];
   summary: { totalActive: number; totalArchived: number };
+  lastImport: LastImport | null;
 }
 
 function fmtMoney(n: number | null, currency: string | null): string {
@@ -119,6 +125,9 @@ export default function SkusPage() {
   const [bulkCostOpen, setBulkCostOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [undoingImport, setUndoingImport] = useState(false);
+  const [lastImport, setLastImport] = useState<LastImport | null>(null);
 
   // Focused per-card modals (inventory simplification). Clicking a
   // card's Cost or Stock line opens a targeted modal instead of
@@ -149,12 +158,98 @@ export default function SkusPage() {
         const data = (await res.json()) as SkusResponse;
         setSkus(data.skus);
         setSummary(data.summary);
+        setLastImport(data.lastImport ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't load SKUs");
       }
     },
     [router]
   );
+
+  // Bulk-delete the selected SKUs. Clean ones (no sales/recipe/production)
+  // are removed; any with history are archived instead. Reuses the
+  // existing multi-select.
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `Delete ${ids.length} selected SKU${ids.length === 1 ? "" : "s"}? ` +
+          `Ones with no sales are permanently removed; any already used in ` +
+          `sales or recipes are archived instead.`
+      )
+    ) {
+      return;
+    }
+    setBulkDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/skus/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { deleted: number; archived: number };
+      setSelected(new Set());
+      setSuccessToast(
+        `Removed ${data.deleted} SKU${data.deleted === 1 ? "" : "s"}` +
+          (data.archived > 0
+            ? ` · archived ${data.archived} that had sales/recipes`
+            : "")
+      );
+      await loadSkus(showArchived);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete SKUs");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }, [selected, loadSkus, showArchived]);
+
+  // Undo the most recent bulk import — remove every SKU stamped with its
+  // batch id (clean ones deleted, history ones archived).
+  const handleUndoImport = useCallback(async () => {
+    if (!lastImport) return;
+    if (
+      !window.confirm(
+        `Undo the last import — remove its ${lastImport.count} SKU${
+          lastImport.count === 1 ? "" : "s"
+        }? Ones with no sales are deleted; any with sales or recipes are ` +
+          `archived instead.`
+      )
+    ) {
+      return;
+    }
+    setUndoingImport(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/skus/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: lastImport.batchId }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { deleted: number; archived: number };
+      setSelected(new Set());
+      setSuccessToast(
+        `Undid last import — removed ${data.deleted}` +
+          (data.archived > 0
+            ? ` · archived ${data.archived} that had sales/recipes`
+            : "")
+      );
+      await loadSkus(showArchived);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to undo import");
+    } finally {
+      setUndoingImport(false);
+    }
+  }, [lastImport, loadSkus, showArchived]);
 
   useEffect(() => {
     let cancelled = false;
@@ -401,6 +496,14 @@ export default function SkusPage() {
               >
                 Update costs →
               </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="py-1.5 px-3 rounded-lg bg-red-600 text-white text-sm font-semibold border-0 cursor-pointer hover:bg-red-700 disabled:opacity-60"
+              >
+                {bulkDeleting ? "Deleting…" : "Delete selected"}
+              </button>
             </div>
           </div>
         )}
@@ -437,6 +540,20 @@ export default function SkusPage() {
             >
               <span>{"\u{1F4CB}"}</span> Paste from spreadsheet
             </button>
+            {lastImport && (
+              <button
+                type="button"
+                onClick={handleUndoImport}
+                disabled={undoingImport}
+                title={`Remove the ${lastImport.count} SKUs from your most recent import`}
+                className="py-2 px-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <span>{"\u{21A9}"}</span>
+                {undoingImport
+                  ? "Undoing…"
+                  : `Undo last import (${lastImport.count})`}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleNewSku(kindFilter)}

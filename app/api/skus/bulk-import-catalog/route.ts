@@ -202,6 +202,12 @@ export async function POST(req: NextRequest) {
     let errored = results.length;
     let totalResolved = 0;
 
+    // One id shared by every row from this import run, so the SKUs tab's
+    // "Undo last import" can remove exactly this batch.
+    const batchId = `imp_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
     const dbClient = await pool.connect();
     try {
       await dbClient.query("BEGIN");
@@ -211,10 +217,10 @@ export async function POST(req: NextRequest) {
         try {
           // 1. Insert the SKU
           const skuRes = await dbClient.query<{ id: number }>(
-            `INSERT INTO skus (client_id, code, name)
-             VALUES ($1, $2, $3)
+            `INSERT INTO skus (client_id, code, name, import_batch_id)
+             VALUES ($1, $2, $3, $4)
              RETURNING id`,
-            [client.id, v.code, v.name]
+            [client.id, v.code, v.name, batchId]
           );
           const skuId = skuRes.rows[0].id;
 

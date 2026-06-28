@@ -179,6 +179,11 @@ export async function POST(req: NextRequest) {
     let skipped = 0;
     let errored = results.length; // pre-validation failures count as errored
 
+    // Shared id for every row from this import → powers "Undo last import".
+    const batchId = `imp_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
     const dbClient = await pool.connect();
     try {
       await dbClient.query("BEGIN");
@@ -190,10 +195,10 @@ export async function POST(req: NextRequest) {
           // for duplicates — we map that to status='skipped' so
           // re-running an import after fixing a typo is safe.
           const skuRes = await dbClient.query<{ id: number }>(
-            `INSERT INTO skus (client_id, code, name, description)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO skus (client_id, code, name, description, import_batch_id)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING id`,
-            [client.id, vrow.code, vrow.name, vrow.description]
+            [client.id, vrow.code, vrow.name, vrow.description, batchId]
           );
           const skuId = skuRes.rows[0].id;
 

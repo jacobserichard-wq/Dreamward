@@ -164,7 +164,30 @@ export async function GET(req: NextRequest) {
       total_archived: 0,
     };
 
+    // Most recent bulk import (for the "Undo last import" affordance).
+    const lastImportRes = await pool.query<{
+      import_batch_id: string;
+      n: number;
+      imported_at: string;
+    }>(
+      `SELECT import_batch_id, COUNT(*)::int AS n, MAX(created_at) AS imported_at
+         FROM skus
+        WHERE client_id = $1 AND import_batch_id IS NOT NULL
+        GROUP BY import_batch_id
+        ORDER BY imported_at DESC
+        LIMIT 1`,
+      [client.id]
+    );
+    const lastImport = lastImportRes.rows[0]
+      ? {
+          batchId: lastImportRes.rows[0].import_batch_id,
+          count: lastImportRes.rows[0].n,
+          importedAt: lastImportRes.rows[0].imported_at,
+        }
+      : null;
+
     return NextResponse.json({
+      lastImport,
       skus: result.rows.map((r) => ({
         id: r.id,
         code: r.code,
