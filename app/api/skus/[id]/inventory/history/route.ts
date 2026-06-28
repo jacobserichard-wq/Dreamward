@@ -33,6 +33,10 @@ interface AdjustmentRowDb {
   reason: string;
   notes: string | null;
   created_at: string;
+  // The date shown to the user: the SALE date (line item's sold_at, =
+  // the transaction's due date) for sale rows, else the record time.
+  // Keeps the stock log's date aligned with the transaction.
+  effective_date: string;
   running_balance: string;
   source_line_item_id: number | null;
 }
@@ -93,16 +97,23 @@ export async function GET(
     // would re-window if we used SUM() in the projection directly.
     const historyRes = await pool.query<AdjustmentRowDb>(
       `WITH ordered AS (
-         SELECT id, delta, reason, notes, source_line_item_id, created_at,
-                SUM(delta) OVER (
-                  ORDER BY created_at ASC, id ASC
+         SELECT ia.id, ia.delta, ia.reason, ia.notes, ia.source_line_item_id,
+                ia.created_at,
+                -- Sale rows show the sale date (sold_at) so the stock log
+                -- lines up with the transaction; manual adjustments (no
+                -- line item) fall back to when they were recorded.
+                COALESCE(li.sold_at::text, ia.created_at::text) AS effective_date,
+                SUM(ia.delta) OVER (
+                  ORDER BY ia.created_at ASC, ia.id ASC
                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                 )::numeric AS running_balance
-           FROM inventory_adjustments
-          WHERE sku_id = $1
+           FROM inventory_adjustments ia
+           LEFT JOIN processed_item_line_items li
+             ON li.id = ia.source_line_item_id
+          WHERE ia.sku_id = $1
        )
        SELECT id, delta, reason, notes, source_line_item_id,
-              created_at, running_balance
+              created_at, effective_date, running_balance
          FROM ordered
         ORDER BY created_at DESC, id DESC
         LIMIT $2 OFFSET $3`,
@@ -125,6 +136,8 @@ export async function GET(
         sourceLineItemId: r.source_line_item_id,
         runningBalance: parseFloat(r.running_balance),
         createdAt: r.created_at,
+        // The user-facing date: sale date for sales, record time otherwise.
+        date: r.effective_date,
       })),
       totalCount: totalRes.rows[0]?.n ?? 0,
     });

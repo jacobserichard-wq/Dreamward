@@ -116,6 +116,9 @@ interface InventoryHistoryRow {
   sourceLineItemId: number | null;
   runningBalance: number;
   createdAt: string;
+  /** User-facing date: the sale date for sale rows (matches the
+   *  transaction's due date), else when the adjustment was recorded. */
+  date: string;
 }
 
 interface InventoryHistoryResponse {
@@ -958,7 +961,7 @@ export default function SkuDetailPage() {
                         className="border-b border-slate-100 last:border-b-0"
                       >
                         <td className="py-2.5 px-4 text-slate-700 whitespace-nowrap text-xs">
-                          {fmtDate(adj.createdAt)}
+                          {fmtDate(adj.date)}
                         </td>
                         <td className="py-2.5 px-4 text-slate-700 text-xs">
                           {REASON_LABELS[adj.reason] ?? adj.reason}
