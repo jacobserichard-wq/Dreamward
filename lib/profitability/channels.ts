@@ -611,7 +611,12 @@ export function buildKindClassifier(
   // per-industry taxonomy, so without this it classifies as "unknown"
   // and the channel rollup silently drops the revenue (Total Sales /
   // Net Profit read $0 even though the payments exist).
-  const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
+  const LEGACY_INCOME = new Set([
+    "invoice",
+    "ar_followup",
+    "Sales",
+    "Online Sales",
+  ]);
   const LEGACY_EXPENSE = new Set(["expense"]);
 
   return (category) => {

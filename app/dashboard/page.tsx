@@ -116,6 +116,19 @@ const STATUS_BUTTON_META: Record<
 // they never get the "assign to event" nudge.
 const IN_PERSON_CHANNELS = new Set(["square", "direct", "uploads"]);
 
+// Categories that are ALWAYS income regardless of the client's seeded
+// taxonomy — mirrors the server's LEGACY_INCOME (lib/profitability/
+// channels.ts). Channel ingests hardcode "Sales" (Square/Etsy) and
+// "Online Sales" (Shopify/Wix); those aren't in every industry's seeded
+// income list, so without this the dashboard mis-types them as expenses
+// (wrong pill, "Refund this" hidden, market nudge suppressed).
+const LEGACY_INCOME_CATEGORIES = new Set([
+  "invoice",
+  "ar_followup",
+  "Sales",
+  "Online Sales",
+]);
+
 // Format a date by its literal YYYY-MM-DD prefix — NO timezone shift, so
 // a stored "2026-06-28" always reads "Jun 28, 2026". The old
 // new Date(...).toLocaleDateString() shifted date-only values across the
@@ -1372,6 +1385,12 @@ function DashboardInner() {
   // lib classifier), so the channel filter + the dropdown's active-channel
   // list match what each card counts — e.g. a Shopify order carries
   // channel=null but classifies to "shopify" via its source.
+  // Income when the category is in the client's seeded income list OR a
+  // known always-income channel/legacy category — same rule the server
+  // classifiers use, so the dashboard agrees with the cards/reports.
+  const isIncomeCategory = (cat: string) =>
+    incomeCategories.includes(cat) || LEGACY_INCOME_CATEGORIES.has(cat);
+
   const channelOf = (i: ProcessedItem): string | null =>
     channelIdForRow({
       amount: i.amount,
@@ -1383,7 +1402,7 @@ function DashboardInner() {
       kind:
         i.category === "Returns & Refunds"
           ? "expense"
-          : incomeCategories.includes(i.category)
+          : isIncomeCategory(i.category)
             ? "income"
             : "expense",
     });
@@ -2099,7 +2118,7 @@ function DashboardInner() {
               ): "income" | "expense" | "refund" =>
                 i.category === "Returns & Refunds"
                   ? "refund"
-                  : incomeCategories.includes(i.category)
+                  : isIncomeCategory(i.category)
                     ? "income"
                     : "expense";
               const byType = (items: ProcessedItem[]) =>
@@ -2466,7 +2485,7 @@ function DashboardInner() {
                           expense or an existing refund can't be refunded).
                           Pre-fills the refund with this sale's customer,
                           amount, channel + event. */}
-                      {incomeCategories.includes(item.category) ? (
+                      {isIncomeCategory(item.category) ? (
                         <button
                           type="button"
                           onClick={() => openRefundForItem(item)}

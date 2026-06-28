@@ -35,7 +35,12 @@ function isPlanAllowed(plan: string | null | undefined): boolean {
 // rows persist and have to be interpreted at read time.
 // "Sales" is what the Square + Etsy ingests tag payments with (not in the
 // seeded taxonomy); without it those sales classify as "unknown".
-const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
+const LEGACY_INCOME = new Set([
+  "invoice",
+  "ar_followup",
+  "Sales",
+  "Online Sales",
+]);
 const LEGACY_EXPENSE = new Set(["expense"]);
 
 type CategoryKind = "income" | "expense" | "unknown";

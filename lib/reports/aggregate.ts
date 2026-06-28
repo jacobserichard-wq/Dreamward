@@ -33,7 +33,12 @@ const CATEGORY_AR_COLLECTED = "AR collected (invoices paid)";
 // in the seeded per-industry taxonomy) — without it, those sales classify
 // as "unknown" and get excluded from revenue. Mirror of the fix in
 // lib/profitability/channels.ts buildKindClassifier.
-const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
+const LEGACY_INCOME = new Set([
+  "invoice",
+  "ar_followup",
+  "Sales",
+  "Online Sales",
+]);
 const LEGACY_EXPENSE = new Set(["expense"]);
 
 export type CategoryKind = "income" | "expense" | "unknown";
