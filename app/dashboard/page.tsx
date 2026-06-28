@@ -1201,9 +1201,19 @@ function DashboardInner() {
           notes: data.notes,
         }),
       });
+      // Return → put the items back in stock (reverse stock + COGS on the
+      // original sale). The refund row above already handles the money side.
+      const didRestock = Boolean(data.restock && data.originalItemId);
+      if (didRestock) {
+        await apiFetch(`/api/items/${data.originalItemId}/restock`, {
+          method: "POST",
+        });
+      }
       setShowRefundForm(false);
       setRefundPrefill(null);
-      setSuccessMsg("Refund logged.");
+      setSuccessMsg(
+        didRestock ? "Refund logged + items restocked." : "Refund logged."
+      );
       await loadItems();
     },
     [loadItems]
@@ -1216,6 +1226,8 @@ function DashboardInner() {
       amount: item.amount,
       channel: item.channel,
       eventId: item.eventId,
+      originalItemId: Number(item.id),
+      hasProducts: (item.lineItems?.length ?? 0) > 0,
     });
     setShowRefundForm(true);
   }, []);

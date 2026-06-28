@@ -34,6 +34,13 @@ export interface RefundFormSubmit {
   channel: string | null;
   eventId: number | null;
   notes: string | null;
+  /** True = the customer returned the goods → put them back in stock +
+   *  reverse their COGS. Only meaningful when the refund is tied to a
+   *  sale that had products (originalItemId set). */
+  restock: boolean;
+  /** The original sale's processed_items.id, when refunding a specific
+   *  sale ("Refund this"). Null for a standalone "Log a refund". */
+  originalItemId: number | null;
 }
 
 /** Pre-fill values when launched from a specific sale ("Refund this"). */
@@ -42,6 +49,11 @@ export interface RefundPrefill {
   amount?: number;
   channel?: string | null;
   eventId?: number | null;
+  /** The sale's row id — lets the refund optionally restock it. */
+  originalItemId?: number;
+  /** Whether that sale had products (drives the "put back in stock?"
+   *  checkbox; hidden when the sale had no products to restock). */
+  hasProducts?: boolean;
 }
 
 export interface RefundFormProps {
@@ -81,6 +93,9 @@ export default function RefundForm({
   const [channel, setChannel] = useState("");
   const [eventId, setEventId] = useState("");
   const [notes, setNotes] = useState("");
+  // Return → restock. Defaults on (most refunds are returns); only shown
+  // when the refunded sale had products.
+  const [restock, setRestock] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +113,7 @@ export default function RefundForm({
     setChannel(prefill?.channel ?? "");
     setEventId(prefill?.eventId != null ? String(prefill.eventId) : "");
     setNotes("");
+    setRestock(true);
     setError(null);
   }, [open, prefill]);
 
@@ -135,6 +151,8 @@ export default function RefundForm({
         channel: channel || null,
         eventId: showEventPicker && eventId ? Number(eventId) : null,
         notes: notes.trim() || null,
+        restock: prefill?.hasProducts ? restock : false,
+        originalItemId: prefill?.originalItemId ?? null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save refund");
@@ -274,6 +292,26 @@ export default function RefundForm({
                 this refund.
               </p>
             </Field>
+          )}
+
+          {prefill?.hasProducts && (
+            <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <input
+                type="checkbox"
+                checked={restock}
+                onChange={(e) => setRestock(e.target.checked)}
+                disabled={saving}
+                className="mt-0.5 accent-rose-600 cursor-pointer flex-shrink-0"
+              />
+              <span>
+                Put the items back in stock
+                <span className="block text-xs text-slate-400 mt-0.5">
+                  Check if the customer returned the products — restocks them
+                  and reverses their cost. Uncheck for a refund without a
+                  return (kept or defective).
+                </span>
+              </span>
+            </label>
           )}
 
           <Field label="Notes (optional)" htmlFor="refund-notes">
