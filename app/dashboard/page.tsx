@@ -2522,10 +2522,15 @@ function DashboardInner() {
                       <button
                         onClick={() => deleteItem(item.id)}
                         disabled={deletingItems.has(item.id)}
-                        className="bg-transparent text-slate-400 text-xs cursor-pointer disabled:cursor-wait px-2 py-1 inline-flex items-center gap-1.5"
+                        title="Delete this transaction (e.g. a wrong upload)"
+                        className="text-red-600 border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 rounded-md text-xs font-semibold cursor-pointer disabled:cursor-wait px-2.5 py-1 inline-flex items-center gap-1.5 transition-colors"
                       >
-                        {deletingItems.has(item.id) && <Spinner size={11} color="#94a3b8" />}
-                        {deletingItems.has(item.id) ? "Removing..." : "Remove"}
+                        {deletingItems.has(item.id) ? (
+                          <Spinner size={11} color="#dc2626" />
+                        ) : (
+                          <span aria-hidden="true">{"\u{1F5D1}"}</span>
+                        )}
+                        {deletingItems.has(item.id) ? "Removing..." : "Delete"}
                       </button>
                     </div>
                   </div>
