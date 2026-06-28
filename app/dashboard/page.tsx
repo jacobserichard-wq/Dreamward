@@ -81,6 +81,15 @@ interface ProcessedItem {
   // Receipt/invoice files attached to this transaction (e.g. an
   // uploaded PDF invoice) — surfaced as a download link on the card.
   attachments?: { id: number; filename: string; mimeType: string }[];
+  // Products sold on this transaction (line items) — shows what was sold
+  // + links to each SKU. Empty for rows without products.
+  lineItems?: {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    matchedSkuId: number | null;
+    cogsAmount: number | null;
+  }[];
   // Component SKU this purchase was received into (null = not received).
   receivedSkuId?: number | null;
 }
@@ -276,6 +285,7 @@ function DashboardInner() {
         channel: item.channel ?? null,
         eventId: item.event_id ?? null,
         attachments: item.attachments || [],
+        lineItems: item.lineItems || [],
         // Set once this expense has been received into a component's stock
         // (drives the "✓ Received" state vs. the "Receive into inventory" button).
         receivedSkuId: item.received_sku_id ?? null,
@@ -2312,6 +2322,50 @@ function DashboardInner() {
 
                     {/* Summary */}
                     <p className="pt-2 px-5 pb-3 text-xs text-slate-500 leading-normal m-0">{item.summary}</p>
+
+                    {/* Products sold (line items) — what was sold + a link to
+                        each SKU so you can see its stock/cost. Unmatched lines
+                        (no SKU → no COGS) are flagged. */}
+                    {item.lineItems && item.lineItems.length > 0 && (
+                      <div className="px-5 pb-2">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 m-0 mb-1">
+                          Products
+                        </p>
+                        <ul className="m-0 p-0 list-none space-y-1">
+                          {item.lineItems.map((li, k) => (
+                            <li
+                              key={k}
+                              className="flex justify-between items-baseline gap-2 text-xs"
+                            >
+                              <span className="text-slate-700 min-w-0">
+                                {li.matchedSkuId ? (
+                                  <a
+                                    href={`/skus/${li.matchedSkuId}`}
+                                    className="text-blue-600 hover:underline font-medium"
+                                  >
+                                    {li.name}
+                                  </a>
+                                ) : (
+                                  <>
+                                    {li.name}{" "}
+                                    <span className="text-amber-600">
+                                      · not matched to a product
+                                    </span>
+                                  </>
+                                )}
+                                <span className="text-slate-400">
+                                  {" "}
+                                  · {li.quantity} × ${li.unitPrice.toFixed(2)}
+                                </span>
+                              </span>
+                              <span className="text-slate-500 tabular-nums flex-shrink-0">
+                                ${(li.quantity * li.unitPrice).toFixed(2)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Market-event nudge: an unlinked in-person sale dated
                         inside an event's window. Suggests linking it (sets

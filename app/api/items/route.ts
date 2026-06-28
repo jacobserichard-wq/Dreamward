@@ -3,6 +3,7 @@ import { getItems, updateItemStatus, getDashboardSummary } from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
+import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
 
 const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
@@ -40,6 +41,47 @@ export async function GET(request: NextRequest) {
         byItem.set(a.processed_item_id, list);
       }
       for (const it of items) it.attachments = byItem.get(it.id) ?? [];
+
+      // Attach the products (line items) sold on each transaction so the
+      // cards can show what was sold + link to each SKU. Most rows have
+      // none; sales with products get one entry per line.
+      const li = await pool.query<{
+        processed_item_id: number;
+        name: string;
+        quantity: string;
+        unit_price: string;
+        matched_sku_id: number | null;
+        cogs_amount: string | null;
+      }>(
+        `SELECT processed_item_id, name, quantity, unit_price,
+                matched_sku_id, cogs_amount
+           FROM processed_item_line_items
+          WHERE client_id = $1 AND processed_item_id = ANY($2)
+          ORDER BY id ASC`,
+        [client.id, ids]
+      );
+      const liByItem = new Map<
+        number,
+        {
+          name: string;
+          quantity: number;
+          unitPrice: number;
+          matchedSkuId: number | null;
+          cogsAmount: number | null;
+        }[]
+      >();
+      for (const r of li.rows) {
+        const list = liByItem.get(r.processed_item_id) ?? [];
+        list.push({
+          name: r.name,
+          quantity: Number(r.quantity),
+          unitPrice: Number(r.unit_price),
+          matchedSkuId: r.matched_sku_id,
+          cogsAmount: r.cogs_amount != null ? Number(r.cogs_amount) : null,
+        });
+        liByItem.set(r.processed_item_id, list);
+      }
+      for (const it of items) it.lineItems = liByItem.get(it.id) ?? [];
     }
     return NextResponse.json({ items });
   } catch (error) {
@@ -152,14 +194,42 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
-    const result = await pool.query(
-      "DELETE FROM processed_items WHERE id = $1 AND client_id = $2 RETURNING id",
-      [id, client.id]
-    );
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    // Restore inventory for any sale line items BEFORE deleting. The FK
+    // cascades line items away and SET-NULLs the ledger rows, which would
+    // otherwise leave stock permanently drawn — reverseSaleAdjustments
+    // credits qty back, restores the FIFO layers, and removes the ledger
+    // rows. Wrapped in one transaction so the reverse + delete are atomic.
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      const liRes = await db.query<{ id: number }>(
+        `SELECT id FROM processed_item_line_items
+          WHERE processed_item_id = $1 AND client_id = $2`,
+        [id, client.id]
+      );
+      const lineItemIds = liRes.rows.map((r) => r.id);
+      if (lineItemIds.length > 0) {
+        await reverseSaleAdjustments({ dbClient: db, lineItemIds });
+      }
+      const result = await db.query(
+        "DELETE FROM processed_items WHERE id = $1 AND client_id = $2 RETURNING id",
+        [id, client.id]
+      );
+      if (result.rows.length === 0) {
+        await db.query("ROLLBACK");
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
+      await db.query("COMMIT");
+      return NextResponse.json({
+        deleted: true,
+        stockRestored: lineItemIds.length,
+      });
+    } catch (txErr) {
+      await db.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      db.release();
     }
-    return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error("Error deleting item:", error);
     return NextResponse.json(

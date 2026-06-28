@@ -23,6 +23,7 @@ import {
   type Industry,
 } from "@/lib/categories";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
+import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
 
 const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
@@ -308,18 +309,43 @@ export async function DELETE(
       [id, client.id]
     );
 
-    const result = await pool.query(
-      `DELETE FROM processed_items
-        WHERE id = $1 AND client_id = $2`,
-      [id, client.id]
-    );
-
-    if (result.rowCount === 0) {
-      return NextResponse.json(
-        { error: "Expense not found" },
-        { status: 404 }
+    // Restore inventory for any sale line items, then delete — atomically.
+    // Without this the FK cascade drops the line items and SET-NULLs the
+    // ledger rows, leaving stock permanently drawn.
+    const db = await pool.connect();
+    let result: { rowCount: number | null };
+    try {
+      await db.query("BEGIN");
+      const liRes = await db.query<{ id: number }>(
+        `SELECT id FROM processed_item_line_items
+          WHERE processed_item_id = $1 AND client_id = $2`,
+        [id, client.id]
       );
+      const lineItemIds = liRes.rows.map((r) => r.id);
+      if (lineItemIds.length > 0) {
+        await reverseSaleAdjustments({ dbClient: db, lineItemIds });
+      }
+      const del = await db.query(
+        `DELETE FROM processed_items
+          WHERE id = $1 AND client_id = $2`,
+        [id, client.id]
+      );
+      if ((del.rowCount ?? 0) === 0) {
+        await db.query("ROLLBACK");
+        return NextResponse.json(
+          { error: "Expense not found" },
+          { status: 404 }
+        );
+      }
+      await db.query("COMMIT");
+      result = { rowCount: del.rowCount };
+    } catch (txErr) {
+      await db.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      db.release();
     }
+    void result;
 
     // Fire blob deletions in parallel after the DB delete
     // succeeded. Errors are logged but don't fail the request.
