@@ -107,6 +107,7 @@ export default function InvoiceDetailPage({ params }: PageProps) {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [reminderSending, setReminderSending] = useState(false);
+  const [invoiceSending, setInvoiceSending] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -276,6 +277,25 @@ export default function InvoiceDetailPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "Failed to send reminder");
     } finally {
       setReminderSending(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!invoice) return;
+    setInvoiceSending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invoices/${rawId}/send`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setSuccessMsg(`Invoice sent to ${invoice.customerEmail}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send invoice");
+    } finally {
+      setInvoiceSending(false);
     }
   };
 
@@ -600,6 +620,48 @@ export default function InvoiceDetailPage({ params }: PageProps) {
             />
           )}
         </section>
+
+        {/* Send invoice — email the customer their actual invoice (amount
+            due, due date, your details). Distinct from a reminder. Shown
+            for any invoice that isn't written off. */}
+        {invoice.status !== "written_off" && (
+          <section className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+            <h2 className="text-lg font-semibold text-slate-900 m-0 mb-2">
+              Send invoice
+            </h2>
+            <p className="text-sm text-slate-600 m-0 mb-4">
+              Email this invoice to the customer — amount due, due date, and your
+              details. (Different from a reminder, which is an overdue nudge.)
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={handleSendInvoice}
+                disabled={!invoice.customerEmail || invoiceSending}
+                title={
+                  !invoice.customerEmail
+                    ? "Add a customer email first"
+                    : undefined
+                }
+                className="py-2 px-5 rounded-lg border-0 bg-emerald-600 text-white text-sm font-semibold cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed"
+              >
+                {invoiceSending ? "Sending..." : `${"\u{1F4E7}"} Send invoice`}
+              </button>
+              {!invoice.customerEmail && (
+                <span className="text-sm text-slate-500">
+                  Add a customer email first
+                </span>
+              )}
+            </div>
+            {invoice.customerEmail && (
+              <p className="text-xs text-slate-500 mt-2 m-0">
+                Will email{" "}
+                <span className="text-slate-700">{invoice.customerEmail}</span>.
+                Replies route back to you.
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Reminders — only meaningful for non-terminal invoices */}
         {!isTerminal &&

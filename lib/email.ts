@@ -216,6 +216,67 @@ export function arReminderEmail(opts: {
   };
 }
 
+/**
+ * "Send invoice" email — delivers the actual invoice to the customer
+ * (amount due, due date, invoice number, optional note). Distinct from
+ * arReminderEmail, which is an overdue follow-up. Reply-To is set in the
+ * route to the vendor's own email so the customer's reply reaches them.
+ */
+export function invoiceEmail(opts: {
+  businessName: string;
+  customerName: string | null;
+  invoiceNumber: string | null;
+  amountDue: number;
+  dueDate: string; // YYYY-MM-DD
+  notes?: string | null;
+}) {
+  const { businessName, customerName, invoiceNumber, amountDue, dueDate, notes } =
+    opts;
+  const invoiceRef = invoiceNumber ? `Invoice #${invoiceNumber}` : "Your invoice";
+  const numberLabel = invoiceNumber ? `#${invoiceNumber}` : "—";
+  const formattedAmount = `$${amountDue.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  const firstName =
+    (customerName && customerName.split(" ")[0]) || customerName || "there";
+  const row = (label: string, value: string, bold = false) =>
+    `<tr>
+       <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b">${label}</td>
+       <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;${bold ? "font-weight:700" : "font-weight:600"}">${value}</td>
+     </tr>`;
+  return {
+    subject: `${invoiceRef} from ${businessName}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px;">
+        <h1 style="font-size: 22px; color: #0f172a; margin: 0 0 16px;">${invoiceRef}</h1>
+        <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 16px;">Hi ${firstName},</p>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 20px;">
+          Here's your invoice from <strong>${businessName}</strong>.
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin:0 0 20px;font-size:15px;">
+          ${row("Invoice", numberLabel)}
+          ${row("Amount due", formattedAmount, true)}
+          ${row("Due date", dueDate)}
+        </table>
+        ${
+          notes
+            ? `<p style="font-size: 14px; color: #64748b; line-height: 1.6; margin: 0 0 20px;">${notes}</p>`
+            : ""
+        }
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 4px;">
+          Reply to this email with any questions or to arrange payment.
+        </p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 16px 0 4px;">Thanks,</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 24px;">${businessName}</p>
+        <p style="font-size: 12px; color: #94a3b8; margin: 32px 0 0;">
+          Sent via Dreamward. Reply directly to reach ${businessName}.
+        </p>
+      </div>
+    `,
+  };
+}
+
 // Phase 7a (Tax Reports + CSV + CPA Handoff) commit 7 of 9. CPA
 // handoff email template — short cover note that accompanies the
 // annual CSV attachment. Tone: brief, professional, hands-off. The
