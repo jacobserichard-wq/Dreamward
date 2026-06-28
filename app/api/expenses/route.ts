@@ -40,6 +40,7 @@ import {
 } from "@/lib/categories";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
 import { receiveExpenseIntoInventory } from "@/lib/inventory/receiveFromExpense";
+import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
 
 const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
@@ -273,6 +274,11 @@ interface CreateExpenseBody {
    *  (adds quantity + sets the component's unit cost). */
   receiveSkuId?: unknown;
   receiveQuantity?: unknown;
+  /** Optional: when logging a "Returns & Refunds" row, also reverse the
+   *  original sale's stock + COGS (restock). Folded into this POST so the
+   *  refund row + the restock commit atomically (audit #4). */
+  restock?: unknown;
+  originalItemId?: unknown;
 }
 
 function isNonEmptyString(v: unknown): v is string {
@@ -418,6 +424,38 @@ export async function POST(req: NextRequest) {
       receiveQuantity = q;
     }
 
+    // ── Optional: restock a refunded sale (reverse stock + COGS on the
+    // original sale's line items). Folded into this POST so the refund row +
+    // the restock commit ATOMICALLY — a separate restock call could fail and
+    // tempt a retry that double-logs the refund (audit #4). ──
+    let restockLineItemIds: number[] = [];
+    if (body.restock && body.originalItemId != null) {
+      const parsedOrig = Number(body.originalItemId);
+      if (!Number.isInteger(parsedOrig) || parsedOrig <= 0) {
+        return NextResponse.json(
+          { error: "Invalid sale to restock" },
+          { status: 400 }
+        );
+      }
+      // Tenant-scope: the original sale must belong to this client.
+      const orig = await pool.query<{ id: number }>(
+        `SELECT id FROM processed_items WHERE id = $1 AND client_id = $2`,
+        [parsedOrig, client.id]
+      );
+      if (orig.rowCount === 0) {
+        return NextResponse.json(
+          { error: "Original sale not found" },
+          { status: 400 }
+        );
+      }
+      const lis = await pool.query<{ id: number }>(
+        `SELECT id FROM processed_item_line_items
+          WHERE processed_item_id = $1 AND client_id = $2`,
+        [parsedOrig, client.id]
+      );
+      restockLineItemIds = lis.rows.map((r) => r.id);
+    }
+
     const vendorTrim = body.vendor.trim();
     const notesVal = typeof body.notes === "string" ? body.notes.trim() : null;
     const insertSql = `INSERT INTO processed_items (
@@ -458,6 +496,30 @@ export async function POST(req: NextRequest) {
         createdAt: row.processed_at,
       },
     });
+
+    // Refund + restock → insert the refund row and reverse the original
+    // sale's stock/COGS in ONE transaction (audit #4). reverseSaleAdjustments
+    // is idempotent, so even a retry can't double-restock; and because the
+    // refund row is created in the same tx, there's no separate call to fail.
+    if (restockLineItemIds.length > 0) {
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        const result = await db.query<ProcessedItemRow>(insertSql, insertParams);
+        const row = result.rows[0];
+        await reverseSaleAdjustments({
+          dbClient: db,
+          lineItemIds: restockLineItemIds,
+        });
+        await db.query("COMMIT");
+        return NextResponse.json(toResponse(row));
+      } catch (txErr) {
+        await db.query("ROLLBACK").catch(() => {});
+        throw txErr;
+      } finally {
+        db.release();
+      }
+    }
 
     // No inventory receive → plain insert.
     if (receiveSkuId === null) {

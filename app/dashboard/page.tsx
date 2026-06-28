@@ -1218,6 +1218,12 @@ function DashboardInner() {
   // revenue and reduces the tagged channel's (and event's) profit.
   const handleSaveRefund = useCallback(
     async (data: RefundFormSubmit) => {
+      const didRestock = Boolean(data.restock && data.originalItemId);
+      // ONE atomic call: the refund (money) row + the optional restock
+      // (reverse stock + COGS on the original sale) commit together on the
+      // server. Previously these were two calls — a failed restock left the
+      // refund row in place, and retrying re-created it (double-counting the
+      // money). Folding them in removes that hazard.
       await apiFetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1229,16 +1235,10 @@ function DashboardInner() {
           channel: data.channel,
           eventId: data.eventId,
           notes: data.notes,
+          restock: didRestock,
+          originalItemId: didRestock ? data.originalItemId : undefined,
         }),
       });
-      // Return → put the items back in stock (reverse stock + COGS on the
-      // original sale). The refund row above already handles the money side.
-      const didRestock = Boolean(data.restock && data.originalItemId);
-      if (didRestock) {
-        await apiFetch(`/api/items/${data.originalItemId}/restock`, {
-          method: "POST",
-        });
-      }
       setShowRefundForm(false);
       setRefundPrefill(null);
       setSuccessMsg(
