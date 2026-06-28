@@ -116,6 +116,23 @@ const STATUS_BUTTON_META: Record<
 // they never get the "assign to event" nudge.
 const IN_PERSON_CHANNELS = new Set(["square", "direct", "uploads"]);
 
+// Format a date by its literal YYYY-MM-DD prefix — NO timezone shift, so
+// a stored "2026-06-28" always reads "Jun 28, 2026". The old
+// new Date(...).toLocaleDateString() shifted date-only values across the
+// UTC boundary (showing the previous day for evening users in UTC-
+// negative zones), which made the card disagree with the SKU stock
+// history (whose fmtDate uses this same literal approach).
+const MONTHS_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+function fmtLocalDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return value;
+  return `${MONTHS_ABBR[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 // useSearchParams (for the ?view=transactions deep-link) requires a
@@ -2224,13 +2241,7 @@ function DashboardInner() {
                       <div className="flex justify-between py-1.5 border-b border-slate-50">
                         <span className="text-[13px] text-slate-500">Due Date</span>
                         <span className="text-[13px] font-medium text-slate-800">
-                          {item.dueDate
-                            ? new Date(item.dueDate).toLocaleDateString("en-US", {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "-"}
+                          {fmtLocalDate(item.dueDate)}
                         </span>
                       </div>
                       <div className="flex justify-between py-1.5 border-b border-slate-50">

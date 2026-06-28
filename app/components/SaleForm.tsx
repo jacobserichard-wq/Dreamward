@@ -65,10 +65,13 @@ const SALE_CHANNELS: readonly ChannelMeta[] = CANONICAL_CHANNELS.filter(
 );
 
 function todayIso(): string {
+  // LOCAL date — a sale logged at 11pm is "today" in the seller's
+  // timezone, not tomorrow's UTC date (the old getUTC* version stored
+  // the next calendar day for evening users in UTC-negative zones).
   const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
 }
 
