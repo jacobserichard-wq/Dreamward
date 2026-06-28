@@ -306,22 +306,38 @@ export async function POST(req: NextRequest) {
           // The order carries the money breakdown — record it on the parent.
           // Tax is excluded from income downstream; tip + service stay in.
           const { tax, tip, service, discount } = extractSquareOrderMoney(order);
-          await pool.query(
-            `UPDATE processed_items
-                SET tax_amount = $1, tip_amount = $2,
-                    service_charge_amount = $3, discount_amount = $4
-              WHERE id = $5 AND client_id = $6`,
-            [tax, tip, service, discount, parentId, conn.client_id]
-          );
           const items = extractSquareLineItems(order);
-          if (items.length > 0) {
-            await bulkInsertLineItemsForParent({
-              parentId,
-              clientId: conn.client_id,
-              platform: "square",
-              soldAt: row.due_date,
-              items,
-            });
+          // Atomic: the money enrichment + line items + stock draw + FIFO
+          // consumption all commit together. Without one transaction a crash
+          // mid-recordSaleAdjustments desyncs inventory_adjustments from
+          // quantity_on_hand / cost layers. The network getOrder above stays
+          // OUTSIDE the tx so we never hold a connection across a Square call.
+          const db = await pool.connect();
+          try {
+            await db.query("BEGIN");
+            await db.query(
+              `UPDATE processed_items
+                  SET tax_amount = $1, tip_amount = $2,
+                      service_charge_amount = $3, discount_amount = $4
+                WHERE id = $5 AND client_id = $6`,
+              [tax, tip, service, discount, parentId, conn.client_id]
+            );
+            if (items.length > 0) {
+              await bulkInsertLineItemsForParent({
+                dbClient: db,
+                parentId,
+                clientId: conn.client_id,
+                platform: "square",
+                soldAt: row.due_date,
+                items,
+              });
+            }
+            await db.query("COMMIT");
+          } catch (txErr) {
+            await db.query("ROLLBACK").catch(() => {});
+            throw txErr;
+          } finally {
+            db.release();
           }
         }
       }
@@ -339,13 +355,24 @@ export async function POST(req: NextRequest) {
     // full amount so the sale surfaces in the COGS view + the unmatched
     // bucket instead of being silently uncosted.
     try {
-      await bulkInsertLineItemsForParent({
-        parentId,
-        clientId: conn.client_id,
-        platform: "square",
-        soldAt: row.due_date,
-        items: [bareSquarePaymentLineItem(payment)],
-      });
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        await bulkInsertLineItemsForParent({
+          dbClient: db,
+          parentId,
+          clientId: conn.client_id,
+          platform: "square",
+          soldAt: row.due_date,
+          items: [bareSquarePaymentLineItem(payment)],
+        });
+        await db.query("COMMIT");
+      } catch (txErr) {
+        await db.query("ROLLBACK").catch(() => {});
+        throw txErr;
+      } finally {
+        db.release();
+      }
     } catch (bareErr) {
       console.warn(
         `Square webhook: bare-payment line item failed for payment=${payment.id}:`,
