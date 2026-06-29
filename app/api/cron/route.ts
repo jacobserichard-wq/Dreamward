@@ -883,9 +883,14 @@ export async function GET(req: NextRequest) {
     try {
       if (isFirstOfMonthUtc(new Date())) {
         const today = new Date().toISOString().slice(0, 10);
+        // Every non-canceled client (trial + band1–7 + legacy tiers). The
+        // old explicit list pre-dated migration 0027's band rename, so it
+        // silently skipped every band1–7 client → no Schedule-C inventory
+        // history for paying customers. Match isPayingTier (false only for
+        // canceled/null) instead of hard-coding tier names.
         const payingClients = await pool.query<{ id: number }>(
           `SELECT id FROM clients
-            WHERE plan IN ('trial', 'dream', 'maker', 'growth', 'pro')`
+            WHERE plan IS NOT NULL AND plan <> 'canceled'`
         );
         for (const c of payingClients.rows) {
           try {
