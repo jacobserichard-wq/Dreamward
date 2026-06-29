@@ -3,6 +3,7 @@ import { getSessionClient } from "@/lib/getClient";
 import pool, { saveProcessedItem } from "@/lib/db";
 import { deriveStorageChannel } from "@/lib/profitability/channels";
 import { isPayingTier } from "@/lib/plans";
+import { AI_MODEL } from "@/lib/aiModel";
 
 export async function POST(req: NextRequest) {
   try {
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
           extracted_data: null,
           source,
           ai_classified_at: new Date(),
-          ai_model: "claude-sonnet-4-6",
+          ai_model: AI_MODEL,
           event_id: eventId,
           channel: derivedChannel,
         },

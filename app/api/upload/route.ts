@@ -10,6 +10,7 @@ import {
 import { matchEventByDate } from "@/lib/eventMatch";
 import { parseXlsx } from "@/lib/xlsx";
 import { isPayingTier } from "@/lib/plans";
+import { AI_MODEL } from "@/lib/aiModel";
 
 export async function POST(req: NextRequest) {
   try {
@@ -194,7 +195,7 @@ Other Accounting Software:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: AI_MODEL,
         max_tokens: 4096,
         messages: [{ role: "user", content: prompt }],
       }),

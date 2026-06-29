@@ -20,6 +20,7 @@
 // owns Gmail fetching + DB inserts + tenant scoping.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { AI_MODEL } from "@/lib/aiModel";
 
 // Confidence threshold below which we discard the extraction even
 // when isInvoice=true. Design §1 #4 — locked at 60 for v1. Lower
@@ -114,7 +115,7 @@ export async function extractInvoicesFromEmails(opts: {
   const prompt = buildExtractionPrompt(emails, industryName);
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: AI_MODEL,
     max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   });

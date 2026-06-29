@@ -3,6 +3,7 @@ import { saveProcessedItem } from "@/lib/db";
 import pool from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSessionClient } from "@/lib/getClient";
+import { AI_MODEL } from "@/lib/aiModel";
 import {
   getCategoryNamesForIndustry,
   INDUSTRY_DISPLAY_NAMES,
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     const prompt = buildExtractionPrompt(emails, category, industryName, allowedCategories);
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: AI_MODEL,
       max_tokens: 4096,
       messages: [
         {
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
             rawEmailId: result.rawEmailId || "",
             extractedData: result,
             aiClassifiedAt: new Date(),
-            aiModel: "claude-sonnet-4-6",
+            aiModel: AI_MODEL,
           }, client.id);
           savedCount++;
         } catch (dbErr) {

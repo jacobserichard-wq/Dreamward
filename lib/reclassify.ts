@@ -5,10 +5,10 @@ import {
   INDUSTRY_DISPLAY_NAMES,
   type Industry,
 } from "@/lib/categories";
+import { AI_MODEL } from "@/lib/aiModel";
 
 const DEFAULT_BATCH_LIMIT = 50;
 const UMBRELLA_VALUES = ["invoice", "expense", "ar_followup"];
-const AI_MODEL = "claude-sonnet-4-6";
 
 interface TargetItem {
   id: number;

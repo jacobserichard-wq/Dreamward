@@ -19,6 +19,7 @@ import {
   type Industry,
 } from "@/lib/categories";
 import { isPayingTier } from "@/lib/plans";
+import { AI_MODEL } from "@/lib/aiModel";
 
 // Anthropic accepts PDFs up to ~32MB base64; guard well under that so a
 // huge scan fails fast with a clear message instead of a timeout.
@@ -129,7 +130,7 @@ Rules:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: AI_MODEL,
         max_tokens: 4096,
         messages: [
           {

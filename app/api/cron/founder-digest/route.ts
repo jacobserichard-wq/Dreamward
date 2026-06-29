@@ -16,8 +16,10 @@
 // FOUNDER_DIGEST_EMAIL to override.
 
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import pool from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { AI_MODEL } from "@/lib/aiModel";
 
 const FOUNDER_EMAIL =
   process.env.FOUNDER_DIGEST_EMAIL || "dreamwardsystems@gmail.com";
@@ -121,13 +123,35 @@ export async function GET(req: NextRequest) {
     { total: 0, trials: 0, paid: 0 }
   );
 
-  const alertCount = failedSyncs.length + plaidIssues.length;
+  // AI model health: a 1-token ping to the pinned model. If it 404s, the
+  // model was retired and EVERY AI feature (PDF/receipt parse, categorize)
+  // is down until AI_MODEL is updated. Inline try/catch so we keep the
+  // actual error message for the digest.
+  let aiHealth: { ok: boolean; error: string | null };
+  try {
+    const anthropic = new Anthropic();
+    await anthropic.messages.create({
+      model: AI_MODEL,
+      max_tokens: 1,
+      messages: [{ role: "user", content: "ping" }],
+    });
+    aiHealth = { ok: true, error: null };
+  } catch (err) {
+    aiHealth = {
+      ok: false,
+      error: err instanceof Error ? err.message : "unknown error",
+    };
+  }
+
+  const alertCount =
+    failedSyncs.length + plaidIssues.length + (aiHealth.ok ? 0 : 1);
   const html = renderDigest({
     failedSyncs,
     plaidIssues,
     dbConnections,
     signups,
     totals,
+    aiHealth,
     alertCount,
   });
   const subject =
@@ -163,6 +187,7 @@ function renderDigest(d: {
   dbConnections: number;
   signups: Signup[];
   totals: { total: number; trials: number; paid: number };
+  aiHealth: { ok: boolean; error: string | null };
   alertCount: number;
 }): string {
   const sections: string[] = [];
@@ -227,6 +252,30 @@ function renderDigest(d: {
       }</p>`
     )
   );
+
+  // AI model health (always shown, like DB health)
+  if (d.aiHealth.ok) {
+    sections.push(
+      box(
+        "#f8fafc",
+        "#e2e8f0",
+        "AI model",
+        `<p style="margin:6px 0 0;font-size:13px;color:#166534">${esc(AI_MODEL)} — responding ✓</p>`
+      )
+    );
+  } else {
+    sections.push(
+      box(
+        "#fef2f2",
+        "#fecaca",
+        "🔴 AI model not responding",
+        `<p style="margin:6px 0 0;font-size:13px;color:#991b1b">The pinned model <b>${esc(AI_MODEL)}</b> failed a health check${
+          d.aiHealth.error ? `: ${esc(d.aiHealth.error.slice(0, 140))}` : ""
+        }.</p>
+         <p style="margin:8px 0 0;font-size:12px;color:#6b7280">Likely retired by Anthropic → all AI features (PDF/receipt parsing, categorize) are down. Fix: update <b>AI_MODEL</b> in lib/aiModel.ts to a current model id and redeploy.</p>`
+      )
+    );
+  }
 
   // This week
   const signupRows =
