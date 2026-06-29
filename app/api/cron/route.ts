@@ -68,8 +68,9 @@ export async function GET(req: NextRequest) {
   try {
     // Trial-expiry emails are PAUSED pre-launch: every account is still a
     // tester/internal, and a salesy "upgrade now" nag shouldn't go to them.
-    // Flip to true at launch — and add a test-account exclusion to the query
-    // first, so internal accounts never receive it.
+    // The query now excludes is_test accounts (migration 0045), so the only
+    // thing left before flipping this to true at launch is the decision to
+    // enforce trial expiry at all — flag real test accounts is_test first.
     const TRIAL_EXPIRY_EMAILS_ENABLED = false;
 
     let sent = 0;
@@ -80,6 +81,7 @@ export async function GET(req: NextRequest) {
         `SELECT id, email, business_name, trial_ends_at
          FROM clients
          WHERE plan = 'trial'
+         AND NOT is_test
          AND trial_ends_at IS NOT NULL
          AND (
            DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '3 days'
@@ -829,9 +831,13 @@ export async function GET(req: NextRequest) {
         email: string;
         business_name: string | null;
       }>(
+        // NOTE: plan = 'pro' matches ~no one post-band-migration (0027), so
+        // this digest is effectively dormant. To actually send it to paying
+        // clients, change to: plan IS NOT NULL AND plan <> 'canceled'. The
+        // `AND NOT is_test` guard is already in place for when that happens.
         `SELECT id, email, business_name
            FROM clients
-          WHERE plan = 'pro' AND email IS NOT NULL`
+          WHERE plan = 'pro' AND NOT is_test AND email IS NOT NULL`
       );
 
       for (const c of proClientsRes.rows) {
