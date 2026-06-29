@@ -50,6 +50,10 @@ export interface InvoiceRow {
   source: "manual" | "email-auto";
   gmail_message_id: string | null;
   needs_review: boolean;
+  // Migration 0042: which dashboard channel a paid invoice rolls up into
+  // ('wholesale' | 'service'). NULL on pre-0042 rows — the rollup treats
+  // NULL as 'wholesale'.
+  channel: string | null;
 }
 
 export interface InvoicePaymentRow {

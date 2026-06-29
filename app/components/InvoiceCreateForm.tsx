@@ -19,6 +19,8 @@ export interface InvoiceSubmitPayload {
   dueDate: string;
   amountTotal: number;
   notes: string | null;
+  /** Which dashboard channel a paid invoice rolls up into. */
+  channel: "wholesale" | "service";
 }
 
 interface InvoiceCreateFormProps {
@@ -76,6 +78,7 @@ export default function InvoiceCreateForm({
   const [invoiceDate, setInvoiceDate] = useState(todayIso());
   const [dueDate, setDueDate] = useState(todayPlus30Iso());
   const [amountTotal, setAmountTotal] = useState("");
+  const [channel, setChannel] = useState<"wholesale" | "service">("wholesale");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +123,7 @@ export default function InvoiceCreateForm({
         invoiceDate,
         dueDate,
         amountTotal: parsedAmount,
+        channel,
         notes: notes.trim() || null,
       });
     } catch (err) {
@@ -240,6 +244,26 @@ export default function InvoiceCreateForm({
           placeholder="$0.00"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
         />
+      </label>
+
+      <label className="block mb-3">
+        <span className="block text-sm font-medium text-slate-700 mb-1">
+          Type
+        </span>
+        <select
+          value={channel}
+          onChange={(e) =>
+            setChannel(e.target.value as "wholesale" | "service")
+          }
+          disabled={saving}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:outline-none focus:border-blue-500"
+        >
+          <option value="wholesale">Wholesale (B2B / resale)</option>
+          <option value="service">Service work (consulting, custom, hourly)</option>
+        </select>
+        <span className="block text-xs text-slate-400 mt-1">
+          Which channel this invoice&apos;s revenue shows under on your dashboard.
+        </span>
       </label>
 
       <label className="block mb-4">

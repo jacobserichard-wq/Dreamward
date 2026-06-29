@@ -28,6 +28,7 @@ interface CreateInvoiceBody {
   dueDate?: unknown;
   amountTotal?: unknown;
   notes?: unknown;
+  channel?: unknown;
 }
 
 // Defense-in-depth at the API: accept "$340", "340", "340.00", and
@@ -97,6 +98,7 @@ function serializeInvoice(row: InvoiceRow, today: Date = new Date()) {
     source: row.source,
     gmailMessageId: row.gmail_message_id,
     needsReview: row.needs_review,
+    channel: row.channel,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -228,7 +230,7 @@ export async function GET(req: NextRequest) {
       `SELECT id, client_id, customer_name, customer_email, invoice_number,
               invoice_date, due_date, amount_total, amount_paid, status,
               notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
-              source, gmail_message_id, needs_review,
+              source, gmail_message_id, needs_review, channel,
               created_at, updated_at
          FROM invoices
         WHERE ${whereParts.join(" AND ")}
@@ -348,14 +350,19 @@ export async function POST(req: NextRequest) {
         ? body.notes.trim()
         : null;
 
+    // Which dashboard channel a paid invoice rolls up into. Only the two
+    // invoice-fed channels (Wholesale / Service work); default wholesale.
+    const channel = body.channel === "service" ? "service" : "wholesale";
+
     const result = await pool.query<InvoiceRow>(
       `INSERT INTO invoices
          (client_id, customer_name, customer_email, invoice_number,
-          invoice_date, due_date, amount_total, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          invoice_date, due_date, amount_total, notes, channel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, client_id, customer_name, customer_email, invoice_number,
                  invoice_date, due_date, amount_total, amount_paid, status,
                  notes, last_reminder_sent_at, reminder_count, invoice_sent_at,
+                 source, gmail_message_id, needs_review, channel,
                  created_at, updated_at`,
       [
         client.id,
@@ -366,6 +373,7 @@ export async function POST(req: NextRequest) {
         dueDate,
         amountTotal,
         notes,
+        channel,
       ]
     );
 

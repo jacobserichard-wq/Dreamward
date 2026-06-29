@@ -110,8 +110,13 @@ export async function GET(req: NextRequest) {
     const rangeEnd = toParam && ymd.test(toParam) ? toParam : yearEnd;
 
     // ── Parallel fetch (same shape as /api/profitability) ───────
-    const [eventsResult, txnsResult, settingsResult, appSettingResult] =
-      await Promise.all([
+    const [
+      eventsResult,
+      txnsResult,
+      settingsResult,
+      appSettingResult,
+      invoicePaymentsResult,
+    ] = await Promise.all([
         pool.query<EventRow>(
           // Events whose date range overlaps the year window. Use
           // start_date for the range check (matches what /api/events
@@ -154,6 +159,21 @@ export async function GET(req: NextRequest) {
         ),
         pool.query<AppSettingRow>(
           `SELECT value FROM app_settings WHERE key = 'irs_mileage_rate'`
+        ),
+        pool.query<{ amount: string; channel: string | null }>(
+          // AR income: invoice payments collected in the window, routed to
+          // the invoice's channel (Wholesale / Service work). Without this the
+          // dashboard rollup + SalesBanner ignored AR entirely — only the tax
+          // report counted it. invoice_payments is the SAME table the tax
+          // report reads, so feeding it here closes that gap with no
+          // double-count (invoices never create processed_items rows).
+          `SELECT ip.amount, i.channel
+             FROM invoice_payments ip
+             JOIN invoices i ON i.id = ip.invoice_id AND i.client_id = $1
+            WHERE ip.client_id = $1
+              AND ip.paid_at::date >= $2
+              AND ip.paid_at::date <= $3`,
+          [client.id, rangeStart, rangeEnd]
         ),
       ]);
 
@@ -204,6 +224,24 @@ export async function GET(req: NextRequest) {
       })
       .filter((r): r is ChannelTxnRow => r !== null);
 
+    // AR income → synthetic income txns, routed by the invoice's channel.
+    // Pre-0042 invoices have null channel → treated as wholesale.
+    const invoiceTxns: ChannelTxnRow[] = invoicePaymentsResult.rows
+      .map((r): ChannelTxnRow | null => {
+        const amount = Number(r.amount);
+        if (!Number.isFinite(amount)) return null;
+        return {
+          amount,
+          tax: 0,
+          category: "invoice",
+          source: "invoice",
+          event_id: null,
+          kind: "income",
+          channel: r.channel ?? "wholesale",
+        };
+      })
+      .filter((r): r is ChannelTxnRow => r !== null);
+
     const events: ChannelEventRow[] = eventsResult.rows.map((e) => {
       const totalMiles = e.total_miles == null ? 0 : Number(e.total_miles);
       // Operating rate, not IRS rate — this is the cash cost driving
@@ -220,7 +258,7 @@ export async function GET(req: NextRequest) {
 
     // ── Aggregate via the pure helper ───────────────────────────
     const result = computeChannels({
-      txns,
+      txns: [...txns, ...invoiceTxns],
       events,
       mode,
       industry,
