@@ -25,6 +25,7 @@ import {
 } from "plaid";
 import pool from "@/lib/db";
 import { encryptForDb, decryptFromDb } from "@/lib/crypto";
+import { deleteAttachmentsForProcessedItems } from "@/lib/blob";
 
 export type PlaidEnv = "sandbox" | "production";
 
@@ -304,6 +305,16 @@ export async function syncTransactions(opts: {
       // removed: delete the local row (tenant-scoped).
       for (const rem of data.removed) {
         if (!rem.transaction_id) continue;
+        const idRes = await pool.query<{ id: number }>(
+          `SELECT id FROM processed_items
+            WHERE client_id = $1 AND plaid_transaction_id = $2`,
+          [clientId, rem.transaction_id]
+        );
+        await deleteAttachmentsForProcessedItems(
+          pool,
+          clientId,
+          idRes.rows.map((r) => r.id)
+        );
         const del = await pool.query(
           `DELETE FROM processed_items
             WHERE client_id = $1 AND plaid_transaction_id = $2`,
@@ -372,6 +383,16 @@ export async function disconnectPlaidItem(
   // import and redo it" + prevents reconnect pileup). Scoped to this item.
   let purged = 0;
   if (purgeTransactions) {
+    const idsRes = await pool.query<{ id: number }>(
+      `SELECT id FROM processed_items
+        WHERE client_id = $1 AND source = 'plaid' AND plaid_item_id = $2`,
+      [clientId, itemId]
+    );
+    await deleteAttachmentsForProcessedItems(
+      pool,
+      clientId,
+      idsRes.rows.map((r) => r.id)
+    );
     const del = await pool.query(
       `DELETE FROM processed_items
         WHERE client_id = $1 AND source = 'plaid' AND plaid_item_id = $2`,

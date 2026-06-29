@@ -25,6 +25,7 @@
 
 import pool from "@/lib/db";
 import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
+import { deleteAttachmentsForProcessedItems } from "@/lib/blob";
 
 export type PurgeableSource = "shopify" | "wix" | "square" | "etsy";
 
@@ -49,6 +50,17 @@ export async function purgePlatformData(opts: {
       lineItemIds.length > 0
         ? await reverseSaleAdjustments({ dbClient: db, lineItemIds })
         : 0;
+
+    // Delete attachment blobs before the rows cascade them away.
+    const parentIdsRes = await db.query<{ id: number }>(
+      `SELECT id FROM processed_items WHERE client_id = $1 AND source = $2`,
+      [opts.clientId, opts.source]
+    );
+    await deleteAttachmentsForProcessedItems(
+      db,
+      opts.clientId,
+      parentIdsRes.rows.map((r) => r.id)
+    );
 
     const del = await db.query(
       `DELETE FROM processed_items

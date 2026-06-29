@@ -20,6 +20,7 @@ import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
 import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
+import { deleteAttachmentsForProcessedItems } from "@/lib/blob";
 
 export async function DELETE(
   _req: NextRequest,
@@ -95,6 +96,9 @@ export async function DELETE(
       let total = 0;
       let parentDeleted = false;
       if (remaining === 0) {
+        await deleteAttachmentsForProcessedItems(db, client.id, [
+          line.processed_item_id,
+        ]);
         await db.query(`DELETE FROM processed_items WHERE id = $1`, [
           line.processed_item_id,
         ]);

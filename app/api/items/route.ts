@@ -4,6 +4,7 @@ import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
 import { CANONICAL_CHANNELS } from "@/lib/profitability/channels";
 import { reverseSaleAdjustments } from "@/lib/inventory/adjustments";
+import { deleteAttachmentsForProcessedItems } from "@/lib/blob";
 
 const VALID_CHANNEL_IDS = new Set(CANONICAL_CHANNELS.map((c) => c.id));
 
@@ -211,6 +212,10 @@ export async function DELETE(request: NextRequest) {
       if (lineItemIds.length > 0) {
         await reverseSaleAdjustments({ dbClient: db, lineItemIds });
       }
+      // Delete the blob bytes of any attachments BEFORE the row delete
+      // cascades the attachment rows away (else the storage orphans).
+      // Tenant-scoped; a no-op if this id isn't this client's.
+      await deleteAttachmentsForProcessedItems(db, client.id, [id]);
       const result = await db.query(
         "DELETE FROM processed_items WHERE id = $1 AND client_id = $2 RETURNING id",
         [id, client.id]

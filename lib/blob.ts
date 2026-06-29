@@ -26,6 +26,7 @@
 //   there, not at the Blob layer.
 
 import { put, del } from "@vercel/blob";
+import type { Pool, PoolClient } from "pg";
 
 function requireToken(): string {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -100,6 +101,39 @@ export async function uploadAttachment(opts: {
  * or never made it past the upload). Throws on auth / network
  * problems so the caller can surface a real failure.
  */
+/**
+ * Delete the Vercel Blob objects for every attachment of the given
+ * processed_items, to be called BEFORE the rows are deleted. Any path that
+ * deletes processed_items must call this first — otherwise the FK cascade
+ * drops the expense_attachments rows and orphans the blob bytes (paid-for
+ * forever). Best-effort: a single blob failure is logged, never thrown, so
+ * it can't block the row delete. Pass the same db client when inside a
+ * transaction so the lookup sees uncommitted state.
+ */
+export async function deleteAttachmentsForProcessedItems(
+  db: Pool | PoolClient,
+  clientId: number,
+  processedItemIds: number[]
+): Promise<void> {
+  if (processedItemIds.length === 0) return;
+  // Scoped by client_id so a forged processed_item id can never delete
+  // another tenant's blobs.
+  const res = await db.query<{ blob_pathname: string }>(
+    `SELECT blob_pathname FROM expense_attachments
+      WHERE processed_item_id = ANY($1::int[]) AND client_id = $2`,
+    [processedItemIds, clientId]
+  );
+  const results = await Promise.allSettled(
+    res.rows.map((r) => deleteAttachment(r.blob_pathname))
+  );
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed > 0) {
+    console.error(
+      `deleteAttachmentsForProcessedItems: ${failed}/${res.rows.length} blob deletes failed (storage may leak)`
+    );
+  }
+}
+
 export async function deleteAttachment(pathname: string): Promise<void> {
   const token = requireToken();
   try {
