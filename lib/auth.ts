@@ -43,6 +43,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    // The whole authorization model is "session email == owner of that
+    // client" (lib/getClient + Stripe customer_email), so the verified
+    // email IS the security boundary. Reject any sign-in where the provider
+    // explicitly says the email isn't verified. Google always sets this
+    // true; this guards the day another provider is added. (Absent field →
+    // allow, so we never block a provider that simply omits it.)
+    async signIn({ profile }) {
+      const verified = (profile as { email_verified?: boolean } | undefined)
+        ?.email_verified;
+      return verified !== false;
+    },
     async jwt({ token, account }) {
       if (account) {
         token.accessToken = account.access_token;

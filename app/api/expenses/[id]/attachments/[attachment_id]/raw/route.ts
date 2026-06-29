@@ -97,6 +97,16 @@ export async function GET(
     // large files don't get fully buffered into RAM.
     const headers = new Headers();
     headers.set("Content-Type", mime_type);
+    // Security: these are private financial documents. Never let the browser
+    // sniff a different type (a file with HTML bytes but an image mime can't
+    // be promoted to a script), and lock down any active content in case it
+    // is rendered as a document. Upload already excludes SVG/HTML; this is
+    // defense-in-depth.
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set(
+      "Content-Security-Policy",
+      "default-src 'none'; img-src 'self' data:; object-src 'none'; sandbox"
+    );
     headers.set(
       "Content-Disposition",
       `inline; filename="${filename.replace(/"/g, "")}"`
