@@ -54,6 +54,10 @@ export interface SaleAdjustmentInput {
   /** Units sold. Will be negated and stored as delta. Fractional
    *  supported (Tier 2 — delta is NUMERIC) for weighed goods. */
   quantity: number;
+  /** YYYY-MM-DD sale date. When set, FIFO consumes only layers acquired
+   *  on/before it (era-correct COGS for retroactively-resolved historical
+   *  sales). Omit for live sales — they consume all open layers. */
+  soldAt?: string;
 }
 
 /**
@@ -85,10 +89,17 @@ export async function recordSaleAdjustments(opts: {
       lineItemId: it.lineItemId,
       skuId: it.skuId,
       quantity: Math.abs(it.quantity),
+      soldAt: it.soldAt,
     }))
     .filter((it) => it.quantity > 0);
 
   if (normalized.length === 0) return 0;
+
+  // Per-line sale date (for era-correct FIFO on retroactive resolution).
+  // Empty for live sales → consumeFifo consumes all open layers as before.
+  const soldAtByLine = new Map<number, string | undefined>(
+    normalized.map((it) => [it.lineItemId, it.soldAt])
+  );
 
   // ── 1. Insert the ledger rows ────────────────────────────────
   // ON CONFLICT DO NOTHING on the partial UNIQUE index handles
@@ -157,6 +168,7 @@ export async function recordSaleAdjustments(opts: {
       quantity: qty,
       reason: "sale",
       lineItemId: row.source_line_item_id,
+      asOf: soldAtByLine.get(row.source_line_item_id) ?? null,
     });
     await db.query(
       `UPDATE processed_item_line_items

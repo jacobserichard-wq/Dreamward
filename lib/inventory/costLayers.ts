@@ -152,6 +152,11 @@ export async function consumeFifo(opts: {
   reason: ConsumeReason;
   productionRunId?: number | null;
   lineItemId?: number | null;
+  /** When set (YYYY-MM-DD), only consume layers acquired ON OR BEFORE this
+   *  date — so a retroactively-resolved historical sale draws the cost
+   *  layers that existed at sale time, not today's newer ones. Omit for
+   *  live sales/production (consume all open layers, oldest first). */
+  asOf?: string | null;
 }): Promise<ConsumeResult> {
   const db = opts.dbClient;
   let need = q4(opts.quantity);
@@ -167,9 +172,10 @@ export async function consumeFifo(opts: {
     `SELECT id, remaining_qty, unit_cost
        FROM cost_layers
       WHERE sku_id = $1 AND remaining_qty > 0
+        ${opts.asOf ? "AND acquired_at <= $2" : ""}
       ORDER BY acquired_at, id
       FOR UPDATE`,
-    [opts.skuId]
+    opts.asOf ? [opts.skuId, opts.asOf] : [opts.skuId]
   );
 
   let totalCost = 0;

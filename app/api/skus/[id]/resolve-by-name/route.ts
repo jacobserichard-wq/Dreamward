@@ -110,7 +110,11 @@ export async function POST(
     let resolvedCount = 0;
     try {
       await db.query("BEGIN");
-      const result = await db.query<{ id: number; quantity: string }>(
+      const result = await db.query<{
+        id: number;
+        quantity: string;
+        sold_at: string | null;
+      }>(
         `UPDATE processed_item_line_items
             SET matched_sku_id = $1
           WHERE client_id = $2
@@ -122,7 +126,7 @@ export async function POST(
               SELECT 1 FROM skus s
                WHERE s.id = $1 AND s.client_id = $2
             )
-          RETURNING id, quantity`,
+          RETURNING id, quantity, sold_at`,
         [skuId, client.id, body.platform, body.name.trim()]
       );
       resolvedCount = result.rowCount ?? 0;
@@ -134,6 +138,9 @@ export async function POST(
             lineItemId: r.id,
             skuId,
             quantity: parseFloat(r.quantity),
+            // Era-correct FIFO: cost each historical sale against the
+            // layers that existed on its own sale date.
+            soldAt: r.sold_at ?? undefined,
           })),
         });
       }

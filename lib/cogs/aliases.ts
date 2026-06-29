@@ -101,14 +101,18 @@ export async function createAliasWithResolve(opts: {
   // gets filled in with the new SKU. Crafty Base's users have to
   // re-import or manually adjust historical sales when they fix
   // a SKU mapping — this single UPDATE does it for them.
-  const resolveRes = await db.query<{ id: number; quantity: string }>(
+  const resolveRes = await db.query<{
+    id: number;
+    quantity: string;
+    sold_at: string | null;
+  }>(
     `UPDATE processed_item_line_items
         SET matched_sku_id = $1
       WHERE client_id = $2
         AND platform = $3
         AND external_item_id = $4
         AND matched_sku_id IS NULL
-      RETURNING id, quantity`,
+      RETURNING id, quantity, sold_at`,
     [alias.skuId, clientId, alias.platform, alias.externalId]
   );
 
@@ -125,6 +129,9 @@ export async function createAliasWithResolve(opts: {
         lineItemId: r.id,
         skuId: alias.skuId,
         quantity: parseFloat(r.quantity),
+        // Era-correct FIFO: cost each historical sale against the layers
+        // that existed on its own sale date, not today's.
+        soldAt: r.sold_at ?? undefined,
       })),
     });
   }
