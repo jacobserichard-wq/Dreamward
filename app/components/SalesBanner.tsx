@@ -149,6 +149,12 @@ export default function SalesBanner({
           sales tax collected — set aside to remit, not income.
         </p>
       )}
+      {(totalSales !== 0 || totalExpenses !== 0) && (
+        <p className="text-[11px] text-slate-400 m-0 mt-1.5">
+          Cash figures at your actual costs. Your tax report can differ — e.g.
+          it uses the IRS mileage deduction, not your real vehicle cost.
+        </p>
+      )}
     </div>
   );
 }
