@@ -25,6 +25,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
+    // Idempotency: Stripe delivers at-least-once + replays on non-2xx.
+    // Record the event id; if it's already there, this is a replay — ack
+    // and skip so side effects (emails, backfill re-arm) don't re-run.
+    const dedup = await pool.query(
+      `INSERT INTO processed_stripe_events (event_id) VALUES ($1)
+       ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+      [event.id]
+    );
+    if (dedup.rowCount === 0) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;

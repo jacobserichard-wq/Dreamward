@@ -115,6 +115,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
+    // Idempotency: skip replays (Stripe delivers at-least-once). Shared
+    // table with the platform webhook — event ids are globally unique.
+    const dedup = await pool.query(
+      `INSERT INTO processed_stripe_events (event_id) VALUES ($1)
+       ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+      [event.id]
+    );
+    if (dedup.rowCount === 0) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
     // Connect events carry the connected account id; platform events don't.
     const accountId = event.account;
     if (!accountId) {
