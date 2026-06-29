@@ -38,6 +38,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { isPayingTier } from "@/lib/plans";
+import { recordSaleAdjustments } from "@/lib/inventory/adjustments";
 
 const VALID_PLATFORMS = new Set(["shopify", "wix", "square"]);
 
@@ -92,32 +93,62 @@ export async function POST(
       );
     }
 
-    // ── Verify SKU ownership, then UPDATE matching line items ──
+    // ── Verify SKU ownership, then UPDATE matching line items AND
+    // draw stock/COGS for them — all in one transaction ──
     //
     // The UPDATE's WHERE clause includes EXISTS (SELECT 1 FROM skus)
     // so a forged sku_id can't bind matched_sku_id to another
     // tenant's catalog. matched_sku_id IS NULL ensures we don't
     // overwrite an existing manual mapping.
-    const result = await pool.query<{ id: number }>(
-      `UPDATE processed_item_line_items
-          SET matched_sku_id = $1
-        WHERE client_id = $2
-          AND platform = $3
-          AND external_item_id IS NULL
-          AND name = $4
-          AND matched_sku_id IS NULL
-          AND EXISTS (
-            SELECT 1 FROM skus s
-             WHERE s.id = $1 AND s.client_id = $2
-          )
-        RETURNING id`,
-      [skuId, client.id, body.platform, body.name.trim()]
-    );
+    //
+    // Previously this ONLY set matched_sku_id — it never decremented
+    // stock or stamped COGS, so resolved Square "Custom Amount" sales
+    // counted revenue with ZERO COGS and left quantity_on_hand
+    // overstated. Mirror the alias path (createAliasWithResolve): every
+    // newly-resolved historical line item becomes a sale adjustment.
+    const db = await pool.connect();
+    let resolvedCount = 0;
+    try {
+      await db.query("BEGIN");
+      const result = await db.query<{ id: number; quantity: string }>(
+        `UPDATE processed_item_line_items
+            SET matched_sku_id = $1
+          WHERE client_id = $2
+            AND platform = $3
+            AND external_item_id IS NULL
+            AND name = $4
+            AND matched_sku_id IS NULL
+            AND EXISTS (
+              SELECT 1 FROM skus s
+               WHERE s.id = $1 AND s.client_id = $2
+            )
+          RETURNING id, quantity`,
+        [skuId, client.id, body.platform, body.name.trim()]
+      );
+      resolvedCount = result.rowCount ?? 0;
+
+      if (resolvedCount > 0) {
+        await recordSaleAdjustments({
+          dbClient: db,
+          items: result.rows.map((r) => ({
+            lineItemId: r.id,
+            skuId,
+            quantity: parseFloat(r.quantity),
+          })),
+        });
+      }
+      await db.query("COMMIT");
+    } catch (txErr) {
+      await db.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      db.release();
+    }
 
     // If the SKU doesn't belong to this client, the EXISTS clause
     // prevents any updates AND no rows are returned. Distinguish
     // "SKU not found" from "nothing matched" so the UI can warn.
-    if (result.rowCount === 0) {
+    if (resolvedCount === 0) {
       const ownsRes = await pool.query<{ id: number }>(
         `SELECT id FROM skus WHERE id = $1 AND client_id = $2`,
         [skuId, client.id]
@@ -130,7 +161,7 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ resolvedCount: result.rowCount ?? 0 });
+    return NextResponse.json({ resolvedCount });
   } catch (err) {
     console.error("Resolve-by-name POST error:", err);
     return NextResponse.json(
