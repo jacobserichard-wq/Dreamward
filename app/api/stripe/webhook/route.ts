@@ -111,39 +111,68 @@ export async function POST(request: NextRequest) {
         const customerId = subscription.customer;
         const status = subscription.status;
 
-        let plan = "trial";
         if (status === "active" || status === "trialing") {
+          // Healthy (or recovered from past_due) → set band + clear any
+          // running grace clock so access is fully restored.
           const priceId = subscription.items.data[0]?.price?.id;
-          plan = planFromPriceId(priceId) ?? "trial";
+          const plan = planFromPriceId(priceId) ?? "trial";
+          await pool.query(
+            "UPDATE clients SET plan = $1, stripe_subscription_id = $2, " +
+            "past_due_since = NULL, updated_at = NOW() " +
+            "WHERE stripe_customer_id = $3",
+            [plan, subscription.id, customerId]
+          );
+          console.log("Subscription active:", plan);
         } else if (status === "canceled" || status === "unpaid") {
-          plan = "canceled";
-        }
-
-        await pool.query(
-          "UPDATE clients SET plan = $1, " +
-          "stripe_subscription_id = $2, updated_at = NOW() " +
-          "WHERE stripe_customer_id = $3",
-          [plan, subscription.id, customerId]
-        );
-        console.log("Subscription updated:", plan);
-
-        // Send payment failed email
-        if (status === "past_due" || status === "unpaid") {
-          const clientResult = await pool.query(
-            "SELECT email, business_name FROM clients WHERE stripe_customer_id = $1",
+          await pool.query(
+            "UPDATE clients SET plan = 'canceled', stripe_subscription_id = $1, " +
+            "past_due_since = NULL, updated_at = NOW() " +
+            "WHERE stripe_customer_id = $2",
+            [subscription.id, customerId]
+          );
+          console.log("Subscription canceled/unpaid");
+        } else if (status === "past_due") {
+          // KEEP their band — past_due starts a 7-day grace period, not an
+          // immediate cutoff. Start the grace clock if it isn't already
+          // running (COALESCE, so dunning retries don't reset it). `plan` is
+          // left untouched, so access stays at their band. The nightly cron
+          // sends the daily countdown + flips to read-only after 7 days.
+          const before = await pool.query<{
+            email: string;
+            business_name: string | null;
+            past_due_since: string | null;
+          }>(
+            "SELECT email, business_name, past_due_since FROM clients " +
+            "WHERE stripe_customer_id = $1",
             [customerId]
           );
-          if (clientResult.rows[0]) {
-            const c = clientResult.rows[0];
-            const email = paymentFailedEmail(c.business_name);
+          await pool.query(
+            "UPDATE clients SET past_due_since = COALESCE(past_due_since, NOW()), " +
+            "stripe_subscription_id = $1, updated_at = NOW() " +
+            "WHERE stripe_customer_id = $2",
+            [subscription.id, customerId]
+          );
+          // Immediate notice — only on the FIRST past_due event (so dunning
+          // retries don't re-spam). The cron handles the daily reminders next.
+          const c = before.rows[0];
+          if (c && c.past_due_since == null) {
             try {
-              await sendEmail({ to: c.email, ...email });
+              await sendEmail({
+                to: c.email,
+                ...paymentFailedEmail(c.business_name ?? ""),
+              });
             } catch (err) {
-              // Don't 5xx the webhook on email failure — Stripe would retry
-              // and we'd re-run the whole subscription update.
               console.error("Payment-failed email send failed:", err);
             }
           }
+          console.log("Subscription past_due — grace clock started/continued");
+        } else {
+          // incomplete / incomplete_expired / paused — keep sub id synced.
+          await pool.query(
+            "UPDATE clients SET stripe_subscription_id = $1, updated_at = NOW() " +
+            "WHERE stripe_customer_id = $2",
+            [subscription.id, customerId]
+          );
         }
         break;
       }
