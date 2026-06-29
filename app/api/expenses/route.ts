@@ -162,9 +162,17 @@ export async function GET(req: NextRequest) {
     );
 
     // ── Filter to expense-kind rows in JS (cleaner than SQL CASE) ─
-    // "Sales" = the Square + Etsy ingest income category (not seeded) — list
-    // it so those sales are excluded from the expense list, not mis-included.
-    const LEGACY_INCOME = new Set(["invoice", "ar_followup", "Sales"]);
+    // Channel sales income categories that aren't seeded for every industry:
+    // "Sales" (Square/Etsy) + "Online Sales" (Shopify/Wix). List them so those
+    // sales are excluded from the expense list, not mis-included. MUST match
+    // the LEGACY_INCOME sets in channels.ts / profitability / aggregate.ts +
+    // the dashboard isIncomeCategory (see reference_income-classifier-sync).
+    const LEGACY_INCOME = new Set([
+      "invoice",
+      "ar_followup",
+      "Sales",
+      "Online Sales",
+    ]);
     const LEGACY_EXPENSE = new Set(["expense"]);
     const expenses = result.rows.filter((r) => {
       if (!r.category) return false; // unknown-category rows aren't expenses

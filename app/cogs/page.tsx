@@ -42,6 +42,9 @@ interface MarginTotals {
   cogs: number;
   margin: number;
   marginPercent: number | null;
+  /** Product value refunded in the period (net of tax), already
+   *  subtracted from `revenue`. From computeMargin. */
+  refunds: number;
   unmatchedRevenue: number;
   unmatchedLineItemCount: number;
   cogsEstimatedLineItemCount: number;
@@ -233,10 +236,12 @@ export default function CogsPage() {
 
   const totals = data?.totals;
   const underwaterSkus = data?.bySku.filter((s) => s.underwater) ?? [];
+  // unmatchedRevenue is GROSS (line-item, pre-refund); totals.revenue is now
+  // NET of refunds. Compare like-to-like against gross (= net + refunds) so
+  // the ratio can't exceed 100% when refunds exist.
+  const grossRevenue = totals ? totals.revenue + (totals.refunds ?? 0) : 0;
   const unmatchedPct =
-    totals && totals.revenue > 0
-      ? (totals.unmatchedRevenue / totals.revenue) * 100
-      : 0;
+    grossRevenue > 0 ? (totals!.unmatchedRevenue / grossRevenue) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -326,7 +331,15 @@ export default function CogsPage() {
         ) : !totals ? null : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-              <StatCard label="Revenue" value={fmtUsd(totals.revenue)} />
+              <StatCard
+                label="Revenue"
+                value={fmtUsd(totals.revenue)}
+                sub={
+                  totals.refunds > 0
+                    ? `net of ${fmtUsd(totals.refunds)} refunded`
+                    : undefined
+                }
+              />
               <StatCard
                 label="Cost of goods"
                 value={fmtUsd(totals.cogs)}
