@@ -831,13 +831,19 @@ export async function GET(req: NextRequest) {
         email: string;
         business_name: string | null;
       }>(
-        // NOTE: plan = 'pro' matches ~no one post-band-migration (0027), so
-        // this digest is effectively dormant. To actually send it to paying
-        // clients, change to: plan IS NOT NULL AND plan <> 'canceled'. The
-        // `AND NOT is_test` guard is already in place for when that happens.
-        `SELECT id, email, business_name
-           FROM clients
-          WHERE plan = 'pro' AND NOT is_test AND email IS NOT NULL`
+        // Sent to every paying client (any band + trial; not canceled), minus
+        // test accounts and anyone who opted out (Settings → Email
+        // notifications → preferences.daily_cogs_digest_disabled). The
+        // per-client handler below still skips days with no mapped sales, so
+        // quiet days never email.
+        `SELECT c.id, c.email, c.business_name
+           FROM clients c
+           LEFT JOIN client_settings cs ON cs.client_id = c.id
+          WHERE c.plan IS NOT NULL
+            AND c.plan <> 'canceled'
+            AND NOT c.is_test
+            AND c.email IS NOT NULL
+            AND COALESCE((cs.preferences->>'daily_cogs_digest_disabled')::boolean, false) = false`
       );
 
       for (const c of proClientsRes.rows) {

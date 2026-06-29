@@ -95,6 +95,12 @@ export default function SettingsPage() {
   const [vehicleSaved, setVehicleSaved] = useState(false);
   const [vehicleError, setVehicleError] = useState<string | null>(null);
 
+  // Daily sales-summary email opt-out. Stored as
+  // preferences.daily_cogs_digest_disabled (true = opted out; default on).
+  const [digestDisabled, setDigestDisabled] = useState(false);
+  const [digestSaving, setDigestSaving] = useState(false);
+  const [digestSaved, setDigestSaved] = useState(false);
+
   const hiddenDefaultsDirty = useMemo(
     () =>
       JSON.stringify([...hiddenDefaults].sort()) !==
@@ -191,6 +197,7 @@ export default function SettingsPage() {
         setHomeAddress(initialHomeAddress);
         setSavedHomeAddress(initialHomeAddress);
         setPreferences(rawPrefs);
+        setDigestDisabled(rawPrefs.daily_cogs_digest_disabled === true);
         setHiddenDefaults(initialHiddenDefaults);
         setSavedHiddenDefaults(initialHiddenDefaults);
         setIncomeCategories(initialIncomeCategories);
@@ -604,6 +611,35 @@ export default function SettingsPage() {
       setLaborRateError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setLaborRateSaving(false);
+    }
+  };
+
+  // Toggle the daily sales-summary email. Round-trips the full preferences
+  // object (PATCH replaces it wholesale) and saves immediately on toggle.
+  const toggleDigest = async (enabled: boolean) => {
+    const disabled = !enabled;
+    const newPreferences = {
+      ...preferences,
+      daily_cogs_digest_disabled: disabled,
+    };
+    setDigestDisabled(disabled);
+    setPreferences(newPreferences);
+    setDigestSaving(true);
+    setDigestSaved(false);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: newPreferences }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setDigestSaved(true);
+      setTimeout(() => setDigestSaved(false), 2000);
+    } catch (err) {
+      console.error("Save failed:", err);
+      setDigestDisabled(!disabled); // revert
+    } finally {
+      setDigestSaving(false);
     }
   };
 
@@ -1123,6 +1159,45 @@ export default function SettingsPage() {
               Optional. Leave blank to disable the {"“"}Send to CPA{"”"} button
               on the Tax Reports page.
             </p>
+          </div>
+        </div>
+
+        {/* Email notifications — opt out of the daily sales-summary email.
+            On by default; only sends on days with a mapped sale. */}
+        <div className="mb-10">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">
+              Email notifications
+            </h2>
+            <p className="text-sm text-slate-500 m-0">
+              Control the automatic emails Dreamward sends you.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 py-5 px-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!digestDisabled}
+                onChange={(e) => toggleDigest(e.target.checked)}
+                disabled={digestSaving}
+                className="mt-0.5 w-4 h-4 cursor-pointer accent-blue-500 disabled:cursor-wait"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">
+                  Daily sales summary
+                </span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  A short morning email recapping yesterday{"’"}s sales, cost of
+                  goods, and margin — sent only on days you made a sale.
+                </span>
+              </span>
+            </label>
+            {digestSaved && (
+              <span className="text-sm text-green-600 font-medium mt-3 inline-block">
+                {"✓ Saved"}
+              </span>
+            )}
           </div>
         </div>
 
