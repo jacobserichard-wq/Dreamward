@@ -40,6 +40,7 @@ const pool = new Pool({
 // --- Client Management ---
 
 export async function getOrCreateClient(email: string) {
+  // Fast path: existing client (a read, on every authenticated request).
   const existing = await pool.query(
     "SELECT * FROM clients WHERE email = $1",
     [email]
@@ -47,12 +48,23 @@ export async function getOrCreateClient(email: string) {
   if (existing.rows.length > 0) {
     return existing.rows[0];
   }
+
+  // First login → create. The app's first page load fires many requests at
+  // once, so two can both miss the SELECT and race the INSERT; the email
+  // UNIQUE would make the second throw. ON CONFLICT makes it idempotent —
+  // both end up returning the same row. We also stamp plan + trial_ends_at
+  // explicitly rather than trusting an (un-versioned) DB column default, so
+  // the app owns its own trial invariant (no silent fallback).
   const result = await pool.query(
-    "INSERT INTO clients (email) VALUES ($1) RETURNING *",
+    `INSERT INTO clients (email, plan, trial_ends_at)
+     VALUES ($1, 'trial', NOW() + INTERVAL '14 days')
+     ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+     RETURNING *`,
     [email]
   );
   await pool.query(
-    "INSERT INTO client_settings (client_id) VALUES ($1)",
+    `INSERT INTO client_settings (client_id) VALUES ($1)
+     ON CONFLICT (client_id) DO NOTHING`,
     [result.rows[0].id]
   );
   return result.rows[0];
