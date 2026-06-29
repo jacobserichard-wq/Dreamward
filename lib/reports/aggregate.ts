@@ -286,11 +286,16 @@ export function buildScheduleCSummary(
     total: number;
     taxDeductible: boolean | null;
     scheduleCLine: string | null;
+    isCogs: boolean;
   }>
 ): AnnualSummary["scheduleCSummary"] {
   const buckets = new Map<string, { total: number; categories: string[] }>();
   for (const row of expense) {
     if (!row.scheduleCLine) continue;
+    // COGS categories are reported via Part III / the dedicated COGS section,
+    // not as a Part II expense line. Some are also mapped to line 22 (Supplies)
+    // for display; skip them here so a CPA doesn't deduct COGS twice.
+    if (row.isCogs) continue;
     const b = buckets.get(row.scheduleCLine) ?? { total: 0, categories: [] };
     b.total += row.total;
     b.categories.push(row.category);

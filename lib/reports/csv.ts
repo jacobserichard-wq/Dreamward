@@ -513,6 +513,7 @@ export async function renderAnnualCsvBody(opts: {
       total: v.total,
       taxDeductible: null,
       scheduleCLine: scheduleCMap.get(category) ?? (category === "Booth Fees" ? "20b" : null),
+      isCogs: isCogsMap.get(category) === true,
     })
   );
   const scheduleCSummary = buildScheduleCSummary(expenseArr);
