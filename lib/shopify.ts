@@ -409,6 +409,7 @@ export interface MappedOrderRow {
   vendor: string;
   invoice_number: string;
   amount: number;
+  tax_amount: number;        // sales tax — excluded from revenue downstream
   due_date: string;          // YYYY-MM-DD (pg DATE)
   status: string;            // 'paid' | 'pending' | 'cancelled'
   category: string;          // hardcoded "Online Sales" (see comment)
@@ -476,6 +477,9 @@ export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
     vendor: customerName,
     invoice_number: order.name || `#${order.order_number}`,
     amount: Number(order.total_price),
+    // Separate sales tax so revenue (amount − tax) excludes it and the
+    // "sales tax collected" liability picks it up — consistent with Square.
+    tax_amount: Number(order.total_tax) || 0,
     due_date: dueDate,
     status,
     category: "Online Sales",
@@ -780,6 +784,8 @@ export function mapRefundToProcessedItem(opts: {
   originalOrderName: string;        // e.g., "#1001"
   customerName: string;             // copied from the original order's vendor field
   currency: string;                 // ISO 4217 from the original order
+  originalAmount: number;           // original order total (incl tax) — for the tax slice
+  originalTax: number;              // original order's total tax — for the tax slice
 }): MappedOrderRow {
   // Sum successful refund transactions. Shopify reports amounts as
   // positive strings; we negate for the processed_items row so
@@ -788,12 +794,22 @@ export function mapRefundToProcessedItem(opts: {
     .filter((t) => t.kind === "refund" && t.status === "success")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
+  // Proportional tax reversal (mirrors Square): the share of the order
+  // refunded × its tax. Negated so the sales-tax-collected liability nets
+  // back down by the same amount the original sale added. Approximate when
+  // refunds are uneven across lines, but correct for full refunds.
+  const taxSlice =
+    opts.originalAmount > 0
+      ? Math.min(1, refundAmount / opts.originalAmount) * opts.originalTax
+      : 0;
+
   const date = (opts.refund.processed_at || opts.refund.created_at).slice(0, 10);
 
   return {
     vendor: opts.customerName,
     invoice_number: `${opts.originalOrderName}-refund`,
     amount: -refundAmount,
+    tax_amount: -taxSlice,
     due_date: date,
     status: "paid",                     // refund completed = paid
     category: "Online Sales",            // negative income, same category

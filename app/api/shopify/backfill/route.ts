@@ -215,10 +215,10 @@ export async function POST() {
       const rows = ordersThisPage.map(mapOrderToProcessedItem);
 
       if (rows.length > 0) {
-        // Build parameterized VALUES. Each row needs 10 params
-        // (vendor, invoice_number, amount, due_date, status,
+        // Build parameterized VALUES. Each row needs 13 params
+        // (vendor, invoice_number, amount, tax_amount, due_date, status,
         // category, source, source_ref_id, confidence, summary,
-        // extracted_data, client_id) — 12 params per row.
+        // extracted_data, client_id).
         const values: unknown[] = [];
         const placeholders = rows
           .map((r) => {
@@ -227,6 +227,7 @@ export async function POST() {
               r.vendor,
               r.invoice_number,
               r.amount,
+              r.tax_amount,
               r.due_date,
               r.status,
               r.category,
@@ -239,7 +240,7 @@ export async function POST() {
             );
             return (
               "(" +
-              Array.from({ length: 12 }, (_, j) => `$${base + j + 1}`).join(",") +
+              Array.from({ length: 13 }, (_, j) => `$${base + j + 1}`).join(",") +
               ")"
             );
           })
@@ -258,7 +259,7 @@ export async function POST() {
           source_ref_id: string;
         }>(
           `INSERT INTO processed_items (
-             vendor, invoice_number, amount, due_date, status,
+             vendor, invoice_number, amount, tax_amount, due_date, status,
              category, source, source_ref_id, confidence, summary,
              extracted_data, client_id
            ) VALUES ${placeholders}

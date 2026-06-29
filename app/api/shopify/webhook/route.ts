@@ -163,13 +163,13 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
   // idempotent: redeliveries skip rather than duplicating.
   const upsertRes = await pool.query<{ id: number }>(
     `INSERT INTO processed_items (
-       vendor, invoice_number, amount, due_date, status,
+       vendor, invoice_number, amount, tax_amount, due_date, status,
        category, source, source_ref_id, confidence, summary,
        extracted_data, client_id
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8, $9, $10,
-       $11, $12
+       $11, $12, $13
      )
      ON CONFLICT (client_id, source, source_ref_id)
        WHERE source_ref_id IS NOT NULL
@@ -177,6 +177,7 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
        SET vendor = EXCLUDED.vendor,
            invoice_number = EXCLUDED.invoice_number,
            amount = EXCLUDED.amount,
+           tax_amount = EXCLUDED.tax_amount,
            due_date = EXCLUDED.due_date,
            status = EXCLUDED.status,
            summary = EXCLUDED.summary,
@@ -186,6 +187,7 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
       row.vendor,
       row.invoice_number,
       row.amount,
+      row.tax_amount,
       row.due_date,
       row.status,
       row.category,
@@ -259,9 +261,11 @@ async function handleRefundCreate(clientId: number, refund: ShopifyRefund) {
   const original = await pool.query<{
     vendor: string;
     invoice_number: string;
+    amount: string;
+    tax_amount: string | null;
     extracted_data: Record<string, unknown>;
   }>(
-    `SELECT vendor, invoice_number, extracted_data
+    `SELECT vendor, invoice_number, amount, tax_amount, extracted_data
        FROM processed_items
       WHERE client_id = $1
         AND source = 'shopify'
@@ -272,41 +276,53 @@ async function handleRefundCreate(clientId: number, refund: ShopifyRefund) {
   // Defaults if the original row isn't found (edge case — webhook
   // delivery order isn't strictly guaranteed; daily cron will
   // backfill the original later).
-  const customerName = original.rows[0]?.vendor ?? "Shopify refund";
-  const originalOrderName =
-    original.rows[0]?.invoice_number ?? `#${refund.order_id}`;
+  const orig = original.rows[0];
+  const customerName = orig?.vendor ?? "Shopify refund";
+  const originalOrderName = orig?.invoice_number ?? `#${refund.order_id}`;
   const currency =
-    typeof original.rows[0]?.extracted_data?.currency === "string"
-      ? (original.rows[0].extracted_data.currency as string)
+    typeof orig?.extracted_data?.currency === "string"
+      ? (orig.extracted_data.currency as string)
       : "USD";
+  const originalAmount = orig ? Number(orig.amount) || 0 : 0;
+  // Prefer the tax_amount column; fall back to extracted_data.tax for
+  // orders ingested before tax was separated onto the column.
+  const originalTax = orig
+    ? orig.tax_amount != null
+      ? Number(orig.tax_amount) || 0
+      : Number(orig.extracted_data?.tax) || 0
+    : 0;
 
   const row = mapRefundToProcessedItem({
     refund,
     originalOrderName,
     customerName,
     currency,
+    originalAmount,
+    originalTax,
   });
 
   await pool.query(
     `INSERT INTO processed_items (
-       vendor, invoice_number, amount, due_date, status,
+       vendor, invoice_number, amount, tax_amount, due_date, status,
        category, source, source_ref_id, confidence, summary,
        extracted_data, client_id
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8, $9, $10,
-       $11, $12
+       $11, $12, $13
      )
      ON CONFLICT (client_id, source, source_ref_id)
        WHERE source_ref_id IS NOT NULL
      DO UPDATE
        SET amount = EXCLUDED.amount,
+           tax_amount = EXCLUDED.tax_amount,
            summary = EXCLUDED.summary,
            extracted_data = EXCLUDED.extracted_data`,
     [
       row.vendor,
       row.invoice_number,
       row.amount,
+      row.tax_amount,
       row.due_date,
       row.status,
       row.category,
