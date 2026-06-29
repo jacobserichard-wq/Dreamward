@@ -22,6 +22,7 @@
 // All endpoints Pro-gated, tenant-scoped on every query.
 
 import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import {
   createAliasWithResolve,
@@ -92,27 +93,43 @@ export async function POST(req: NextRequest) {
         : null;
 
     // ── Create + resolve in one transaction ────────────────────
+    // createAliasWithResolve does an alias INSERT, a retroactive
+    // matched_sku_id UPDATE, then N recordSaleAdjustments (ledger +
+    // stock + FIFO). On the bare pool those auto-commit independently —
+    // a mid-backfill crash leaves the alias created but stock/COGS only
+    // partially applied. Own the transaction here so it's all-or-nothing.
     try {
-      const result = await createAliasWithResolve({
-        clientId: client.id,
-        alias: {
-          skuId,
-          platform: body.platform as AliasPlatform,
-          externalId: body.externalId.trim(),
-          externalSku,
-        },
-      });
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        const result = await createAliasWithResolve({
+          dbClient: db,
+          clientId: client.id,
+          alias: {
+            skuId,
+            platform: body.platform as AliasPlatform,
+            externalId: body.externalId.trim(),
+            externalSku,
+          },
+        });
+        await db.query("COMMIT");
 
-      return NextResponse.json({
-        alias: {
-          id: result.aliasId,
-          skuId,
-          platform: body.platform,
-          externalId: body.externalId.trim(),
-          externalSku,
-        },
-        resolvedCount: result.resolvedCount,
-      });
+        return NextResponse.json({
+          alias: {
+            id: result.aliasId,
+            skuId,
+            platform: body.platform,
+            externalId: body.externalId.trim(),
+            externalSku,
+          },
+          resolvedCount: result.resolvedCount,
+        });
+      } catch (txErr) {
+        await db.query("ROLLBACK").catch(() => {});
+        throw txErr;
+      } finally {
+        db.release();
+      }
     } catch (err) {
       const e = err as { code?: string; message?: string };
       // SKU not found / wrong tenant
