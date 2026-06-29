@@ -149,6 +149,49 @@ export function paymentFailedEmail(businessName: string) {
   };
 }
 
+// Daily reminder during the 7-day past-due grace period (sent by the
+// nightly cron). daysRemaining counts down to the read-only cutoff;
+// daysRemaining <= 0 is the cutoff notice itself.
+export function paymentPastDueEmail(opts: {
+  businessName: string | null;
+  daysRemaining: number;
+}) {
+  const name = opts.businessName?.trim() || "there";
+  if (opts.daysRemaining <= 0) {
+    return {
+      subject: "Dreamward: your account is now read-only",
+      html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px;">
+        <h1 style="font-size: 24px; color: #0f172a; margin: 0 0 16px;">Your access is now limited</h1>
+        <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 24px;">
+          Hi ${name}, we still couldn't process your Dreamward payment, so your
+          account has switched to read-only. Your data is safe — update your
+          payment method to restore full access right away.
+        </p>
+        <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Update payment</a>
+        <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">If you believe this is an error, please reply to this email.</p>
+      </div>
+    `,
+    };
+  }
+  const dayWord = opts.daysRemaining === 1 ? "day" : "days";
+  return {
+    subject: `Dreamward: update your payment — ${opts.daysRemaining} ${dayWord} left`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px;">
+        <h1 style="font-size: 24px; color: #0f172a; margin: 0 0 16px;">Your payment needs attention</h1>
+        <p style="font-size: 16px; color: #334155; line-height: 1.6; margin: 0 0 24px;">
+          Hi ${name}, your latest Dreamward payment didn't go through. You still
+          have full access for now — but if it isn't updated, your account will
+          switch to read-only in <strong>${opts.daysRemaining} ${dayWord}</strong>.
+        </p>
+        <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Update payment</a>
+        <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">If you believe this is an error, please reply to this email.</p>
+      </div>
+    `,
+  };
+}
+
 // Phase 6 AR follow-up reminder. Polite-but-firm tone — design §7.
 // Sent via Resend with Reply-To = the Dreamward user's own email so
 // the customer's reply threads back to the vendor, not to Dreamward.

@@ -4,6 +4,7 @@ import {
   sendEmail,
   trialExpiringEmail,
   cogsDailyDigestEmail,
+  paymentPastDueEmail,
 } from "@/lib/email";
 import { SUPPORT_EMAIL } from "@/lib/support";
 import {
@@ -101,6 +102,70 @@ export async function GET(req: NextRequest) {
           failed++;
         }
       }
+    }
+
+    // ── Past-due grace: daily reminders + read-only cutoff after 7 days ──
+    // A subscription whose payment failed keeps full access for GRACE_DAYS
+    // (the Stripe webhook stamps past_due_since + leaves the band intact).
+    // Here we send the daily countdown and flip to read-only ('canceled')
+    // once the window closes. These go ONLY to customers with a real failed
+    // payment (past_due_since set) — not a broad blast — so it's safe to run
+    // pre-launch without a test-account exclusion.
+    const GRACE_DAYS = 7;
+    let pastDueReminders = 0;
+    let pastDueCutoffs = 0;
+    try {
+      const pastDue = await pool.query<{
+        id: number;
+        email: string;
+        business_name: string | null;
+        days_elapsed: number;
+      }>(
+        `SELECT id, email, business_name,
+                FLOOR(EXTRACT(EPOCH FROM (NOW() - past_due_since)) / 86400)::int
+                  AS days_elapsed
+           FROM clients
+          WHERE past_due_since IS NOT NULL
+            AND email IS NOT NULL`
+      );
+      for (const c of pastDue.rows) {
+        try {
+          if (c.days_elapsed >= GRACE_DAYS) {
+            // Grace window closed → read-only, clear the clock, final notice.
+            await pool.query(
+              `UPDATE clients SET plan = 'canceled', past_due_since = NULL,
+                      updated_at = NOW() WHERE id = $1`,
+              [c.id]
+            );
+            await sendEmail({
+              to: c.email,
+              ...paymentPastDueEmail({
+                businessName: c.business_name,
+                daysRemaining: 0,
+              }),
+            });
+            pastDueCutoffs++;
+          } else if (c.days_elapsed >= 1) {
+            // Daily countdown. Day 0 is the webhook's immediate notice, so
+            // the cron reminders start from day 1.
+            await sendEmail({
+              to: c.email,
+              ...paymentPastDueEmail({
+                businessName: c.business_name,
+                daysRemaining: GRACE_DAYS - c.days_elapsed,
+              }),
+            });
+            pastDueReminders++;
+          }
+        } catch (err) {
+          console.error(
+            `[cron] past-due handling failed for client ${c.id}:`,
+            err
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[cron] past-due pass failed:", err);
     }
 
     // Daily: refresh the owner-dashboard revenue cache for every account
@@ -916,6 +981,8 @@ export async function GET(req: NextRequest) {
       success: true,
       emailsSent: sent,
       emailsFailed: failed,
+      pastDueReminders,
+      pastDueCutoffs,
       revenueCached,
       reclassifyClientsProcessed,
       reclassifyItemsTotal,
