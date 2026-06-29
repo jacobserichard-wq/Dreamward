@@ -202,13 +202,29 @@ async function handleOrderUpsert(clientId: number, order: ShopifyOrder) {
   if (parentId) {
     const lineItems = extractShopifyLineItems(order);
     if (lineItems.length > 0) {
-      await bulkInsertLineItemsForParent({
-        parentId,
-        clientId,
-        platform: "shopify",
-        soldAt: row.due_date,
-        items: lineItems,
-      });
+      // Atomic: line items + stock draw + FIFO consumption commit together,
+      // so a crash mid-recordSaleAdjustments can't desync inventory_adjustments
+      // from quantity_on_hand / cost layers. The parent row above is already
+      // committed and stays decoupled — a line-item failure here rolls back
+      // only the items/stock and is recoverable via the daily reconcile cron.
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        await bulkInsertLineItemsForParent({
+          dbClient: db,
+          parentId,
+          clientId,
+          platform: "shopify",
+          soldAt: row.due_date,
+          items: lineItems,
+        });
+        await db.query("COMMIT");
+      } catch (txErr) {
+        await db.query("ROLLBACK").catch(() => {});
+        throw txErr;
+      } finally {
+        db.release();
+      }
     }
   }
 }
