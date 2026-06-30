@@ -112,7 +112,9 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
       "Credit card processing, payment platform fees (Stripe, Square, PayPal), and bank merchant fees.",
     type: "expense",
     taxDeductible: true,
-    scheduleC: "17",
+    // 27a (Other expenses) — merchant/processing fees are NOT legal or
+    // professional services (line 17). 27a is the standard CPA placement.
+    scheduleC: "27a",
   },
   {
     name: "Travel & Mileage",
