@@ -5,6 +5,7 @@ import {
   trialExpiringEmail,
   cogsDailyDigestEmail,
   paymentPastDueEmail,
+  unsubscribeUrl,
 } from "@/lib/email";
 import { SUPPORT_EMAIL } from "@/lib/support";
 import {
@@ -78,14 +79,16 @@ export async function GET(req: NextRequest) {
     if (TRIAL_EXPIRY_EMAILS_ENABLED) {
       // Find clients whose trial expires in 3 days or 1 day
       const result = await pool.query(
-        `SELECT id, email, business_name, trial_ends_at
-         FROM clients
-         WHERE plan = 'trial'
-         AND NOT is_test
-         AND trial_ends_at IS NOT NULL
+        `SELECT c.id, c.email, c.business_name, c.trial_ends_at
+         FROM clients c
+         LEFT JOIN client_settings cs ON cs.client_id = c.id
+         WHERE c.plan = 'trial'
+         AND NOT c.is_test
+         AND COALESCE((cs.preferences->>'email_opt_out')::boolean, false) = false
+         AND c.trial_ends_at IS NOT NULL
          AND (
-           DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '3 days'
-           OR DATE(trial_ends_at) = CURRENT_DATE + INTERVAL '1 day'
+           DATE(c.trial_ends_at) = CURRENT_DATE + INTERVAL '3 days'
+           OR DATE(c.trial_ends_at) = CURRENT_DATE + INTERVAL '1 day'
          )`
       );
 
@@ -93,11 +96,17 @@ export async function GET(req: NextRequest) {
         const daysLeft = Math.ceil(
           (new Date(client.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
         );
-        const email = trialExpiringEmail(client.business_name, daysLeft);
+        const unsub = unsubscribeUrl(client.id);
+        const email = trialExpiringEmail(client.business_name, daysLeft, unsub);
         try {
           // reply_to = monitored inbox, so "just reply to this email" works
           // (the From is hello@godreamward.com, not yet wired for inbound).
-          await sendEmail({ to: client.email, replyTo: SUPPORT_EMAIL, ...email });
+          await sendEmail({
+            to: client.email,
+            replyTo: SUPPORT_EMAIL,
+            unsubscribeUrl: unsub,
+            ...email,
+          });
           sent++;
         } catch (err) {
           console.error(`Trial-expiring email failed for ${client.email}:`, err);
@@ -843,7 +852,8 @@ export async function GET(req: NextRequest) {
             AND c.plan <> 'canceled'
             AND NOT c.is_test
             AND c.email IS NOT NULL
-            AND COALESCE((cs.preferences->>'daily_cogs_digest_disabled')::boolean, false) = false`
+            AND COALESCE((cs.preferences->>'daily_cogs_digest_disabled')::boolean, false) = false
+            AND COALESCE((cs.preferences->>'email_opt_out')::boolean, false) = false`
       );
 
       for (const c of proClientsRes.rows) {
@@ -872,9 +882,11 @@ export async function GET(req: NextRequest) {
             (s) => s.underwater
           ).length;
 
+          const unsub = unsubscribeUrl(c.id);
           const email = cogsDailyDigestEmail({
             businessName: c.business_name ?? "Your business",
             date: yIso,
+            unsubscribeUrl: unsub,
             revenue: totals.revenue,
             cogs: totals.cogs,
             margin: totals.margin,
@@ -890,7 +902,7 @@ export async function GET(req: NextRequest) {
                 }
               : null,
           });
-          await sendEmail({ to: c.email, ...email });
+          await sendEmail({ to: c.email, unsubscribeUrl: unsub, ...email });
           cogsDigestsSent++;
         } catch (err) {
           console.error(

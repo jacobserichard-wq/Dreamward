@@ -1,8 +1,49 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { BANDS } from "./plans";
 import { SUPPORT_EMAIL } from "./support";
 
 const FROM_EMAIL = "Dreamward <hello@godreamward.com>";
 const baseUrl = process.env.NEXTAUTH_URL ?? "https://godreamward.com";
+
+// ── CAN-SPAM / bulk-sender compliance ────────────────────────────────
+// Recurring update emails (daily digest, trial-expiry, welcome) must carry
+// a working unsubscribe link + a physical postal address, and sendEmail
+// sets the one-click List-Unsubscribe header (Gmail/Yahoo bulk-sender rule).
+// Transactional mail (invoices, AR reminders, billing) is exempt + omits it.
+const POSTAL_ADDRESS =
+  process.env.BUSINESS_POSTAL_ADDRESS ??
+  "Dreamward — mailing address not configured";
+
+function unsubToken(clientId: number): string {
+  const secret = process.env.NEXTAUTH_SECRET ?? "dev-unsub-secret";
+  return createHmac("sha256", secret)
+    .update(`unsub:${clientId}`)
+    .digest("base64url");
+}
+
+/** Tokenized one-click unsubscribe URL for a client — works without login. */
+export function unsubscribeUrl(clientId: number): string {
+  return `${baseUrl}/api/unsubscribe?c=${clientId}&t=${unsubToken(clientId)}`;
+}
+
+/** Verify an unsubscribe token (timing-safe). */
+export function verifyUnsubToken(clientId: number, token: string): boolean {
+  const expected = Buffer.from(unsubToken(clientId));
+  const got = Buffer.from(token);
+  return expected.length === got.length && timingSafeEqual(expected, got);
+}
+
+/** CAN-SPAM footer — append to recurring (non-transactional) emails. */
+export function complianceFooter(unsubUrl: string): string {
+  return `
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0 12px;" />
+    <p style="font-size:11px;color:#94a3b8;line-height:1.6;margin:0;">
+      You're receiving this because you have a Dreamward account.
+      <a href="${unsubUrl}" style="color:#94a3b8;">Unsubscribe</a> from these
+      update emails (you'll still get essential billing &amp; invoice messages).<br/>
+      ${POSTAL_ADDRESS}
+    </p>`;
+}
 
 interface EmailAttachment {
   /** Display filename — the CPA's mail client uses this on download. */
@@ -28,6 +69,9 @@ interface EmailParams {
   // total attachment size at 40MB; Dreamward CSVs are < 1MB at v1 scale
   // so this isn't actively enforced here.
   attachments?: EmailAttachment[];
+  // When set, adds the one-click List-Unsubscribe header (recurring/update
+  // emails only). Pair with complianceFooter() in the HTML.
+  unsubscribeUrl?: string;
 }
 
 export async function sendEmail({
@@ -36,6 +80,7 @@ export async function sendEmail({
   html,
   replyTo,
   attachments,
+  unsubscribeUrl,
 }: EmailParams) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_API_KEY) {
@@ -54,6 +99,14 @@ export async function sendEmail({
   // (→ the vendor) and CPA handoff (→ the business owner) — pass their own
   // replyTo, which wins. Resend's REST API uses `reply_to` (snake_case).
   payload.reply_to = replyTo ?? SUPPORT_EMAIL;
+  // One-click unsubscribe header for recurring/update emails (Gmail/Yahoo
+  // bulk-sender requirement; lets clients honor an opt-out from the inbox).
+  if (unsubscribeUrl) {
+    payload.headers = {
+      "List-Unsubscribe": `<${unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    };
+  }
   if (attachments && attachments.length > 0) {
     // Resend's REST API expects `attachments: [{filename, content,
     // content_type?}]`. `content` is base64-encoded; the API decodes
@@ -111,7 +164,11 @@ export function welcomeEmail(businessName: string) {
   };
 }
 
-export function trialExpiringEmail(businessName: string, daysLeft: number) {
+export function trialExpiringEmail(
+  businessName: string,
+  daysLeft: number,
+  unsubscribeUrl?: string
+) {
   // Floor of the revenue-band ladder (single source of truth in plans.ts),
   // so this never drifts from real pricing again.
   const startingPrice = BANDS[0].price;
@@ -127,6 +184,7 @@ export function trialExpiringEmail(businessName: string, daysLeft: number) {
         <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 24px;">Pricing is based on your sales — plans start at just $${startingPrice}/month and scale as you grow.</p>
         <a href="${baseUrl}/billing" style="display: inline-block; padding: 12px 28px; background: #16a34a; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">View Plans</a>
         <p style="font-size: 13px; color: #94a3b8; margin: 32px 0 0;">Questions? Just reply to this email.</p>
+        ${unsubscribeUrl ? complianceFooter(unsubscribeUrl) : ""}
       </div>
     `,
   };
@@ -350,6 +408,7 @@ export function cogsDailyDigestEmail(opts: {
   unmatchedLineItemCount: number;
   underwaterSkuCount: number;
   topSku: { code: string; name: string; revenue: number } | null;
+  unsubscribeUrl?: string;
 }) {
   const fmtUsd = (n: number) =>
     `$${n.toLocaleString("en-US", {
@@ -432,8 +491,9 @@ export function cogsDailyDigestEmail(opts: {
         ${topSkuBlock}
 
         <p style="font-size: 11px; color: #cbd5e1; margin: 32px 0 0; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-          You receive this once a day on days you have mapped sales. To stop these, reply with "unsubscribe" and we'll handle it.
+          You receive this once a day on days you have mapped sales.
         </p>
+        ${opts.unsubscribeUrl ? complianceFooter(opts.unsubscribeUrl) : ""}
       </div>
     `,
   };
