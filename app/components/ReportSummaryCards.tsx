@@ -83,7 +83,7 @@ export default function ReportSummaryCards({
       {showCogsLayout && (
         <>
           <Card
-            label="Cost of goods"
+            label="Cost of goods (cash basis)"
             value={formatUsd(cogs ?? 0)}
             icon={"\u{1F4E6}"}
             borderClass="border-t-orange-500"

@@ -695,8 +695,10 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 m-0 mt-3">
-                  Not tax advice — verify with your CPA. Inventory accounting
-                  rules vary by business.
+                  For reference only — these inventory values are not used to
+                  compute the cost of goods above (this is a cash-basis report,
+                  which deducts materials when purchased). Not tax advice —
+                  verify with your CPA.
                 </p>
               </div>
             )}

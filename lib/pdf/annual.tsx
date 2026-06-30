@@ -183,7 +183,9 @@ export function AnnualPdfDocument({
           {s.cogs > 0 && (
             <>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Cost of goods sold</Text>
+                <Text style={styles.summaryLabel}>
+                  Cost of goods sold (cash basis)
+                </Text>
                 <Text style={styles.summaryValue}>{fmtUsd(s.cogs)}</Text>
               </View>
               <View style={styles.summaryRow}>
@@ -490,6 +492,11 @@ export function AnnualPdfDocument({
                 {fmtUsd(summary.inventoryValuation.ending)}
               </Text>
             </View>
+            <Text style={{ fontSize: 8, color: "#94a3b8", marginTop: 6 }}>
+              For reference only — these inventory values are not used to
+              compute the cost of goods sold above (this is a cash-basis
+              report, which deducts materials when purchased).
+            </Text>
           </View>
         )}
 
