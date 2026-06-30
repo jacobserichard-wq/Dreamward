@@ -512,30 +512,17 @@ export async function renderAnnualCsvBody(opts: {
       count: v.count,
       total: v.total,
       taxDeductible: null,
-      scheduleCLine: scheduleCMap.get(category) ?? (category === "Booth Fees" ? "20b" : null),
+      scheduleCLine: scheduleCMap.get(category) ?? null,
       isCogs: isCogsMap.get(category) === true,
     })
   );
-  const scheduleCSummary = buildScheduleCSummary(expenseArr);
-  // Add mileage to the rollup if any. Synthetic row — not in the
-  // expenseArr (mileage tracked separately) but does appear on Schedule
-  // C line 9 (Car and truck expenses).
-  if (mileageCost > 0) {
-    const existing = scheduleCSummary.find((r) => r.line === "9");
-    if (existing) {
-      existing.total += mileageCost;
-      existing.categories.push("Mileage deduction");
-    } else {
-      scheduleCSummary.push({
-        line: "9",
-        description: "Car and truck expenses",
-        total: mileageCost,
-        categories: ["Mileage deduction"],
-      });
-    }
-    // Re-sort since we may have added a row.
-    scheduleCSummary.sort((a, b) => b.total - a.total);
-  }
+  // Mileage (line 9) + booth fees (line 20b) live outside expense
+  // categories; the shared helper injects them so this CSV matches the
+  // on-screen + PDF Schedule C summary exactly.
+  const scheduleCSummary = buildScheduleCSummary(expenseArr, {
+    mileageCost,
+    boothFees,
+  });
   const scheduleCSection = scheduleCSummary.map((r) =>
     csvRow([
       "ScheduleC Summary",

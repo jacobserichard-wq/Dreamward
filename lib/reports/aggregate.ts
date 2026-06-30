@@ -287,19 +287,38 @@ export function buildScheduleCSummary(
     taxDeductible: boolean | null;
     scheduleCLine: string | null;
     isCogs: boolean;
-  }>
+  }>,
+  opts?: { mileageCost?: number; boothFees?: number }
 ): AnnualSummary["scheduleCSummary"] {
   const buckets = new Map<string, { total: number; categories: string[] }>();
+  const add = (line: string, total: number, category: string) => {
+    const b = buckets.get(line) ?? { total: 0, categories: [] };
+    b.total += total;
+    b.categories.push(category);
+    buckets.set(line, b);
+  };
   for (const row of expense) {
-    if (!row.scheduleCLine) continue;
     // COGS categories are reported via Part III / the dedicated COGS section,
     // not as a Part II expense line. Some are also mapped to line 22 (Supplies)
     // for display; skip them here so a CPA doesn't deduct COGS twice.
     if (row.isCogs) continue;
-    const b = buckets.get(row.scheduleCLine) ?? { total: 0, categories: [] };
-    b.total += row.total;
-    b.categories.push(row.category);
-    buckets.set(row.scheduleCLine, b);
+    // Unmapped (custom user) categories: fold DEDUCTIBLE ones into 27a (Other
+    // expenses) so the per-line breakdown stays complete and ties to total
+    // expenses, instead of silently dropping them. Non-deductible → skip.
+    let line = row.scheduleCLine;
+    if (!line) {
+      if (row.taxDeductible === false) continue;
+      line = "27a";
+    }
+    add(line, row.total, row.category);
+  }
+  // Synthetic rows for deductions tracked OUTSIDE expense categories, so the
+  // on-screen panel + PDF + CSV all show the same Schedule C lines.
+  if (opts?.mileageCost && opts.mileageCost > 0) {
+    add("9", opts.mileageCost, "Mileage deduction");
+  }
+  if (opts?.boothFees && opts.boothFees > 0) {
+    add("20b", opts.boothFees, "Booth & show fees");
   }
   return Array.from(buckets.entries())
     .map(([line, b]) => ({
@@ -669,7 +688,10 @@ export async function annualSummary(opts: {
       isCogs: isCogsMap.get(category) === true,
     }))
     .sort((a, b) => b.total - a.total);
-  const scheduleCSummary = buildScheduleCSummary(expenseArr);
+  const scheduleCSummary = buildScheduleCSummary(expenseArr, {
+    mileageCost,
+    boothFees,
+  });
 
   const outstandingAsOfYearEnd = Number(
     outstandingResult.rows[0]?.outstanding ?? 0
