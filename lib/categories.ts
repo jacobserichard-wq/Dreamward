@@ -125,6 +125,14 @@ export const UNIVERSAL_CATEGORIES: Category[] = [
     scheduleC: "24a",
   },
   {
+    name: "Business Meals",
+    description:
+      "Meals with clients or vendors, or while traveling for business. Generally 50% deductible.",
+    type: "expense",
+    taxDeductible: true,
+    scheduleC: "24b",
+  },
+  {
     name: "Equipment",
     description:
       "Tools, equipment, and machinery purchased for business use. Items over the de minimis threshold are typically depreciated; smaller items immediately expensed.",

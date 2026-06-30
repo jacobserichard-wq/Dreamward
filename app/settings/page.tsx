@@ -1335,7 +1335,7 @@ export default function SettingsPage() {
 
               <div>
                 <label htmlFor="settings-se-pct" className="block text-sm font-medium text-slate-700 mb-1">
-                  Self-employment tax %
+                  Self-employment set-aside %
                 </label>
                 <input
                   id="settings-se-pct"
@@ -1351,7 +1351,8 @@ export default function SettingsPage() {
                   className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none box-border focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
                 <p className="text-xs text-slate-500 mt-1 m-0">
-                  Effective SE tax (default 14.13%).
+                  Rough flat planning estimate (default 14.13%) — a set-aside,
+                  not exact Schedule SE tax. Verify with your CPA.
                 </p>
               </div>
             </div>
