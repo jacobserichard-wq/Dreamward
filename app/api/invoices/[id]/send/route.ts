@@ -70,6 +70,18 @@ export async function POST(
         { status: 400 }
       );
     }
+    // Don't email a customer an invoice showing "$0.00 due" — a paid /
+    // fully-settled invoice has nothing to collect. (The reminder endpoint
+    // already blocks paid; this keeps "Send invoice" consistent.)
+    if (
+      inv.status === "paid" ||
+      Number(inv.amount_total) - Number(inv.amount_paid) <= 0
+    ) {
+      return NextResponse.json(
+        { error: "This invoice is already paid in full — nothing to send" },
+        { status: 400 }
+      );
+    }
 
     const businessName =
       typeof client.business_name === "string" &&
