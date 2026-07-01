@@ -123,17 +123,41 @@ export async function POST(request: NextRequest) {
         const customerId = subscription.customer;
         const status = subscription.status;
 
+        // Our own clientId rides along in the subscription metadata (set at
+        // checkout via subscription_data.metadata). Matching on it makes the
+        // plan write order-independent: Stripe doesn't guarantee delivery
+        // order, so subscription.created can land BEFORE
+        // checkout.session.completed has stamped stripe_customer_id. Keying
+        // the active/trialing write on clientId (and backfilling the customer
+        // id) avoids the silent 0-row update that would otherwise leave a
+        // paying customer stuck on `trial`. Subs created outside our checkout
+        // have no clientId → fall back to matching on stripe_customer_id.
+        const metaClientId = subscription.metadata?.clientId;
+        const clientId =
+          metaClientId && /^\d+$/.test(metaClientId)
+            ? parseInt(metaClientId, 10)
+            : null;
+
         if (status === "active" || status === "trialing") {
           // Healthy (or recovered from past_due) → set band + clear any
           // running grace clock so access is fully restored.
           const priceId = subscription.items.data[0]?.price?.id;
           const plan = planFromPriceId(priceId) ?? "trial";
-          await pool.query(
-            "UPDATE clients SET plan = $1, stripe_subscription_id = $2, " +
-            "past_due_since = NULL, updated_at = NOW() " +
-            "WHERE stripe_customer_id = $3",
-            [plan, subscription.id, customerId]
-          );
+          if (clientId !== null) {
+            await pool.query(
+              "UPDATE clients SET plan = $1, stripe_customer_id = $2, " +
+              "stripe_subscription_id = $3, past_due_since = NULL, " +
+              "updated_at = NOW() WHERE id = $4",
+              [plan, customerId, subscription.id, clientId]
+            );
+          } else {
+            await pool.query(
+              "UPDATE clients SET plan = $1, stripe_subscription_id = $2, " +
+              "past_due_since = NULL, updated_at = NOW() " +
+              "WHERE stripe_customer_id = $3",
+              [plan, subscription.id, customerId]
+            );
+          }
           console.log("Subscription active:", plan);
         } else if (status === "canceled" || status === "unpaid") {
           await pool.query(
