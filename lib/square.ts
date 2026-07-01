@@ -80,7 +80,10 @@ function loadOauthCreds(): {
 function loadWebhookSignatureKey(): string {
   const key = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
   if (!key) throw new Error("SQUARE_WEBHOOK_SIGNATURE_KEY env var is not set");
-  return key;
+  // Trim: pasting the key into a hosting dashboard can silently append a
+  // trailing newline/space, which corrupts the HMAC key so EVERY signature
+  // fails with a 401 even though the value "looks" right in the UI.
+  return key.trim();
 }
 
 // ---------------------------------------------------------------------
@@ -278,14 +281,31 @@ export function verifyWebhookSignature(opts: {
   if (!opts.signatureHeader) return false;
   try {
     const key = loadWebhookSignatureKey();
+    // Trim the URL too — the notification-URL env var is just as prone to a
+    // stray trailing newline, and Square signs over the EXACT url + body.
+    const url = opts.notificationUrl.trim();
     const expected = createHmac("sha256", key)
-      .update(opts.notificationUrl + opts.rawBody)
+      .update(url + opts.rawBody)
       .digest("base64");
     const expectedBuf = Buffer.from(expected);
-    const receivedBuf = Buffer.from(opts.signatureHeader);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return timingSafeEqual(expectedBuf, receivedBuf);
-  } catch {
+    const receivedBuf = Buffer.from(opts.signatureHeader.trim());
+    const ok =
+      expectedBuf.length === receivedBuf.length &&
+      timingSafeEqual(expectedBuf, receivedBuf);
+    if (!ok) {
+      // Safe diagnostic (no secrets): lengths + url expose a whitespace or
+      // URL-mismatch cause without leaking the key or the signature itself.
+      console.warn(
+        `Square sig mismatch: keyLen=${key.length} urlLen=${url.length} ` +
+          `expectedLen=${expectedBuf.length} receivedLen=${receivedBuf.length} url=${url}`
+      );
+    }
+    return ok;
+  } catch (err) {
+    console.warn(
+      "Square sig verify threw:",
+      err instanceof Error ? err.message : String(err)
+    );
     return false;
   }
 }
