@@ -111,7 +111,7 @@ export default function PricingPage() {
             14-day free trial on any tier. No credit card. Every feature
             included from day one.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
         </div>
       </section>
 

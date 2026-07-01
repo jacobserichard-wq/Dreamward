@@ -53,7 +53,7 @@ export default function HowItWorksPage() {
             14-day free trial. Connect a store or add a sale and watch your real
             margins appear.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
         </div>
       </section>
 

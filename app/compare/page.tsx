@@ -60,7 +60,7 @@ export default function ComparePage() {
             not makers. Here&apos;s where Dreamward does it differently —
             in plain English.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">
             14-day free trial. No credit card required.
           </p>
@@ -269,7 +269,7 @@ export default function ComparePage() {
             re-import your past orders, and see your real gross-margin
             numbers in under 10 minutes.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>
           <p className="text-sm text-bark mt-6 m-0">
             Coming from Excel or Google Sheets?{" "}

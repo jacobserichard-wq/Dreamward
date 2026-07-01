@@ -56,7 +56,7 @@ export default function CompareSpreadsheetsPage() {
             quietly rewrites last year&apos;s profit. Here&apos;s what you
             get when your numbers live somewhere built for them.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">
             14-day free trial. No credit card required.
           </p>
@@ -224,7 +224,7 @@ export default function CompareSpreadsheetsPage() {
             so it never overwrites anything), connect a store, and see your
             real gross-margin numbers in under 10 minutes.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
+          <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>
         </div>
       </section>
