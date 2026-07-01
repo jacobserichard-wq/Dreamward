@@ -30,9 +30,9 @@ import { TESTIMONIALS } from "@/lib/testimonials";
 import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 
 export const metadata = {
-  title: "Dreamward — Gross margin tracking + Schedule-C P&L for small business",
+  title: "Dreamward — one P&L for makers who sell at markets and online",
   description:
-    "Track real gross margin per product across Shopify, Wix, Square, and Etsy. Effective-date COGS — your historical margins never silently rewrite when a cost changes today. Schedule-C-ready P&L for your CPA, receipts attached.",
+    "The financial command center for makers who sell in person and online. Track real margin across every market, Shopify, Wix, Square, and Etsy in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
   openGraph: {
     title: "Dreamward — Gross margin tracking that doesn't lie",
     description:
@@ -147,24 +147,33 @@ export default async function MarketingLandingPage() {
             redesign: airy warm hero, Lora display headline. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
           <h2 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
-            Built for people.
-            <br />
-            Priced for people.
+            The financial command center for makers who sell in person{" "}
+            <span className="text-eucalyptus-dark">AND</span> online.
           </h2>
           <p className="text-lg sm:text-2xl font-semibold text-eucalyptus-dark m-0 mb-3 leading-snug">
-            Real gross margin. Per product. Per channel. Per period.
+            Every market, every channel, every product — one place. Real
+            margins. Real decisions.
           </p>
-          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
-            Dreamward tracks the actual cost behind every sale — so when
-            wholesale prices change, your historical margins{" "}
-            <em>stay historical</em>. Built for makers and small
-            businesses who outgrew spreadsheets but don&apos;t need a
-            $500/month ERP.
+          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-4 leading-relaxed">
+            Markets, Etsy, Shopify, your Square reader — one honest P&amp;L.
+            Dreamward tracks the real cost behind every sale and keeps last
+            year&apos;s numbers from quietly changing when a cost changes
+            today. Built for makers who outgrew spreadsheets but don&apos;t
+            need a $500/month ERP.
           </p>
-          <SignInButton label="Go dreamward &rarr;" />
-          <p className="text-xs text-stone mt-4">
-            14-day free trial. No credit card required.
+          <p className="text-sm font-medium text-stone m-0 mb-8">
+            Built for people. Priced for people.
           </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <SignInButton label="Start free 14-day trial" />
+            <a
+              href="#how-it-works"
+              className="text-sm font-semibold text-eucalyptus-dark no-underline hover:text-forest inline-flex items-center gap-1"
+            >
+              See how it works <span aria-hidden="true">&darr;</span>
+            </a>
+          </div>
+          <p className="text-xs text-stone mt-4">No credit card required.</p>
           <p className="text-[11px] uppercase tracking-widest text-stone mt-6">
             Syncs with Shopify {"\u{00B7}"} Etsy {"\u{00B7}"} Square {"\u{00B7}"} Wix
           </p>
@@ -391,6 +400,9 @@ export default async function MarketingLandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-sand py-6 text-center text-xs text-stone">
+        <p className="m-0 mb-2 text-bark">
+          Your data is yours. Export to CSV anytime. No lock-in.
+        </p>
         <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
           Privacy
         </Link>
