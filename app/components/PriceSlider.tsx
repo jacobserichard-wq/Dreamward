@@ -17,9 +17,10 @@ import SignInButton from "./SignInButton";
 import { PRICE_LADDER } from "@/lib/plans";
 
 export default function PriceSlider() {
-  // Default to the $5k–$15k band — where a typical graduating maker
-  // lands, so the first thing you see isn't the cheapest edge.
-  const [i, setI] = useState(1);
+  // Default to the entry band ($10 / Under $5k) so the price the
+  // marketing leads with ("starting at $10/mo") is the first number a
+  // visitor sees — consistent with the hero, /compare, and /for pages.
+  const [i, setI] = useState(0);
   const band = PRICE_LADDER[i];
   const lastIndex = PRICE_LADDER.length - 1;
 
@@ -85,7 +86,7 @@ export default function PriceSlider() {
       </div>
 
       <div className="text-center mt-7">
-        <SignInButton label="Go dreamward &rarr;" />
+        <SignInButton label="Start free 14-day trial" />
         <p className="text-xs text-stone mt-3 m-0 max-w-sm mx-auto leading-relaxed">
           14-day free trial, no credit card. Your tier adjusts automatically
           as you grow — you&apos;re always on the band that fits, never a
