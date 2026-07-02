@@ -280,6 +280,15 @@ export default function ComparePage() {
               See Dreamward vs. spreadsheets &rarr;
             </Link>
           </p>
+          <p className="text-sm text-bark mt-2 m-0">
+            Comparing to Craftybase?{" "}
+            <Link
+              href="/compare/craftybase"
+              className="text-eucalyptus-dark underline hover:text-forest"
+            >
+              See Dreamward vs. Craftybase &rarr;
+            </Link>
+          </p>
         </div>
       </section>
 
