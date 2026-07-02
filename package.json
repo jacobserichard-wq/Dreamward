@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.92.0",
     "@react-pdf/renderer": "^4.5.1",
     "@types/pg": "^8.20.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.4.0",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",

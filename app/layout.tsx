@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lora, Nunito_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SessionProvider } from "./providers";
 
@@ -44,6 +45,11 @@ export default function RootLayout({
     <html lang="en" className={`${display.variable} ${nunitoSans.variable}`}>
       <body>
         <SessionProvider>{children}</SessionProvider>
+        {/* Vercel Analytics — pageviews + conversion measurement.
+            First analytics on the site (2026-07-02 review): without it
+            we can't see visitors, signups, or which /for + /compare
+            pages actually pull traffic. */}
+        <Analytics />
       </body>
     </html>
   );
