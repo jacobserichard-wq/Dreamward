@@ -55,10 +55,13 @@ export default async function MarketingLandingPage() {
       {/* Header band — minimal nav for the public landing */}
       <header className="border-b border-sand/70">
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
-          <h1 className="m-0 text-xl sm:text-2xl font-semibold font-serif text-forest flex items-center gap-2">
+          {/* Logo is deliberately NOT a heading — the hero headline
+              below is the page's single h1 (SEO + a11y: the h1 should
+              carry the positioning, not the brand name). */}
+          <div className="m-0 text-xl sm:text-2xl font-semibold font-serif text-forest flex items-center gap-2">
             <SproutMark className="w-6 h-6 sm:w-7 sm:h-7 text-eucalyptus" />
             Dreamward
-          </h1>
+          </div>
           {/* Desktop nav — visible links read as an intentional nav
               bar (Pricing was easy to miss as a lone right-side
               link). */}
@@ -146,11 +149,11 @@ export default async function MarketingLandingPage() {
             Phase 12 (COGS) + Phase 13 (Schedule-C P&L). Sage & Rose
             redesign: airy warm hero, Lora display headline. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
-          <h2 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
+          <h1 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
             Built for people.
             <br />
             Priced for people.
-          </h2>
+          </h1>
           <p className="text-lg sm:text-2xl font-semibold text-eucalyptus-dark m-0 mb-3 leading-snug">
             For makers who sell in person AND online. Real margin — every
             market, every channel, every product.
@@ -223,9 +226,9 @@ export default async function MarketingLandingPage() {
           soon list signals roadmap without commitment. */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-8 pb-12 sm:pb-16">
         <div className="text-center mb-8">
-          <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
             Where your money moves
-          </h3>
+          </h2>
           <p className="text-sm sm:text-base text-bark m-0">
             One ledger for every channel.
           </p>
@@ -275,9 +278,9 @@ export default async function MarketingLandingPage() {
             block is invisible. */}
         {TESTIMONIALS.length > 0 && (
           <div className="mt-12">
-            <h3 className="text-center font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-8">
+            <h2 className="text-center font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-8">
               From people building their dream
-            </h3>
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {TESTIMONIALS.map((t, i) => (
                 <figure
@@ -336,9 +339,9 @@ export default async function MarketingLandingPage() {
             </span>
           </div>
           <div className="text-center mb-10">
-            <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
+            <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-forest m-0 mb-2">
               Pricing that grows with you. Not against you.
-            </h3>
+            </h2>
             <p className="text-sm sm:text-base text-bark m-0 max-w-2xl mx-auto leading-relaxed">
               Every tier includes every feature. We charge based on
               your business size, not which tools you&apos;re allowed
@@ -364,7 +367,7 @@ export default async function MarketingLandingPage() {
             </p>
             <p className="text-center text-sm text-bark m-0 mb-6">
               No locked features, no &ldquo;upgrade to unlock.&rdquo; All
-              of it, on every tier — even $10 Dream.
+              of it, on every tier — even the $10 tier.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {PLAN_FEATURE_GROUPS.map((group) => (
@@ -400,6 +403,24 @@ export default async function MarketingLandingPage() {
       <footer className="border-t border-sand py-6 text-center text-xs text-stone">
         <p className="m-0 mb-2 text-bark">
           Your data is yours. Export to CSV anytime. No lock-in.
+        </p>
+        {/* /for + /compare SEO pages need inbound links to rank —
+            orphaned pages get crawled late and ranked poorly. Grow
+            this into a small footer nav as the /for/* series lands. */}
+        <p className="m-0 mb-2">
+          <Link
+            href="/for/farmers-market-vendors"
+            className="text-bark no-underline mx-2 hover:text-forest"
+          >
+            For farmers market vendors
+          </Link>
+          <span className="text-sand">{"\u{00B7}"}</span>
+          <Link
+            href="/compare/craftybase"
+            className="text-bark no-underline mx-2 hover:text-forest"
+          >
+            Dreamward vs Craftybase
+          </Link>
         </p>
         <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
           Privacy
@@ -460,9 +481,9 @@ function FeatureCard({
   return (
     <div className="bg-cream rounded-2xl border border-sand p-5 text-center">
       <div className="text-3xl mb-3">{icon}</div>
-      <h4 className="font-serif text-base font-semibold text-forest m-0 mb-2">
+      <h3 className="font-serif text-base font-semibold text-forest m-0 mb-2">
         {title}
-      </h4>
+      </h3>
       <p className="text-sm text-bark m-0 leading-relaxed">{body}</p>
     </div>
   );

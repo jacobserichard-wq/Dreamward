@@ -128,7 +128,7 @@ export default function ComparePage() {
                 feature="Tax-ready profit & loss for your accountant"
                 them="Costs extra (higher tier only)"
                 themBad
-                us="Included on every plan — even $10 Dream"
+                us="Included on every plan — even the $10 tier"
               />
               <ComparisonRow
                 feature="Attach receipts to expenses"
