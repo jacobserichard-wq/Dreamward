@@ -428,6 +428,13 @@ export default async function MarketingLandingPage() {
           >
             vs Craftybase
           </Link>
+          <span className="text-sand">{"\u{00B7}"}</span>
+          <Link
+            href="/compare/quickbooks"
+            className="text-bark no-underline mx-2 hover:text-forest"
+          >
+            vs QuickBooks
+          </Link>
         </p>
         <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
           Privacy

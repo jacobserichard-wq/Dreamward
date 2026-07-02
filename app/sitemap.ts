@@ -24,6 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/how-it-works", priority: 0.8, changeFrequency: "monthly" },
     { path: "/compare", priority: 0.8, changeFrequency: "monthly" },
     { path: "/compare/craftybase", priority: 0.8, changeFrequency: "monthly" },
+    { path: "/compare/quickbooks", priority: 0.8, changeFrequency: "monthly" },
     { path: "/compare/spreadsheets", priority: 0.7, changeFrequency: "monthly" },
     {
       path: "/for/farmers-market-vendors",
