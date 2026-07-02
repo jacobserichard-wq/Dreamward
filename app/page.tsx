@@ -412,14 +412,21 @@ export default async function MarketingLandingPage() {
             href="/for/farmers-market-vendors"
             className="text-bark no-underline mx-2 hover:text-forest"
           >
-            For farmers market vendors
+            Farmers market vendors
+          </Link>
+          <span className="text-sand">{"\u{00B7}"}</span>
+          <Link
+            href="/for/candle-makers"
+            className="text-bark no-underline mx-2 hover:text-forest"
+          >
+            Candle makers
           </Link>
           <span className="text-sand">{"\u{00B7}"}</span>
           <Link
             href="/compare/craftybase"
             className="text-bark no-underline mx-2 hover:text-forest"
           >
-            Dreamward vs Craftybase
+            vs Craftybase
           </Link>
         </p>
         <Link href="/privacy" className="text-bark no-underline mx-2 hover:text-forest">
