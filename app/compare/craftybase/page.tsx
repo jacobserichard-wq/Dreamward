@@ -19,6 +19,7 @@
 
 import Link from "next/link";
 import SignInButton from "../../components/SignInButton";
+import FaqSection from "../../components/FaqSection";
 
 export const metadata = {
   title:
@@ -216,6 +217,31 @@ export default function CraftybaseComparePage() {
           </Link>
         </div>
       </section>
+
+      <FaqSection
+        faqs={[
+          {
+            q: "Is Dreamward a good Craftybase (now Stocksmith) alternative?",
+            a: "Yes. Dreamward covers the recipe COGS and real-time inventory makers use Craftybase for, and adds in-person market P&L — booth fee, mileage, and market sales — that Craftybase doesn't model. It starts at $10/month, versus Craftybase Studio at $49 and Stocksmith at $99+.",
+          },
+          {
+            q: "How is Dreamward's costing different from Craftybase's?",
+            a: "Craftybase (Stocksmith) uses rolling weighted-average costing, which recalculates as your material prices change. Dreamward uses FIFO and locks each sale's cost the moment it sells — so a price change today never rewrites the profit on sales you already filed.",
+          },
+          {
+            q: "Is Dreamward cheaper than Craftybase?",
+            a: "Dreamward is $10/month with every feature included, and your tier is set by your revenue. Craftybase's smaller Studio tier is $49/month, and its main product (now Stocksmith) runs $99–$349/month with features gated to higher tiers (as of July 2026).",
+          },
+          {
+            q: "Can I move my catalog from Craftybase to Dreamward?",
+            a: "Yes. Paste or import your product catalog (insert-only, so it never overwrites), connect Etsy, Shopify, Square, or Wix to re-import past orders, and see real margins in minutes. Your data always exports back to CSV — no lock-in.",
+          },
+          {
+            q: "Does Dreamward handle selling at markets and online at the same time?",
+            a: "That's the core of it. Every market is its own P&L — booth fee plus auto-tracked mileage plus the day's sales — and your online channels roll into the same ledger, giving you one honest P&L and one Schedule C across booth and online.",
+          },
+        ]}
+      />
 
       {/* Bottom CTA */}
       <section className="bg-eucalyptus-soft/50 border-t border-sand py-12 sm:py-16">

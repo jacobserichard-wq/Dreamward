@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import SignInButton from "../../components/SignInButton";
+import FaqSection from "../../components/FaqSection";
 
 export const metadata = {
   title: "Dreamward vs QuickBooks — maker COGS QuickBooks Online can't do",
@@ -205,6 +206,31 @@ export default function QuickbooksComparePage() {
           </Link>
         </div>
       </section>
+
+      <FaqSection
+        faqs={[
+          {
+            q: "Is Dreamward a QuickBooks alternative for makers?",
+            a: "For the maker-specific parts, yes. QuickBooks Online is general accounting — it has no recipe or bill-of-materials costing, doesn't auto-deduct raw materials when a handmade product sells, and doesn't model in-person markets. Dreamward does all three, from $10/month.",
+          },
+          {
+            q: "Does Dreamward replace QuickBooks entirely?",
+            a: "For many makers, yes — Dreamward tracks income, expenses, COGS, and inventory and produces a Schedule-C P&L (plus Form 1125-A inventory value) for your CPA. If you already rely on QuickBooks for general bookkeeping, Dreamward can run alongside it as the maker-native COGS and margin layer.",
+          },
+          {
+            q: "Can Dreamward do recipe costing that QuickBooks can't?",
+            a: "Yes. QuickBooks Online has no native bill-of-materials or assembly feature, so makers track materials by hand or bolt on a separate manufacturing tool. Dreamward builds every product from a recipe of its materials, so each sale already knows what it cost to make.",
+          },
+          {
+            q: "Is Dreamward cheaper than QuickBooks Online?",
+            a: "QuickBooks Online only adds inventory at its Plus tier ($115/month, up to $275 for Advanced, as of July 2026) — and still has no maker recipes. Dreamward includes recipe COGS, inventory, and tax-ready reports on every plan, from $10/month.",
+          },
+          {
+            q: "Do I still need an accountant?",
+            a: "Dreamward hands your accountant a clean, tax-ready Schedule-C P&L with COGS and inventory already figured, which usually means less billable time. It doesn't file your taxes or replace professional advice — it removes the year-end scramble.",
+          },
+        ]}
+      />
 
       {/* Bottom CTA */}
       <section className="bg-eucalyptus-soft/50 border-t border-sand py-12 sm:py-16">

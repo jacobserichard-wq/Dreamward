@@ -26,6 +26,7 @@ import { authOptions } from "@/lib/auth";
 import SignInButton from "./components/SignInButton";
 import PriceSlider from "./components/PriceSlider";
 import HowItWorks from "./components/HowItWorks";
+import FaqSection from "./components/FaqSection";
 import { TESTIMONIALS } from "@/lib/testimonials";
 import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 
@@ -398,6 +399,31 @@ export default async function MarketingLandingPage() {
           </p>
         </div>
       </section>
+
+      <FaqSection
+        faqs={[
+          {
+            q: "Do I still need an accountant?",
+            a: "Dreamward gives your accountant a tax-ready Schedule-C P&L with COGS and inventory already figured, which usually means less billable time at year end. It doesn't file your taxes or replace professional advice — it ends the shoebox-of-receipts scramble.",
+          },
+          {
+            q: "What if I sell cash at markets, not just online?",
+            a: "Dreamward is built for exactly that. Log a market as its own event — booth fee, mileage, and the day's cash-and-card sales — and it lands in the same P&L as your online channels.",
+          },
+          {
+            q: "Which sales channels does Dreamward sync?",
+            a: "Real-time sync from Shopify, Wix, and Square, plus daily Etsy sync — line items flow into per-product margin automatically. Anything else (Venmo, cash, market days) imports via CSV/XLSX or quick manual entry.",
+          },
+          {
+            q: "How is pricing set?",
+            a: "By your business size, not by features. Every plan includes every feature, from $10/month; your tier is set by your tracked revenue and adjusts automatically as you grow — no upgrade-to-unlock walls.",
+          },
+          {
+            q: "What happens to my data if I leave?",
+            a: "It's yours. Export everything to CSV anytime — no lock-in.",
+          },
+        ]}
+      />
 
       {/* Footer */}
       <footer className="border-t border-sand py-6 text-center text-xs text-stone">
