@@ -147,22 +147,20 @@ export default async function MarketingLandingPage() {
             redesign: airy warm hero, Lora display headline. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
           <h2 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
-            The financial command center for makers who sell in person{" "}
-            <span className="text-eucalyptus-dark">AND</span> online.
+            Built for people.
+            <br />
+            Priced for people.
           </h2>
           <p className="text-lg sm:text-2xl font-semibold text-eucalyptus-dark m-0 mb-3 leading-snug">
-            Every market, every channel, every product — one place. Real
-            margins. Real decisions.
+            For makers who sell in person AND online. Real margin — every
+            market, every channel, every product.
           </p>
-          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-4 leading-relaxed">
+          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
             Markets, Etsy, Shopify, your Square reader — one honest P&amp;L.
             Dreamward tracks the real cost behind every sale and keeps last
             year&apos;s numbers from quietly changing when a cost changes
             today. Built for makers who outgrew spreadsheets but don&apos;t
             need a $500/month ERP.
-          </p>
-          <p className="text-sm font-medium text-stone m-0 mb-8">
-            Built for people. Priced for people.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <SignInButton label="Start free 14-day trial" />
