@@ -104,7 +104,7 @@ export default function CraftybaseComparePage() {
             <tbody className="divide-y divide-sand/60">
               <ComparisonRow
                 feature="Change a material cost — does last year's profit move?"
-                them="Averaging recalculates costs as prices change"
+                them="Rolling weighted-average recalculates costs as prices change"
                 us="No — FIFO locks each sale's cost the moment it sells"
               />
               <ComparisonRow
@@ -127,12 +127,18 @@ export default function CraftybaseComparePage() {
                 them="COGS + inventory tracking focus"
                 us="On your tax report automatically, every plan"
               />
+              <ComparisonRow
+                feature="Entry price (billed monthly)"
+                them="Craftybase Studio $49 · Stocksmith $99+"
+                us="$10 — every feature + all channels included"
+              />
             </tbody>
           </table>
         </div>
         <p className="text-center text-[11px] text-stone mt-3 max-w-2xl mx-auto">
-          Comparison reflects Craftybase&apos;s publicly documented approach as
-          of{" "}
+          Craftybase is now <strong>Stocksmith</strong> (same team, same
+          software; a smaller &ldquo;Craftybase Studio&rdquo; tier remains).
+          This reflects their publicly documented method &amp; pricing as of{" "}
           {new Date().toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
@@ -158,7 +164,7 @@ export default function CraftybaseComparePage() {
             <CompareSection
               num="1"
               title="Your filed numbers stay put"
-              theirCopy="Craftybase values inventory with a real-time averaging method — as your material costs change, it recalculates. That keeps a live average, but it means a cost you enter today can move the cost-of-goods behind sales you already reported."
+              theirCopy="Craftybase (now Stocksmith) uses the rolling weighted-average cost method — every material purchase recalculates the average cost per unit, and manufacturing draws on that current average. It's a valid, IRS-accepted method, but it means a cost you enter today can move the cost-of-goods behind sales you already reported."
               ourCopy="Dreamward uses FIFO and locks each sale's cost the moment it sells — drawing down your oldest stock at the price you actually paid. Change a cost today and it applies going forward; a number you already filed never moves."
               highlight
             />
