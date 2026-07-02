@@ -289,6 +289,15 @@ export default function ComparePage() {
               See Dreamward vs. Craftybase &rarr;
             </Link>
           </p>
+          <p className="text-sm text-bark mt-2 m-0">
+            Using QuickBooks?{" "}
+            <Link
+              href="/compare/quickbooks"
+              className="text-eucalyptus-dark underline hover:text-forest"
+            >
+              See Dreamward vs. QuickBooks &rarr;
+            </Link>
+          </p>
         </div>
       </section>
 
