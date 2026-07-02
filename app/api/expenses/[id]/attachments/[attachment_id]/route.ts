@@ -77,8 +77,9 @@ export async function DELETE(
     const del = await pool.query(
       `DELETE FROM expense_attachments
         WHERE id = $1
-          AND processed_item_id = $2`,
-      [attachmentId, expenseId]
+          AND processed_item_id = $2
+          AND client_id = $3`,
+      [attachmentId, expenseId, client.id]
     );
 
     if (del.rowCount === 0) {

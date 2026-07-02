@@ -99,9 +99,10 @@ export async function DELETE(
         await deleteAttachmentsForProcessedItems(db, client.id, [
           line.processed_item_id,
         ]);
-        await db.query(`DELETE FROM processed_items WHERE id = $1`, [
-          line.processed_item_id,
-        ]);
+        await db.query(
+          `DELETE FROM processed_items WHERE id = $1 AND client_id = $2`,
+          [line.processed_item_id, client.id]
+        );
         parentDeleted = true;
       } else {
         const saleValue =
@@ -109,9 +110,9 @@ export async function DELETE(
         const totalRes = await db.query<{ amount: string }>(
           `UPDATE processed_items
               SET amount = GREATEST(amount - $1, 0), updated_at = NOW()
-            WHERE id = $2
+            WHERE id = $2 AND client_id = $3
             RETURNING amount`,
-          [saleValue, line.processed_item_id]
+          [saleValue, line.processed_item_id, client.id]
         );
         total = Number(totalRes.rows[0].amount);
       }

@@ -153,7 +153,7 @@ export async function GET() {
                 ELSE e.round_trip_miles
               END AS total_miles
          FROM events e
-         LEFT JOIN processed_items pi ON pi.event_id = e.id
+         LEFT JOIN processed_items pi ON pi.event_id = e.id AND pi.client_id = $1
         WHERE e.client_id = $1
         GROUP BY e.id
         ORDER BY e.start_date DESC, e.id DESC`,
