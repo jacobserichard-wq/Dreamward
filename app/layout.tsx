@@ -34,6 +34,9 @@ export const metadata: Metadata = {
   },
   description:
     "Per-SKU COGS, per-channel margin, Schedule-C-ready P&L. Built for makers + small businesses that outgrew spreadsheets.",
+  // Large-image card on X/Twitter; the image itself comes from the
+  // app/opengraph-image + app/twitter-image file conventions.
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
