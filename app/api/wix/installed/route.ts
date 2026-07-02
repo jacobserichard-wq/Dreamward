@@ -1,71 +1,39 @@
 // app/api/wix/installed/route.ts
 //
-// Phase 10 email-matching binding (replaces the JWT-only-stub from
-// the previous architecture pivot). Wix webhook receiver for the
-// app-installed event. PUBLIC route — Wix POSTs machine-to-machine,
-// no NextAuth session.
+// Wix "app installed" webhook receiver. PUBLIC route — Wix POSTs
+// machine-to-machine, no NextAuth session. Verifies the RS256 JWT
+// against WIX_WEBHOOK_PUBLIC_KEY (lib/wix.verifyAppInstalledWebhook).
 //
 // ─────────────────────────────────────────────────────────────────
-// Why we're not redirect-binding anymore:
+// SECURITY (2026-07-02): this webhook NO LONGER auto-binds.
 // ─────────────────────────────────────────────────────────────────
-// The previous design assumed Wix would redirect the merchant's
-// browser back to /api/wix/installed/redirect with the instanceId
-// after install completed. Empirical install test on prod proved
-// Wix Studio Custom Apps don't expose a configurable post-install
-// redirect URL — Wix sends merchants to its own manage-apps page.
-// See session-notes/phase-10-wix-email-matching.md § 1.
+// The previous design fetched the Wix site's *business email* and
+// bound instance_id → the Dreamward client whose email matched. That
+// email is set by the installing merchant inside Wix and is NOT proven
+// — so a merchant could set it to a victim's Dreamward address and have
+// their Wix orders written into the victim's books (cross-tenant data
+// pollution). The JWT proves the request came from Wix; it does NOT
+// prove who owns the Dreamward account.
 //
-// This webhook is now the PRIMARY binding path:
-//   1. Wix POSTs the install event here with the new instance_id
-//   2. We mint a Client Credentials token for that instance
-//   3. Call Wix's site-properties API to retrieve the site's
-//      business email (our scope already grants this access —
-//      "Read site, business, and email details")
-//   4. Lookup clients table by email
-//   5. If exactly 1 match → INSERT wix_connections binding
-//      If 0 matches → log "unbound", merchant can re-attempt later
-//      If >1 matches → log "ambiguous", don't auto-bind
+// Binding now happens ONLY through the session-authenticated
+// /api/wix/bind path, where client_id comes from the signed-in session
+// (proven) and never from an email. This webhook simply verifies +
+// acknowledges the install so Wix stops retrying; the merchant connects
+// the site while signed in to Dreamward (Integrations → Wix → paste
+// instance ID).
 //
-// ─────────────────────────────────────────────────────────────────
-// JWT verification:
-// ─────────────────────────────────────────────────────────────────
-// Full RS256 signature verification against WIX_WEBHOOK_PUBLIC_KEY
-// (the public key Wix Dev Center exposes from the Webhooks page →
-// "Get Public Key" button — only visible after at least one webhook
-// is registered, which is why we initially shipped with a soft
-// iss-only check). lib/wix.verifyAppInstalledWebhook handles the
-// jose.jwtVerify call + issuer + audience checks + envelope shape
-// normalization.
+// FUTURE UX (tracked in the launch checklist): when Wix goes to App
+// Market, record verified installs in a pending-hint table keyed by the
+// claimed email as a HINT ONLY, and let the matching signed-in user
+// CONFIRM the connection — client_id still coming from the session, the
+// email never authorizing anything on its own.
 //
-// Always returns 200 on a well-formed verified request — Wix
-// re-delivers failed webhooks aggressively, and we don't want retry
-// storms over events we intentionally don't act on. Returns 401 on
-// signature failure / wrong iss / wrong aud / expired JWT. Returns
-// 400 on malformed input.
-//
-// NOT in proxy.ts matcher — must remain public for Wix to reach.
+// Always 200 on a well-formed verified request (Wix retries failures
+// aggressively). 401 on signature / iss / aud / exp failure. 400 on
+// malformed input. NOT in proxy.ts matcher — must remain public.
 
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { mintAccessToken, verifyAppInstalledWebhook, wixGet } from "@/lib/wix";
-
-// Wix's site-properties API response shape — only the fields we
-// need. Wix returns more; we ignore the rest. Multiple email-bearing
-// fields exist (top-level + nested) — we try them in order.
-interface WixSiteProperties {
-  email?: string | null;
-  contact?: { email?: string | null } | null;
-  businessContactData?: { email?: string | null } | null;
-  // Display name as fallback if not yet stored — convenient to
-  // hydrate at bind time so the connection card doesn't have to
-  // do a separate API call.
-  businessName?: string | null;
-}
-
-interface ClientLookupRow {
-  id: number;
-  email: string;
-}
+import { verifyAppInstalledWebhook } from "@/lib/wix";
 
 export async function POST(req: NextRequest) {
   // ── 1. Read body + extract JWT ──────────────────────────────
@@ -78,7 +46,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // JWT shape sanity check: 3 base64url segments separated by "."
+    // JWT shape: 3 base64url segments separated by "."
     if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw.trim())) {
       jwt = raw.trim();
     } else {
@@ -109,169 +77,30 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2. Verify JWT signature (RS256 vs WIX_WEBHOOK_PUBLIC_KEY) ─
-  // verifyAppInstalledWebhook returns null on any failure:
-  // bad signature, expired, wrong issuer (must be wix.com), wrong
-  // audience (must be our app id). Returns the verified envelope
-  // (with data parsed in place) on success.
   const payload = await verifyAppInstalledWebhook({ jwt });
   if (!payload) {
-    console.warn("Wix webhook: JWT verification failed (signature/iss/aud/exp)");
+    console.warn(
+      "Wix webhook: JWT verification failed (signature/iss/aud/exp)"
+    );
     return NextResponse.json(
       { error: "Webhook signature verification failed" },
       { status: 401 }
     );
   }
 
-  // ── 3. Extract instanceId from envelope ─────────────────────
-  // Wix wraps event payloads as { eventType, instanceId, data, identity }
-  // at the top level of the JWT-decoded claims. instanceId here is the
-  // site-app instance, exactly what we want.
+  // ── 3. Acknowledge only — do NOT bind (see security note) ───
+  // Binding is session-authed via /api/wix/bind. We intentionally do no
+  // email lookup and touch no tenant data here, so an unverified,
+  // merchant-controlled email can never associate this install with a
+  // Dreamward account.
   const instanceId =
     typeof payload.instanceId === "string" ? payload.instanceId : null;
   const eventType =
     typeof payload.eventType === "string" ? payload.eventType : "(unknown)";
-
-  if (!instanceId) {
-    console.warn(
-      "Wix webhook: payload missing instanceId — keys:",
-      Object.keys(payload)
-    );
-    return NextResponse.json({ acknowledged: true, action: "ignored" });
-  }
-
-  // ── 4. Short-circuit if already bound ───────────────────────
-  // Webhooks can re-deliver (Wix retries failures, and we may
-  // intentionally receive multiple events for the same instance over
-  // its lifetime). If a row already exists, no work to do.
-  try {
-    const existing = await pool.query<{ id: number; client_id: number }>(
-      `SELECT id, client_id
-         FROM wix_connections
-        WHERE instance_id = $1`,
-      [instanceId]
-    );
-    if (existing.rows.length > 0) {
-      console.log(
-        `Wix webhook: event=${eventType} instance=${instanceId} ` +
-          `already bound to client_id=${existing.rows[0].client_id} — no action`
-      );
-      return NextResponse.json({ acknowledged: true, action: "already_bound" });
-    }
-  } catch (err) {
-    console.error("Wix webhook: existence check failed:", err);
-    return NextResponse.json({ acknowledged: true, dbError: true });
-  }
-
-  // ── 5. Mint Client Credentials token + fetch site properties ─
-  let siteEmail: string | null = null;
-  let siteName: string | null = null;
-  try {
-    const { accessToken } = await mintAccessToken({ instanceId });
-    const props = await wixGet<WixSiteProperties>({
-      accessToken,
-      path: "/site-properties/v4/properties",
-    });
-    // Try multiple field paths — Wix's SDK typings show both top-level
-    // and nested email locations; the actual REST response shape isn't
-    // fully documented externally, so be defensive.
-    siteEmail =
-      props.email ||
-      props.contact?.email ||
-      props.businessContactData?.email ||
-      null;
-    siteName = props.businessName ?? null;
-  } catch (err) {
-    console.error(
-      `Wix webhook: failed to fetch site-properties for ` +
-        `instance=${instanceId}:`,
-      err
-    );
-    return NextResponse.json({
-      acknowledged: true,
-      action: "fetch_failed",
-    });
-  }
-
-  if (!siteEmail) {
-    console.warn(
-      `Wix webhook: site-properties for instance=${instanceId} ` +
-        `returned no email — can't auto-bind. Merchant can manually ` +
-        `link via fallback UI (TODO).`
-    );
-    return NextResponse.json({ acknowledged: true, action: "no_email" });
-  }
-
-  // ── 6. Match against clients table ──────────────────────────
-  const normalized = siteEmail.trim().toLowerCase();
-  let matches: ClientLookupRow[];
-  try {
-    const res = await pool.query<ClientLookupRow>(
-      `SELECT id, email
-         FROM clients
-        WHERE LOWER(email) = $1`,
-      [normalized]
-    );
-    matches = res.rows;
-  } catch (err) {
-    console.error("Wix webhook: client lookup failed:", err);
-    return NextResponse.json({ acknowledged: true, dbError: true });
-  }
-
-  if (matches.length === 0) {
-    // No Dreamward account with this email yet. The merchant may sign
-    // up later — at that point we'd need a "look for pending unbound
-    // installs for my email" job (not built yet). For now, log + 200.
-    console.warn(
-      `Wix webhook: unbound install for instance=${instanceId} ` +
-        `email=${normalized} — no Dreamward account matches`
-    );
-    return NextResponse.json({ acknowledged: true, action: "unbound_no_match" });
-  }
-
-  if (matches.length > 1) {
-    // Shouldn't happen — UNIQUE(email) is enforced on clients — but
-    // be defensive. If it does happen, don't pick arbitrarily.
-    console.warn(
-      `Wix webhook: ambiguous match for instance=${instanceId} ` +
-        `email=${normalized} → ${matches.length} clients. Refusing to bind.`
-    );
-    return NextResponse.json({ acknowledged: true, action: "ambiguous" });
-  }
-
-  // ── 7. Bind ─────────────────────────────────────────────────
-  const clientId = matches[0].id;
-  try {
-    await pool.query(
-      `INSERT INTO wix_connections (
-         client_id,
-         instance_id,
-         site_display_name,
-         installed_at,
-         scopes
-       ) VALUES ($1, $2, $3, NOW(), $4)
-       ON CONFLICT (client_id) DO UPDATE
-         SET instance_id       = EXCLUDED.instance_id,
-             site_display_name = EXCLUDED.site_display_name,
-             installed_at      = NOW()`,
-      [clientId, instanceId, siteName, []]
-    );
-    console.log(
-      `Wix webhook: bound instance=${instanceId} → client_id=${clientId} ` +
-        `via email=${normalized}`
-    );
-    return NextResponse.json({ acknowledged: true, action: "bound", clientId });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // UNIQUE(instance_id) constraint can fire if a race created the
-    // row between our existence-check (step 4) and this insert.
-    if (msg.includes("wix_connections_instance_id_key") || msg.includes("instance_id")) {
-      console.warn(
-        `Wix webhook: race on instance=${instanceId} insert ` +
-          `(another binding committed first) — ignoring`
-      );
-      return NextResponse.json({ acknowledged: true, action: "race_lost" });
-    }
-    console.error("Wix webhook: bind INSERT failed:", err);
-    return NextResponse.json({ acknowledged: true, dbError: true });
-  }
+  console.log(
+    `Wix webhook: verified install event=${eventType} ` +
+      `instance=${instanceId ?? "(none)"} — acknowledged, NOT auto-bound ` +
+      `(binding is session-authenticated via /api/wix/bind)`
+  );
+  return NextResponse.json({ acknowledged: true, action: "logged_no_autobind" });
 }
