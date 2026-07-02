@@ -4,8 +4,14 @@
 // as default; the older `export { default } from "next-auth/middleware"`
 // pattern is not recognized by Next 16's Turbopack analyzer as a function.
 //
-// The matcher below is the authoritative list of protected routes. Anything
-// not listed is public.
+// ⚠️ THIS MATCHER IS NOT THE SECURITY BOUNDARY. It only controls which
+// requests run through NextAuth's withAuth (a redirect convenience for
+// pages). The REAL tenant gate is per-handler: every API route calls
+// getSessionClient() and 401s itself. A route missing from this matcher is
+// NOT automatically protected — so any new route that touches tenant data
+// MUST call getSessionClient() on its own. The list below is a curated set
+// of page/route prefixes that get the withAuth redirect; it is intentionally
+// incomplete for API routes (most enforce auth in-handler, not here).
 //
 // Public by intentional omission:
 //   /                  — marketing landing page (sub-session 24 flow redesign)

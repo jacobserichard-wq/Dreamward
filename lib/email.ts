@@ -15,7 +15,14 @@ const POSTAL_ADDRESS =
   "Dreamward — mailing address not configured";
 
 function unsubToken(clientId: number): string {
-  const secret = process.env.NEXTAUTH_SECRET ?? "dev-unsub-secret";
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    // No silent fallback: signing with a stub secret would let anyone forge
+    // an opt-out link for any client id. Fail loudly instead.
+    throw new Error(
+      "NEXTAUTH_SECRET is not set — cannot sign unsubscribe tokens"
+    );
+  }
   return createHmac("sha256", secret)
     .update(`unsub:${clientId}`)
     .digest("base64url");
