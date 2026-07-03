@@ -37,6 +37,25 @@ const pool = new Pool({
   connectionTimeoutMillis: 10_000,
 });
 
+// REQUIRED error handler — without it, a backend-terminated idle client
+// crashes the whole Node process (unhandled 'error' event) and Vercel
+// serves a 503. This happens routinely in production: the DB has a
+// server-side `idle_session_timeout = 5min` guard (set 2026-06-26 to
+// stop connection pile-ups), and Vercel SUSPENDS warm function
+// instances between invocations — JS timers freeze, so the pool's 10s
+// idle reaper can't run, the connection sits past 5min of wall-clock,
+// Postgres kills it ("terminating connection due to idle-session
+// timeout"), and the dead socket emits a pool-level error on resume.
+// Logging + swallowing is correct: the pool discards the dead client
+// and mints fresh connections for subsequent queries. Found 2026-07-02
+// when the report CSV/PDF downloads 503'd on suspended instances.
+pool.on("error", (err) => {
+  console.warn(
+    "pg pool: idle client error (expected after instance suspend + server idle_session_timeout):",
+    err.message
+  );
+});
+
 // --- Client Management ---
 
 export async function getOrCreateClient(email: string) {
