@@ -503,6 +503,23 @@ export function computeChannels(opts: ComputeChannelsOpts): ChannelAggregateResu
 
   // ── Aggregate processed_items ──────────────────────────────────
   for (const row of opts.txns) {
+    // Manual refunds ("Log a refund" → a positive-amount
+    // "Returns & Refunds" expense row) are CONTRA-REVENUE, not an
+    // expense: subtract from the tagged channel's revenue. This matches
+    // (a) platform-synced refunds, which arrive as negative income rows
+    // and net revenue in the income branch below, and (b) the refund
+    // modal's promise ("automatically subtracted from your revenue").
+    // Route by the income classifier — its "uploads" catch-all means an
+    // untagged refund still nets somewhere visible instead of vanishing.
+    if (row.category === "Returns & Refunds") {
+      const cid = classifyIncomeRow(row);
+      const ch = channelMap.get(cid);
+      if (ch) {
+        ch.revenue -= row.amount;
+        ch.hasData = true;
+      }
+      continue;
+    }
     if (row.kind === "income") {
       const cid = classifyIncomeRow(row);
       const ch = channelMap.get(cid);

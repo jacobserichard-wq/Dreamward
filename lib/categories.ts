@@ -83,6 +83,20 @@ export type Category = {
 
 export const UNIVERSAL_CATEGORIES: Category[] = [
   {
+    // Universal, not per-industry: the "Log a refund" modal writes this
+    // category for EVERY client, so every industry's classifier must
+    // recognize it. It previously lived only in the ecommerce overlay,
+    // which made refunds classify as "unknown" for everyone else — the
+    // channel rollup silently dropped them (net profit overstated) and
+    // the tax report shunted them into unknownAmount.
+    name: "Returns & Refunds",
+    description:
+      "Refunded sales, return shipping costs, restocking fees.",
+    type: "expense",
+    taxDeductible: true,
+    scheduleC: "27a",
+  },
+  {
     name: "Business Insurance",
     description:
       "General liability, professional liability, business owner's policy, equipment insurance, and other business-purpose insurance premiums.",
@@ -433,14 +447,8 @@ export const INDUSTRY_OVERLAY: Record<Industry, Category[]> = {
       taxDeductible: true,
       scheduleC: "8",
     },
-    {
-      name: "Returns & Refunds",
-      description:
-        "Refunded sales, return shipping costs, restocking fees.",
-      type: "expense",
-      taxDeductible: true,
-      scheduleC: "27a",
-    },
+    // "Returns & Refunds" moved to UNIVERSAL_CATEGORIES (2026-07-02) —
+    // the refund modal writes it for every industry, not just ecommerce.
     {
       name: "Marketplace Revenue",
       description: "Etsy + Amazon + eBay sales.",
