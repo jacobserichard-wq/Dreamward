@@ -1,8 +1,9 @@
 // app/skus/bulk-import/page.tsx
 //
 // Phase 12e commit 2 of 2. The catalog bulk-import surface.
-// Four tabs (Square / Shopify / Wix / Etsy) → pull the connected
-// platform's catalog → edit codes/costs in preview → import.
+// Tabs (Square / Shopify / Wix; Etsy gated by FEATURES.ETSY_ENABLED —
+// banned app 2026-07-03) → pull the connected platform's catalog →
+// edit codes/costs in preview → import.
 //
 // Anti-Crafty: Crafty Base requires per-row data entry through
 // multiple tabs/screens. We let the merchant populate their
@@ -18,8 +19,15 @@ import PageHeader from "../../components/PageHeader";
 import AppHeader from "../../components/AppHeader";
 import ErrorBanner from "../../components/ErrorBanner";
 import Spinner from "../../components/Spinner";
+import { FEATURES } from "@/lib/features";
 
 type Platform = "square" | "shopify" | "wix" | "etsy";
+
+// Etsy tab hidden while FEATURES.ETSY_ENABLED is false (banned app,
+// 2026-07-03). Default tab is "square", so nothing here depends on Etsy.
+const PLATFORM_TABS: readonly Platform[] = FEATURES.ETSY_ENABLED
+  ? (["square", "shopify", "wix", "etsy"] as const)
+  : (["square", "shopify", "wix"] as const);
 
 interface CatalogRow {
   externalId: string;
@@ -288,7 +296,7 @@ export default function BulkImportPage() {
           backHref="/skus"
           backLabel="SKUs"
           title="Bulk import from a connected store"
-          subtitle="Pull every product from Square, Shopify, Wix, or Etsy in one click — edit codes and costs in the preview, then commit. Already-mapped items skip cleanly."
+          subtitle="Pull every product from Square, Shopify, or Wix in one click — edit codes and costs in the preview, then commit. Already-mapped items skip cleanly."
         />
 
         {error && (
@@ -297,7 +305,7 @@ export default function BulkImportPage() {
 
         {/* Platform tabs */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          {(["square", "shopify", "wix", "etsy"] as const).map((p) => {
+          {PLATFORM_TABS.map((p) => {
             const m = platformMeta(p);
             return (
               <button

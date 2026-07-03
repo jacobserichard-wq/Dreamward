@@ -3,9 +3,11 @@
 // Phase 8b commit 3 of 3 (commit 9 of Phase 8 overall).
 //
 // /integrations — the user-facing hub for connecting external
-// platforms. Live: Shopify, Wix, Square, Etsy. Placeholder cards
-// for upcoming platforms (WooCommerce, Stripe Connect) signal the
-// roadmap.
+// platforms. Live: Shopify, Wix, Square. Placeholder cards for
+// upcoming platforms (Etsy, WooCommerce, Stripe Connect) signal the
+// roadmap. Etsy is gated by FEATURES.ETSY_ENABLED (banned app,
+// 2026-07-03) — false renders it as "Coming soon" instead of a live
+// connect card; flip the flag to restore the live card.
 //
 // Pro-gated (matches every other /api/shopify/* + /api/wix/* route
 // + the /reports page pattern). Non-Pro users see an amber upgrade
@@ -33,6 +35,7 @@ import ErrorBanner from "../components/ErrorBanner";
 import SectionTip from "../components/SectionTip";
 import EtsyConnectionCard from "../components/EtsyConnectionCard";
 import PlaidConnectionCard from "../components/PlaidConnectionCard";
+import { FEATURES } from "@/lib/features";
 import ShopifyConnectionCard from "../components/ShopifyConnectionCard";
 import SquareConnectionCard from "../components/SquareConnectionCard";
 import StripeConnectionCard from "../components/StripeConnectionCard";
@@ -230,9 +233,9 @@ function IntegrationsPageInner() {
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
               Subscribe (plans start at $10/mo) to connect Shopify,
-              Wix, Square, or Etsy and pull orders + revenue
-              automatically into Dreamward. Coming soon: WooCommerce,
-              Stripe Connect.
+              Wix, or Square and pull orders + revenue automatically
+              into Dreamward. Coming soon: Etsy, WooCommerce, Stripe
+              Connect.
             </p>
             <Link
               href="/billing"
@@ -256,7 +259,7 @@ function IntegrationsPageInner() {
         />
 
         <SectionTip id="integrations" title="Connect a store to automate everything">
-          Connecting Shopify, Wix, Square, or Etsy pulls in your order
+          Connecting Shopify, Wix, or Square pulls in your order
           history and keeps it synced — no manual uploads. To build your{" "}
           <strong>SKUs</strong> catalog from it, use <strong>Bulk import</strong>{" "}
           — one click pulls every product from the platform (Square even brings
@@ -292,7 +295,9 @@ function IntegrationsPageInner() {
             <ShopifyConnectionCard />
             <WixConnectionCard />
             <SquareConnectionCard />
-            <EtsyConnectionCard />
+            {/* Etsy: gated by FEATURES.ETSY_ENABLED — banned app 2026-07-03.
+                When false it renders as a Coming-soon card below instead. */}
+            {FEATURES.ETSY_ENABLED && <EtsyConnectionCard />}
             <StripeConnectionCard />
           </div>
         </div>
@@ -305,6 +310,13 @@ function IntegrationsPageInner() {
             Coming soon
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {!FEATURES.ETSY_ENABLED && (
+              <ComingSoonCard
+                icon={"\u{1F3F7}\u{FE0F}"}
+                name="Etsy"
+                subtitle="Shop orders + per-listing line items"
+              />
+            )}
             <ComingSoonCard
               icon={"\u{1F6D2}"}
               name="WooCommerce"

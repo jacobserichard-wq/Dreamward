@@ -112,7 +112,7 @@ export default function CompareSpreadsheetsPage() {
                 feature="Online & market sales"
                 them="Export a CSV, paste it, reformat — every single time"
                 themBad
-                us="Shopify, Etsy, Square & Wix sync in automatically"
+                us="Shopify, Square & Wix sync in automatically"
               />
               <ComparisonRow
                 feature="Live stock counts"
@@ -174,7 +174,7 @@ export default function CompareSpreadsheetsPage() {
               num="3"
               title="It fills itself in"
               theirCopy="Sales don't enter themselves. You export a CSV from each store, paste it in, fix the columns, and hope you didn't double-paste — over and over, forever."
-              ourCopy="Connect Shopify, Etsy, Square, or Wix and sales flow in on their own — deducting materials and updating stock automatically. Cash and market-day sales? Tap them in on your phone at the booth."
+              ourCopy="Connect Shopify, Square, or Wix and sales flow in on their own — deducting materials and updating stock automatically. Etsy, cash, and market-day sales? Import a CSV or tap them in on your phone at the booth."
             />
             <CompareSection
               num="4"

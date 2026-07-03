@@ -161,7 +161,7 @@ export default function QuickbooksComparePage() {
               num="2"
               title="Built for booth AND online, not just the ledger"
               theirCopy="QuickBooks records income and expenses, but it doesn't model an in-person market — the booth fee, the drive there and back, the day's mixed cash-and-card sales — as its own profit-and-loss."
-              ourCopy="Dreamward treats every market as a first-class P&L: booth fee, auto-tracked mileage, and the day's sales together — right alongside your Etsy, Shopify, and Square channels in one ledger."
+              ourCopy="Dreamward treats every market as a first-class P&L: booth fee, auto-tracked mileage, and the day's sales together — right alongside your Shopify, Wix, and Square channels in one ledger."
             />
             <CompareSection
               num="3"

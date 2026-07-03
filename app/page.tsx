@@ -33,7 +33,7 @@ import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 export const metadata = {
   title: "Dreamward — one P&L for makers who sell at markets and online",
   description:
-    "The financial command center for makers who sell in person and online. Track real margin across every market, Shopify, Wix, Square, and Etsy in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
+    "The financial command center for makers who sell in person and online. Track real margin across every market, Shopify, Wix, and Square in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
   openGraph: {
     title: "Dreamward — Gross margin tracking that doesn't lie",
     description:
@@ -160,7 +160,7 @@ export default async function MarketingLandingPage() {
             market, every channel, every product.
           </p>
           <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
-            Markets, Etsy, Shopify, your Square reader — one honest P&amp;L.
+            Markets, Shopify, Wix, your Square reader — one honest P&amp;L.
             Dreamward tracks the real cost behind every sale and keeps last
             year&apos;s numbers from quietly changing when a cost changes
             today. Built for makers who outgrew spreadsheets but don&apos;t
@@ -177,7 +177,7 @@ export default async function MarketingLandingPage() {
           </div>
           <p className="text-xs text-stone mt-4">No credit card required.</p>
           <p className="text-[11px] uppercase tracking-widest text-stone mt-6">
-            Syncs with Shopify {"\u{00B7}"} Etsy {"\u{00B7}"} Square {"\u{00B7}"} Wix
+            Syncs with Shopify {"\u{00B7}"} Square {"\u{00B7}"} Wix
           </p>
         </div>
       </header>
@@ -210,7 +210,7 @@ export default async function MarketingLandingPage() {
           <FeatureCard
             icon={"\u{1F6D2}"}
             title="Sync every revenue source"
-            body="Real-time webhook sync from Shopify, Wix, and Square, plus daily Etsy shop sync. Line items flow into per-product margin automatically. CSV/XLSX upload covers market days, Venmo/Zelle, and anything else without a connected source."
+            body="Real-time webhook sync from Shopify, Wix, and Square — line items flow into per-product margin automatically. CSV/XLSX upload covers Etsy, market days, Venmo/Zelle, and anything else without a connected source."
           />
           <FeatureCard
             icon={"\u{1F4CE}"}
@@ -253,7 +253,7 @@ export default async function MarketingLandingPage() {
           <ChannelCard
             icon={"\u{1F3F7}\u{FE0F}"}
             label="Etsy"
-            blurb="Shop orders + listing line items, synced daily"
+            blurb="Coming soon — for now, import orders via CSV"
           />
           <ChannelCard
             icon={"\u{1F697}"}
@@ -412,7 +412,7 @@ export default async function MarketingLandingPage() {
           },
           {
             q: "Which sales channels does Dreamward sync?",
-            a: "Real-time sync from Shopify, Wix, and Square, plus daily Etsy sync — line items flow into per-product margin automatically. Anything else (Venmo, cash, market days) imports via CSV/XLSX or quick manual entry.",
+            a: "Real-time sync from Shopify, Wix, and Square — line items flow into per-product margin automatically. Anything else (Etsy, Venmo, cash, market days) imports via CSV/XLSX or quick manual entry.",
           },
           {
             q: "How is pricing set?",

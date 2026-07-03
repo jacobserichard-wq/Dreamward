@@ -114,7 +114,7 @@ export default function GettingStartedGuide() {
           <p>
             Dreamward is gross-margin tracking and Schedule-C P&amp;L for small
             businesses that have outgrown spreadsheets. You connect the places
-            your money actually moves — Shopify, Wix, Square, Etsy, your event
+            your money actually moves — Shopify, Wix, Square, your event
             markets, your manual receipts — and Dreamward tells you what every
             sale was really worth after the cost of goods, and what your
             accountant needs at tax time.
@@ -146,10 +146,12 @@ export default function GettingStartedGuide() {
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <strong>Online seller</strong> (Shopify, Wix, Square Online, or
-              Etsy): start by connecting your store — your sales pull in
+              <strong>Online seller</strong> (Shopify, Wix, or Square Online):
+              start by connecting your store — your sales pull in
               automatically. Then import your products (one click) and set
-              their costs, and per-SKU margin appears.
+              their costs, and per-SKU margin appears. (Sell on{" "}
+              <strong>Etsy</strong>? Automatic sync is coming soon — for now,
+              export your Etsy orders and bring them in via CSV upload.)
             </li>
             <li>
               <strong>Market or event vendor</strong> (booth at the farmer&apos;s
@@ -177,36 +179,33 @@ export default function GettingStartedGuide() {
         <Section id="connect-revenue-source" title="3. Connect your first revenue source">
           <p>
             Open <Link href="/integrations" className="text-blue-600 no-underline hover:underline">Integrations</Link>{" "}
-            from the header nav. You&apos;ll see cards for Shopify, Wix,
-            Square, and Etsy. Click &ldquo;Connect&rdquo; on the one you use.
-            Each integration walks through an OAuth handoff — Dreamward
-            redirects you to the platform, you authorize, they redirect you
-            back.
+            from the header nav. You&apos;ll see cards for Shopify, Wix, and
+            Square. Click &ldquo;Connect&rdquo; on the one you use. Each
+            integration walks through an OAuth handoff — Dreamward redirects
+            you to the platform, you authorize, they redirect you back.
           </p>
           <p>
             Once connected, Dreamward does two things in the background:
           </p>
           <ol className="list-decimal pl-6 space-y-2">
             <li>
-              <strong>Backfills your order history.</strong> Etsy pulls your
-              full history; Shopify, Wix, and Square start with the last 90
-              days, extendable from the integration card. The backfill runs
-              server-side — close the tab if you want, it&apos;ll keep going.
+              <strong>Backfills your order history.</strong> Shopify, Wix, and
+              Square start with the last 90 days, extendable from the
+              integration card. The backfill runs server-side — close the tab
+              if you want, it&apos;ll keep going.
             </li>
             <li>
               <strong>Keeps it synced.</strong> Shopify, Wix, and Square send
               real-time webhooks — every new order, refund, or fulfillment
-              event hits Dreamward within seconds. Etsy doesn&apos;t offer
-              webhooks, so Etsy shops reconcile automatically once a day
-              instead. Either way, you don&apos;t click &ldquo;sync.&rdquo;
+              event hits Dreamward within seconds. You don&apos;t click
+              &ldquo;sync.&rdquo;
             </li>
           </ol>
           <Callout variant="info">
-            Each platform pulls slightly different data. Shopify, Wix, and
-            Etsy tag line items with a SKU code — so once you add those
-            products as SKUs (step 4), every future order matches to them
-            automatically. Square line items come through too, and Square&apos;s
-            catalog carries{" "}
+            Each platform pulls slightly different data. Shopify and Wix tag
+            line items with a SKU code — so once you add those products as SKUs
+            (step 4), every future order matches to them automatically. Square
+            line items come through too, and Square&apos;s catalog carries{" "}
             <code className="bg-slate-100 px-1.5 py-0.5 rounded text-sm">default_unit_cost</code>{" "}
             — so when you import your Square products in step 4, the costs you
             set in Square come with them.
@@ -237,7 +236,7 @@ export default function GettingStartedGuide() {
             <Link href="/skus/bulk-import" className="text-blue-600 no-underline hover:underline">
               Bulk import
             </Link>{" "}
-            (one click pulls every product from Square, Shopify, Wix, or Etsy —
+            (one click pulls every product from Square, Shopify, or Wix —
             Square even brings the costs you set in its Item Library). You can
             also paste from a spreadsheet, map products from the Unmatched
             queue as they sell, or add SKUs by hand.
@@ -291,7 +290,7 @@ export default function GettingStartedGuide() {
           <p>
             <strong>Tracking stock on hand.</strong> Every SKU tracks its unit
             count. Sales auto-decrement finished goods as they sync from
-            Shopify, Wix, Square, or Etsy. The SKU detail page shows a{" "}
+            Shopify, Wix, or Square. The SKU detail page shows a{" "}
             <strong>Cost layers</strong> panel — each open batch, oldest first,
             with how much is left and what it cost — plus a full history of
             every stock adjustment.
