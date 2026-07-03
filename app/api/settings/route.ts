@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionClient } from "@/lib/getClient";
 import pool from "@/lib/db";
-import { getCategoryNamesForIndustry, type Industry } from "@/lib/categories";
+import {
+  getCategoriesForIndustry,
+  getCategoryNamesForIndustry,
+  type Industry,
+} from "@/lib/categories";
 import { computeRoundTripMiles } from "@/lib/distance";
 
 export async function GET() {
@@ -28,6 +32,15 @@ export async function GET() {
 
     const industry = (client.industry ?? "other") as Industry;
     const industryDefaults = getCategoryNamesForIndustry(industry);
+    // Expense-only seeded names for the "+ New expense" category picker.
+    // industryDefaults mixes income + expense, and the dashboard's old
+    // client-side filter only knew about CUSTOM income names — so seeded
+    // income categories (Event Sales, Online Sales, …) leaked into the
+    // expense dropdown. Keep industryDefaults untouched for existing
+    // consumers; this is the typed subset.
+    const industryExpenseDefaults = getCategoriesForIndustry(industry)
+      .filter((c) => c.type === "expense")
+      .map((c) => c.name);
 
     const irsRateRaw = appSettingResult.rows[0]?.value;
     const parsedRate = irsRateRaw == null ? NaN : Number(irsRateRaw);
@@ -43,6 +56,7 @@ export async function GET() {
       industry: client.industry,
       businessName: client.business_name,
       industryDefaults,
+      industryExpenseDefaults,
       // Phase 4: home address lives on clients (not client_settings) since
       // it's a client attribute, not a per-feature preference. Returned
       // here so the Settings UI has a single GET to load all its fields.

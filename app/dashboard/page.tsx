@@ -349,6 +349,7 @@ function DashboardInner() {
     try {
       const sdata = await apiFetch<{
         industryDefaults?: string[];
+        industryExpenseDefaults?: string[];
         settings?: {
           custom_categories?: string[];
           preferences?: { custom_income_categories?: string[] };
@@ -357,7 +358,12 @@ function DashboardInner() {
       const incomeSet = new Set(
         sdata.settings?.preferences?.custom_income_categories ?? []
       );
-      const cats = (sdata.industryDefaults ?? [])
+      // Prefer the server's typed expense-only list — industryDefaults
+      // mixes in seeded INCOME categories (Event Sales, Online Sales, …),
+      // which used to leak into this expense picker; the incomeSet filter
+      // only ever knew about CUSTOM income names.
+      const seeded = sdata.industryExpenseDefaults ?? sdata.industryDefaults ?? [];
+      const cats = seeded
         .filter((name) => !incomeSet.has(name))
         .map((name) => ({ name }) as ExpenseFormCategory);
       for (const c of sdata.settings?.custom_categories ?? []) {
