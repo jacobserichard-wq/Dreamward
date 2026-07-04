@@ -22,6 +22,18 @@
 //   - orders/cancelled  → soft-cancel (status='cancelled', preserve row)
 //   - refunds/create    → INSERT a NEGATIVE row with source_ref_id='refund-{id}'
 //
+// GDPR compliance handlers (3) — MANDATORY for Shopify App Store
+// approval (added 2026-07-03 for the public-distribution submission):
+//   - customers/data_request → log the request for manual fulfilment
+//   - customers/redact       → anonymize customer PII on named orders
+//   - shop/redact            → drop the connection + anonymize the
+//                              shop's order PII (48h after uninstall)
+// These route BEFORE the connection lookup below: shop/redact arrives
+// after uninstall, when the shopify_connections row may already be
+// deleted, so they resolve the shop themselves and no-op cleanly when
+// there's nothing left to redact. All three are HMAC-verified like any
+// other webhook, so a forged redact can't wipe a live merchant's data.
+//
 // Idempotency:
 //   - orders/create + orders/updated use ON CONFLICT DO UPDATE so
 //     Shopify retrying the same event doesn't create duplicates
@@ -70,6 +82,51 @@ export async function POST(req: NextRequest) {
   if (!shopDomain || !topic) {
     console.warn("Shopify webhook missing shop-domain or topic header");
     return NextResponse.json({ error: "Missing headers" }, { status: 400 });
+  }
+
+  // ── 3b. GDPR compliance webhooks (mandatory for App Store) ────
+  // Handled here, BEFORE the connection lookup, because shop/redact
+  // fires 48h after uninstall (connection row may be gone) and must
+  // still succeed. Deliberate divergence from the "always 200" rule:
+  // a redact/erase failure returns 500 so Shopify RETRIES — silently
+  // 200-ing a failed data deletion would break our GDPR obligation.
+  if (
+    topic === "customers/data_request" ||
+    topic === "customers/redact" ||
+    topic === "shop/redact"
+  ) {
+    let gdpr: unknown;
+    try {
+      gdpr = JSON.parse(rawBody);
+    } catch (err) {
+      console.error("Shopify compliance webhook JSON parse failed:", err);
+      return NextResponse.json({ error: "Bad JSON" }, { status: 400 });
+    }
+    try {
+      switch (topic) {
+        case "customers/data_request":
+          await handleCustomerDataRequest(
+            shopDomain,
+            gdpr as CustomerDataRequestPayload
+          );
+          break;
+        case "customers/redact":
+          await handleCustomerRedact(shopDomain, gdpr as CustomerRedactPayload);
+          break;
+        case "shop/redact":
+          await handleShopRedact(shopDomain, gdpr as ShopRedactPayload);
+          break;
+      }
+      return NextResponse.json({ received: true, topic });
+    } catch (err) {
+      console.error(`Shopify compliance handler failed (topic=${topic}):`, err);
+      // 500 → Shopify retries (up to 48h). Correct for a data-deletion
+      // obligation: better a retry than a false "handled".
+      return NextResponse.json(
+        { error: "compliance handler failed" },
+        { status: 500 }
+      );
+    }
   }
 
   // ── 4. Map shop → Dreamward client ────────────────────────────
@@ -333,5 +390,157 @@ async function handleRefundCreate(clientId: number, refund: ShopifyRefund) {
       JSON.stringify(row.extracted_data),
       clientId,
     ]
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// GDPR compliance handlers (Shopify App Store mandatory)
+// ─────────────────────────────────────────────────────────────────
+//
+// What Dreamward stores about a Shopify customer: the customer NAME
+// on processed_items.vendor (a misnomer — for income rows it's the
+// buyer, see lib/shopify.mapOrderToProcessedItem) and the raw Shopify
+// `customer` object under extracted_data.customer (id/email/name).
+// Redaction strips both; it does NOT delete the financial rows, so
+// the merchant's own books + FIFO/COGS ledger stay intact.
+
+interface CustomerDataRequestPayload {
+  shop_domain?: string;
+  customer?: { id?: number; email?: string | null };
+  orders_requested?: number[];
+  data_request?: { id?: number };
+}
+
+interface CustomerRedactPayload {
+  shop_domain?: string;
+  customer?: { id?: number; email?: string | null };
+  orders_to_redact?: number[];
+}
+
+interface ShopRedactPayload {
+  shop_id?: number;
+  shop_domain?: string;
+}
+
+// Resolve a shop domain → Dreamward client_id, or null if no active
+// connection exists (shop_domain is UNIQUE, so at most one row).
+async function resolveClientForShop(
+  shopDomain: string
+): Promise<number | null> {
+  const res = await pool.query<{ client_id: number }>(
+    `SELECT client_id FROM shopify_connections WHERE shop_domain = $1`,
+    [shopDomain]
+  );
+  return res.rows[0]?.client_id ?? null;
+}
+
+// The jsonb keys that can hold customer PII in extracted_data. Only
+// `customer` is set today (the raw Shopify customer object); the rest
+// are defensive so a future mapper change can't silently leak PII —
+// removing a non-existent key is a no-op.
+const PII_KEYS = [
+  "customer",
+  "customer_name",
+  "email",
+  "phone",
+  "billing_address",
+  "shipping_address",
+] as const;
+const STRIP_PII_SQL = PII_KEYS.map((k) => `- '${k}'`).join(" ");
+
+/**
+ * customers/data_request — a merchant asks what data we hold about a
+ * customer. Dreamward has no self-serve export, so we LOG the request
+ * with enough detail to fulfil it manually inside Shopify's 30-day
+ * window. Logging (not a silent 200) is the compliant minimum for an
+ * app that holds this little customer PII.
+ */
+async function handleCustomerDataRequest(
+  shopDomain: string,
+  payload: CustomerDataRequestPayload
+) {
+  const clientId = await resolveClientForShop(shopDomain);
+  console.warn(
+    "[GDPR customers/data_request] fulfil manually within 30 days:",
+    JSON.stringify({
+      shopDomain,
+      clientId,
+      customerId: payload.customer?.id ?? null,
+      customerEmail: payload.customer?.email ?? null,
+      ordersRequested: payload.orders_requested ?? [],
+      requestId: payload.data_request?.id ?? null,
+    })
+  );
+}
+
+/**
+ * customers/redact — erase a specific customer's PII. Anonymize the
+ * exact orders Shopify names (orders_to_redact), scoped to the shop's
+ * client: strip the name off `vendor` and drop the PII keys from
+ * extracted_data. Financial rows survive.
+ */
+async function handleCustomerRedact(
+  shopDomain: string,
+  payload: CustomerRedactPayload
+) {
+  const clientId = await resolveClientForShop(shopDomain);
+  const orderIds = (payload.orders_to_redact ?? []).map((id) => String(id));
+  if (clientId === null || orderIds.length === 0) return; // nothing to redact
+  const res = await pool.query(
+    `UPDATE processed_items
+        SET vendor = 'Redacted (GDPR)',
+            extracted_data = COALESCE(extracted_data, '{}'::jsonb) ${STRIP_PII_SQL},
+            updated_at = NOW()
+      WHERE client_id = $1
+        AND source = 'shopify'
+        AND source_ref_id = ANY($2::text[])`,
+    [clientId, orderIds]
+  );
+  console.warn(
+    `[GDPR customers/redact] anonymized ${res.rowCount ?? 0} order(s) for ${shopDomain}`
+  );
+}
+
+/**
+ * shop/redact — 48h after uninstall, erase the shop's data. Drop the
+ * connection (tokens + shop identity) and anonymize customer PII on
+ * ALL of that shop's imported orders in one transaction. Idempotent:
+ * a missing connection just means it's already gone.
+ */
+async function handleShopRedact(
+  shopDomain: string,
+  payload: ShopRedactPayload
+) {
+  void payload; // shop identity comes from the (HMAC-trusted) header
+  const clientId = await resolveClientForShop(shopDomain);
+  if (clientId === null) {
+    console.log(
+      `[GDPR shop/redact] no connection for ${shopDomain} — nothing to do`
+    );
+    return;
+  }
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query(
+      `UPDATE processed_items
+          SET vendor = 'Redacted (GDPR)',
+              extracted_data = COALESCE(extracted_data, '{}'::jsonb) ${STRIP_PII_SQL},
+              updated_at = NOW()
+        WHERE client_id = $1 AND source = 'shopify'`,
+      [clientId]
+    );
+    await db.query(`DELETE FROM shopify_connections WHERE client_id = $1`, [
+      clientId,
+    ]);
+    await db.query("COMMIT");
+  } catch (err) {
+    await db.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    db.release();
+  }
+  console.warn(
+    `[GDPR shop/redact] redacted shop ${shopDomain} (client ${clientId})`
   );
 }
