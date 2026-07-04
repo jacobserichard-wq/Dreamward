@@ -67,12 +67,16 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Trial-expiry emails are PAUSED pre-launch: every account is still a
-    // tester/internal, and a salesy "upgrade now" nag shouldn't go to them.
-    // The query now excludes is_test accounts (migration 0045), so the only
-    // thing left before flipping this to true at launch is the decision to
-    // enforce trial expiry at all — flag real test accounts is_test first.
-    const TRIAL_EXPIRY_EMAILS_ENABLED = false;
+    // Trial-expiry emails ENABLED at launch (2026-07-03). Safety rails that
+    // gate who actually receives one, all enforced in the query below:
+    //   - AND NOT c.is_test        — every internal/tester account is flagged
+    //     is_test (migration 0045), so they never get a nag. Verified blast
+    //     radius = 0 at flip time (all 5 then-existing accounts were is_test).
+    //   - email_opt_out = false    — honors one-click unsubscribe (CAN-SPAM).
+    //   - plan = 'trial'           — paid/cancelled accounts are excluded.
+    // Real (non-test) trials created after launch get a 3-day + 1-day nudge.
+    // Footer mailing address comes from BUSINESS_POSTAL_ADDRESS (set in prod).
+    const TRIAL_EXPIRY_EMAILS_ENABLED = true;
 
     let sent = 0;
     let failed = 0;
