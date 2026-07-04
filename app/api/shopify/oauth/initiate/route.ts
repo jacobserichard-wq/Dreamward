@@ -98,8 +98,16 @@ export async function POST(req: NextRequest) {
     const authorizeUrl = buildAuthorizeUrl({
       shopDomain,
       state,
+      // read_orders  → order + refund sync (webhooks + backfill)
+      // read_products → catalog pull for SKU bulk-import
+      //   (lib/shopify.fetchProducts hits /admin/api/.../products.json,
+      //   which 403s without this scope). Added 2026-07-03 during the
+      //   App Store scope review — safe now (0 installs, no re-consent
+      //   needed for existing merchants). Keep this list MINIMAL: every
+      //   extra scope is a line on the merchant's consent screen and a
+      //   question in App Store review.
       redirectUri: callbackUrl(),
-      scopes: ["read_orders"],
+      scopes: ["read_orders", "read_products"],
     });
 
     // ── Set the state cookie + return ───────────────────────────
