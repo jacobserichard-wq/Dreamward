@@ -184,7 +184,7 @@ export default function ComparePage() {
               num="4"
               title="Sales that actually deduct materials"
               theirCopy="On cheaper plans an online sale won't auto-deduct your materials, and in-person 'custom' sales land as generic line items — quietly throwing off your stock."
-              ourCopy="Shopify, Wix, and Square sales sync and deduct materials automatically on every plan. Map a one-off 'custom' item once and future ones resolve themselves."
+              ourCopy="Square sales sync and deduct materials automatically on every plan (Shopify & Wix sync coming soon; import them via CSV meanwhile). Map a one-off 'custom' item once and future ones resolve themselves."
             />
           </div>
         </div>
@@ -265,9 +265,9 @@ export default function ComparePage() {
             Try it on your own products
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
-            14-day free trial. Connect Shopify, Wix, or Square,
-            re-import your past orders, and see your real gross-margin
-            numbers in under 10 minutes.
+            14-day free trial. Connect Square (or import a CSV from any
+            store), re-import your past orders, and see your real
+            gross-margin numbers in under 10 minutes.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

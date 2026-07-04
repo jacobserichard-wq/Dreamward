@@ -234,7 +234,7 @@ export default function CraftybaseComparePage() {
           },
           {
             q: "Can I move my catalog from Craftybase to Dreamward?",
-            a: "Yes. Paste or import your product catalog (insert-only, so it never overwrites), connect Shopify, Square, or Wix to re-import past orders, and see real margins in minutes. Your data always exports back to CSV — no lock-in.",
+            a: "Yes. Paste or import your product catalog (insert-only, so it never overwrites), connect Square (or import a CSV from Shopify/Wix/anywhere) to bring in past orders, and see real margins in minutes. Your data always exports back to CSV — no lock-in.",
           },
           {
             q: "Does Dreamward handle selling at markets and online at the same time?",
@@ -250,9 +250,9 @@ export default function CraftybaseComparePage() {
             Try it on your own products
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
-            14-day free trial. Connect Shopify, Wix, or Square, add a
-            market or two, and see your real gross-margin numbers in under 10
-            minutes.
+            14-day free trial. Connect Square (or import a CSV from any
+            store), add a market or two, and see your real gross-margin
+            numbers in under 10 minutes.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

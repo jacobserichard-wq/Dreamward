@@ -25,7 +25,7 @@ const STAGES: Stage[] = [
     accent: "border-l-eucalyptus",
     cols: "sm:grid-cols-2 lg:grid-cols-3",
     items: [
-      ["Online stores", "Shopify, Square & Wix orders sync in automatically."],
+      ["Online stores", "Square orders sync in automatically; Shopify, Wix & Etsy via CSV (live sync soon)."],
       ["Markets", "Make an event, then tap each booth sale on your phone."],
       ["Direct sales", "Cash, Venmo, word-of-mouth — use “+ Add a sale.”"],
       ["Wholesale", "Send invoices and track who still owes you."],

@@ -3,11 +3,14 @@
 // Phase 8b commit 3 of 3 (commit 9 of Phase 8 overall).
 //
 // /integrations — the user-facing hub for connecting external
-// platforms. Live: Shopify, Wix, Square. Placeholder cards for
-// upcoming platforms (Etsy, WooCommerce, Stripe Connect) signal the
-// roadmap. Etsy is gated by FEATURES.ETSY_ENABLED (banned app,
-// 2026-07-03) — false renders it as "Coming soon" instead of a live
-// connect card; flip the flag to restore the live card.
+// platforms. Live self-serve: Square (+ bank feed via Plaid, + Stripe).
+// Shopify, Wix, and Etsy are each gated by a FEATURES.*_ENABLED flag
+// (all false as of 2026-07-03): Etsy's app was banned, Shopify never
+// chose distribution, Wix isn't App-Market-published — none are
+// strangers-connectable yet. A false flag renders that platform as a
+// "Coming soon" card instead of a live connect card + hides its
+// bulk-import tab; flip the flag once the platform is approved. Also
+// placeholder-only: WooCommerce, Stripe Connect.
 //
 // Pro-gated (matches every other /api/shopify/* + /api/wix/* route
 // + the /reports page pattern). Non-Pro users see an amber upgrade
@@ -232,10 +235,10 @@ function IntegrationsPageInner() {
               {"\u{1F512}"} Active subscription required
             </p>
             <p className="text-sm text-amber-800 m-0 mb-5 leading-relaxed max-w-md mx-auto">
-              Subscribe (plans start at $10/mo) to connect Shopify,
-              Wix, or Square and pull orders + revenue automatically
-              into Dreamward. Coming soon: Etsy, WooCommerce, Stripe
-              Connect.
+              Subscribe (plans start at $10/mo) to connect Square and
+              pull orders + revenue automatically into Dreamward — or
+              import anything via CSV. Coming soon: Shopify, Wix, Etsy,
+              WooCommerce, Stripe Connect.
             </p>
             <Link
               href="/billing"
@@ -259,8 +262,9 @@ function IntegrationsPageInner() {
         />
 
         <SectionTip id="integrations" title="Connect a store to automate everything">
-          Connecting Shopify, Wix, or Square pulls in your order
-          history and keeps it synced — no manual uploads. To build your{" "}
+          Connecting Square pulls in your order history and keeps it
+          synced — no manual uploads (Shopify, Wix &amp; Etsy are on the
+          way). To build your{" "}
           <strong>SKUs</strong> catalog from it, use <strong>Bulk import</strong>{" "}
           — one click pulls every product from the platform (Square even brings
           the costs from its Item Library) — or map items from the Unmatched
@@ -292,11 +296,13 @@ function IntegrationsPageInner() {
           </h2>
           <div className="space-y-3">
             <PlaidConnectionCard />
-            <ShopifyConnectionCard />
-            <WixConnectionCard />
+            {/* Shopify / Wix / Etsy: each gated by its FEATURES.*_ENABLED
+                flag (all false 2026-07-03 — see lib/features.ts). While
+                false the live connect card is hidden and the platform
+                shows as a Coming-soon card below instead. */}
+            {FEATURES.SHOPIFY_ENABLED && <ShopifyConnectionCard />}
+            {FEATURES.WIX_ENABLED && <WixConnectionCard />}
             <SquareConnectionCard />
-            {/* Etsy: gated by FEATURES.ETSY_ENABLED — banned app 2026-07-03.
-                When false it renders as a Coming-soon card below instead. */}
             {FEATURES.ETSY_ENABLED && <EtsyConnectionCard />}
             <StripeConnectionCard />
           </div>
@@ -310,6 +316,20 @@ function IntegrationsPageInner() {
             Coming soon
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {!FEATURES.SHOPIFY_ENABLED && (
+              <ComingSoonCard
+                icon={"\u{1F6D2}"}
+                name="Shopify"
+                subtitle="Auto-pull orders + revenue from your store"
+              />
+            )}
+            {!FEATURES.WIX_ENABLED && (
+              <ComingSoonCard
+                icon={"\u{1F310}"}
+                name="Wix"
+                subtitle="Sync orders from your Wix store"
+              />
+            )}
             {!FEATURES.ETSY_ENABLED && (
               <ComingSoonCard
                 icon={"\u{1F3F7}\u{FE0F}"}

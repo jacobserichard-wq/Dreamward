@@ -76,12 +76,16 @@ export interface ChannelMeta {
  *  this is the row order on the dashboard. */
 export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
   {
+    // comingSoon derives from FEATURES.SHOPIFY_ENABLED (false 2026-07-03
+    // — app not App-Store-published). While off, the channel greys out
+    // with no "Connect" CTA rather than linking to /integrations where
+    // Shopify can't be connected. Flip the flag → channel goes live.
     id: "shopify",
     label: "Shopify",
     icon: "\u{1F6D2}",
-    comingSoon: false,
-    emptyAddHref: "/integrations",
-    emptyAddLabel: "Connect Shopify",
+    comingSoon: !FEATURES.SHOPIFY_ENABLED,
+    emptyAddHref: FEATURES.SHOPIFY_ENABLED ? "/integrations" : null,
+    emptyAddLabel: FEATURES.SHOPIFY_ENABLED ? "Connect Shopify" : null,
     proGated: true,
     drillHref: "/integrations",
   },
@@ -163,14 +167,15 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     description: "Catch-all for transactions that don't fit any other channel. Mostly CSV-uploaded rows without an obvious tag — review periodically to re-tag.",
   },
   {
-    // Live as of the Etsy integration (June 2026) — the #1
-    // competitive gap closed. Was comingSoon since Phase 9.1.
+    // Went live June 2026, then back to coming-soon 2026-07-03 when the
+    // Etsy app was banned (FEATURES.ETSY_ENABLED false). Derives from the
+    // flag so re-enablement (reinstated/new app) flips it live again.
     id: "etsy",
     label: "Etsy",
     icon: "\u{1F3F7}\u{FE0F}",
-    comingSoon: false,
-    emptyAddHref: "/integrations",
-    emptyAddLabel: "Connect Etsy",
+    comingSoon: !FEATURES.ETSY_ENABLED,
+    emptyAddHref: FEATURES.ETSY_ENABLED ? "/integrations" : null,
+    emptyAddLabel: FEATURES.ETSY_ENABLED ? "Connect Etsy" : null,
     proGated: true,
     drillHref: "/dashboard?tab=processed",
   },
@@ -185,12 +190,14 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     drillHref: "/dashboard?tab=processed",
   },
   {
+    // comingSoon derives from FEATURES.WIX_ENABLED (false 2026-07-03 —
+    // app not App-Market-published). Flip the flag → channel goes live.
     id: "wix",
     label: "Wix",
     icon: "\u{1F310}",
-    comingSoon: false,
-    emptyAddHref: "/integrations",
-    emptyAddLabel: "Connect Wix",
+    comingSoon: !FEATURES.WIX_ENABLED,
+    emptyAddHref: FEATURES.WIX_ENABLED ? "/integrations" : null,
+    emptyAddLabel: FEATURES.WIX_ENABLED ? "Connect Wix" : null,
     proGated: true,
     drillHref: "/dashboard?tab=processed",
   },

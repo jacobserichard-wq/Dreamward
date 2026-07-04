@@ -31,4 +31,23 @@ export const FEATURES = {
    *  point ETSY_API_KEY / ETSY_SHARED_SECRET (Vercel) at the live app.
    *  See session-notes/launch-checklist.md. */
   ETSY_ENABLED: false,
+
+  /** Shopify shop sync. false since 2026-07-03: the Shopify app exists
+   *  (Client ID cd26fb7a…) but distribution was NEVER chosen — no App
+   *  Store listing, 0 installs — so a stranger can't self-serve connect.
+   *  App Store approval (~1-3 weeks) is in progress; the GDPR compliance
+   *  webhooks + read_products scope it requires are already shipped
+   *  (commits 4611134, fd7ad22). While false, the /integrations connect
+   *  card + the bulk-import "Shopify" tab are hidden and Shopify shows
+   *  only as a "Coming soon" card. Backend routes + ShopifyConnectionCard
+   *  stay dormant. Flip to true once the App Store listing is approved. */
+  SHOPIFY_ENABLED: false,
+
+  /** Wix shop sync. false since 2026-07-03: the Wix app exists (App ID
+   *  96fcca2e…, still named "My New App-0") but is NOT published to the
+   *  Wix App Market, so it isn't self-serve installable. App Market
+   *  publishing (~weeks) is the path. Same gating shape as Shopify:
+   *  connect card + bulk-import tab hidden, Coming-soon card shown,
+   *  backend + WixConnectionCard dormant. Flip to true once published. */
+  WIX_ENABLED: false,
 } as const;

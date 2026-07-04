@@ -23,11 +23,17 @@ import { FEATURES } from "@/lib/features";
 
 type Platform = "square" | "shopify" | "wix" | "etsy";
 
-// Etsy tab hidden while FEATURES.ETSY_ENABLED is false (banned app,
-// 2026-07-03). Default tab is "square", so nothing here depends on Etsy.
-const PLATFORM_TABS: readonly Platform[] = FEATURES.ETSY_ENABLED
-  ? (["square", "shopify", "wix", "etsy"] as const)
-  : (["square", "shopify", "wix"] as const);
+// Only platforms with a live connect flow show an import tab. Square is
+// always live; Shopify / Wix / Etsy are each gated by their FEATURES
+// flag (all false 2026-07-03 — Shopify/Wix not published, Etsy banned;
+// see lib/features.ts). Default tab is "square", so hiding the others
+// never orphans the selection.
+const PLATFORM_TABS: readonly Platform[] = [
+  "square",
+  ...(FEATURES.SHOPIFY_ENABLED ? (["shopify"] as Platform[]) : []),
+  ...(FEATURES.WIX_ENABLED ? (["wix"] as Platform[]) : []),
+  ...(FEATURES.ETSY_ENABLED ? (["etsy"] as Platform[]) : []),
+];
 
 interface CatalogRow {
   externalId: string;

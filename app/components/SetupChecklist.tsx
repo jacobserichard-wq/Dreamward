@@ -190,7 +190,7 @@ export default function SetupChecklist(props: SetupChecklistProps) {
     //    without an online store can skip the store-connect step. ──
     {
       id: "connect_store",
-      label: "Connect your store (Shopify, Wix, or Square)",
+      label: "Connect Square (or import a CSV from any store)",
       done: props.storeConnected ?? false,
       action: { kind: "link", href: "/integrations" },
       buttonLabel: "Connect",

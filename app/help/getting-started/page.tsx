@@ -146,12 +146,12 @@ export default function GettingStartedGuide() {
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <strong>Online seller</strong> (Shopify, Wix, or Square Online):
-              start by connecting your store — your sales pull in
-              automatically. Then import your products (one click) and set
-              their costs, and per-SKU margin appears. (Sell on{" "}
-              <strong>Etsy</strong>? Automatic sync is coming soon — for now,
-              export your Etsy orders and bring them in via CSV upload.)
+              <strong>Online seller</strong> (Square or Square Online): start
+              by connecting Square — your sales pull in automatically. Then
+              import your products (one click) and set their costs, and
+              per-SKU margin appears. (On <strong>Shopify, Wix, or Etsy</strong>?
+              Automatic sync is coming soon — for now, export your orders and
+              bring them in via CSV upload.)
             </li>
             <li>
               <strong>Market or event vendor</strong> (booth at the farmer&apos;s
@@ -179,33 +179,33 @@ export default function GettingStartedGuide() {
         <Section id="connect-revenue-source" title="3. Connect your first revenue source">
           <p>
             Open <Link href="/integrations" className="text-blue-600 no-underline hover:underline">Integrations</Link>{" "}
-            from the header nav. You&apos;ll see cards for Shopify, Wix, and
-            Square. Click &ldquo;Connect&rdquo; on the one you use. Each
-            integration walks through an OAuth handoff — Dreamward redirects
-            you to the platform, you authorize, they redirect you back.
+            from the header nav. Click &ldquo;Connect&rdquo; on the{" "}
+            <strong>Square</strong> card (Shopify, Wix, and Etsy are marked
+            &ldquo;coming soon&rdquo; while their app-store approvals land).
+            It walks through an OAuth handoff — Dreamward redirects you to
+            Square, you authorize, it redirects you back.
           </p>
           <p>
             Once connected, Dreamward does two things in the background:
           </p>
           <ol className="list-decimal pl-6 space-y-2">
             <li>
-              <strong>Backfills your order history.</strong> Shopify, Wix, and
-              Square start with the last 90 days, extendable from the
-              integration card. The backfill runs server-side — close the tab
-              if you want, it&apos;ll keep going.
+              <strong>Backfills your order history.</strong> Square starts
+              with the last 90 days, extendable from the integration card.
+              The backfill runs server-side — close the tab if you want,
+              it&apos;ll keep going.
             </li>
             <li>
-              <strong>Keeps it synced.</strong> Shopify, Wix, and Square send
-              real-time webhooks — every new order, refund, or fulfillment
-              event hits Dreamward within seconds. You don&apos;t click
+              <strong>Keeps it synced.</strong> Square sends real-time
+              webhooks — every new order, refund, or fulfillment event hits
+              Dreamward within seconds. You don&apos;t click
               &ldquo;sync.&rdquo;
             </li>
           </ol>
           <Callout variant="info">
-            Each platform pulls slightly different data. Shopify and Wix tag
-            line items with a SKU code — so once you add those products as SKUs
-            (step 4), every future order matches to them automatically. Square
-            line items come through too, and Square&apos;s catalog carries{" "}
+            Square line items come through tagged with product info — so once
+            you add those products as SKUs (step 4), every future order matches
+            to them automatically. Square&apos;s catalog also carries{" "}
             <code className="bg-slate-100 px-1.5 py-0.5 rounded text-sm">default_unit_cost</code>{" "}
             — so when you import your Square products in step 4, the costs you
             set in Square come with them.

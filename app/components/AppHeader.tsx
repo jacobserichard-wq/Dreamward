@@ -276,7 +276,7 @@ export default function AppHeader({ plan: planProp }: AppHeaderProps) {
               <Link
                 href="/integrations"
                 className={MENU_ITEM}
-                title="Connect Shopify and other platforms"
+                title="Connect Square and other revenue sources"
               >
                 Integrations
               </Link>

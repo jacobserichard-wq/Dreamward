@@ -33,7 +33,7 @@ import { PLAN_FEATURE_GROUPS } from "@/lib/plans";
 export const metadata = {
   title: "Dreamward — one P&L for makers who sell at markets and online",
   description:
-    "The financial command center for makers who sell in person and online. Track real margin across every market, Shopify, Wix, and Square in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
+    "The financial command center for makers who sell in person and online. Track real margin across every market, your Square sales, and imported Shopify, Wix & Etsy orders in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
   openGraph: {
     title: "Dreamward — Gross margin tracking that doesn't lie",
     description:
@@ -160,7 +160,8 @@ export default async function MarketingLandingPage() {
             market, every channel, every product.
           </p>
           <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
-            Markets, Shopify, Wix, your Square reader — one honest P&amp;L.
+            Markets, your Square reader, and every sale in between — one
+            honest P&amp;L.
             Dreamward tracks the real cost behind every sale and keeps last
             year&apos;s numbers from quietly changing when a cost changes
             today. Built for makers who outgrew spreadsheets but don&apos;t
@@ -177,7 +178,8 @@ export default async function MarketingLandingPage() {
           </div>
           <p className="text-xs text-stone mt-4">No credit card required.</p>
           <p className="text-[11px] uppercase tracking-widest text-stone mt-6">
-            Syncs with Shopify {"\u{00B7}"} Square {"\u{00B7}"} Wix
+            Syncs with Square today {"\u{00B7}"} Shopify, Wix &amp; Etsy
+            coming soon
           </p>
         </div>
       </header>
@@ -189,9 +191,9 @@ export default async function MarketingLandingPage() {
 
       {/* Feature cards. Sub-session 32 rewrite: leads with the
           gross-margin + audit-trail combo (Phase 12). Card #2
-          surfaces Schedule-C P&L (Phase 13). Card #3 names every
-          live integration (no more "Coming soon: Square" — we
-          shipped Square + Wix). Card #4 is the receipt vault
+          surfaces Schedule-C P&L (Phase 13). Card #3 covers revenue
+          sync (Square live; Shopify/Wix/Etsy import via CSV until their
+          App Store/Market approvals land — 2026-07-03). Card #4 is the receipt vault
           (Phase 9.4). Gmail + CSV moved to the channels section
           below — they're ingestion methods, not headline
           differentiators. */}
@@ -210,7 +212,7 @@ export default async function MarketingLandingPage() {
           <FeatureCard
             icon={"\u{1F6D2}"}
             title="Sync every revenue source"
-            body="Real-time webhook sync from Shopify, Wix, and Square — line items flow into per-product margin automatically. CSV/XLSX upload covers Etsy, market days, Venmo/Zelle, and anything else without a connected source."
+            body="Real-time webhook sync from Square — line items flow into per-product margin automatically. CSV/XLSX upload covers Shopify, Wix, Etsy, market days, Venmo/Zelle, and everything else — with live Shopify, Wix & Etsy sync rolling out."
           />
           <FeatureCard
             icon={"\u{1F4CE}"}
@@ -236,29 +238,29 @@ export default async function MarketingLandingPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <ChannelCard
-            icon={"\u{1F6D2}"}
-            label="Shopify"
-            blurb="Real-time orders + per-SKU line items"
-          />
-          <ChannelCard
-            icon={"\u{1F310}"}
-            label="Wix"
-            blurb="eCommerce orders auto-pulled with COGS"
-          />
-          <ChannelCard
             icon={"\u{1F4B3}"}
             label="Square"
             blurb="POS + online payments with line-item COGS"
           />
           <ChannelCard
-            icon={"\u{1F3F7}\u{FE0F}"}
-            label="Etsy"
-            blurb="Coming soon — for now, import orders via CSV"
-          />
-          <ChannelCard
             icon={"\u{1F697}"}
             label="Events"
             blurb="Markets, fairs, pop-ups with auto-mileage"
+          />
+          <ChannelCard
+            icon={"\u{1F6D2}"}
+            label="Shopify"
+            blurb="Coming soon — for now, import orders via CSV"
+          />
+          <ChannelCard
+            icon={"\u{1F310}"}
+            label="Wix"
+            blurb="Coming soon — for now, import orders via CSV"
+          />
+          <ChannelCard
+            icon={"\u{1F3F7}\u{FE0F}"}
+            label="Etsy"
+            blurb="Coming soon — for now, import orders via CSV"
           />
         </div>
         <p className="text-center text-xs text-bark mt-6">
@@ -412,7 +414,7 @@ export default async function MarketingLandingPage() {
           },
           {
             q: "Which sales channels does Dreamward sync?",
-            a: "Real-time sync from Shopify, Wix, and Square — line items flow into per-product margin automatically. Anything else (Etsy, Venmo, cash, market days) imports via CSV/XLSX or quick manual entry.",
+            a: "Real-time sync from Square today — line items flow into per-product margin automatically. Shopify, Wix, and Etsy sync is rolling out; until then (and for Venmo, cash, or market days) you import via CSV/XLSX or quick manual entry, and it lands in the same P&L.",
           },
           {
             q: "How is pricing set?",
