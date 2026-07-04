@@ -26,7 +26,19 @@ function SignInContent() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-3 sm:p-6 font-sans">
       <div className="bg-white rounded-xl border border-slate-200 py-8 px-6 sm:py-11 sm:px-10 max-w-md w-full text-center">
         <div className="inline-flex items-center gap-2.5 mb-2">
-          <span className="text-3xl">{"⚡"}</span>
+          {/* Brand sprout mark — matches AppHeader + PWA icons. Replaced the
+              retired ⚡ lightning bolt (2026-07-03); this is the first screen
+              a new user sees, so it must be on-brand. */}
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            className="w-8 h-8 text-[#566b4e]"
+            aria-hidden="true"
+          >
+            <path d="M12 22V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M12 13c-3.3 0-6-2.7-6-6 3.3 0 6 2.7 6 6Z" fill="currentColor" />
+            <path d="M12 11c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z" fill="currentColor" />
+          </svg>
           <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
             Dreamward
           </span>

@@ -16,7 +16,19 @@ export default function PolicyDocument({ content }: PolicyDocumentProps) {
           {"←"} Back to Dreamward
         </a>
         <div className="inline-flex items-center gap-2.5 mb-6">
-          <span className="text-3xl">{"⚡"}</span>
+          {/* Brand sprout mark — same 3-path glyph as AppHeader. Replaced
+              the retired ⚡ lightning bolt (2026-07-03) so the legal pages
+              match the rest of the app + the PWA/apple-touch icons. */}
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            className="w-7 h-7 text-[#566b4e]"
+            aria-hidden="true"
+          >
+            <path d="M12 22V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M12 13c-3.3 0-6-2.7-6-6 3.3 0 6 2.7 6 6Z" fill="currentColor" />
+            <path d="M12 11c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z" fill="currentColor" />
+          </svg>
           <span className="text-[22px] font-extrabold text-slate-900 tracking-tight">
             Dreamward
           </span>
