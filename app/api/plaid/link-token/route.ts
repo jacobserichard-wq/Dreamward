@@ -26,8 +26,22 @@ export async function POST() {
     return NextResponse.json({ linkToken });
   } catch (error) {
     console.error("Plaid link-token error:", error);
+    // Surface Plaid's own error_code/type/message alongside the friendly
+    // message. These are developer-facing and carry NO secrets (they name
+    // things like INVALID_FIELD / a redirect_uri mismatch), so exposing
+    // them makes setup issues diagnosable without server-log access. The
+    // UI still shows only the friendly `error`.
+    const data = (error as { response?: { data?: unknown } }).response?.data;
+    const detail =
+      data && typeof data === "object"
+        ? {
+            code: (data as Record<string, unknown>).error_code,
+            type: (data as Record<string, unknown>).error_type,
+            message: (data as Record<string, unknown>).error_message,
+          }
+        : undefined;
     return NextResponse.json(
-      { error: "Couldn't start the bank connection." },
+      { error: "Couldn't start the bank connection.", plaidError: detail },
       { status: 500 }
     );
   }
