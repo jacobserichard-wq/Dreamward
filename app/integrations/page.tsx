@@ -295,7 +295,11 @@ function IntegrationsPageInner() {
             Available now
           </h2>
           <div className="space-y-3">
-            <PlaidConnectionCard />
+            {/* Plaid bank feed: gated by FEATURES.PLAID_ENABLED (false
+                2026-07-05 — production works but the account is in Plaid's
+                limited state; connecting real banks needs a 2-4 wk OAuth
+                institution review, so it's a dead-end until then). */}
+            {FEATURES.PLAID_ENABLED && <PlaidConnectionCard />}
             {/* Shopify / Wix / Etsy: each gated by its FEATURES.*_ENABLED
                 flag (all false 2026-07-03 — see lib/features.ts). While
                 false the live connect card is hidden and the platform
@@ -316,6 +320,13 @@ function IntegrationsPageInner() {
             Coming soon
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {!FEATURES.PLAID_ENABLED && (
+              <ComingSoonCard
+                icon={"\u{1F3E6}"}
+                name="Bank accounts"
+                subtitle="Auto-pull expenses from your bank via Plaid"
+              />
+            )}
             {!FEATURES.SHOPIFY_ENABLED && (
               <ComingSoonCard
                 icon={"\u{1F6D2}"}

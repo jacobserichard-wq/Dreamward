@@ -50,4 +50,19 @@ export const FEATURES = {
    *  connect card + bulk-import tab hidden, Coming-soon card shown,
    *  backend + WixConnectionCard dormant. Flip to true once published. */
   WIX_ENABLED: false,
+
+  /** Plaid bank feed. false since 2026-07-05. Production is configured
+   *  and working end-to-end (PLAID_ENV=production, OAuth web flow, real
+   *  banks list, link-token 200) — BUT the account is in Plaid's LIMITED
+   *  "test with real data" production state. Connecting the major banks
+   *  (Chase/BofA/Wells Fargo) requires completing Plaid's "Access OAuth
+   *  institutions" registration in the Compliance Center (app name, logo,
+   *  use-case) + a 2-4 WEEK per-institution review. Until that clears,
+   *  real connections hit an unpassable reCAPTCHA/fraud gate, so the
+   *  "Connect a bank" card is a dead-end. While false, the card is hidden
+   *  and a "Coming soon" bank card shows instead. All Plaid code + the
+   *  Vercel prod creds stay intact — flip to true the day Jacob's own
+   *  bank connects cleanly. Consider reverting PLAID_ENV to sandbox in
+   *  Vercel meanwhile so no accidental prod call is billable. */
+  PLAID_ENABLED: false,
 } as const;
