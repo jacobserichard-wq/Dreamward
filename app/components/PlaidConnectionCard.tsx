@@ -1,9 +1,18 @@
 // app/components/PlaidConnectionCard.tsx
 //
-// Plaid bank-feed (Phase 1). Connect bank accounts via Plaid Link.
-// Unlike the platform cards (Shopify/Square/etc.) this uses Plaid's
-// in-page Link modal (usePlaidLink) rather than an OAuth redirect, and
-// supports MULTIPLE connected banks (one row per institution login).
+// Plaid bank-feed (Phase 1). Connect bank accounts via Plaid Link
+// (usePlaidLink), supporting MULTIPLE connected banks (one row per
+// institution login).
+//
+// OAuth support (2026-07-05): production banks (Chase, BofA, Wells
+// Fargo, etc.) are OAuth institutions — selecting one redirects the
+// browser to the bank's login and back to PLAID_REDIRECT_URI (this
+// page) with ?oauth_state_id=…. We persist the link_token in
+// localStorage before opening Link so it survives that full-page
+// redirect, then on return re-initialize usePlaidLink with the stored
+// token + receivedRedirectUri to resume and finish. Without this, big
+// banks just stall ("nothing happens"). Non-OAuth banks (and all
+// sandbox test banks) complete in-modal with no redirect.
 //
 // Phase 1 scope = the connect flow only: list connected items + add /
 // disconnect. Transaction ingest (debits-only → Transactions) is
@@ -36,6 +45,15 @@ interface PlaidItem {
   environment: string;
 }
 
+// The active link_token is stashed here before opening Plaid Link so it
+// survives an OAuth full-page redirect to the bank and back. Same token
+// must be reused on return (Plaid requirement). Cleared on success/exit.
+const LINK_TOKEN_STORAGE_KEY = "plaid_link_token";
+// The chosen import range is stashed alongside it — the range picker
+// isn't re-rendered on the OAuth return, so without this the user's
+// choice would silently reset to all-history and over-import.
+const IMPORT_RANGE_STORAGE_KEY = "plaid_import_start";
+
 export default function PlaidConnectionCard() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<PlaidItem[]>([]);
@@ -43,6 +61,13 @@ export default function PlaidConnectionCard() {
   const [notConfigured, setNotConfigured] = useState(false);
 
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  // Set only when resuming an OAuth flow after the bank redirects back
+  // (URL carries ?oauth_state_id=…). Passed to usePlaidLink so Link
+  // reopens straight into the OAuth completion step instead of the
+  // institution picker. Stays undefined for the normal first open.
+  const [receivedRedirectUri, setReceivedRedirectUri] = useState<
+    string | undefined
+  >(undefined);
   const [connecting, setConnecting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState<PlaidItem | null>(
     null
@@ -82,6 +107,53 @@ export default function PlaidConnectionCard() {
     loadItems();
   }, [loadItems]);
 
+  // Clear the stashed token + strip ?oauth_state_id from the URL so a
+  // refresh doesn't try to re-resume a finished/aborted OAuth flow.
+  const cleanupOAuth = useCallback(() => {
+    try {
+      window.localStorage.removeItem(LINK_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(IMPORT_RANGE_STORAGE_KEY);
+    } catch {
+      // localStorage can throw in private-mode/quota edge cases — non-fatal.
+    }
+    if (window.location.search.includes("oauth_state_id")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // OAuth return: an OAuth bank redirected the browser back here with
+  // ?oauth_state_id=…. Resume Link with the SAME token we stashed before
+  // the redirect so it completes the handoff (Plaid requires token reuse).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("oauth_state_id")) return;
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(LINK_TOKEN_STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
+    if (stored) {
+      // Restore the import range chosen before the redirect ("" = all
+      // history; absent = null). The picker isn't shown on this return.
+      try {
+        const range = window.localStorage.getItem(IMPORT_RANGE_STORAGE_KEY);
+        importStartDateRef.current = range ? range : null;
+      } catch {
+        importStartDateRef.current = null;
+      }
+      setReceivedRedirectUri(window.location.href);
+      setConnecting(true);
+      setLinkToken(stored); // the auto-open effect launches Link when ready
+    } else {
+      // Token lost (different browser, cleared storage) — can't resume.
+      setError(
+        "That bank sign-in couldn't be resumed. Please click Connect a bank to try again."
+      );
+      cleanupOAuth();
+    }
+  }, [cleanupOAuth]);
+
   // Exchange the public token + persist the connection (the encrypted
   // access token lands server-side in plaid_items).
   const onSuccess = useCallback(
@@ -109,19 +181,24 @@ export default function PlaidConnectionCard() {
       } finally {
         setConnecting(false);
         setLinkToken(null);
+        cleanupOAuth();
       }
     },
-    [loadItems]
+    [loadItems, cleanupOAuth]
   );
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
+    // Present only on an OAuth return — tells Link to resume the in-flight
+    // handoff rather than restart at the institution picker.
+    receivedRedirectUri,
     onSuccess,
     onExit: () => {
       // User closed Link without finishing (or it errored). Reset so the
-      // button is clickable again.
+      // button is clickable again, and clear any OAuth resume state.
       setConnecting(false);
       setLinkToken(null);
+      cleanupOAuth();
     },
   });
 
@@ -148,6 +225,20 @@ export default function PlaidConnectionCard() {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const data = (await res.json()) as { linkToken: string };
+      // Stash the token BEFORE opening Link so it survives an OAuth
+      // full-page redirect to the bank and back (see cleanupOAuth /
+      // the oauth_state_id effect). Non-fatal if storage is unavailable —
+      // non-OAuth banks still complete in-modal without it.
+      try {
+        window.localStorage.setItem(LINK_TOKEN_STORAGE_KEY, data.linkToken);
+        // "" encodes all-history (null) distinctly from an absent key.
+        window.localStorage.setItem(
+          IMPORT_RANGE_STORAGE_KEY,
+          importStartDateRef.current ?? ""
+        );
+      } catch {
+        // ignore — private mode / quota
+      }
       setLinkToken(data.linkToken); // the effect opens Link when ready
     } catch (err) {
       setError(

@@ -73,14 +73,25 @@ export function getPlaidClient(): PlaidApi {
 }
 
 /** Create a short-lived Link token for the Plaid Link flow. We only
- *  request the Transactions product — the bank feed is the use case. */
+ *  request the Transactions product — the bank feed is the use case.
+ *
+ *  redirect_uri is REQUIRED for OAuth institutions (Chase, BofA, Wells
+ *  Fargo, most big banks): Link bounces the user to the bank's own login
+ *  and back to this URI. Set only when PLAID_REDIRECT_URI is configured
+ *  AND registered in the Plaid dashboard (Developers → API → Allowed
+ *  redirect URIs) — including an unregistered URI makes linkTokenCreate
+ *  fail. Omitting it (dev/sandbox) is fine: sandbox test banks use
+ *  in-modal username/password, no redirect. The client resumes the flow
+ *  via receivedRedirectUri (see PlaidConnectionCard). */
 export async function createLinkToken(clientId: number): Promise<string> {
+  const redirectUri = process.env.PLAID_REDIRECT_URI?.trim();
   const resp = await getPlaidClient().linkTokenCreate({
     user: { client_user_id: String(clientId) },
     client_name: "Dreamward",
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: "en",
+    ...(redirectUri ? { redirect_uri: redirectUri } : {}),
   });
   return resp.data.link_token;
 }
