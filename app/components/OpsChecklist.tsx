@@ -14,7 +14,7 @@
 
 import { useState, useEffect } from "react";
 
-type Cadence = "daily" | "weekly" | "monthly" | "yearly";
+type Cadence = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 interface Item {
   id: string;
   label: string;
@@ -106,7 +106,7 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
       {
         id: "w-deps",
         label: "Dependabot alerts",
-        how: "GitHub → Security",
+        how: "GitHub → Security · patch Critical/High ≤7d (security-policy §6)",
         auto: "GitHub Dependabot",
       },
     ],
@@ -150,6 +150,30 @@ const CHECKLIST: { group: string; cadence: Cadence; resets: string; items: Item[
           "DB size: SELECT pg_size_pretty(pg_database_size(current_database())); and SELECT count(*) FROM processed_items;.",
           "Churn: review cancellations / downgrades in Stripe.",
           "Note upcoming token / key expiries; rotate if warranted.",
+        ],
+      },
+    ],
+  },
+  {
+    group: "Quarterly",
+    cadence: "quarterly",
+    resets: "each quarter",
+    items: [
+      {
+        id: "q-eol",
+        label: "EOL / dependency review",
+        desc: [
+          "Check Node.js (Vercel runtime), Next.js, Postgres (Railway) + key deps vs end-of-support dates — `npm outdated` gives a quick view.",
+          "Upgrade anything approaching EOL before support ends.",
+          "This is the practice behind the Plaid 'monitors EOL software' security attestation — doing it keeps that attestation honest.",
+        ],
+      },
+      {
+        id: "q-secpolicy",
+        label: "Re-date the security policy",
+        desc: [
+          "Open session-notes/security-policy.md, confirm each control still reflects reality, and update its Effective/Review date.",
+          "Plaid security attestations were signed 2026-07-05 and are due again 2026-12-22 — re-attest by then.",
         ],
       },
     ],
@@ -225,6 +249,8 @@ function periodKey(cadence: Cadence, d: Date): string {
     }
     case "monthly":
       return `M${y}-${pad(d.getMonth() + 1)}`;
+    case "quarterly":
+      return `Q${y}-${Math.floor(d.getMonth() / 3) + 1}`;
     case "yearly":
       return `Y${y}`;
   }
