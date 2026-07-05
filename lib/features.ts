@@ -64,5 +64,5 @@ export const FEATURES = {
    *  Vercel prod creds stay intact — flip to true the day Jacob's own
    *  bank connects cleanly. Consider reverting PLAID_ENV to sandbox in
    *  Vercel meanwhile so no accidental prod call is billable. */
-  PLAID_ENABLED: false,
+  PLAID_ENABLED: true,
 } as const;
