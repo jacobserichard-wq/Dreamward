@@ -51,18 +51,15 @@ export const FEATURES = {
    *  backend + WixConnectionCard dormant. Flip to true once published. */
   WIX_ENABLED: false,
 
-  /** Plaid bank feed. false since 2026-07-05. Production is configured
-   *  and working end-to-end (PLAID_ENV=production, OAuth web flow, real
-   *  banks list, link-token 200) — BUT the account is in Plaid's LIMITED
-   *  "test with real data" production state. Connecting the major banks
-   *  (Chase/BofA/Wells Fargo) requires completing Plaid's "Access OAuth
-   *  institutions" registration in the Compliance Center (app name, logo,
-   *  use-case) + a 2-4 WEEK per-institution review. Until that clears,
-   *  real connections hit an unpassable reCAPTCHA/fraud gate, so the
-   *  "Connect a bank" card is a dead-end. While false, the card is hidden
-   *  and a "Coming soon" bank card shows instead. All Plaid code + the
-   *  Vercel prod creds stay intact — flip to true the day Jacob's own
-   *  bank connects cleanly. Consider reverting PLAID_ENV to sandbox in
-   *  Vercel meanwhile so no accidental prod call is billable. */
+  /** Plaid bank feed. TRUE (LIVE) since 2026-07-05 — Jacob's real Chase
+   *  account connected cleanly end-to-end in production: OAuth redirect
+   *  flow works (Link → Chase login → back → Connected), plaid_items row
+   *  active/production/success, Compliance Center "Up to date". The earlier
+   *  reCAPTCHA loop (Plaid limited-production fraud gate) lifted once the
+   *  Compliance Center registration was submitted. Import is EXPENSES-ONLY:
+   *  debits only, skips pending + deposits (verified lib/plaid.syncTransactions
+   *  L267-268) so bank deposits never double-count platform payouts as income.
+   *  Per-connection Plaid billing now applies (~$0.30/account/mo). If Plaid
+   *  ever regresses to the reCAPTCHA/limited gate, flip back to false. */
   PLAID_ENABLED: true,
 } as const;
