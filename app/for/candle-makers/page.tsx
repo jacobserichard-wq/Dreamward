@@ -117,7 +117,7 @@ export default function CandleMakersPage() {
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial. Add a recipe, log a pour, connect your shops,
-            and see real per-candle margin in under 10 minutes.
+            and see real per-candle margin in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

@@ -165,13 +165,17 @@ export default async function MarketingLandingPage() {
             For makers who sell in person AND online. Real margin — every
             market, every channel, every product.
           </p>
-          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
+          <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-4 leading-relaxed">
             Markets, your Square reader, and every sale in between — one
             honest P&amp;L.
             Dreamward tracks the real cost behind every sale and keeps last
             year&apos;s numbers from quietly changing when a cost changes
             today. Built for makers who outgrew spreadsheets but don&apos;t
             need a $500/month ERP.
+          </p>
+          <p className="text-sm text-stone italic max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
+            Built for real makers — candle makers, bakers, soap makers, and
+            the people who set up at the market every Saturday.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <SignInButton label="Start free 14-day trial" />

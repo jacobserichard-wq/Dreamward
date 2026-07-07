@@ -222,7 +222,7 @@ export default function CompareSpreadsheetsPage() {
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             Paste your product list straight from your sheet (insert-only,
             so it never overwrites anything), connect a store, and see your
-            real gross-margin numbers in under 10 minutes.
+            real gross-margin numbers in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

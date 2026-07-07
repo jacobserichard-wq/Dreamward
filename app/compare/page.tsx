@@ -267,7 +267,7 @@ export default function ComparePage() {
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial. Connect Square (or import a CSV from any
             store), re-import your past orders, and see your real
-            gross-margin numbers in under 10 minutes.
+            gross-margin numbers in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

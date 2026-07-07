@@ -120,7 +120,7 @@ export default function FarmersMarketVendorsPage() {
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial. Add an event, connect your online shops, and
-            watch one honest P&amp;L come together in under 10 minutes.
+            watch one honest P&amp;L come together in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

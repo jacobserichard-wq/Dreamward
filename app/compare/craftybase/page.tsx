@@ -130,7 +130,7 @@ export default function CraftybaseComparePage() {
               />
               <ComparisonRow
                 feature="Entry price (billed monthly)"
-                them="Craftybase Studio $49 · Stocksmith $99+"
+                them="Stocksmith from ~$99/mo (Indie) up to ~$349/mo (Growth)"
                 us="$10 — every feature + all channels included"
               />
             </tbody>
@@ -138,8 +138,8 @@ export default function CraftybaseComparePage() {
         </div>
         <p className="text-center text-[11px] text-stone mt-3 max-w-2xl mx-auto">
           Craftybase is now <strong>Stocksmith</strong> (same team, same
-          software; a smaller &ldquo;Craftybase Studio&rdquo; tier remains).
-          This reflects their publicly documented method &amp; pricing as of{" "}
+          software). This reflects their publicly documented method &amp;
+          pricing as of{" "}
           {new Date().toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
@@ -222,7 +222,7 @@ export default function CraftybaseComparePage() {
         faqs={[
           {
             q: "Is Dreamward a good Craftybase (now Stocksmith) alternative?",
-            a: "Yes. Dreamward covers the recipe COGS and real-time inventory makers use Craftybase for, and adds in-person market P&L — booth fee, mileage, and market sales — that Craftybase doesn't model. It starts at $10/month, versus Craftybase Studio at $49 and Stocksmith at $99+.",
+            a: "Yes. Dreamward covers the recipe COGS and real-time inventory makers use Craftybase for, and adds in-person market P&L — booth fee, mileage, and market sales — that Craftybase doesn't model. It starts at $10/month, versus Stocksmith at roughly $99–$349/month depending on tier.",
           },
           {
             q: "How is Dreamward's costing different from Craftybase's?",
@@ -230,7 +230,7 @@ export default function CraftybaseComparePage() {
           },
           {
             q: "Is Dreamward cheaper than Craftybase?",
-            a: "Dreamward is $10/month with every feature included, and your tier is set by your revenue. Craftybase's smaller Studio tier is $49/month, and its main product (now Stocksmith) runs $99–$349/month with features gated to higher tiers (as of July 2026).",
+            a: "Dreamward is $10/month with every feature included, and your tier is set by your revenue. Stocksmith (formerly Craftybase) runs roughly $99–$349/month across its Indie, Business, and Growth tiers, with features gated to higher tiers (verified July 2026).",
           },
           {
             q: "Can I move my catalog from Craftybase to Dreamward?",
@@ -252,7 +252,7 @@ export default function CraftybaseComparePage() {
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial. Connect Square (or import a CSV from any
             store), add a market or two, and see your real gross-margin
-            numbers in under 10 minutes.
+            numbers in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>

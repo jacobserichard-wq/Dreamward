@@ -240,7 +240,7 @@ export default function QuickbooksComparePage() {
           </h2>
           <p className="text-base text-bark m-0 mb-6 max-w-xl mx-auto">
             14-day free trial. Add a recipe, connect a shop, and see real
-            per-product margin in under 10 minutes.
+            per-product margin in your first afternoon.
           </p>
           <SignInButton label="Start free 14-day trial" />
           <p className="text-xs text-stone mt-4">No credit card required.</p>
