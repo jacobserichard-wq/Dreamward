@@ -35,10 +35,16 @@ export const metadata = {
   description:
     "The financial command center for makers who sell in person and online. Track real margin across every market, your Square sales, and imported Shopify, Wix & Etsy orders in one honest P&L — Schedule-C ready, with effective-date COGS that never rewrites your past numbers.",
   openGraph: {
-    title: "Dreamward — Gross margin tracking that doesn't lie",
+    title: "Dreamward — one P&L for makers who sell at markets and online",
     description:
-      "Per-SKU COGS, per-channel margin, audit-trail on every number, Schedule-C P&L. Built for makers + small business who outgrew spreadsheets but don't need a $500/mo ERP.",
+      "Track real margin across every market, your Square sales, and imported Shopify/Wix/Etsy orders in one honest, Schedule-C-ready P&L. Built for makers who sell in person and online.",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dreamward — one P&L for makers who sell at markets and online",
+    description:
+      "Real margin across markets, Square, and your online stores — one honest P&L, Schedule-C ready. Built for makers who sell in person and online.",
   },
 };
 
