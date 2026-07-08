@@ -70,6 +70,7 @@ export default function OnboardingPage() {
   const [hasSku, setHasSku] = useState(false);
   const [hasCostedSku, setHasCostedSku] = useState(false);
   const [storeConnected, setStoreConnected] = useState(false);
+  const [bankConnected, setBankConnected] = useState(false);
   const [laborRateSet, setLaborRateSet] = useState(false);
 
   // Skip flow state.
@@ -92,6 +93,7 @@ export default function OnboardingPage() {
         squareRes,
         wixRes,
         etsyRes,
+        plaidRes,
       ] = await Promise.allSettled([
         fetch("/api/client"),
         fetch("/api/settings"),
@@ -107,6 +109,9 @@ export default function OnboardingPage() {
         fetch("/api/square/connection"),
         fetch("/api/wix/connection"),
         fetch("/api/etsy/connection"),
+        // 2026-07-07 (Plaid live): drives the connect_bank step.
+        // Returns { items: [...] } — connected = non-empty.
+        fetch("/api/plaid/items"),
       ]);
 
       // /api/client — required; bail to /signin if unauthenticated
@@ -185,6 +190,16 @@ export default function OnboardingPage() {
         }
       }
       setStoreConnected(connected);
+
+      // Bank feed (Plaid) — the expense mirror of storeConnected.
+      if (plaidRes.status === "fulfilled" && plaidRes.value.ok) {
+        const data = (await plaidRes.value.json().catch(() => null)) as {
+          items?: unknown[];
+        } | null;
+        setBankConnected(
+          Array.isArray(data?.items) && data.items.length > 0
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load setup data");
     } finally {
@@ -367,6 +382,7 @@ export default function OnboardingPage() {
           hasSku={hasSku}
           hasCostedSku={hasCostedSku}
           storeConnected={storeConnected}
+          bankConnected={bankConnected}
           laborRateSet={laborRateSet}
           businessName={clientInfo.businessName ?? ""}
           industry={clientInfo.industry ?? ""}

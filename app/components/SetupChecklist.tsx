@@ -66,6 +66,10 @@ export interface SetupChecklistProps {
    *  a store doesn't create SKUs, and a manually-created SKU
    *  shouldn't tick the step). */
   storeConnected?: boolean;
+  /** 2026-07-07 (Plaid live): true when at least one bank is connected
+   *  via Plaid (/api/plaid/items non-empty). Drives the connect_bank
+   *  step — the expense mirror of connect_store. */
+  bankConnected?: boolean;
   /** Sub-session 33: true when at least one SKU has a cost-history
    *  row — the action that turns SKUs into gross-margin tracking. */
   hasCostedSku?: boolean;
@@ -196,6 +200,29 @@ export default function SetupChecklist(props: SetupChecklistProps) {
       buttonLabel: "Connect",
       visibleOn: ["trial", "dream", "maker", "growth", "pro"],
     },
+    // 2026-07-07: bank feed went LIVE (Plaid production, real-bank
+    // verified). The expense mirror of connect_store: sales come from
+    // the store sync, spending comes from the bank. Gated on the flag
+    // so re-gating Plaid hides the step with the card. Skippable —
+    // cash-only vendors can run on manual expenses alone.
+    ...(FEATURES.PLAID_ENABLED
+      ? [
+          {
+            id: "connect_bank" as const,
+            label: "Connect your bank to auto-pull expenses",
+            done: props.bankConnected ?? false,
+            action: { kind: "link" as const, href: "/integrations" },
+            buttonLabel: "Connect",
+            visibleOn: [
+              "trial",
+              "dream",
+              "maker",
+              "growth",
+              "pro",
+            ] as Array<"trial" | "dream" | "maker" | "growth" | "pro">,
+          },
+        ]
+      : []),
     {
       id: "setup_cogs",
       label: "Add costs to your products to unlock gross margin",

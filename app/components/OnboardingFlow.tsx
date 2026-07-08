@@ -34,7 +34,7 @@ const STAGES: Stage[] = [
     n: 1,
     icon: "\u{1F50C}", // 🔌
     title: "Bring in your sales",
-    desc: "Connect Square and orders sync in automatically — or add a sale by hand, upload a CSV (Shopify, Wix, Etsy, anything), or log a market day. Live Shopify/Wix/Etsy sync is coming soon.",
+    desc: "Connect Square and orders sync in automatically — or add a sale by hand, upload a CSV (Shopify, Wix, Etsy, anything), or log a market day. Connect your bank to auto-pull expenses too. Live Shopify/Wix/Etsy sync is coming soon.",
     pill: "bg-eucalyptus",
     accent: "border-l-eucalyptus",
   },
