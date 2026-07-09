@@ -14,6 +14,7 @@ interface Client {
   plan: string;
   stripe_customer_id: string | null;
   onboarding_completed: boolean;
+  is_test: boolean;
   trial_ends_at: string | null;
   created_at: string;
   updated_at: string;
@@ -191,6 +192,18 @@ export default function AdminPage() {
   const mrr = paidClients.reduce((s, c) => s + bandPrice(c.plan), 0);
   const monthlyCost = costs.reduce((s, c) => s + monthlyOf(c), 0);
   const net = mrr - monthlyCost;
+  // Launch-week signal (2026-07-07): real signups in the last 7 days —
+  // is_test accounts (founder logins, comped users) excluded.
+  const newThisWeek = clients.filter(
+    (c) =>
+      !c.is_test &&
+      c.created_at &&
+      Date.now() - new Date(c.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000
+  ).length;
+  // A far-future trial (2099) is the "comped forever" convention —
+  // real user, deliberately never billed (e.g. founding users).
+  const isComped = (c: Client): boolean =>
+    !!c.trial_ends_at && new Date(c.trial_ends_at).getFullYear() >= 2099;
 
   // Trials expiring within 7 days
   const now = Date.now();
@@ -216,7 +229,7 @@ export default function AdminPage() {
           backHref="/dashboard"
           backLabel="Dreamward"
           title={<>{"\u{1F6E0}\u{FE0F}"} Owner Dashboard</>}
-          subtitle={`${clients.length} accounts · ${paidCount} paying`}
+          subtitle={`${clients.length} accounts · ${paidCount} paying · ${newThisWeek} new this week`}
         />
 
         {/* P&L strip */}
@@ -464,6 +477,19 @@ export default function AdminPage() {
                       <span className="font-semibold text-slate-900">
                         {client.business_name || "—"}
                       </span>
+                      {/* Billing-status badges: no-billing (is_test — founder
+                          logins + comped users are excluded from nag emails
+                          and metrics) and comped-forever (trial year ≥2099). */}
+                      {client.is_test && (
+                        <span className="ml-2 py-[2px] px-1.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-500 border border-slate-200">
+                          no billing
+                        </span>
+                      )}
+                      {isComped(client) && (
+                        <span className="ml-2 py-[2px] px-1.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200">
+                          comped {"\u{221E}"}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="text-[13px] text-slate-500">

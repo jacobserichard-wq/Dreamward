@@ -8,8 +8,11 @@ import { authOptions } from "@/lib/auth";
 
 /** The founder's logins ALWAYS have owner access — baked in so a misset (or
  *  leftover) ADMIN_EMAILS env var can never lock the owner out of their own
- *  dashboard. ADMIN_EMAILS just *adds* extra admins on top. */
-const OWNER_EMAILS = [
+ *  dashboard. ADMIN_EMAILS just *adds* extra admins on top.
+ *  Exported (2026-07-07): getOrCreateClient auto-flags these emails is_test
+ *  at signup so the founder's own accounts never pollute real-customer
+ *  metrics or receive billing/nag emails. */
+export const OWNER_EMAILS = [
   "jacobse.richard@gmail.com",
   "dreamwardsystems@gmail.com",
 ];

@@ -1,4 +1,5 @@
 import { Pool, types } from "pg";
+import { OWNER_EMAILS } from "@/lib/admin";
 
 // Phase 5 follow-up bug fix: by default pg parses Postgres DATE (OID
 // 1082) into a JavaScript Date object using server-local midnight,
@@ -74,12 +75,17 @@ export async function getOrCreateClient(email: string) {
   // both end up returning the same row. We also stamp plan + trial_ends_at
   // explicitly rather than trusting an (un-versioned) DB column default, so
   // the app owns its own trial invariant (no silent fallback).
+  // 2026-07-07: owner emails auto-flag is_test so the founder's own
+  // sign-ins never count as real customers in metrics or receive
+  // billing/nag emails (post-wipe, a fresh owner account would otherwise
+  // default is_test=false and pollute launch numbers).
+  const isOwner = OWNER_EMAILS.includes(email.toLowerCase());
   const result = await pool.query(
-    `INSERT INTO clients (email, plan, trial_ends_at)
-     VALUES ($1, 'trial', NOW() + INTERVAL '14 days')
+    `INSERT INTO clients (email, plan, trial_ends_at, is_test)
+     VALUES ($1, 'trial', NOW() + INTERVAL '14 days', $2)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
      RETURNING *`,
-    [email]
+    [email, isOwner]
   );
   await pool.query(
     `INSERT INTO client_settings (client_id) VALUES ($1)

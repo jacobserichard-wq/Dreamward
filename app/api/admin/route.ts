@@ -14,6 +14,7 @@ interface AdminClientRow {
   plan: string;
   stripe_customer_id: string | null;
   onboarding_completed: boolean;
+  is_test: boolean;
   trial_ends_at: string | null;
   created_at: string;
   updated_at: string;
@@ -40,7 +41,7 @@ export async function GET() {
     const result = await pool.query<AdminClientRow>(
       `SELECT
          c.id, c.email, c.business_name, c.industry, c.plan,
-         c.stripe_customer_id, c.onboarding_completed,
+         c.stripe_customer_id, c.onboarding_completed, c.is_test,
          c.trial_ends_at, c.created_at, c.updated_at,
          c.cached_trailing_revenue, c.cached_would_be_band, c.revenue_cached_at,
          COUNT(pi.id) as total_items,
