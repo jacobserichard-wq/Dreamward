@@ -151,10 +151,12 @@ export default async function MarketingLandingPage() {
           </details>
         </div>
 
-        {/* Hero. Sub-session 32 marketing refresh: leads with the
-            gross-margin + audit-trail differentiation shipped in
-            Phase 12 (COGS) + Phase 13 (Schedule-C P&L). Sage & Rose
-            redesign: airy warm hero, Lora display headline. */}
+        {/* Hero — 2026-07-07 launch tightening (Jacob's exact spec):
+            one crisp value sentence, Victoria's real quote as the proof
+            element (house rule: never fabricated — her words), single
+            merged trust line under the CTAs. The "outgrew spreadsheets /
+            $500 ERP" price contrast moved to the pricing section intro
+            where it belongs. */}
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-14 sm:pt-24 pb-16 sm:pb-24 text-center">
           <h1 className="font-serif text-4xl sm:text-6xl font-semibold m-0 mb-5 leading-[1.08] text-forest tracking-tight">
             Built for people.
@@ -166,17 +168,18 @@ export default async function MarketingLandingPage() {
             market, every channel, every product.
           </p>
           <p className="text-base text-bark max-w-2xl mx-auto m-0 mb-4 leading-relaxed">
-            Markets, your Square reader, and every sale in between — one
-            honest P&amp;L.
-            Dreamward tracks the real cost behind every sale and keeps last
-            year&apos;s numbers from quietly changing when a cost changes
-            today. Built for makers who outgrew spreadsheets but don&apos;t
-            need a $500/month ERP.
+            Dreamward tracks the real cost behind every sale — and never
+            rewrites last year&apos;s numbers when today&apos;s costs
+            change.
           </p>
-          <p className="text-sm text-stone italic max-w-2xl mx-auto m-0 mb-9 leading-relaxed">
-            Built for real makers — candle makers, bakers, soap makers, and
-            the people who set up at the market every Saturday.
-          </p>
+          <figure className="max-w-2xl mx-auto m-0 mb-9">
+            <blockquote className="text-sm text-stone italic m-0 leading-relaxed">
+              {"\u{201C}"}Super easy and intuitive.{"\u{201D}"}
+            </blockquote>
+            <figcaption className="text-xs text-stone mt-1">
+              — Victoria, Sweet to the Soul
+            </figcaption>
+          </figure>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <SignInButton label="Start free 14-day trial" />
             <a
@@ -186,10 +189,9 @@ export default async function MarketingLandingPage() {
               See how it works <span aria-hidden="true">&darr;</span>
             </a>
           </div>
-          <p className="text-xs text-stone mt-4">No credit card required.</p>
-          <p className="text-[11px] uppercase tracking-widest text-stone mt-6">
-            Syncs with Square today {"\u{00B7}"} Shopify, Wix &amp; Etsy
-            coming soon
+          <p className="text-xs text-stone mt-4">
+            No credit card required. {"\u{00B7}"} Syncs with Square today{" "}
+            {"\u{00B7}"} Shopify, Wix &amp; Etsy coming soon
           </p>
         </div>
       </header>
@@ -356,11 +358,12 @@ export default async function MarketingLandingPage() {
               Pricing that grows with you. Not against you.
             </h2>
             <p className="text-sm sm:text-base text-bark m-0 max-w-2xl mx-auto leading-relaxed">
-              Every tier includes every feature. We charge based on
-              your business size, not which tools you&apos;re allowed
-              to use. As your revenue grows, your tier auto-updates —
-              no upsell calls, no &ldquo;upgrade to unlock&rdquo;
-              walls.
+              Built for makers who outgrew spreadsheets but don&apos;t
+              need a $500/month ERP. Every tier includes every feature.
+              We charge based on your business size, not which tools
+              you&apos;re allowed to use. As your revenue grows, your
+              tier auto-updates — no upsell calls, no &ldquo;upgrade to
+              unlock&rdquo; walls.
             </p>
           </div>
 
