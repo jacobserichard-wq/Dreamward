@@ -32,5 +32,13 @@ export interface Testimonial {
 }
 
 export const TESTIMONIALS: Testimonial[] = [
-  // Empty on purpose. See house rule above.
+  // Victoria — received via text 2026-07-08, written by her explicitly
+  // for Dreamward's use ("more than happy to add anything!"). Faithful
+  // excerpt of her longer review; connectors trimmed, meaning intact.
+  {
+    quote:
+      "Dreamward has allowed me to focus on what I love most—growing my business—instead of getting buried in tedious spreadsheets and trackers. I can easily track sales, monitor profits, manage expenses, and see exactly how my business is performing—all in one place. Dreamward is what every small business owner NEEDS!",
+    name: "Victoria",
+    business: "Sweet to the Soul",
+  },
 ];

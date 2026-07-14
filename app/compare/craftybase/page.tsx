@@ -243,9 +243,20 @@ export default function CraftybaseComparePage() {
         ]}
       />
 
-      {/* Bottom CTA */}
+      {/* Bottom CTA — Victoria's real quote (permission given 2026-07-08)
+          lands right before the ask. */}
       <section className="bg-eucalyptus-soft/50 border-t border-sand py-12 sm:py-16">
         <div className="max-w-[800px] mx-auto px-4 sm:px-8 text-center">
+          <figure className="m-0 mb-8">
+            <blockquote className="text-base text-bark italic m-0 leading-relaxed max-w-xl mx-auto">
+              {"\u{201C}"}Dreamward makes it so much easier to stay
+              organized, understand your numbers, and focus on growth
+              instead of paperwork.{"\u{201D}"}
+            </blockquote>
+            <figcaption className="text-xs text-stone mt-2">
+              — Victoria, Sweet to the Soul
+            </figcaption>
+          </figure>
           <h2 className="font-serif text-2xl sm:text-3xl font-semibold m-0 mb-3 text-forest">
             Try it on your own products
           </h2>
