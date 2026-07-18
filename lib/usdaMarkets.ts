@@ -110,7 +110,16 @@ export async function searchUsdaMarkets(opts: {
   url.searchParams.set("y", String(geo.lat));
   url.searchParams.set("radius", String(opts.radius ?? 30));
 
-  const res = await fetch(url.toString());
+  // USDA's WAF 403s non-browser user agents (Node's default "node"
+  // UA gets an HTML 403, which parsed as zero markets). The standard
+  // "compatible" product UA passes while still identifying us
+  // honestly. Found 2026-07-08 when the first live search returned
+  // empty despite a valid key.
+  const res = await fetch(url.toString(), {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; Dreamward/1.0; +https://godreamward.com)",
+    },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
