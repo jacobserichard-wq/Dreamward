@@ -20,13 +20,31 @@
 //     we point to live aggregators (CRAFT_FAIR_SOURCES) instead of
 //     freezing dates we can't keep current.
 
-export type MarketCounty = "Lake" | "Porter" | "LaPorte";
+// 2026-07-08 build-out: the register grew past NWI, so "county"
+// became "region". The three NWI counties keep county-style labels;
+// new regions are broader buckets. Add a region here + entries below
+// + it appears as a filter pill automatically.
+export type MarketRegion =
+  | "Lake"
+  | "Porter"
+  | "LaPorte"
+  | "Chicagoland"
+  | "Greater Indiana";
+
+/** Filter-pill label. NWI counties read as counties; regions as-is. */
+export function regionLabel(r: MarketRegion): string {
+  return r === "Lake" || r === "Porter" || r === "LaPorte"
+    ? `${r} County`
+    : r;
+}
 
 export interface MarketEntry {
   id: string;
   name: string;
   city: string;
-  county: MarketCounty;
+  region: MarketRegion;
+  /** Two-letter state — the register now crosses into Illinois. */
+  state: "IN" | "IL";
   /** Day(s) + time, e.g. "Saturdays, 8am–2pm". Verify at source. */
   schedule: string;
   /** Active season, e.g. "May–October". */
@@ -57,7 +75,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "highland-farmers",
     name: "Highland Farmers Market",
     city: "Highland",
-    county: "Lake",
+    region: "Lake", state: "IN",
     schedule: "Weekly, afternoons (3–7:30pm)",
     season: "May–September",
     venue: "Municipal Parking Lot, 2730 Highway Ave, Highland, IN",
@@ -71,7 +89,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "hobart-summer-market",
     name: "Summer Market on the Lake",
     city: "Hobart",
-    county: "Lake",
+    region: "Lake", state: "IN",
     schedule: "Thursdays, 4–9pm",
     season: "June–August",
     venue: "Festival Park, 111 E. Old Ridge Rd, Hobart, IN",
@@ -88,7 +106,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "merrillville-farms",
     name: "Merrillville Farms",
     city: "Hobart",
-    county: "Lake",
+    region: "Lake", state: "IN",
     schedule: "Seasonal — see source for hours",
     season: "Summer–Fall",
     venue: "Hobart, IN",
@@ -104,7 +122,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "valparaiso-market",
     name: "Valparaiso Farmers Market",
     city: "Valparaiso",
-    county: "Porter",
+    region: "Porter", state: "IN",
     schedule: "Tuesdays & Saturdays, 9am–1pm",
     season: "June–October",
     venue: "Urschel Pavilion, Central Park Plaza, 63 Lafayette St, Valparaiso, IN",
@@ -119,7 +137,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "chesterton-european-market",
     name: "Chesterton European Market",
     city: "Chesterton",
-    county: "Porter",
+    region: "Porter", state: "IN",
     schedule: "Saturdays, 8am–2pm",
     season: "May–October",
     venue: "Downtown Chesterton, IN",
@@ -134,7 +152,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "coffee-creek-market",
     name: "Coffee Creek Farmers Market",
     city: "Chesterton",
-    county: "Porter",
+    region: "Porter", state: "IN",
     schedule: "Wednesdays, 3–7pm",
     season: "April–November",
     venue: "2300 Village Point, Chesterton, IN",
@@ -148,7 +166,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "portage-market-on-the-square",
     name: "Market on the Square",
     city: "Portage",
-    county: "Porter",
+    region: "Porter", state: "IN",
     schedule: "Fridays, 4–9pm",
     season: "June–September",
     venue: "Founders Square, 6300 W Main St, Portage, IN",
@@ -164,7 +182,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "edge-of-liberty-valpo",
     name: "Edge of Liberty Market",
     city: "Valparaiso",
-    county: "Porter",
+    region: "Porter", state: "IN",
     schedule: "Sundays (every other), May–Halloween",
     season: "May–October",
     venue: "606 N Calumet Ave, Valparaiso, IN",
@@ -180,7 +198,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "laporte-farmers",
     name: "LaPorte Farmers Market (Farmed & Forged)",
     city: "LaPorte",
-    county: "LaPorte",
+    region: "LaPorte", state: "IN",
     schedule: "Sundays, 11am–2pm",
     season: "May–September",
     venue: "Monroe St (Washington–Lincolnway), Downtown LaPorte, IN",
@@ -196,7 +214,7 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     id: "michigan-city-farmers",
     name: "Michigan City Farmers Market",
     city: "Michigan City",
-    county: "LaPorte",
+    region: "LaPorte", state: "IN",
     schedule: "Saturdays, 8am–1pm",
     season: "May–September",
     venue: "Uptown Arts District (8th & Washington St), Michigan City, IN",
@@ -205,6 +223,120 @@ export const MARKET_REGISTER: readonly MarketEntry[] = [
     applyUrl: "https://www.facebook.com/farmersmarketmichigancity",
     vendorNote:
       "Producers-only — apply via the market's Facebook page (no public form found).",
+  },
+
+  // ── Chicagoland (researched July 2026 — NWI vendors work these) ──
+  {
+    id: "frankfort-country-market",
+    name: "Frankfort Country Market",
+    city: "Frankfort",
+    region: "Chicagoland", state: "IL",
+    schedule: "Sundays, mornings–early afternoon",
+    season: "Late April–October",
+    venue: "Downtown Frankfort, IL (Breidert Green area)",
+    note: "One of the south suburbs' largest Sunday markets.",
+    sourceName: "Village of Frankfort",
+    sourceUrl:
+      "https://www.frankfortil.org/business/country_market/become_a_vendor.php",
+    applyUrl:
+      "https://www.frankfortil.org/business/country_market/become_a_vendor.php",
+    vendorNote:
+      "Application + insurance certificate + rules acceptance required; apply via the Village site.",
+  },
+  {
+    id: "homewood-farmers-market",
+    name: "Homewood Farmers Market",
+    city: "Homewood",
+    region: "Chicagoland", state: "IL",
+    schedule: "Saturdays, mornings",
+    season: "Late May–October",
+    venue: "Downtown Homewood, IL (Martin Ave)",
+    sourceName: "Village of Homewood",
+    sourceUrl:
+      "https://www.village.homewood.il.us/community/events/homewood-s-farmers-market",
+    vendorNote:
+      "Vendor applications open in winter and close early (2026's closed Feb 28) — plan a season ahead.",
+  },
+  {
+    id: "orland-park-market",
+    name: "Market at the Park",
+    city: "Orland Park",
+    region: "Chicagoland", state: "IL",
+    schedule: "Thursdays, 4–8pm",
+    season: "June–August",
+    venue: "Centennial Park West, Orland Park, IL",
+    note: "Evening market — after-work crowd.",
+    sourceName: "LocalHarvest",
+    sourceUrl: "https://www.localharvest.org/orland-park-il/farmers-markets",
+    vendorNote:
+      "No public application form found — contact the Village of Orland Park to vend.",
+  },
+  {
+    id: "green-city-market",
+    name: "Green City Market",
+    city: "Chicago",
+    region: "Chicagoland", state: "IL",
+    schedule: "Wednesdays & Saturdays, mornings",
+    season: "Year-round (outdoor Lincoln Park; indoor in winter)",
+    venue: "Lincoln Park, Chicago, IL",
+    note: "Chicago's flagship sustainable market — high traffic, juried.",
+    sourceName: "Green City Market",
+    sourceUrl: "https://www.greencitymarket.org/",
+    applyUrl:
+      "https://www.greencitymarket.org/visit-our-markets/become-a-vendor",
+    vendorContact: "farmersupport@greencitymarket.org",
+    vendorNote:
+      "Producer-only + juried. Farmers need third-party certification; prepared-food makers are exempt from farm certification but must make everything themselves.",
+  },
+  {
+    id: "chicago-city-markets",
+    name: "Chicago Farmers Markets (citywide program)",
+    city: "Chicago",
+    region: "Chicagoland", state: "IL",
+    schedule: "Multiple locations & days (Daley Plaza + neighborhoods)",
+    season: "May–October",
+    venue: "Various — see the city program page",
+    note: "One application covers the city-run markets.",
+    sourceName: "City of Chicago DCASE",
+    sourceUrl:
+      "https://www.chicago.gov/city/en/depts/dca/supp_info/markets2.html",
+    applyUrl:
+      "https://www.chicago.gov/city/en/depts/dca/supp_info/markets2.html",
+    vendorNote:
+      "Free to apply; open to farmers, food entrepreneurs, and artisans with locally made goods.",
+  },
+
+  // ── Greater Indiana anchors (researched July 2026) ───────────────
+  {
+    id: "broad-ripple-farmers",
+    name: "Broad Ripple Farmers Market",
+    city: "Indianapolis",
+    region: "Greater Indiana", state: "IN",
+    schedule: "Saturdays, 8am–noon (summer)",
+    season: "Year-round (outdoor May–Oct; indoor Nov–Apr)",
+    venue: "Broad Ripple, Indianapolis, IN",
+    note: "Indiana's largest — 80+ vendors in summer.",
+    sourceName: "Broad Ripple Cultural District",
+    sourceUrl: "https://www.broadrippleindy.org/farmers-market/",
+    applyUrl:
+      "https://www.broadrippleindy.org/farmers-market-vendor-application/",
+    vendorNote:
+      "Food products only (human food). Summer market is often FULL — the inquiry form is a waitlist for vacancies.",
+  },
+  {
+    id: "south-bend-farmers",
+    name: "South Bend Farmers Market",
+    city: "South Bend",
+    region: "Greater Indiana", state: "IN",
+    schedule: "Multiple days weekly (see source)",
+    season: "Year-round (historic indoor market house)",
+    venue: "1105 Northside Blvd, South Bend, IN",
+    note: "Operating since 1911 — permanent indoor stalls.",
+    sourceName: "South Bend Farmers Market",
+    sourceUrl: "http://southbendfarmersmarket.com/vendors/",
+    applyUrl: "http://southbendfarmersmarket.com/vendors/",
+    vendorNote:
+      "Permanent + daily stall options at the market house — see the vendors page for stall availability.",
   },
 ] as const;
 
@@ -241,8 +373,10 @@ export const CRAFT_FAIR_SOURCES: readonly CraftFairSource[] = [
   },
 ];
 
-export const MARKET_COUNTIES: readonly MarketCounty[] = [
+export const MARKET_REGIONS: readonly MarketRegion[] = [
   "Lake",
   "Porter",
   "LaPorte",
+  "Chicagoland",
+  "Greater Indiana",
 ];

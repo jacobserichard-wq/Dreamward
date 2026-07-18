@@ -185,7 +185,7 @@ export default function EventsPage() {
             <Link
               href="/markets"
               className="py-2.5 px-5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium no-underline"
-              title="Browse recurring markets in Northwest Indiana"
+              title="Browse markets — NWI, Chicagoland, and nationwide by zip"
             >
               {"\u{1F50D}"} Find markets
             </Link>
