@@ -218,7 +218,11 @@ export const PLAN_FEATURE_GROUPS: { group: string; items: string[] }[] = [
   {
     group: "Sell everywhere",
     items: [
-      "Shopify, Wix, Square & Etsy sync",
+      // Honest-copy rule: only claim live sync for live integrations
+      // (Square + bank feed). Shopify/Wix/Etsy are CSV until their
+      // FEATURES flags flip — update this line when each goes live.
+      "Square sync · CSV import for Shopify, Wix & Etsy",
+      "Bank feed — auto-import expenses",
       "CSV / XLSX upload",
       "Market Day mode — tap sales at your booth",
       "Find markets near you",

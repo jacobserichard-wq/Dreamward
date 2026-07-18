@@ -229,7 +229,7 @@ export default async function MarketingLandingPage() {
           <FeatureCard
             icon={"\u{1F4CE}"}
             title="Receipt vault for every expense"
-            body="Drag-drop receipts into any expense. Private Vercel Blob storage, full audit-defense compliance. Preview images + PDFs inline; download originals anytime."
+            body="Drag-drop receipts into any expense. Securely stored and audit-ready — preview images + PDFs inline, download originals anytime."
           />
         </div>
       </section>
