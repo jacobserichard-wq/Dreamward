@@ -106,6 +106,13 @@ function IntegrationsPageInner() {
     // connection, then show success/failure via the existing
     // banner plumbing.
     const wixBindInstance = params.get("wix_bind_instance");
+    // App Store install handoff: the OAuth callback stored a PENDING
+    // connection (no session at install time) and routed the merchant
+    // through /signin back here with ?shopify_pending=<shop>. We claim
+    // it via POST /api/shopify/bind, then hard-navigate with the
+    // standard connected params so every card remounts with the fresh
+    // connection state.
+    const shopifyPending = params.get("shopify_pending");
 
     if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
@@ -168,6 +175,38 @@ function IntegrationsPageInner() {
           setError(err instanceof Error ? err.message : "Couldn't connect Wix");
         }
       })();
+    } else if (shopifyPending) {
+      setSuccessMsg(`Finishing your Shopify connection to ${shopifyPending}…`);
+      void (async () => {
+        try {
+          const res = await fetch("/api/shopify/bind", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shop: shopifyPending }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            bound?: boolean;
+            error?: string;
+          };
+          if (!res.ok || !data.bound) {
+            setSuccessMsg(null);
+            setError(
+              data.error || `Couldn't connect Shopify (HTTP ${res.status})`
+            );
+            return;
+          }
+          // Full navigation (not router.replace) so the Shopify card
+          // remounts and refetches its now-bound connection state.
+          window.location.replace(
+            `/integrations?connected=1&shop=${encodeURIComponent(shopifyPending)}`
+          );
+        } catch (err) {
+          setSuccessMsg(null);
+          setError(
+            err instanceof Error ? err.message : "Couldn't connect Shopify"
+          );
+        }
+      })();
     }
 
     if (
@@ -177,7 +216,8 @@ function IntegrationsPageInner() {
       connectedWix ||
       errParam ||
       upgrade ||
-      wixBindInstance
+      wixBindInstance ||
+      shopifyPending
     ) {
       // Strip the params so reload doesn't replay the toast / re-bind.
       router.replace("/integrations");

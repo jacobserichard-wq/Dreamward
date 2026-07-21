@@ -96,16 +96,18 @@ export async function GET(req: NextRequest) {
     return redirectWithError(req, "Invalid shop domain in callback URL.");
   }
 
-  // ── 4. Auth + plan gate ───────────────────────────────────────
+  // ── 4. Resolve session (OPTIONAL as of the App Store flow) ────
+  // Two legitimate arrivals here:
+  //   a) In-app connect: signed-in Pro user started at
+  //      /api/shopify/oauth/initiate. Session present → bind directly.
+  //   b) App Store install: merchant started at /api/shopify/install
+  //      with NO Dreamward account. Session absent → store the token
+  //      as a PENDING connection (client_id NULL, migration 0046) and
+  //      route them through signin; /api/shopify/bind claims it after.
+  // Either way the code must be exchanged NOW — it's single-use and
+  // short-lived; bouncing to signin first would discard the install.
   const client = await getSessionClient();
-  if (!client) {
-    // Session expired during the OAuth round-trip — relatively rare
-    // but possible. Send them back through signin.
-    const url = new URL("/signin", req.url);
-    url.searchParams.set("callbackUrl", "/integrations");
-    return NextResponse.redirect(url);
-  }
-  if (!isPayingTier(client.plan)) {
+  if (client && !isPayingTier(client.plan)) {
     return redirectWithError(
       req,
       "Shopify integration is a Pro feature. Upgrade to connect a store."
@@ -149,17 +151,85 @@ export async function GET(req: NextRequest) {
   const importStartDate = normalizeImportStartDate(
     req.cookies.get(IMPORT_DATE_COOKIE_NAME)?.value
   );
+
+  // ── 7-cold. NO session: store as PENDING, route through signin ──
+  // Upsert by shop_domain: a re-install refreshes the token. If the
+  // shop is already BOUND to an account, keep that binding (this is
+  // just a token refresh from a re-auth) and let the signin flow take
+  // the merchant back to their app.
+  if (!client) {
+    try {
+      await pool.query(
+        `INSERT INTO shopify_connections (
+           client_id, shop_domain,
+           access_token_ciphertext, access_token_iv, access_token_auth_tag,
+           scopes, import_start_date
+         ) VALUES (NULL, $1, $2, $3, $4, $5, NULL)
+         ON CONFLICT (shop_domain) DO UPDATE SET
+           access_token_ciphertext = EXCLUDED.access_token_ciphertext,
+           access_token_iv         = EXCLUDED.access_token_iv,
+           access_token_auth_tag   = EXCLUDED.access_token_auth_tag,
+           scopes                  = EXCLUDED.scopes,
+           updated_at              = NOW()`,
+        [
+          shopDomain,
+          encrypted.ciphertext,
+          encrypted.iv,
+          encrypted.authTag,
+          tokenResult.scopes,
+        ]
+      );
+    } catch (err) {
+      console.error("Shopify pending-connection upsert failed:", err);
+      return redirectWithError(
+        req,
+        "Couldn't save the Shopify connection. Please try again."
+      );
+    }
+    // Send the merchant through signin; /integrations picks up the
+    // shopify_pending param after auth and calls /api/shopify/bind.
+    const signin = new URL("/signin", req.url);
+    signin.searchParams.set(
+      "callbackUrl",
+      `/integrations?shopify_pending=${encodeURIComponent(shopDomain)}`
+    );
+    const res = NextResponse.redirect(signin);
+    res.cookies.delete(STATE_COOKIE_NAME);
+    res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
+    return res;
+  }
+
+  // ── 7-warm. Session present: bind directly ────────────────────
+  // Upsert by shop_domain so an App-Store install that created a
+  // pending row gets claimed here when the merchant was already
+  // signed in. Guard: never steal a shop bound to ANOTHER account.
   try {
+    const existing = await pool.query<{ client_id: number | null }>(
+      `SELECT client_id FROM shopify_connections WHERE shop_domain = $1`,
+      [shopDomain]
+    );
+    const owner = existing.rows[0]?.client_id ?? null;
+    if (owner !== null && owner !== client.id) {
+      return redirectWithError(
+        req,
+        "That Shopify store is already connected to a different Dreamward account."
+      );
+    }
     await pool.query(
       `INSERT INTO shopify_connections (
-         client_id,
-         shop_domain,
-         access_token_ciphertext,
-         access_token_iv,
-         access_token_auth_tag,
-         scopes,
-         import_start_date
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         client_id, shop_domain,
+         access_token_ciphertext, access_token_iv, access_token_auth_tag,
+         scopes, import_start_date
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (shop_domain) DO UPDATE SET
+         client_id               = EXCLUDED.client_id,
+         access_token_ciphertext = EXCLUDED.access_token_ciphertext,
+         access_token_iv         = EXCLUDED.access_token_iv,
+         access_token_auth_tag   = EXCLUDED.access_token_auth_tag,
+         scopes                  = EXCLUDED.scopes,
+         import_start_date       = COALESCE(EXCLUDED.import_start_date,
+                                            shopify_connections.import_start_date),
+         updated_at              = NOW()`,
       [
         client.id,
         shopDomain,
@@ -172,9 +242,7 @@ export async function GET(req: NextRequest) {
     );
   } catch (err) {
     // Most likely: UNIQUE(client_id) violation (this client already
-    // has a connected store — v1 allows only one). Surface a clean
-    // message; the /integrations page can show the existing
-    // connection so the user knows what's there.
+    // has a DIFFERENT store connected — v1 allows only one).
     console.error("Shopify connection insert failed:", err);
     const msg =
       err instanceof Error && err.message.includes("unique")

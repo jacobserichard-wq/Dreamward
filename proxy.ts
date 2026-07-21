@@ -31,6 +31,14 @@
 //                                 hit (Shopify is the referrer); the route
 //                                 itself checks session + CSRF state +
 //                                 Shopify HMAC. Phase 8a sub-session 24.
+//                                 App Store installs (2026-07) may have NO
+//                                 session at all — the route stores a
+//                                 pending row and sends them to /signin.
+//   /api/shopify/install — the app's "App URL" in the Shopify Partner
+//                          dashboard. App Store installs and admin-icon
+//                          clicks land here cold (no session). The route
+//                          verifies Shopify's HMAC on the query string
+//                          before starting OAuth. App Store flow, 2026-07.
 //   /api/shopify/webhook — invoked by Shopify with X-Shopify-Hmac-SHA256
 //                          header; route verifies the signature. Phase 8d.
 //   /api/square/oauth/callback — Square redirects merchants here after
@@ -87,6 +95,7 @@ export const config = {
     "/api/sample-data/:path*",
     "/api/settings/:path*",
     "/api/shopify/backfill/:path*",
+    "/api/shopify/bind/:path*",
     "/api/shopify/connection/:path*",
     "/api/shopify/disconnect/:path*",
     "/api/shopify/oauth/initiate/:path*",
