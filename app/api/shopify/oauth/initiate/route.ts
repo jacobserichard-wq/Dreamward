@@ -106,8 +106,12 @@ export async function POST(req: NextRequest) {
       //   needed for existing merchants). Keep this list MINIMAL: every
       //   extra scope is a line on the merchant's consent screen and a
       //   question in App Store review.
+      // read_all_orders → lifts Shopify's 60-day order-history window
+      //   for the initial backfill. Access request GRANTED in the
+      //   Partner dashboard 2026-07-21; only meaningful alongside
+      //   read_orders.
       redirectUri: callbackUrl(),
-      scopes: ["read_orders", "read_products"],
+      scopes: ["read_orders", "read_all_orders", "read_products"],
     });
 
     // ── Set the state cookie + return ───────────────────────────

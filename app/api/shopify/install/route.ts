@@ -92,8 +92,9 @@ export async function GET(req: NextRequest) {
     state,
     redirectUri: callbackUrl(req),
     // Keep in lockstep with /api/shopify/oauth/initiate. read_orders →
-    // order/refund sync; read_products → catalog bulk-import.
-    scopes: ["read_orders", "read_products"],
+    // order/refund sync; read_all_orders → full-history backfill
+    // (granted 2026-07-21); read_products → catalog bulk-import.
+    scopes: ["read_orders", "read_all_orders", "read_products"],
   });
 
   const res = NextResponse.redirect(authorizeUrl);
