@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: June 20, 2026**
+**Last updated: July 21, 2026**
 
 Dreamward ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, store, and disclose information when you use Dreamward at godreamward.com (the "Service"). By using the Service, you agree to this policy.
 
@@ -15,6 +15,8 @@ We collect the following categories of information:
 **Information you provide directly.** When you create an account, you give us your business name, industry, and any custom expense categories you configure. When you upload CSV files for processing, we receive the data those files contain.
 
 **Information collected through Google sign-in.** When you sign in with Google, we request only the `openid` and `email` scopes. We receive your email address and a Google account identifier — used to create and identify your account. We do not request your name, profile picture, Gmail, or any other Google data.
+
+**Information from connected sales channels (Shopify, Square, Wix, Etsy).** If you choose to connect an online store or point-of-sale account, we import your order history and ongoing orders on a **read-only** basis: order date, totals, taxes, line items, product/SKU details, refund records, and the buyer's name. We use this data solely to produce your bookkeeping records — revenue, cost of goods, and profit reports shown only to you. Buyer names appear only as labels on your own sale records so you can reconcile orders; we never contact your customers, never use their information for marketing or advertising, and never sell or share it. When a platform sends us a data-deletion request for a customer or store (for example Shopify's GDPR redaction webhooks), we honor it. Disconnecting a store from the Integrations page stops further access, and you can request deletion of imported data at any time.
 
 **Information from linked bank accounts (via Plaid).** If you choose to connect a bank account, we use Plaid Inc. ("Plaid") to access your account's transaction data — including transaction date, amount, description, merchant name, category, and the account name and type — on a **read-only** basis, in order to import your business expenses. We do **not** receive or store your bank login credentials, and we do not receive your full bank account or routing numbers. We do not initiate payments or move money. You can disconnect a linked account at any time from the Integrations page, which stops further access. Your use of Plaid is also governed by Plaid's own privacy policy.
 
