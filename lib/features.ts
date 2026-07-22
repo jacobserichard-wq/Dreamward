@@ -32,16 +32,17 @@ export const FEATURES = {
    *  See session-notes/launch-checklist.md. */
   ETSY_ENABLED: false,
 
-  /** Shopify shop sync. false since 2026-07-03: the Shopify app exists
-   *  (Client ID cd26fb7a…) but distribution was NEVER chosen — no App
-   *  Store listing, 0 installs — so a stranger can't self-serve connect.
-   *  App Store approval (~1-3 weeks) is in progress; the GDPR compliance
-   *  webhooks + read_products scope it requires are already shipped
-   *  (commits 4611134, fd7ad22). While false, the /integrations connect
-   *  card + the bulk-import "Shopify" tab are hidden and Shopify shows
-   *  only as a "Coming soon" card. Backend routes + ShopifyConnectionCard
-   *  stay dormant. Flip to true once the App Store listing is approved. */
-  SHOPIFY_ENABLED: false,
+  /** Shopify shop sync. TRUE since 2026-07-21 — flipped ahead of App
+   *  Store review because the reviewer exercises the connect flow
+   *  BEFORE approval, and the cold-install handoff (commit d420d08)
+   *  lands on /integrations where this card must exist. Dev-store
+   *  installs work with the flag on; a real (non-development) store
+   *  CANNOT install until distribution is chosen + the listing is
+   *  approved, so a real user clicking Connect pre-approval sees a
+   *  Shopify-side error — acceptable while the only real user is on
+   *  Etsy. On approval: restore the live-sync marketing copy (it was
+   *  edited out 2026-07-03; grep SHOPIFY_ENABLED for breadcrumbs). */
+  SHOPIFY_ENABLED: true,
 
   /** Wix shop sync. false since 2026-07-03: the Wix app exists (App ID
    *  96fcca2e…, still named "My New App-0") but is NOT published to the
