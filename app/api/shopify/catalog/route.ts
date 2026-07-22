@@ -14,15 +14,13 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { decryptFromDb } from "@/lib/crypto";
+import { getShopifyAccessToken } from "@/lib/shopifyToken";
 import { listCatalog } from "@/lib/shopify";
 import { isPayingTier } from "@/lib/plans";
 
 interface ShopifyConnRow {
+  id: number;
   shop_domain: string;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
 }
 
 export async function GET() {
@@ -42,8 +40,7 @@ export async function GET() {
     }
 
     const connRes = await pool.query<ShopifyConnRow>(
-      `SELECT shop_domain,
-              access_token_ciphertext, access_token_iv, access_token_auth_tag
+      `SELECT id, shop_domain
          FROM shopify_connections
         WHERE client_id = $1`,
       [client.id]
@@ -56,11 +53,7 @@ export async function GET() {
     }
     const conn = connRes.rows[0];
 
-    const accessToken = decryptFromDb({
-      ciphertext: conn.access_token_ciphertext,
-      iv: conn.access_token_iv,
-      authTag: conn.access_token_auth_tag,
-    });
+    const accessToken = await getShopifyAccessToken(conn.id);
 
     const rows = await listCatalog({
       shopDomain: conn.shop_domain,

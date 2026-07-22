@@ -29,16 +29,13 @@ import {
   subscribeWebhook,
   SHOPIFY_WEBHOOK_TOPICS,
 } from "@/lib/shopify";
-import { decryptFromDb } from "@/lib/crypto";
+import { getShopifyAccessToken } from "@/lib/shopifyToken";
 import { isPayingTier } from "@/lib/plans";
 import { normalizeImportStartDate } from "@/lib/importRange";
 
 interface PendingRow {
   id: number;
   client_id: number | null;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
 }
 
 export async function POST(req: NextRequest) {
@@ -77,8 +74,7 @@ export async function POST(req: NextRequest) {
 
   // ── Locate the pending row + conflict checks ──────────────────
   const found = await pool.query<PendingRow>(
-    `SELECT id, client_id,
-            access_token_ciphertext, access_token_iv, access_token_auth_tag
+    `SELECT id, client_id
        FROM shopify_connections WHERE shop_domain = $1`,
     [shopDomain]
   );
@@ -129,11 +125,7 @@ export async function POST(req: NextRequest) {
   // Best-effort — failures logged, never block the bind. Daily
   // reconciliation cron compensates for missed webhooks.
   try {
-    const accessToken = decryptFromDb({
-      ciphertext: row.access_token_ciphertext,
-      iv: row.access_token_iv,
-      authTag: row.access_token_auth_tag,
-    });
+    const accessToken = await getShopifyAccessToken(row.id);
     const webhookAddress = new URL("/api/shopify/webhook", req.url).toString();
     const webhookIds: string[] = [];
     for (const topic of SHOPIFY_WEBHOOK_TOPICS) {

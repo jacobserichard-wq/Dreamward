@@ -32,7 +32,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { decryptFromDb } from "@/lib/crypto";
+import { getShopifyAccessToken } from "@/lib/shopifyToken";
 import {
   listOrders,
   mapOrderToProcessedItem,
@@ -53,9 +53,6 @@ const TIME_BUDGET_MS = 50_000;
 interface ConnectionRow {
   id: number;
   shop_domain: string;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
   backfill_orders_imported: number;
   backfill_capped_at_30k: boolean;
   backfill_extended_paid_at: string | null;
@@ -83,7 +80,6 @@ export async function POST() {
     // ── Load connection state ──────────────────────────────────
     const found = await pool.query<ConnectionRow>(
       `SELECT id, shop_domain,
-              access_token_ciphertext, access_token_iv, access_token_auth_tag,
               backfill_orders_imported, backfill_capped_at_30k,
               backfill_extended_paid_at, backfill_completed_at,
               import_start_date::text AS import_start_date
@@ -109,12 +105,9 @@ export async function POST() {
       });
     }
 
-    // ── Decrypt token + mark backfill as started (idempotent) ──
-    const accessToken = decryptFromDb({
-      ciphertext: conn.access_token_ciphertext,
-      iv: conn.access_token_iv,
-      authTag: conn.access_token_auth_tag,
-    });
+    // ── Get a live token + mark backfill as started (idempotent) ──
+    // getShopifyAccessToken transparently refreshes an expired token.
+    const accessToken = await getShopifyAccessToken(conn.id);
 
     await pool.query(
       `UPDATE shopify_connections

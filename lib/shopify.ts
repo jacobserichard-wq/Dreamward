@@ -106,16 +106,59 @@ export function buildAuthorizeUrl(opts: {
   return `https://${opts.shopDomain}/admin/oauth/authorize?${params.toString()}`;
 }
 
+/** Token set returned by the code exchange and the refresh grant.
+ *  Expiring offline tokens (mandatory for public apps since Spring
+ *  '26): accessToken lives ~1 hour, refreshToken ~90 days. The
+ *  expiry fields are null only if Shopify hands back a legacy
+ *  non-expiring token (shouldn't happen with expiring=1, but the
+ *  parser doesn't assume). */
+export interface ShopifyTokenSet {
+  accessToken: string;
+  scopes: string[];
+  refreshToken: string | null;
+  /** Absolute expiry timestamps, computed from expires_in at parse time. */
+  accessTokenExpiresAt: Date | null;
+  refreshTokenExpiresAt: Date | null;
+}
+
+function parseTokenResponse(data: {
+  access_token?: string;
+  scope?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  refresh_token_expires_in?: number;
+}): ShopifyTokenSet {
+  if (!data.access_token) {
+    throw new Error("Shopify token endpoint returned no access_token");
+  }
+  const now = Date.now();
+  return {
+    accessToken: data.access_token,
+    scopes: (data.scope ?? "").split(",").filter((s) => s.length > 0),
+    refreshToken: data.refresh_token ?? null,
+    accessTokenExpiresAt:
+      typeof data.expires_in === "number"
+        ? new Date(now + data.expires_in * 1000)
+        : null,
+    refreshTokenExpiresAt:
+      typeof data.refresh_token_expires_in === "number"
+        ? new Date(now + data.refresh_token_expires_in * 1000)
+        : null,
+  };
+}
+
 /**
- * Exchange the OAuth `code` we got back at the callback for a
- * permanent access token. Shopify returns the token + the actual
- * granted scopes (which may be a SUBSET of what we requested — the
- * merchant can deny individual scopes during consent).
+ * Exchange the OAuth `code` we got back at the callback for an
+ * offline access token. `expiring: "1"` requests the expiring
+ * variant (1h access + 90-day refresh token) — required for public
+ * apps; the Admin API 403s non-expiring tokens. Shopify returns the
+ * actual granted scopes (which may be a SUBSET of what we requested —
+ * the merchant can deny individual scopes during consent).
  */
 export async function exchangeCodeForToken(opts: {
   shopDomain: string;
   code: string;
-}): Promise<{ accessToken: string; scopes: string[] }> {
+}): Promise<ShopifyTokenSet> {
   const { clientId, clientSecret } = loadEnv();
   const res = await fetch(
     `https://${opts.shopDomain}/admin/oauth/access_token`,
@@ -126,6 +169,7 @@ export async function exchangeCodeForToken(opts: {
         client_id: clientId,
         client_secret: clientSecret,
         code: opts.code,
+        expiring: "1",
       }),
     }
   );
@@ -135,17 +179,43 @@ export async function exchangeCodeForToken(opts: {
       `Shopify token exchange failed: HTTP ${res.status} ${body.slice(0, 200)}`
     );
   }
-  const data = (await res.json()) as {
-    access_token?: string;
-    scope?: string;
-  };
-  if (!data.access_token) {
-    throw new Error("Shopify token exchange returned no access_token");
+  return parseTokenResponse(await res.json());
+}
+
+/**
+ * Redeem a refresh token for a fresh access + refresh token pair.
+ * Shopify invalidates the old refresh token on use (but replays the
+ * same response for ~1h, so a retry with the same refresh token
+ * after a transient failure is safe). Form-encoded per the docs.
+ */
+export async function refreshOfflineToken(opts: {
+  shopDomain: string;
+  refreshToken: string;
+}): Promise<ShopifyTokenSet> {
+  const { clientId, clientSecret } = loadEnv();
+  const res = await fetch(
+    `https://${opts.shopDomain}/admin/oauth/access_token`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "refresh_token",
+        refresh_token: opts.refreshToken,
+      }).toString(),
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Shopify token refresh failed: HTTP ${res.status} ${body.slice(0, 200)}`
+    );
   }
-  return {
-    accessToken: data.access_token,
-    scopes: (data.scope ?? "").split(",").filter((s) => s.length > 0),
-  };
+  return parseTokenResponse(await res.json());
 }
 
 // ---------------------------------------------------------------------

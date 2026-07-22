@@ -25,7 +25,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { decryptFromDb } from "@/lib/crypto";
+import { getShopifyAccessToken } from "@/lib/shopifyToken";
 import { extractShopifyLineItems, type ShopifyOrder } from "@/lib/shopify";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
@@ -33,10 +33,8 @@ import { isPayingTier } from "@/lib/plans";
 const TIME_BUDGET_MS = 50_000;
 
 interface ConnectionRow {
+  id: number;
   shop_domain: string;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
 }
 
 interface ParentRow {
@@ -92,8 +90,7 @@ export async function POST(req: Request) {
     const cursor = Number(url.searchParams.get("cursor") ?? "0") || 0;
 
     const connRes = await pool.query<ConnectionRow>(
-      `SELECT shop_domain,
-              access_token_ciphertext, access_token_iv, access_token_auth_tag
+      `SELECT id, shop_domain
          FROM shopify_connections
         WHERE client_id = $1`,
       [client.id]
@@ -105,11 +102,7 @@ export async function POST(req: Request) {
       );
     }
     const conn = connRes.rows[0];
-    const accessToken = decryptFromDb({
-      ciphertext: conn.access_token_ciphertext,
-      iv: conn.access_token_iv,
-      authTag: conn.access_token_auth_tag,
-    });
+    const accessToken = await getShopifyAccessToken(conn.id);
 
     // Pull a page of parents that don't already have line items.
     // The NOT EXISTS keeps the query fast — once a parent gets line

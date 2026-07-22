@@ -27,14 +27,12 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
-import { decryptFromDb } from "@/lib/crypto";
+import { getShopifyAccessToken } from "@/lib/shopifyToken";
 import { isPayingTier } from "@/lib/plans";
 
 interface ShopifyConnectionRow {
+  id: number;
   shop_domain: string;
-  access_token_ciphertext: Buffer;
-  access_token_iv: Buffer;
-  access_token_auth_tag: Buffer;
   webhook_subscription_ids: string[];
 }
 
@@ -60,10 +58,7 @@ export async function POST() {
     // Load the connection (single tenant — UNIQUE(client_id) means
     // at most one row).
     const found = await pool.query<ShopifyConnectionRow>(
-      `SELECT shop_domain,
-              access_token_ciphertext,
-              access_token_iv,
-              access_token_auth_tag,
+      `SELECT id, shop_domain,
               webhook_subscription_ids
          FROM shopify_connections
         WHERE client_id = $1`,
@@ -77,16 +72,12 @@ export async function POST() {
     }
     const conn = found.rows[0];
 
-    // Best-effort Shopify-side webhook cleanup. Decrypts the token,
-    // calls DELETE for each webhook ID. Failures get logged but
-    // never block the local disconnect.
+    // Best-effort Shopify-side webhook cleanup. Gets a live token
+    // (refreshing if expired), calls DELETE for each webhook ID.
+    // Failures get logged but never block the local disconnect.
     if (conn.webhook_subscription_ids.length > 0) {
       try {
-        const accessToken = decryptFromDb({
-          ciphertext: conn.access_token_ciphertext,
-          iv: conn.access_token_iv,
-          authTag: conn.access_token_auth_tag,
-        });
+        const accessToken = await getShopifyAccessToken(conn.id);
         const apiVersion = process.env.SHOPIFY_API_VERSION || "2026-04";
         for (const webhookId of conn.webhook_subscription_ids) {
           try {

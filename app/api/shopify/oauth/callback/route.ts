@@ -40,6 +40,7 @@ import {
   verifyOAuthCallbackHmac,
   subscribeWebhook,
   SHOPIFY_WEBHOOK_TOPICS,
+  type ShopifyTokenSet,
 } from "@/lib/shopify";
 import { encryptForDb } from "@/lib/crypto";
 import { isPayingTier } from "@/lib/plans";
@@ -120,7 +121,7 @@ export async function GET(req: NextRequest) {
     return redirectWithError(req, "OAuth callback missing authorization code.");
   }
 
-  let tokenResult: { accessToken: string; scopes: string[] };
+  let tokenResult: ShopifyTokenSet;
   try {
     tokenResult = await exchangeCodeForToken({ shopDomain, code });
   } catch (err) {
@@ -131,10 +132,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ── 6. Encrypt the token ──────────────────────────────────────
+  // ── 6. Encrypt the tokens ─────────────────────────────────────
+  // Expiring offline tokens (2026-07-21): the exchange returns a
+  // ~1h access token + ~90d refresh token; both stored encrypted.
   let encrypted: ReturnType<typeof encryptForDb>;
+  let encryptedRefresh: ReturnType<typeof encryptForDb> | null;
   try {
     encrypted = encryptForDb(tokenResult.accessToken);
+    encryptedRefresh = tokenResult.refreshToken
+      ? encryptForDb(tokenResult.refreshToken)
+      : null;
   } catch (err) {
     // Most likely cause: SHOPIFY_TOKEN_ENCRYPTION_KEY env var is
     // missing or malformed. Surface this clearly so the operator
@@ -163,19 +170,32 @@ export async function GET(req: NextRequest) {
         `INSERT INTO shopify_connections (
            client_id, shop_domain,
            access_token_ciphertext, access_token_iv, access_token_auth_tag,
+           access_token_expires_at,
+           refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag,
+           refresh_token_expires_at,
            scopes, import_start_date
-         ) VALUES (NULL, $1, $2, $3, $4, $5, NULL)
+         ) VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL)
          ON CONFLICT (shop_domain) DO UPDATE SET
-           access_token_ciphertext = EXCLUDED.access_token_ciphertext,
-           access_token_iv         = EXCLUDED.access_token_iv,
-           access_token_auth_tag   = EXCLUDED.access_token_auth_tag,
-           scopes                  = EXCLUDED.scopes,
-           updated_at              = NOW()`,
+           access_token_ciphertext  = EXCLUDED.access_token_ciphertext,
+           access_token_iv          = EXCLUDED.access_token_iv,
+           access_token_auth_tag    = EXCLUDED.access_token_auth_tag,
+           access_token_expires_at  = EXCLUDED.access_token_expires_at,
+           refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
+           refresh_token_iv         = EXCLUDED.refresh_token_iv,
+           refresh_token_auth_tag   = EXCLUDED.refresh_token_auth_tag,
+           refresh_token_expires_at = EXCLUDED.refresh_token_expires_at,
+           scopes                   = EXCLUDED.scopes,
+           updated_at               = NOW()`,
         [
           shopDomain,
           encrypted.ciphertext,
           encrypted.iv,
           encrypted.authTag,
+          tokenResult.accessTokenExpiresAt,
+          encryptedRefresh?.ciphertext ?? null,
+          encryptedRefresh?.iv ?? null,
+          encryptedRefresh?.authTag ?? null,
+          tokenResult.refreshTokenExpiresAt,
           tokenResult.scopes,
         ]
       );
@@ -219,23 +239,36 @@ export async function GET(req: NextRequest) {
       `INSERT INTO shopify_connections (
          client_id, shop_domain,
          access_token_ciphertext, access_token_iv, access_token_auth_tag,
+         access_token_expires_at,
+         refresh_token_ciphertext, refresh_token_iv, refresh_token_auth_tag,
+         refresh_token_expires_at,
          scopes, import_start_date
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (shop_domain) DO UPDATE SET
-         client_id               = EXCLUDED.client_id,
-         access_token_ciphertext = EXCLUDED.access_token_ciphertext,
-         access_token_iv         = EXCLUDED.access_token_iv,
-         access_token_auth_tag   = EXCLUDED.access_token_auth_tag,
-         scopes                  = EXCLUDED.scopes,
-         import_start_date       = COALESCE(EXCLUDED.import_start_date,
-                                            shopify_connections.import_start_date),
-         updated_at              = NOW()`,
+         client_id                = EXCLUDED.client_id,
+         access_token_ciphertext  = EXCLUDED.access_token_ciphertext,
+         access_token_iv          = EXCLUDED.access_token_iv,
+         access_token_auth_tag    = EXCLUDED.access_token_auth_tag,
+         access_token_expires_at  = EXCLUDED.access_token_expires_at,
+         refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
+         refresh_token_iv         = EXCLUDED.refresh_token_iv,
+         refresh_token_auth_tag   = EXCLUDED.refresh_token_auth_tag,
+         refresh_token_expires_at = EXCLUDED.refresh_token_expires_at,
+         scopes                   = EXCLUDED.scopes,
+         import_start_date        = COALESCE(EXCLUDED.import_start_date,
+                                             shopify_connections.import_start_date),
+         updated_at               = NOW()`,
       [
         client.id,
         shopDomain,
         encrypted.ciphertext,
         encrypted.iv,
         encrypted.authTag,
+        tokenResult.accessTokenExpiresAt,
+        encryptedRefresh?.ciphertext ?? null,
+        encryptedRefresh?.iv ?? null,
+        encryptedRefresh?.authTag ?? null,
+        tokenResult.refreshTokenExpiresAt,
         tokenResult.scopes,
         importStartDate,
       ]
