@@ -1,0 +1,34 @@
+# Shopify app configuration — the Dev Dashboard's "New version" form
+# can't express compliance webhooks (its own UI says to use the CLI
+# for "all configuration"), so this file is the source of truth and
+# `shopify app deploy` releases it as a new app version.
+#
+# ⚠️ Deploying this REPLACES the active version's config wholesale.
+# Everything here mirrors v3-full-orders exactly; the only addition
+# is the mandatory GDPR compliance-webhook subscription. If you
+# change app config in the dashboard UI later, mirror it here (or
+# re-pull with `shopify app config link`) before the next deploy.
+
+client_id = "cd26fb7a5fc430fcea34570ff1547e58"
+name = "Dreamward"
+application_url = "https://godreamward.com/api/shopify/install"
+embedded = false
+
+[access_scopes]
+scopes = "read_all_orders,read_orders,read_products"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = ["https://godreamward.com/api/shopify/oauth/callback"]
+
+[webhooks]
+api_version = "2026-04"
+
+# Mandatory GDPR topics (App Store requirement). Handler:
+# app/api/shopify/webhook/route.ts — verifies X-Shopify-Hmac-SHA256,
+# answers customers/data_request, customers/redact, shop/redact.
+# Order webhooks are NOT configured here — the app registers those
+# per-shop via the API at connect time (webhook_subscription_ids).
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://godreamward.com/api/shopify/webhook"
