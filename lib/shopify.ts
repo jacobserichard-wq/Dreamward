@@ -299,25 +299,23 @@ export function verifyWebhookHmac(
 // ---------------------------------------------------------------------
 
 /**
- * Bare REST GET against Shopify's admin API. All calls authenticate
- * via the X-Shopify-Access-Token header. URL is built from the shop
- * domain + pinned SHOPIFY_API_VERSION + caller-supplied path.
+ * Execute a GraphQL operation against the Admin API. ALL Shopify
+ * data access goes through this — REST is retired (App Store
+ * requirement 2.2.4: public apps created after 2025-04 must use
+ * GraphQL exclusively; the REST orders endpoint also hard-403s
+ * protected customer data).
  *
- * Sub-phase 8c layers paginated helpers on top; 8d uses this for
- * webhook subscription management.
+ * Throws on transport errors and on top-level GraphQL `errors`.
+ * Mutations must additionally check their payload's userErrors.
  */
-/**
- * Bare REST POST against Shopify's admin API. Used by webhook
- * subscription registration (8d) + future write-back operations.
- */
-export async function shopifyPost<T = unknown>(opts: {
+export async function shopifyGraphql<T = unknown>(opts: {
   shopDomain: string;
   accessToken: string;
-  path: string;
-  body: unknown;
+  query: string;
+  variables?: Record<string, unknown>;
 }): Promise<T> {
   const { apiVersion } = loadEnv();
-  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}${opts.path}`;
+  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/graphql.json`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -325,33 +323,37 @@ export async function shopifyPost<T = unknown>(opts: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify(opts.body),
+    body: JSON.stringify({
+      query: opts.query,
+      variables: opts.variables ?? {},
+    }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Shopify POST ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
+    throw new Error(
+      `Shopify GraphQL: HTTP ${res.status} ${body.slice(0, 200)}`
+    );
   }
-  return (await res.json()) as T;
+  const payload = (await res.json()) as {
+    data?: T;
+    errors?: Array<{ message: string }>;
+  };
+  if (payload.errors && payload.errors.length > 0) {
+    throw new Error(
+      `Shopify GraphQL errors: ${payload.errors
+        .map((e) => e.message)
+        .join("; ")
+        .slice(0, 300)}`
+    );
+  }
+  if (!payload.data) throw new Error("Shopify GraphQL: empty data");
+  return payload.data;
 }
 
-export async function shopifyGet<T = unknown>(opts: {
-  shopDomain: string;
-  accessToken: string;
-  path: string;          // e.g. "/orders.json?limit=250"
-}): Promise<T> {
-  const { apiVersion } = loadEnv();
-  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}${opts.path}`;
-  const res = await fetch(url, {
-    headers: {
-      "X-Shopify-Access-Token": opts.accessToken,
-      Accept: "application/json",
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Shopify GET ${opts.path}: HTTP ${res.status} ${body.slice(0, 200)}`);
-  }
-  return (await res.json()) as T;
+/** Parse the trailing numeric ID out of a gid://shopify/Type/123. */
+function gidToNumber(gid: string): number {
+  const m = /(\d+)$/.exec(gid);
+  return m ? Number(m[1]) : 0;
 }
 
 // ---------------------------------------------------------------------
@@ -403,19 +405,140 @@ export interface ShopifyOrder {
   }>;
 }
 
+// GraphQL wire shapes + adapter. The rest of the codebase (mapper,
+// backfill, webhook handler) speaks the REST-era ShopifyOrder shape;
+// orderNodeToRest() converts at the boundary so the GraphQL
+// migration has zero blast radius downstream.
+
+interface GqlMoneySet {
+  shopMoney: { amount: string; currencyCode?: string };
+}
+
+interface GqlOrderNode {
+  legacyResourceId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  processedAt: string | null;
+  cancelledAt: string | null;
+  currencyCode: string;
+  displayFinancialStatus: string | null;
+  displayFulfillmentStatus: string | null;
+  totalPriceSet: GqlMoneySet | null;
+  subtotalPriceSet: GqlMoneySet | null;
+  totalTaxSet: GqlMoneySet | null;
+  totalShippingPriceSet: GqlMoneySet | null;
+  customer: {
+    legacyResourceId: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  lineItems: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      sku: string | null;
+      originalUnitPriceSet: GqlMoneySet | null;
+      variant: { legacyResourceId: string } | null;
+      product: { legacyResourceId: string } | null;
+    }>;
+  };
+}
+
+/** Shared field selection for order queries. lineItems capped at 250
+ *  (connection max) — far beyond any maker order. Customer email is
+ *  deliberately NOT queried: our protected-customer-data grant covers
+ *  Name only, and the mapper falls back to "Unknown" without it. */
+const ORDER_SELECTION = `
+  legacyResourceId
+  name
+  createdAt
+  updatedAt
+  processedAt
+  cancelledAt
+  currencyCode
+  displayFinancialStatus
+  displayFulfillmentStatus
+  totalPriceSet { shopMoney { amount } }
+  subtotalPriceSet { shopMoney { amount } }
+  totalTaxSet { shopMoney { amount } }
+  totalShippingPriceSet { shopMoney { amount currencyCode } }
+  customer { legacyResourceId firstName lastName }
+  lineItems(first: 250) {
+    nodes {
+      id
+      name
+      quantity
+      sku
+      originalUnitPriceSet { shopMoney { amount } }
+      variant { legacyResourceId }
+      product { legacyResourceId }
+    }
+  }`;
+
+function orderNodeToRest(node: GqlOrderNode): ShopifyOrder {
+  // GraphQL enums are SCREAMING_SNAKE ("PARTIALLY_REFUNDED"); the
+  // REST strings the mapper matches on are lowercase.
+  const lower = (v: string | null) => (v ? v.toLowerCase() : null);
+  return {
+    id: Number(node.legacyResourceId),
+    // GraphQL has no order_number field; the digits of name ("#1001")
+    // are the same value.
+    order_number: Number(node.name.replace(/\D/g, "")) || 0,
+    name: node.name,
+    created_at: node.createdAt,
+    updated_at: node.updatedAt,
+    processed_at: node.processedAt,
+    cancelled_at: node.cancelledAt,
+    total_price: node.totalPriceSet?.shopMoney.amount ?? "0",
+    subtotal_price: node.subtotalPriceSet?.shopMoney.amount ?? "0",
+    total_tax: node.totalTaxSet?.shopMoney.amount ?? "0",
+    total_shipping_price_set: node.totalShippingPriceSet
+      ? {
+          shop_money: {
+            amount: node.totalShippingPriceSet.shopMoney.amount,
+            currency_code:
+              node.totalShippingPriceSet.shopMoney.currencyCode ?? "",
+          },
+        }
+      : null,
+    currency: node.currencyCode,
+    financial_status: lower(node.displayFinancialStatus),
+    fulfillment_status: lower(node.displayFulfillmentStatus),
+    customer: node.customer
+      ? {
+          id: Number(node.customer.legacyResourceId),
+          email: null, // not queried — see ORDER_SELECTION comment
+          first_name: node.customer.firstName,
+          last_name: node.customer.lastName,
+        }
+      : null,
+    line_items: node.lineItems.nodes.map((li) => ({
+      id: gidToNumber(li.id),
+      name: li.name,
+      quantity: li.quantity,
+      price: li.originalUnitPriceSet?.shopMoney.amount ?? "0",
+      variant_id: li.variant ? Number(li.variant.legacyResourceId) : null,
+      product_id: li.product ? Number(li.product.legacyResourceId) : null,
+      sku: li.sku && li.sku.trim().length > 0 ? li.sku : null,
+    })),
+  };
+}
+
 /**
- * Fetch a single page of orders. Shopify's REST pagination uses
- * cursor-based `since_id` — pass the last order's ID to get the
- * next page (orders sorted by ID ascending = chronological).
+ * Fetch a single page of orders via GraphQL, keeping the REST-era
+ * since_id resume semantics: the search filter `id:>N` + sortKey ID
+ * gives ascending-ID pages, so the backfill's MAX(source_ref_id)
+ * cursor keeps working unchanged.
  *
  * Returns the orders + nextSinceId. nextSinceId is the last order's
  * ID if a full page came back, OR null when fewer than `limit`
  * orders returned (indicates end of history).
  *
  * @param sinceId pass 0 (or omit) for the first call
- * @param limit 1-250 (Shopify max); 250 is most efficient
- * @param status 'any' to include cancelled + open; default Shopify
- *               behavior is 'open' which excludes cancelled
+ * @param limit 1-250 (connection max); 250 is most efficient
+ * @param status 'any' (default) includes cancelled + closed
  */
 export async function listOrders(opts: {
   shopDomain: string;
@@ -428,45 +551,53 @@ export async function listOrders(opts: {
   createdAtMin?: string;
 }): Promise<{ orders: ShopifyOrder[]; nextSinceId: number | null }> {
   const limit = Math.min(Math.max(opts.limit ?? 250, 1), 250);
-  const params = new URLSearchParams({
-    limit: String(limit),
-    status: opts.status ?? "any",
-    // Restrict to fields we actually use. Keeps the JSON payload
-    // ~5-10x smaller than the default response.
-    fields: [
-      "id",
-      "order_number",
-      "name",
-      "created_at",
-      "updated_at",
-      "processed_at",
-      "cancelled_at",
-      "total_price",
-      "subtotal_price",
-      "total_tax",
-      "total_shipping_price_set",
-      "currency",
-      "financial_status",
-      "fulfillment_status",
-      "customer",
-      "line_items",
-    ].join(","),
-  });
-  if (opts.sinceId && opts.sinceId > 0) {
-    params.set("since_id", String(opts.sinceId));
-  }
-  if (opts.createdAtMin) {
-    params.set("created_at_min", opts.createdAtMin);
-  }
-  const result = await shopifyGet<{ orders: ShopifyOrder[] }>({
+  const terms: string[] = [];
+  if (opts.sinceId && opts.sinceId > 0) terms.push(`id:>${opts.sinceId}`);
+  if (opts.createdAtMin) terms.push(`created_at:>='${opts.createdAtMin}'`);
+  if (opts.status && opts.status !== "any")
+    terms.push(`status:${opts.status}`);
+  const data = await shopifyGraphql<{
+    orders: { nodes: GqlOrderNode[] };
+  }>({
     shopDomain: opts.shopDomain,
     accessToken: opts.accessToken,
-    path: `/orders.json?${params.toString()}`,
+    query: `query OrdersPage($first: Int!, $query: String) {
+      orders(first: $first, query: $query, sortKey: ID) {
+        nodes {${ORDER_SELECTION}
+        }
+      }
+    }`,
+    variables: {
+      first: limit,
+      query: terms.length > 0 ? terms.join(" AND ") : null,
+    },
   });
-  const orders = result.orders ?? [];
+  const orders = (data.orders?.nodes ?? []).map(orderNodeToRest);
   const nextSinceId =
     orders.length === limit ? orders[orders.length - 1].id : null;
   return { orders, nextSinceId };
+}
+
+/**
+ * Fetch one order by its numeric (legacy) ID. Returns null when the
+ * order doesn't exist. Used by reimport-line-items to hydrate
+ * historical orders that were ingested before COGS tracking.
+ */
+export async function getOrder(opts: {
+  shopDomain: string;
+  accessToken: string;
+  orderId: string | number;
+}): Promise<ShopifyOrder | null> {
+  const data = await shopifyGraphql<{ order: GqlOrderNode | null }>({
+    shopDomain: opts.shopDomain,
+    accessToken: opts.accessToken,
+    query: `query GetOrder($id: ID!) {
+      order(id: $id) {${ORDER_SELECTION}
+      }
+    }`,
+    variables: { id: `gid://shopify/Order/${opts.orderId}` },
+  });
+  return data.order ? orderNodeToRest(data.order) : null;
 }
 
 // ---------------------------------------------------------------------
@@ -608,33 +739,22 @@ export function mapOrderToProcessedItem(order: ShopifyOrder): MappedOrderRow {
 // variant_id is what line items reference (and what gets stored as
 // sku_aliases.external_id).
 //
-// Cost: `cost` field on variant returns the merchant-entered "cost
-// per item" from the Shopify admin. Optional — only populated when
-// the merchant enabled inventory tracking + filled it in. When
-// absent we surface null and the bulk-import UI prompts the user.
+// Cost: Shopify keeps per-item cost on InventoryItem.unitCost, which
+// requires the read_inventory scope we don't request — so cost is
+// always null here and the bulk-import UI prompts the user. (The old
+// REST version asked for a `cost` field products.json never returns,
+// so nothing regressed; requesting read_inventory to prefill costs is
+// a possible post-launch improvement.)
 //
-// Pagination: Shopify supports both since_id and Link-header
-// pagination. We use since_id (matches our orders fetcher pattern)
-// against the variant id space. Variants pages are typically much
-// smaller than orders pages — 250-row pages should be plenty for
-// most maker catalogs.
+// Pagination: GraphQL cursor pagination over productVariants —
+// flatter than products→variants nesting and 250-row pages are
+// plenty for most maker catalogs.
 
-interface ShopifyProductForCatalog {
-  id: number;
-  title: string;
-  variants: Array<{
-    id: number;
-    title: string;
-    sku: string | null;
-    price: string;
-    /** Per-item cost as a decimal string (e.g., "4.50"). May be
-     *  absent on stores without inventory cost tracking enabled. */
-    cost?: string | null;
-  }>;
-}
-
-interface ShopifyProductsResponse {
-  products: ShopifyProductForCatalog[];
+interface GqlVariantNode {
+  legacyResourceId: string;
+  title: string | null;
+  sku: string | null;
+  product: { legacyResourceId: string; title: string };
 }
 
 /** Flattened, Dreamward-friendly shape returned by listCatalog. */
@@ -658,65 +778,57 @@ export interface ShopifyCatalogVariation {
 
 /**
  * Fetch the merchant's full Shopify product catalog (every variant
- * across every product), paginated via since_id. Walks every page
- * automatically until an empty one returns.
+ * across every product) via GraphQL cursor pagination. Walks every
+ * page automatically until hasNextPage is false.
  */
 export async function listCatalog(opts: {
   shopDomain: string;
   accessToken: string;
 }): Promise<ShopifyCatalogVariation[]> {
   const out: ShopifyCatalogVariation[] = [];
-  let sinceId = 0;
+  let after: string | null = null;
 
   while (true) {
-    const params = new URLSearchParams({
-      limit: "250",
-      // Restrict to what we need — shrinks payload ~5x.
-      fields: "id,title,variants",
+    const data: {
+      productVariants: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: GqlVariantNode[];
+      };
+    } = await shopifyGraphql({
+      shopDomain: opts.shopDomain,
+      accessToken: opts.accessToken,
+      query: `query CatalogPage($first: Int!, $after: String) {
+        productVariants(first: $first, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            legacyResourceId
+            title
+            sku
+            product { legacyResourceId title }
+          }
+        }
+      }`,
+      variables: { first: 250, after },
     });
-    if (sinceId > 0) params.set("since_id", String(sinceId));
 
-    const apiVersion = process.env.SHOPIFY_API_VERSION;
-    if (!apiVersion)
-      throw new Error("SHOPIFY_API_VERSION env var is not set");
-    const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/products.json?${params.toString()}`;
-    const res = await fetch(url, {
-      headers: {
-        "X-Shopify-Access-Token": opts.accessToken,
-        Accept: "application/json",
-      },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(
-        `Shopify products list failed: HTTP ${res.status} ${body.slice(0, 200)}`
-      );
-    }
-    const data = (await res.json()) as ShopifyProductsResponse;
-    const products = data.products ?? [];
-    if (products.length === 0) break;
-
-    for (const p of products) {
-      for (const v of p.variants) {
-        const costNum =
-          v.cost != null && v.cost !== "" ? Number(v.cost) : null;
-        const distinctTitle =
-          v.title && v.title !== "Default Title" && v.title !== p.title;
-        out.push({
-          variantId: String(v.id),
-          productId: String(p.id),
-          displayName: distinctTitle
-            ? `${p.title} - ${v.title}`
-            : p.title,
-          sku: v.sku && v.sku.trim().length > 0 ? v.sku : null,
-          cost: Number.isFinite(costNum ?? NaN) ? costNum : null,
-          currency: null,
-        });
-      }
+    const page = data.productVariants;
+    for (const v of page.nodes) {
+      const distinctTitle =
+        v.title && v.title !== "Default Title" && v.title !== v.product.title;
+      out.push({
+        variantId: v.legacyResourceId,
+        productId: v.product.legacyResourceId,
+        displayName: distinctTitle
+          ? `${v.product.title} - ${v.title}`
+          : v.product.title,
+        sku: v.sku && v.sku.trim().length > 0 ? v.sku : null,
+        cost: null, // needs read_inventory — see header comment
+        currency: null,
+      });
     }
 
-    if (products.length < 250) break; // last page
-    sinceId = products[products.length - 1].id;
+    if (!page.pageInfo.hasNextPage || !page.pageInfo.endCursor) break;
+    after = page.pageInfo.endCursor;
   }
 
   return out;
@@ -751,14 +863,23 @@ export const SHOPIFY_WEBHOOK_TOPICS = [
 
 export type ShopifyWebhookTopic = (typeof SHOPIFY_WEBHOOK_TOPICS)[number];
 
+/** REST-style topic ("orders/create") → GraphQL enum (ORDERS_CREATE).
+ *  The webhook DELIVERIES still carry the REST-style topic in the
+ *  X-Shopify-Topic header, so the receiving route is unchanged. */
+function topicToEnum(topic: ShopifyWebhookTopic): string {
+  return topic.toUpperCase().replace(/\//g, "_");
+}
+
 /**
- * Register a webhook subscription with Shopify. Returns the webhook
- * id (which we persist on shopify_connections.webhook_subscription_ids
- * so the disconnect flow can clean them up).
+ * Register a webhook subscription with Shopify. Returns the
+ * subscription id — a gid string — which we persist on
+ * shopify_connections.webhook_subscription_ids so the disconnect
+ * flow can clean them up. (Legacy rows hold bare numeric REST ids;
+ * unsubscribeWebhook accepts both.)
  *
- * Shopify deduplicates by (topic, address) — re-subscribing the same
- * topic+address combo returns the existing webhook ID rather than
- * creating a duplicate. So this is safe to call on reconnect.
+ * Idempotent on reconnect: unlike REST, the GraphQL create errors
+ * with "already been taken" for an existing (topic, uri) pair — in
+ * that case we look up and return the existing subscription's id.
  *
  * @param address the public URL Shopify will POST to on each event
  */
@@ -768,21 +889,54 @@ export async function subscribeWebhook(opts: {
   topic: ShopifyWebhookTopic;
   address: string;
 }): Promise<{ id: string }> {
-  const result = await shopifyPost<{
-    webhook: { id: number; topic: string; address: string; format: string };
+  const topicEnum = topicToEnum(opts.topic);
+  const data = await shopifyGraphql<{
+    webhookSubscriptionCreate: {
+      webhookSubscription: { id: string } | null;
+      userErrors: Array<{ field: string[] | null; message: string }>;
+    };
   }>({
     shopDomain: opts.shopDomain,
     accessToken: opts.accessToken,
-    path: "/webhooks.json",
-    body: {
-      webhook: {
-        topic: opts.topic,
-        address: opts.address,
-        format: "json",
-      },
+    query: `mutation WebhookCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+      webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+        webhookSubscription { id }
+        userErrors { field message }
+      }
+    }`,
+    variables: {
+      topic: topicEnum,
+      webhookSubscription: { callbackUrl: opts.address, format: "JSON" },
     },
   });
-  return { id: String(result.webhook.id) };
+  const payload = data.webhookSubscriptionCreate;
+  if (payload.webhookSubscription) return { id: payload.webhookSubscription.id };
+
+  const messages = payload.userErrors.map((e) => e.message).join("; ");
+  if (/taken|exists/i.test(messages)) {
+    // Already subscribed — find and return the existing id.
+    const lookup = await shopifyGraphql<{
+      webhookSubscriptions: {
+        nodes: Array<{ id: string; topic: string; uri: string }>;
+      };
+    }>({
+      shopDomain: opts.shopDomain,
+      accessToken: opts.accessToken,
+      query: `query WebhookLookup($topics: [WebhookSubscriptionTopic!]) {
+        webhookSubscriptions(first: 50, topics: $topics) {
+          nodes { id topic uri }
+        }
+      }`,
+      variables: { topics: [topicEnum] },
+    });
+    const existing = lookup.webhookSubscriptions.nodes.find(
+      (n) => n.uri === opts.address
+    );
+    if (existing) return { id: existing.id };
+  }
+  throw new Error(
+    `Shopify webhook subscribe (${opts.topic}) failed: ${messages || "no subscription returned"}`
+  );
 }
 
 /**
@@ -790,25 +944,39 @@ export async function subscribeWebhook(opts: {
  * route logs failures but doesn't block on them (a webhook to a
  * deleted Dreamward connection is harmless — the receiver 404s on
  * its own client_id lookup).
+ *
+ * Accepts both gid ids (GraphQL era) and bare numeric ids persisted
+ * by the retired REST implementation.
  */
 export async function unsubscribeWebhook(opts: {
   shopDomain: string;
   accessToken: string;
   webhookId: string;
 }): Promise<void> {
-  const { apiVersion } = loadEnv();
-  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/webhooks/${opts.webhookId}.json`;
-  const res = await fetch(url, {
-    method: "DELETE",
-    headers: {
-      "X-Shopify-Access-Token": opts.accessToken,
-      Accept: "application/json",
-    },
+  const gid = opts.webhookId.startsWith("gid://")
+    ? opts.webhookId
+    : `gid://shopify/WebhookSubscription/${opts.webhookId}`;
+  const data = await shopifyGraphql<{
+    webhookSubscriptionDelete: {
+      deletedWebhookSubscriptionId: string | null;
+      userErrors: Array<{ field: string[] | null; message: string }>;
+    };
+  }>({
+    shopDomain: opts.shopDomain,
+    accessToken: opts.accessToken,
+    query: `mutation WebhookDelete($id: ID!) {
+      webhookSubscriptionDelete(id: $id) {
+        deletedWebhookSubscriptionId
+        userErrors { field message }
+      }
+    }`,
+    variables: { id: gid },
   });
-  if (!res.ok && res.status !== 404) {
-    const body = await res.text().catch(() => "");
+  const errs = data.webhookSubscriptionDelete.userErrors;
+  // "not found" parity with the REST 404 tolerance: already gone is fine.
+  if (errs.length > 0 && !/not found|doesn't exist/i.test(errs.map((e) => e.message).join(" "))) {
     throw new Error(
-      `Shopify DELETE webhook ${opts.webhookId}: HTTP ${res.status} ${body.slice(0, 200)}`
+      `Shopify webhook delete ${opts.webhookId}: ${errs.map((e) => e.message).join("; ")}`
     );
   }
 }

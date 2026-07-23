@@ -26,7 +26,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { getShopifyAccessToken } from "@/lib/shopifyToken";
-import { extractShopifyLineItems, type ShopifyOrder } from "@/lib/shopify";
+import { extractShopifyLineItems, getOrder } from "@/lib/shopify";
 import { bulkInsertLineItemsForParent } from "@/lib/cogs/lineItems";
 import { isPayingTier } from "@/lib/plans";
 
@@ -43,30 +43,7 @@ interface ParentRow {
   due_date: string;
 }
 
-async function fetchOrderFromShopify(opts: {
-  shopDomain: string;
-  accessToken: string;
-  orderId: string;
-}): Promise<ShopifyOrder | null> {
-  const apiVersion = process.env.SHOPIFY_API_VERSION;
-  if (!apiVersion) throw new Error("SHOPIFY_API_VERSION env var is not set");
-  const url = `https://${opts.shopDomain}/admin/api/${apiVersion}/orders/${encodeURIComponent(opts.orderId)}.json`;
-  const res = await fetch(url, {
-    headers: {
-      "X-Shopify-Access-Token": opts.accessToken,
-      Accept: "application/json",
-    },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(
-      `Shopify order ${opts.orderId} fetch failed: HTTP ${res.status} ${txt.slice(0, 200)}`
-    );
-  }
-  const data = (await res.json()) as { order?: ShopifyOrder };
-  return data.order ?? null;
-}
+// Single-order fetch now lives in lib/shopify.getOrder (GraphQL).
 
 export async function POST(req: Request) {
   const startMs = Date.now();
@@ -133,7 +110,7 @@ export async function POST(req: Request) {
     for (const parent of parentsRes.rows) {
       if (Date.now() - startMs > TIME_BUDGET_MS) break;
       lastTouchedId = parent.id;
-      const order = await fetchOrderFromShopify({
+      const order = await getOrder({
         shopDomain: conn.shop_domain,
         accessToken,
         orderId: parent.source_ref_id,
