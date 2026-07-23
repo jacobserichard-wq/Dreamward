@@ -444,10 +444,10 @@ export default function SkusPage() {
         />
 
         <SectionTip id="skus" title="Costs, stock, and recipes live here">
-          Build your catalog with <strong>Bulk import</strong> (one click
-          pulls products from a connected store), <strong>Paste from
-          spreadsheet</strong>, by mapping unmatched items as they sell, or by
-          hand. Set a SKU&apos;s{" "}
+          Build your catalog with <strong>Pull from a store</strong> (one
+          click imports every product from a connected store), <strong>Paste
+          from spreadsheet</strong>, by mapping unmatched items as they sell,
+          or by hand. Set a SKU&apos;s{" "}
           <strong>cost</strong> by receiving a purchase into inventory (it
           records what you paid as a cost layer); sales then draw down your
           oldest stock first (<strong>FIFO</strong>), so margins follow what

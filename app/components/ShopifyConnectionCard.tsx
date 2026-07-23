@@ -14,14 +14,15 @@
 //   - connected      — shows shop domain + connected-since date + Disconnect button
 //                      + (placeholder for sync state / backfill progress)
 //
-// Connect flow:
-//   1. User types shop name (e.g., "my-store" or "my-store.myshopify.com")
-//   2. POST /api/shopify/oauth/initiate → { authorizeUrl }
-//   3. window.location = authorizeUrl (full-page redirect to Shopify)
-//   4. Shopify redirects back to /api/shopify/oauth/callback
-//   5. Callback persists encrypted token, redirects to
-//      /integrations?connected=1&shop=<domain>
-//   6. /integrations page surfaces a success toast (next commit)
+// Connect flow (App-Store-initiated — 2026-07-22, requirement 2.3.1
+// bans in-app typed-domain fields):
+//   1. Card links out to the Shopify App Store listing
+//   2. Merchant installs there → Shopify hits /api/shopify/install
+//   3. OAuth → /api/shopify/oauth/callback persists the token
+//      (pending row + bind if they weren't signed in here)
+//   4. Merchant lands on /integrations?connected=1&shop=<domain>
+//   (the old typed-domain POST to /api/shopify/oauth/initiate is
+//   retired from the UI; the route remains server-side)
 //
 // Disconnect flow:
 //   1. User clicks Disconnect → ConfirmModal opens
@@ -33,8 +34,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "./ConfirmModal";
 import Spinner from "./Spinner";
-import ImportRangePicker from "./ImportRangePicker";
 import ReimportLineItemsButton from "./ReimportLineItemsButton";
+
+/** The public App Store listing — the ONLY merchant-facing connect
+ *  path (requirement 2.3.1 bans typed-domain fields). Handle chosen
+ *  at listing creation; update here if it differs. Dead link until
+ *  the listing is approved, which is fine: pre-approval the only
+ *  installers are us + the reviewer, both arriving from Shopify's
+ *  side. */
+const SHOPIFY_APP_STORE_URL = "https://apps.shopify.com/dreamward";
 
 // Backfill polling cadence — how often the card re-fetches state
 // while a backfill is running. 5s is a good balance: responsive
@@ -67,15 +75,6 @@ export default function ShopifyConnectionCard() {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<ConnectionState | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Connect-modal state
-  const [shopInput, setShopInput] = useState("");
-  // Import-range cutoff (rides the initiate POST body).
-  const importStartDateRef = useRef<string | null>(null);
-  const handleRangeChange = useCallback((d: string | null) => {
-    importStartDateRef.current = d;
-  }, []);
-  const [connecting, setConnecting] = useState(false);
 
   // Disconnect-modal state
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -165,39 +164,6 @@ export default function ShopifyConnectionCard() {
     state?.backfill?.extendedPaidAt,
     loadState,
   ]);
-
-  const handleConnect = useCallback(async () => {
-    if (!shopInput.trim()) {
-      setError("Enter your Shopify store name (e.g., my-store)");
-      return;
-    }
-    setConnecting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/shopify/oauth/initiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shopDomain: shopInput.trim(),
-          importStartDate: importStartDateRef.current,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        authorizeUrl?: string;
-        error?: string;
-      };
-      if (!res.ok || !data.authorizeUrl) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      // Full-page redirect to Shopify consent. The OAuth cookie was
-      // set by the initiate route; the callback will land back on
-      // /integrations and re-trigger the card's loadState.
-      window.location.href = data.authorizeUrl;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Connect failed");
-      setConnecting(false);
-    }
-  }, [shopInput]);
 
   // Phase 8c commit 4: trigger the $99 Stripe Checkout for unlimited
   // backfill. Returns a checkoutUrl; full-page redirects the user.
@@ -438,50 +404,27 @@ export default function ShopifyConnectionCard() {
           </div>
         )}
 
-        {/* Disconnected state — shop name input + Connect */}
+        {/* Disconnected state — App Store install CTA.
+            App Store requirement 2.3.1 bans asking merchants to type
+            their .myshopify.com domain in-app, so the connect path is
+            Shopify-initiated: install from the listing → OAuth → land
+            back here bound. The old typed-domain + /oauth/initiate
+            path is retired from the UI (route kept server-side). */}
         {!state?.connected && (
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <div>
-              <label
-                htmlFor="shopify-shop-input"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+              <a
+                href={SHOPIFY_APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold no-underline"
               >
-                Your Shopify store
-              </label>
-              <div className="flex gap-2 flex-wrap">
-                <input
-                  id="shopify-shop-input"
-                  type="text"
-                  value={shopInput}
-                  onChange={(e) => {
-                    setShopInput(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="my-store"
-                  className="flex-1 min-w-[200px] py-2 px-3 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  disabled={connecting}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleConnect();
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleConnect}
-                  disabled={connecting || !shopInput.trim()}
-                  className="py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-2"
-                >
-                  {connecting && <Spinner size={12} color="white" />}
-                  {connecting ? "Redirecting…" : "Connect"}
-                </button>
-              </div>
-              <ImportRangePicker
-                onChange={handleRangeChange}
-                disabled={connecting}
-                className="mt-3"
-              />
-              <p className="text-xs text-slate-500 mt-1.5">
-                Enter the part before <code>.myshopify.com</code>, or the full
-                URL. You&apos;ll be redirected to Shopify to approve.
+                Install from the Shopify App Store →
+              </a>
+              <p className="text-xs text-slate-500 mt-2">
+                Install Dreamward on your store from the Shopify App
+                Store — approve the permissions there and you&apos;ll land
+                right back here, connected. Orders import automatically.
               </p>
             </div>
           </div>
