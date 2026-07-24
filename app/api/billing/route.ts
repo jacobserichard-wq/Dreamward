@@ -26,6 +26,9 @@ export async function GET() {
 
     return NextResponse.json({
       plan: client.plan,
+      // 'stripe' | 'shopify' — shopify-billed clients manage their
+      // subscription in the Shopify admin; Stripe surfaces hidden.
+      billingSource: client.billing_source ?? "stripe",
       email: client.email,
       businessName: client.business_name,
       trialEndsAt: client.trial_ends_at,

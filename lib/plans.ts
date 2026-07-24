@@ -124,11 +124,18 @@ export function getPlanFeatures(plan: string): PlanFeatures {
   };
 }
 
-/** True when the plan has full feature access — trial, any band, or a
- *  not-yet-migrated legacy paid name. Canceled returns false. */
+/** True when the plan has full feature access — trial, any band, a
+ *  not-yet-migrated legacy paid name, or an active Shopify App
+ *  Pricing subscription ('shopify', billed by Shopify — see
+ *  lib/shopifyAppPricing.ts). Canceled returns false. */
 export function isPayingTier(plan: string | null | undefined): boolean {
   if (!plan) return false;
-  return plan === "trial" || BAND_IDS.has(plan) || LEGACY_PAID.has(plan);
+  return (
+    plan === "trial" ||
+    plan === "shopify" ||
+    BAND_IDS.has(plan) ||
+    LEGACY_PAID.has(plan)
+  );
 }
 
 /** Map trailing-12-month revenue (USD) to its band. Boundaries are

@@ -39,6 +39,12 @@
 //                          clicks land here cold (no session). The route
 //                          verifies Shopify's HMAC on the query string
 //                          before starting OAuth. App Store flow, 2026-07.
+//   /api/shopify/billing/confirm — Shopify App Pricing welcome link.
+//                          Merchants arrive from the Shopify admin after
+//                          approving the plan charge, usually with no
+//                          Dreamward session. Params are untrusted; the
+//                          route verifies the subscription server-side
+//                          via the Partner API. 2026-07.
 //   /api/shopify/webhook — invoked by Shopify with X-Shopify-Hmac-SHA256
 //                          header; route verifies the signature. Phase 8d.
 //   /api/square/oauth/callback — Square redirects merchants here after

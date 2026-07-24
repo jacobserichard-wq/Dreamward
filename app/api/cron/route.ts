@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getActiveSubscription } from "@/lib/shopifyAppPricing";
 import {
   sendEmail,
   trialExpiringEmail,
@@ -1005,6 +1006,71 @@ export async function GET(req: NextRequest) {
       console.error("[cron] inventory snapshot pass failure:", err);
     }
 
+    // ── Shopify App Pricing re-verification pass ─────────────────
+    // Shopify App Pricing has NO webhooks: cancellations, freezes,
+    // and expirations happen silently. Re-verify every shopify-billed
+    // client daily against the Partner API; downgrade to 'canceled'
+    // when the contract is gone, restore to 'shopify' if it's back.
+    let shopifyBillingChecked = 0;
+    let shopifyBillingDowngraded = 0;
+    let shopifyBillingErrors = 0;
+    try {
+      const shopifyBilled = await pool.query<{
+        client_id: number;
+        plan: string;
+        conn_id: number;
+        shop_gid: string | null;
+      }>(
+        `SELECT c.id AS client_id, c.plan, sc.id AS conn_id, sc.shop_gid
+           FROM clients c
+           JOIN shopify_connections sc ON sc.client_id = c.id
+          WHERE c.billing_source = 'shopify'`
+      );
+      for (const row of shopifyBilled.rows) {
+        shopifyBillingChecked++;
+        try {
+          if (!row.shop_gid) continue; // filled on next connect/confirm
+          const sub = await getActiveSubscription(row.shop_gid);
+          if (sub && row.plan !== "shopify") {
+            await pool.query(
+              `UPDATE clients SET plan = 'shopify' WHERE id = $1`,
+              [row.client_id]
+            );
+          } else if (!sub && row.plan === "shopify") {
+            await pool.query(
+              `UPDATE clients SET plan = 'canceled' WHERE id = $1`,
+              [row.client_id]
+            );
+            shopifyBillingDowngraded++;
+            console.log(
+              `[cron] shopify billing: client ${row.client_id} subscription gone → canceled`
+            );
+          }
+          await pool.query(
+            `UPDATE shopify_connections
+                SET subscription_plan_handle = $1,
+                    subscription_trial_ends_at = $2,
+                    subscription_checked_at = NOW()
+              WHERE id = $3`,
+            [sub?.planHandle ?? null, sub?.trialEndsAt ?? null, row.conn_id]
+          );
+        } catch (err) {
+          shopifyBillingErrors++;
+          console.error(
+            `[cron] shopify billing check failed for client ${row.client_id}:`,
+            err
+          );
+        }
+      }
+      if (shopifyBillingChecked > 0) {
+        console.log(
+          `[cron] shopify billing: ${shopifyBillingChecked} checked, ${shopifyBillingDowngraded} downgraded, ${shopifyBillingErrors} errors`
+        );
+      }
+    } catch (err) {
+      console.error("[cron] shopify billing pass failure:", err);
+    }
+
     return NextResponse.json({
       success: true,
       emailsSent: sent,
@@ -1036,6 +1102,9 @@ export async function GET(req: NextRequest) {
       tierErrors,
       snapshotsRecorded,
       snapshotErrors,
+      shopifyBillingChecked,
+      shopifyBillingDowngraded,
+      shopifyBillingErrors,
     });
   } catch (error) {
     console.error("Cron error:", error);

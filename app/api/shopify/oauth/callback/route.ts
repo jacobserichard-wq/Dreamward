@@ -45,6 +45,7 @@ import {
 import { encryptForDb } from "@/lib/crypto";
 import { isPayingTier } from "@/lib/plans";
 import { normalizeImportStartDate } from "@/lib/importRange";
+import { ensureShopifyBilling } from "@/lib/shopifyAppPricing";
 
 const STATE_COOKIE_NAME = "shopify_oauth_state";
 const IMPORT_DATE_COOKIE_NAME = "shopify_import_start_date";
@@ -223,6 +224,7 @@ export async function GET(req: NextRequest) {
   // Upsert by shop_domain so an App-Store install that created a
   // pending row gets claimed here when the merchant was already
   // signed in. Guard: never steal a shop bound to ANOTHER account.
+  let connectionId: number;
   try {
     const existing = await pool.query<{ client_id: number | null }>(
       `SELECT client_id FROM shopify_connections WHERE shop_domain = $1`,
@@ -235,7 +237,7 @@ export async function GET(req: NextRequest) {
         "That Shopify store is already connected to a different Dreamward account."
       );
     }
-    await pool.query(
+    connectionId = (await pool.query<{ id: number }>(
       `INSERT INTO shopify_connections (
          client_id, shop_domain,
          access_token_ciphertext, access_token_iv, access_token_auth_tag,
@@ -257,7 +259,8 @@ export async function GET(req: NextRequest) {
          scopes                   = EXCLUDED.scopes,
          import_start_date        = COALESCE(EXCLUDED.import_start_date,
                                              shopify_connections.import_start_date),
-         updated_at               = NOW()`,
+         updated_at               = NOW()
+       RETURNING id`,
       [
         client.id,
         shopDomain,
@@ -272,7 +275,7 @@ export async function GET(req: NextRequest) {
         tokenResult.scopes,
         importStartDate,
       ]
-    );
+    )).rows[0].id;
   } catch (err) {
     // Most likely: UNIQUE(client_id) violation (this client already
     // has a DIFFERENT store connected — v1 allows only one).
@@ -356,6 +359,24 @@ export async function GET(req: NextRequest) {
     console.warn("Backfill kickoff exception:", err);
   }
 
+  // ── 8b. App Store billing (Shopify App Pricing, req 1.2) ──────
+  // Stripe-paying clients pass straight through; everyone else on
+  // this shop bills through Shopify. If the merchant hasn't picked
+  // a plan yet, send them to Shopify's hosted plan page instead of
+  // /integrations — its welcome link brings them back to us.
+  const billing = await ensureShopifyBilling({
+    clientId: client.id,
+    connectionId,
+    shopDomain,
+    accessToken: tokenResult.accessToken,
+  });
+  if (billing.planSelectionUrl) {
+    const res = NextResponse.redirect(billing.planSelectionUrl);
+    res.cookies.delete(STATE_COOKIE_NAME);
+    res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
+    return res;
+  }
+
   // ── 9. Success: redirect to /integrations ─────────────────────
   const url = new URL("/integrations", req.url);
   url.searchParams.set("connected", "1");
@@ -364,8 +385,4 @@ export async function GET(req: NextRequest) {
   res.cookies.delete(STATE_COOKIE_NAME);
   res.cookies.delete(IMPORT_DATE_COOKIE_NAME);
   return res;
-
-  // NOTE: sub-phase 8d will additionally register webhooks here so
-  // we get real-time order updates after the initial backfill
-  // completes.
 }

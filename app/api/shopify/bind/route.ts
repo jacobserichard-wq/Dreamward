@@ -30,6 +30,7 @@ import {
   SHOPIFY_WEBHOOK_TOPICS,
 } from "@/lib/shopify";
 import { getShopifyAccessToken } from "@/lib/shopifyToken";
+import { ensureShopifyBilling } from "@/lib/shopifyAppPricing";
 import { isPayingTier } from "@/lib/plans";
 import { normalizeImportStartDate } from "@/lib/importRange";
 
@@ -124,8 +125,9 @@ export async function POST(req: NextRequest) {
   // ── Post-bind work: webhooks + backfill (mirrors warm callback) ─
   // Best-effort — failures logged, never block the bind. Daily
   // reconciliation cron compensates for missed webhooks.
+  let accessToken: string | null = null;
   try {
-    const accessToken = await getShopifyAccessToken(row.id);
+    accessToken = await getShopifyAccessToken(row.id);
     const webhookAddress = new URL("/api/shopify/webhook", req.url).toString();
     const webhookIds: string[] = [];
     for (const topic of SHOPIFY_WEBHOOK_TOPICS) {
@@ -166,5 +168,21 @@ export async function POST(req: NextRequest) {
     console.warn("Bind: backfill kickoff exception:", err);
   }
 
-  return NextResponse.json({ bound: true, shop: shopDomain });
+  // ── App Store billing (Shopify App Pricing, req 1.2) ──────────
+  // Cold installs are App-Store-acquired by definition, so unless
+  // this client already pays through Stripe they bill via Shopify.
+  // billingUrl (when set) sends the merchant to Shopify's hosted
+  // plan page; its welcome link routes them back to /integrations.
+  let billingUrl: string | null = null;
+  if (accessToken) {
+    const billing = await ensureShopifyBilling({
+      clientId: client.id,
+      connectionId: row.id,
+      shopDomain,
+      accessToken,
+    });
+    billingUrl = billing.planSelectionUrl;
+  }
+
+  return NextResponse.json({ bound: true, shop: shopDomain, billingUrl });
 }

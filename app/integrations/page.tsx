@@ -113,8 +113,19 @@ function IntegrationsPageInner() {
     // standard connected params so every card remounts with the fresh
     // connection state.
     const shopifyPending = params.get("shopify_pending");
+    // Set by /api/shopify/billing/confirm (Shopify App Pricing
+    // welcome link) after verifying the subscription server-side.
+    const billingParam = params.get("billing");
 
-    if (connected === "1" && shop) {
+    if (billingParam === "active") {
+      setSuccessMsg(
+        "Your Shopify subscription is active — welcome to Dreamward Pro!"
+      );
+    } else if (billingParam === "pending") {
+      setSuccessMsg(
+        "Shopify is finishing your subscription — access unlocks automatically once it settles."
+      );
+    } else if (connected === "1" && shop) {
       setSuccessMsg(`Connected to ${shop}!`);
     } else if (connectedEtsy === "1") {
       setSuccessMsg(
@@ -186,6 +197,7 @@ function IntegrationsPageInner() {
           });
           const data = (await res.json().catch(() => ({}))) as {
             bound?: boolean;
+            billingUrl?: string | null;
             error?: string;
           };
           if (!res.ok || !data.bound) {
@@ -193,6 +205,12 @@ function IntegrationsPageInner() {
             setError(
               data.error || `Couldn't connect Shopify (HTTP ${res.status})`
             );
+            return;
+          }
+          if (data.billingUrl) {
+            // App-Store billing: pick a plan on Shopify's hosted page;
+            // its welcome link returns them to /integrations.
+            window.location.assign(data.billingUrl);
             return;
           }
           // Full navigation (not router.replace) so the Shopify card
@@ -217,7 +235,8 @@ function IntegrationsPageInner() {
       errParam ||
       upgrade ||
       wixBindInstance ||
-      shopifyPending
+      shopifyPending ||
+      billingParam
     ) {
       // Strip the params so reload doesn't replay the toast / re-bind.
       router.replace("/integrations");

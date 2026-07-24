@@ -11,6 +11,7 @@ import { SUPPORT_EMAIL } from "@/lib/support";
 
 interface BillingData {
   plan: string;
+  billingSource?: "stripe" | "shopify";
   email: string;
   businessName: string;
   trialEndsAt: string | null;
@@ -126,6 +127,48 @@ export default function BillingPage() {
       <div className="min-h-screen bg-slate-50 font-sans">
         <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
           <p className="text-center text-red-600 p-[60px]">{error || "Unable to load billing"}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Shopify-billed clients (App Store installs) manage everything in
+  // the Shopify admin — showing them the Stripe ladder or checkout
+  // would risk double-billing and violates App Store req 1.2. Render
+  // a dedicated card and nothing else.
+  if (billing.billingSource === "shopify") {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <AppHeader />
+        <div className="max-w-[900px] mx-auto py-8 px-4 sm:px-6">
+          <PageHeader title="Billing & Plan" subtitle={billing.email} />
+          {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h2 className="text-[13px] font-medium text-slate-500 mb-2 uppercase tracking-wider m-0">
+              Current plan
+            </h2>
+            <div className="flex items-baseline gap-3 mb-4">
+              <span className="text-2xl font-bold text-slate-900">
+                {billing.plan === "shopify" ? "Dreamward Pro" : "No active plan"}
+              </span>
+              <span className="text-lg font-semibold text-slate-500">
+                {billing.plan === "shopify" ? "$10/mo" : ""}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600 m-0">
+              Your subscription is billed through <strong>Shopify</strong> —
+              it appears on your regular Shopify invoice. To view, change, or
+              cancel your plan, open the Dreamward app&apos;s page in your
+              Shopify admin. Every feature is included; nothing to configure
+              here.
+            </p>
+            {billing.plan !== "shopify" && (
+              <p className="text-sm text-amber-700 bg-yellow-50 border border-amber-200 rounded-lg py-2.5 px-4 mt-4 m-0">
+                No active Shopify subscription found — choose a plan from the
+                Dreamward listing in your Shopify admin to restore access.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );
