@@ -37,12 +37,15 @@ import Spinner from "./Spinner";
 import ReimportLineItemsButton from "./ReimportLineItemsButton";
 
 /** The public App Store listing — the ONLY merchant-facing connect
- *  path (requirement 2.3.1 bans typed-domain fields). Handle chosen
- *  at listing creation; update here if it differs. Dead link until
- *  the listing is approved, which is fine: pre-approval the only
- *  installers are us + the reviewer, both arriving from Shopify's
- *  side. */
-const SHOPIFY_APP_STORE_URL = "https://apps.shopify.com/dreamward";
+ *  path (requirement 2.3.1 bans typed-domain fields). The handle is
+ *  "flowwork": Shopify mints handles from the app's ORIGINAL name at
+ *  creation and renames don't touch them (verified 2026-07-25 in the
+ *  dev store's app_installations URL). If Shopify support ever
+ *  renames the handle, update here + SHOPIFY_APP_HANDLE in Vercel.
+ *  Dead link until the listing is approved, which is fine:
+ *  pre-approval the only installers are us + the reviewer, both
+ *  arriving from Shopify's side. */
+const SHOPIFY_APP_STORE_URL = "https://apps.shopify.com/flowwork";
 
 // Backfill polling cadence — how often the card re-fetches state
 // while a backfill is running. 5s is a good balance: responsive
