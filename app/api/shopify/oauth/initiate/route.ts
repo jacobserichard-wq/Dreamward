@@ -99,13 +99,10 @@ export async function POST(req: NextRequest) {
       shopDomain,
       state,
       // read_orders  → order + refund sync (webhooks + backfill)
-      // read_products → catalog pull for SKU bulk-import
-      //   (lib/shopify.fetchProducts hits /admin/api/.../products.json,
-      //   which 403s without this scope). Added 2026-07-03 during the
-      //   App Store scope review — safe now (0 installs, no re-consent
-      //   needed for existing merchants). Keep this list MINIMAL: every
-      //   extra scope is a line on the merchant's consent screen and a
-      //   question in App Store review.
+      // read_products → catalog pull for SKU bulk-import (GraphQL
+      //   productVariants, which 403s without this scope). Keep this
+      //   list MINIMAL: every extra scope is a line on the merchant's
+      //   consent screen and a question in App Store review.
       // read_all_orders → lifts Shopify's 60-day order-history window
       //   for the initial backfill. Access request GRANTED in the
       //   Partner dashboard 2026-07-21; only meaningful alongside

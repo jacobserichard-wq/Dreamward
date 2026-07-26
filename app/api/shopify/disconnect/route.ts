@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionClient } from "@/lib/getClient";
 import { getShopifyAccessToken } from "@/lib/shopifyToken";
+import { unsubscribeWebhook } from "@/lib/shopify";
 import { isPayingTier } from "@/lib/plans";
 
 interface ShopifyConnectionRow {
@@ -78,19 +79,18 @@ export async function POST() {
     if (conn.webhook_subscription_ids.length > 0) {
       try {
         const accessToken = await getShopifyAccessToken(conn.id);
-        const apiVersion = process.env.SHOPIFY_API_VERSION || "2026-04";
         for (const webhookId of conn.webhook_subscription_ids) {
           try {
-            await fetch(
-              `https://${conn.shop_domain}/admin/api/${apiVersion}/webhooks/${webhookId}.json`,
-              {
-                method: "DELETE",
-                headers: {
-                  "X-Shopify-Access-Token": accessToken,
-                  Accept: "application/json",
-                },
-              }
-            );
+            // GraphQL mutation (accepts both gid ids and legacy
+            // numeric REST ids). This was the last REST Admin call
+            // in the codebase — found by the official self-review;
+            // the old /webhooks/{id}.json DELETE also silently 404d
+            // on gid-format ids.
+            await unsubscribeWebhook({
+              shopDomain: conn.shop_domain,
+              accessToken,
+              webhookId,
+            });
           } catch (err) {
             console.warn(
               `Shopify webhook ${webhookId} delete failed (best-effort):`,
