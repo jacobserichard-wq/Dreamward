@@ -55,10 +55,26 @@ export async function GET() {
 
     const accessToken = await getShopifyAccessToken(conn.id);
 
-    const rows = await listCatalog({
+    const variations = await listCatalog({
       shopDomain: conn.shop_domain,
       accessToken,
     });
+
+    // The bulk-import page (and /api/skus/bulk-import-catalog) expect
+    // externalId — same boundary rename the Square catalog route does.
+    // Without it row.externalId is undefined and every Import errors
+    // "externalId is required" (found 2026-07-26, first real Shopify
+    // bulk import ever attempted). externalId = the variant id, which
+    // is also what order line items carry as variant_id, so aliases
+    // created from these rows match Shopify sales.
+    const rows = variations.map((v) => ({
+      externalId: v.variantId,
+      productId: v.productId,
+      displayName: v.displayName,
+      sku: v.sku,
+      cost: v.cost,
+      currency: v.currency,
+    }));
 
     return NextResponse.json({ rows });
   } catch (err) {
