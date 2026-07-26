@@ -321,14 +321,14 @@ function IntegrationsPageInner() {
         />
 
         <SectionTip id="integrations" title="Connect a store to automate everything">
-          Connecting Square pulls in your order history and keeps it
-          synced — no manual uploads (Shopify, Wix &amp; Etsy are on the
-          way). To build your{" "}
-          <strong>SKUs</strong> catalog from it, use <strong>Bulk import</strong>{" "}
-          — one click pulls every product from the platform (Square even brings
-          the costs from its Item Library) — or map items from the Unmatched
-          queue as they sell. Then cost your SKUs (receive purchases into
-          inventory) to see gross margin.
+          Connecting Square or Shopify pulls in your order history and keeps
+          it synced — no manual uploads (Wix &amp; Etsy are on the way). To
+          build your <strong>SKUs</strong> catalog from it, use{" "}
+          <strong>Pull from a store</strong> — one click imports every product
+          from the platform (Square even brings the costs from its Item
+          Library) — or map items from the Unmatched queue as they sell. Then
+          cost your SKUs (receive purchases into inventory) to see gross
+          margin.
         </SectionTip>
 
         {error && (
