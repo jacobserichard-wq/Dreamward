@@ -1,6 +1,17 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { timingSafeEqual } from "crypto";
 import { FEATURES } from "./features";
+
+/** Constant-time string compare (length leak is fine — the secret is
+ *  a random 20+ char password, not something guessable by length). */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 // Sub-session 33: OAuth scope is tied to FEATURES.GMAIL_INGEST so
 // the feature flag is the single point of control over Gmail
@@ -39,6 +50,40 @@ export const authOptions: NextAuthOptions = {
           access_type: "offline",
           prompt: "select_account",
         },
+      },
+    }),
+    // Reviewer/email access (2026-07-26, App Store submission).
+    // Shopify's review process explicitly disallows test accounts
+    // that need Google SSO, so this single-credential side door
+    // exists for their reviewers: it accepts EXACTLY the email +
+    // password in REVIEWER_EMAIL / REVIEWER_PASSWORD (Vercel env)
+    // and signs into that demo account (pre-created, is_test).
+    // Unset env vars = provider dead (authorize always null), so
+    // nothing changes for normal users unless configured. The
+    // signin page shows the form behind a low-key "Sign in with
+    // email" link. If email+password auth ever becomes a real
+    // feature, this gets replaced by proper hashed-password auth —
+    // do NOT extend this provider to look up user tables.
+    CredentialsProvider({
+      id: "reviewer",
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = process.env.REVIEWER_EMAIL;
+        const password = process.env.REVIEWER_PASSWORD;
+        if (!email || !password) return null;
+        const givenEmail = (credentials?.email ?? "").trim().toLowerCase();
+        const givenPassword = credentials?.password ?? "";
+        if (
+          safeEqual(givenEmail, email.toLowerCase()) &&
+          safeEqual(givenPassword, password)
+        ) {
+          return { id: "reviewer", email: email.toLowerCase() };
+        }
+        return null;
       },
     }),
   ],

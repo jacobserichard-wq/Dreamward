@@ -9,10 +9,18 @@ function SignInContent() {
   const callbackUrl = params.get("callbackUrl") || "/";
   const errorParam = params.get("error");
   const [submitting, setSubmitting] = useState(false);
+  // Email/password path — exists for App Store reviewers (Shopify
+  // disallows Google-SSO-only test accounts). Collapsed behind a
+  // link so the Google-first flow stays clean for real users.
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const friendlyError =
     errorParam === "OAuthAccountNotLinked"
       ? "That email is already registered with a different sign-in method."
+      : errorParam === "CredentialsSignin"
+      ? "Email or password is incorrect."
       : errorParam
       ? "Sign-in failed. Please try again."
       : null;
@@ -20,6 +28,12 @@ function SignInContent() {
   const handleSignIn = async () => {
     setSubmitting(true);
     await signIn("google", { callbackUrl });
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    await signIn("reviewer", { email, password, callbackUrl });
   };
 
   return (
@@ -57,6 +71,43 @@ function SignInContent() {
           <GoogleIcon />
           <span>{submitting ? "Redirecting..." : "Sign in with Google"}</span>
         </button>
+        {!showEmailForm ? (
+          <button
+            type="button"
+            onClick={() => setShowEmailForm(true)}
+            className="mt-3 bg-transparent border-0 cursor-pointer text-[13px] text-slate-400 underline"
+          >
+            Sign in with email
+          </button>
+        ) : (
+          <form onSubmit={handleEmailSignIn} className="mt-4 text-left space-y-2.5">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              autoComplete="username"
+              required
+              className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              autoComplete="current-password"
+              required
+              className="w-full py-2.5 px-3.5 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-2.5 px-5 rounded-[10px] border-0 bg-slate-800 text-white cursor-pointer text-sm font-semibold disabled:opacity-60 disabled:cursor-wait"
+            >
+              {submitting ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
+        )}
         <div className="mt-6 text-[13px] text-slate-400">
           <a href="/privacy" className="text-slate-500 no-underline mx-1.5">
             Privacy
