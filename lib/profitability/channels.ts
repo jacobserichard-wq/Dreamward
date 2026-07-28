@@ -69,6 +69,14 @@ export interface ChannelMeta {
    *  business. Omit for channels with self-explanatory names
    *  (e.g., "Shopify" — what else could it be?). */
   description?: string;
+  /** True for channels populated by a platform-sync integration
+   *  (webhook/backfill ingest). These are RESERVED: per-channel
+   *  reports + refund netting assume they reconcile to platform
+   *  payouts, so rows may only enter them via their sync path
+   *  (source='shopify' etc.) or an explicit manual re-tag by the
+   *  user — never via category-based derivation of uploaded or
+   *  manual rows. */
+  platformSync?: boolean;
 }
 
 /** The fixed canonical channel list rendered on the dashboard table
@@ -88,6 +96,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: FEATURES.SHOPIFY_ENABLED ? "Connect Shopify" : null,
     proGated: true,
     drillHref: "/integrations",
+    platformSync: true,
   },
   {
     id: "markets",
@@ -178,6 +187,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: FEATURES.ETSY_ENABLED ? "Connect Etsy" : null,
     proGated: true,
     drillHref: "/dashboard?tab=processed",
+    platformSync: true,
   },
   {
     id: "square",
@@ -188,6 +198,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Connect Square",
     proGated: true,
     drillHref: "/dashboard?tab=processed",
+    platformSync: true,
   },
   {
     // comingSoon derives from FEATURES.WIX_ENABLED (false 2026-07-03 —
@@ -200,6 +211,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: FEATURES.WIX_ENABLED ? "Connect Wix" : null,
     proGated: true,
     drillHref: "/dashboard?tab=processed",
+    platformSync: true,
   },
   {
     // Stripe CONNECT — a customer's own Stripe sales sync in as income.
@@ -212,6 +224,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: "Connect Stripe",
     proGated: true,
     drillHref: "/dashboard?tab=processed",
+    platformSync: true,
   },
   {
     id: "woocommerce",
@@ -222,6 +235,7 @@ export const CANONICAL_CHANNELS: readonly ChannelMeta[] = [
     emptyAddLabel: null,
     proGated: false,
     drillHref: null,
+    platformSync: true,
   },
 ] as const;
 
@@ -324,9 +338,13 @@ const CATEGORY_TO_CHANNEL: Record<string, ChannelId> = {
   // Markets / events
   "Event Sales": "markets",
 
-  // Online stores (will pick up Shopify orders regardless of category
-  // because Shopify rows are routed by source — see classifyTxn below).
-  "Online Sales": "shopify",
+  // NOTE: "Online Sales" deliberately has NO mapping. It used to map to
+  // "shopify", which mis-attributed CSV-uploaded "online order" rows to
+  // the Shopify channel (platform channels are assumed to reconcile to
+  // platform payouts). Actual Shopify orders are routed by
+  // source='shopify' before this map is consulted, so they never needed
+  // the entry. Uploaded online sales stay Uncategorized until the user
+  // re-tags them.
 
   // Wholesale
   "Wholesale Orders": "wholesale",
@@ -350,6 +368,25 @@ const VALID_CHANNEL_IDS = new Set<ChannelId>(
   CANONICAL_CHANNELS.map((c) => c.id)
 );
 
+/** Channels reserved for platform-sync ingest (see
+ *  ChannelMeta.platformSync). Guard: category-based derivation must
+ *  never land a row in one of these — only the sync paths
+ *  (source='shopify' etc.) and explicit user re-tags may. */
+const SYNCED_CHANNEL_IDS = new Set<ChannelId>(
+  CANONICAL_CHANNELS.filter((c) => c.platformSync).map((c) => c.id)
+);
+
+/** Category → channel lookup with the platform-sync guard applied.
+ *  Returns null for unmapped categories AND for any mapping that
+ *  would target a synced channel (defense against a future mapping
+ *  reintroducing the CSV-rows-in-Shopify bug). */
+function channelFromCategory(category: string | null): ChannelId | null {
+  if (!category) return null;
+  const mapped = CATEGORY_TO_CHANNEL[category];
+  if (!mapped || SYNCED_CHANNEL_IDS.has(mapped)) return null;
+  return mapped;
+}
+
 /** Sub-session 32: storage-time channel derivation for CSV/manual
  *  inserts. Mirrors the income-side rules from classifyIncomeRow
  *  but excludes the source-routed branches (shopify/wix/square/gmail)
@@ -366,10 +403,7 @@ export function deriveStorageChannel(row: {
   event_id: number | null;
 }): ChannelId | null {
   if (row.event_id !== null) return "markets";
-  if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
-    return CATEGORY_TO_CHANNEL[row.category];
-  }
-  return null;
+  return channelFromCategory(row.category);
 }
 
 /** Categorize a single income row into a channel. Priority:
@@ -378,7 +412,8 @@ export function deriveStorageChannel(row: {
  *  1. source='shopify' → Shopify channel (Shopify backfill / webhook)
  *  2. source IN ('gmail','email') → Gmail channel
  *  3. event_id IS NOT NULL → Markets channel (event-linked income)
- *  4. category name → channel via CATEGORY_TO_CHANNEL map
+ *  4. category name → channel via CATEGORY_TO_CHANNEL map (never a
+ *     platform-sync channel — see channelFromCategory guard)
  *  5. source='manual' (no event link) → Uploads channel
  *  6. anything else → Uploads channel (catch-all for unknown income)
  */
@@ -397,9 +432,8 @@ function classifyIncomeRow(row: ChannelTxnRow): ChannelId {
     return FEATURES.GMAIL_INGEST ? "gmail" : "uploads";
   }
   if (row.event_id !== null) return "markets";
-  if (row.category && CATEGORY_TO_CHANNEL[row.category]) {
-    return CATEGORY_TO_CHANNEL[row.category];
-  }
+  const fromCategory = channelFromCategory(row.category);
+  if (fromCategory) return fromCategory;
   return "uploads";
 }
 
