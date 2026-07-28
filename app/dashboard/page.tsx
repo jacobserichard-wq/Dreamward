@@ -873,6 +873,55 @@ function DashboardInner() {
     [processedItems]
   );
 
+  // ─── Bulk-approve the review queue ─────────────────────────────────────────
+  //
+  // Non-null = the ConfirmModal is open, holding the ids the banner
+  // captured at click time (so the target set can't shift under the open
+  // modal if a sync lands mid-confirm). Cleared on cancel or success.
+  const [bulkApproveIds, setBulkApproveIds] = useState<string[] | null>(null);
+  const [bulkApproving, setBulkApproving] = useState(false);
+
+  // "Approve all" on the Transactions view: marks every visible needs-
+  // review card paid (settled) in one batched PATCH instead of a click
+  // per card. Same semantics as tapping ✅ on each card — status updates
+  // have no side effects — just one round-trip. Not optimistic: the
+  // modal holds a busy state while in flight (confirmClearSample
+  // pattern), and local state is patched from the ids the server
+  // actually updated, so a row deleted mid-flight can't get faked into
+  // "paid" locally.
+  const confirmBulkApprove = useCallback(async () => {
+    if (!bulkApproveIds || bulkApproveIds.length === 0) return;
+    setBulkApproving(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ updated: number; ids: number[] }>(
+        "/api/items/bulk-status",
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids: bulkApproveIds.map(Number),
+            status: "paid",
+          }),
+        }
+      );
+      const approved = new Set((data.ids ?? []).map(String));
+      setProcessedItems((prev) =>
+        prev.map((item) =>
+          approved.has(item.id) ? { ...item, status: "paid" } : item
+        )
+      );
+      setSuccessMsg(
+        `Approved ${data.updated} item${data.updated === 1 ? "" : "s"} — marked as settled.`
+      );
+      setBulkApproveIds(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't approve items");
+    } finally {
+      setBulkApproving(false);
+    }
+  }, [bulkApproveIds]);
+
   // ─── CSV Upload ────────────────────────────────────────────────────────────
 
   const handleUpload = useCallback(
@@ -2224,6 +2273,33 @@ function DashboardInner() {
                     <strong>&ldquo;{txnSearch.trim()}&rdquo;</strong>
                   </p>
                 )}
+              {(() => {
+                // Bulk-approve banner: shown when the visible set holds 2+
+                // needs-review cards (a single card's ✅ button is already
+                // one click). Acts on the *visible* set — the status/
+                // settled/channel/type filters and search all narrow it —
+                // so what you see is exactly what gets approved. Indigo to
+                // match the needs-review badge.
+                const reviewIds = searchedItems
+                  .filter((i) => i.status === "needs_review")
+                  .map((i) => i.id);
+                if (reviewIds.length < 2) return null;
+                return (
+                  <div className="mb-4 px-4 py-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-900 flex items-center justify-between gap-2 flex-wrap">
+                    <span>
+                      {"\u{1F440}"} <strong>{reviewIds.length}</strong> of the
+                      items below need review.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBulkApproveIds(reviewIds)}
+                      className="font-semibold text-indigo-700 hover:text-indigo-900 hover:underline bg-transparent border-0 cursor-pointer whitespace-nowrap"
+                    >
+                      {"\u{2705}"} Approve all
+                    </button>
+                  </div>
+                );
+              })()}
               <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
                 {searchedItems.map((item) => (
                   <div key={item.id} className="bg-white rounded-xl border border-slate-200">
@@ -2950,6 +3026,20 @@ function DashboardInner() {
           busy={clearingSample}
           onConfirm={confirmClearSample}
           onCancel={() => setConfirmClearOpen(false)}
+        />
+
+        {/* ── BULK-APPROVE REVIEW QUEUE CONFIRMATION ── */}
+        {/* Opened by the "Approve all" banner on the Transactions view.
+            Reversible (any card's status can be set back), so blue
+            confirm, not the danger treatment. */}
+        <ConfirmModal
+          open={bulkApproveIds !== null}
+          title={`Approve ${bulkApproveIds?.length ?? 0} items?`}
+          message={`This marks all ${bulkApproveIds?.length ?? 0} needs-review items shown as paid (settled) and archives them from the inbox. You can still see them anytime with "Show settled".`}
+          confirmLabel="Approve all"
+          busy={bulkApproving}
+          onConfirm={confirmBulkApprove}
+          onCancel={() => setBulkApproveIds(null)}
         />
 
       </main>
