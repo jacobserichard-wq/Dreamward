@@ -339,6 +339,22 @@ export async function shopifyGraphql<T = unknown>(opts: {
     errors?: Array<{ message: string }>;
   };
   if (payload.errors && payload.errors.length > 0) {
+    // Protected-customer-data denials can arrive as FIELD-level
+    // errors alongside otherwise-good data (the denied fields come
+    // back null). Until our protected-data approval activates
+    // (which only happens on App Store review approval — the
+    // reviewer's own store hits this!), treat that shape as success
+    // so order sync works everywhere; the buyer name just shows as
+    // "Unknown" until approval. Real errors still throw.
+    const allProtectedDenials = payload.errors.every((e) =>
+      isProtectedDataDenial(e.message)
+    );
+    if (payload.data && allProtectedDenials) {
+      console.warn(
+        "Shopify GraphQL: protected-customer-data fields denied (pre-approval store) — continuing without them"
+      );
+      return payload.data;
+    }
     throw new Error(
       `Shopify GraphQL errors: ${payload.errors
         .map((e) => e.message)
@@ -348,6 +364,15 @@ export async function shopifyGraphql<T = unknown>(opts: {
   }
   if (!payload.data) throw new Error("Shopify GraphQL: empty data");
   return payload.data;
+}
+
+/** True when an error message is Shopify refusing protected customer
+ *  data (name/email/etc.) — the state every store is in until our
+ *  protected-data approval activates at App Store review approval. */
+export function isProtectedDataDenial(message: string): boolean {
+  return /protected customer data|not approved to access|ACCESS_DENIED/i.test(
+    message
+  );
 }
 
 /** Parse the trailing numeric ID out of a gid://shopify/Type/123. */
@@ -428,7 +453,9 @@ interface GqlOrderNode {
   subtotalPriceSet: GqlMoneySet | null;
   totalTaxSet: GqlMoneySet | null;
   totalShippingPriceSet: GqlMoneySet | null;
-  customer: {
+  /** Optional: omitted entirely when querying without the customer
+   *  block (protected-data fallback). */
+  customer?: {
     legacyResourceId: string;
     firstName: string | null;
     lastName: string | null;
@@ -449,8 +476,14 @@ interface GqlOrderNode {
 /** Shared field selection for order queries. lineItems capped at 250
  *  (connection max) — far beyond any maker order. Customer email is
  *  deliberately NOT queried: our protected-customer-data grant covers
- *  Name only, and the mapper falls back to "Unknown" without it. */
-const ORDER_SELECTION = `
+ *  Name only, and the mapper falls back to "Unknown" without it.
+ *
+ *  includeCustomer=false drops the customer block entirely — the
+ *  fallback for stores where protected customer data is denied
+ *  (every non-development store until App Store approval activates
+ *  our grant). Sync still works; buyers show as "Unknown". */
+function orderSelection(includeCustomer: boolean): string {
+  return `
   legacyResourceId
   name
   createdAt
@@ -464,7 +497,7 @@ const ORDER_SELECTION = `
   subtotalPriceSet { shopMoney { amount } }
   totalTaxSet { shopMoney { amount } }
   totalShippingPriceSet { shopMoney { amount currencyCode } }
-  customer { legacyResourceId firstName lastName }
+  ${includeCustomer ? "customer { legacyResourceId firstName lastName }" : ""}
   lineItems(first: 250) {
     nodes {
       id
@@ -476,6 +509,7 @@ const ORDER_SELECTION = `
       product { legacyResourceId }
     }
   }`;
+}
 
 function orderNodeToRest(node: GqlOrderNode): ShopifyOrder {
   // GraphQL enums are SCREAMING_SNAKE ("PARTIALLY_REFUNDED"); the
@@ -556,22 +590,41 @@ export async function listOrders(opts: {
   if (opts.createdAtMin) terms.push(`created_at:>='${opts.createdAtMin}'`);
   if (opts.status && opts.status !== "any")
     terms.push(`status:${opts.status}`);
-  const data = await shopifyGraphql<{
-    orders: { nodes: GqlOrderNode[] };
-  }>({
-    shopDomain: opts.shopDomain,
-    accessToken: opts.accessToken,
-    query: `query OrdersPage($first: Int!, $query: String) {
-      orders(first: $first, query: $query, sortKey: ID) {
-        nodes {${ORDER_SELECTION}
+
+  const page = async (includeCustomer: boolean) =>
+    shopifyGraphql<{ orders: { nodes: GqlOrderNode[] } }>({
+      shopDomain: opts.shopDomain,
+      accessToken: opts.accessToken,
+      query: `query OrdersPage($first: Int!, $query: String) {
+        orders(first: $first, query: $query, sortKey: ID) {
+          nodes {${orderSelection(includeCustomer)}
+          }
         }
-      }
-    }`,
-    variables: {
-      first: limit,
-      query: terms.length > 0 ? terms.join(" AND ") : null,
-    },
-  });
+      }`,
+      variables: {
+        first: limit,
+        query: terms.length > 0 ? terms.join(" AND ") : null,
+      },
+    });
+
+  let data;
+  try {
+    data = await page(true);
+  } catch (err) {
+    // Whole-query protected-data denial (pre-approval store where
+    // Shopify rejects the operation outright instead of nulling the
+    // field) → retry without the customer block. Review finding
+    // 2.1.4: sync must work on the reviewer's store BEFORE our
+    // protected-data approval activates.
+    if (err instanceof Error && isProtectedDataDenial(err.message)) {
+      console.warn(
+        "listOrders: retrying without customer block (protected data denied)"
+      );
+      data = await page(false);
+    } else {
+      throw err;
+    }
+  }
   const orders = (data.orders?.nodes ?? []).map(orderNodeToRest);
   const nextSinceId =
     orders.length === limit ? orders[orders.length - 1].id : null;
@@ -588,15 +641,26 @@ export async function getOrder(opts: {
   accessToken: string;
   orderId: string | number;
 }): Promise<ShopifyOrder | null> {
-  const data = await shopifyGraphql<{ order: GqlOrderNode | null }>({
-    shopDomain: opts.shopDomain,
-    accessToken: opts.accessToken,
-    query: `query GetOrder($id: ID!) {
-      order(id: $id) {${ORDER_SELECTION}
-      }
-    }`,
-    variables: { id: `gid://shopify/Order/${opts.orderId}` },
-  });
+  const fetchOne = async (includeCustomer: boolean) =>
+    shopifyGraphql<{ order: GqlOrderNode | null }>({
+      shopDomain: opts.shopDomain,
+      accessToken: opts.accessToken,
+      query: `query GetOrder($id: ID!) {
+        order(id: $id) {${orderSelection(includeCustomer)}
+        }
+      }`,
+      variables: { id: `gid://shopify/Order/${opts.orderId}` },
+    });
+  let data;
+  try {
+    data = await fetchOne(true);
+  } catch (err) {
+    if (err instanceof Error && isProtectedDataDenial(err.message)) {
+      data = await fetchOne(false);
+    } else {
+      throw err;
+    }
+  }
   return data.order ? orderNodeToRest(data.order) : null;
 }
 
