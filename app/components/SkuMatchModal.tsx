@@ -126,6 +126,11 @@ export default function SkuMatchModal({
       .slice(0, 50);
   }, [existingSkus, filter]);
 
+  const pickedSku =
+    pickedSkuId == null
+      ? null
+      : (existingSkus.find((s) => s.id === pickedSkuId) ?? null);
+
   if (!open) return null;
   if (items.length === 0) return null;
 
@@ -463,22 +468,49 @@ export default function SkuMatchModal({
                             type="button"
                             onClick={() => setPickedSkuId(s.id)}
                             disabled={saving}
-                            className={`w-full text-left px-3 py-2 text-sm cursor-pointer border-0 bg-transparent ${
+                            aria-pressed={pickedSkuId === s.id}
+                            className={`w-full text-left px-3 py-2 text-sm cursor-pointer border-0 flex items-center gap-2 ${
                               pickedSkuId === s.id
-                                ? "bg-blue-50 text-blue-900"
-                                : "hover:bg-slate-50 text-slate-700"
+                                ? "bg-blue-100 text-blue-900"
+                                : "bg-transparent hover:bg-slate-50 text-slate-700"
                             }`}
                           >
-                            <span className="font-mono font-semibold mr-2">
+                            <span
+                              aria-hidden="true"
+                              className={`flex h-4 w-4 items-center justify-center rounded-full border-2 flex-shrink-0 ${
+                                pickedSkuId === s.id
+                                  ? "border-blue-600"
+                                  : "border-slate-300"
+                              }`}
+                            >
+                              {pickedSkuId === s.id && (
+                                <span className="h-2 w-2 rounded-full bg-blue-600" />
+                              )}
+                            </span>
+                            <span className="font-mono font-semibold">
                               {s.code}
                             </span>
-                            <span>{s.name}</span>
+                            <span className="truncate">{s.name}</span>
                           </button>
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
+
+                {pickedSku ? (
+                  <p className="text-xs text-slate-700 m-0">
+                    Selected:{" "}
+                    <span className="font-mono font-semibold">
+                      {pickedSku.code}
+                    </span>{" "}
+                    — {pickedSku.name}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 m-0">
+                    Click a SKU above to select it.
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -496,15 +528,17 @@ export default function SkuMatchModal({
           <button
             type="button"
             onClick={mode === "create" ? handleCreateAndMap : handleMapToExisting}
-            disabled={saving}
-            className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
+            disabled={saving || (mode === "existing" && pickedSku == null)}
+            className="py-2 px-4 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg border-0 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
             {saving && <Spinner size={12} color="white" />}
             {saving
               ? "Saving..."
               : mode === "create"
                 ? "Create + map"
-                : "Map to selected"}
+                : pickedSku
+                  ? `Map to ${pickedSku.code}`
+                  : "Map to selected"}
           </button>
         </div>
       </div>
