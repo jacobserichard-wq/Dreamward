@@ -211,14 +211,23 @@ export default function CogsSummaryCard() {
     useState<SelectedUnmatchedItem | null>(null);
 
   const loadTopUnmatched = useCallback(async () => {
+    // Parallel + independent: the modal's "Map to existing SKU" tab
+    // is disabled while existingSkus is empty, so the SKU list must
+    // not wait on (or be skipped by) the unmatched fetch — that race
+    // showed up as a dead tab in the field (2026-08-19).
+    const [unmatchedRes, skusRes] = await Promise.allSettled([
+      fetch("/api/skus/unmatched?limit=3&sort=revenue"),
+      fetch("/api/skus?limit=500"),
+    ]);
     try {
-      const res = await fetch("/api/skus/unmatched?limit=3&sort=revenue");
-      if (!res.ok) return; // non-fatal — the block just hides
-      const d = (await res.json()) as { items: SelectedUnmatchedItem[] };
-      setTopUnmatched(d.items ?? []);
-      const skusRes = await fetch("/api/skus?limit=500");
-      if (skusRes.ok) {
-        const sd = (await skusRes.json()) as {
+      if (unmatchedRes.status === "fulfilled" && unmatchedRes.value.ok) {
+        const d = (await unmatchedRes.value.json()) as {
+          items: SelectedUnmatchedItem[];
+        };
+        setTopUnmatched(d.items ?? []);
+      }
+      if (skusRes.status === "fulfilled" && skusRes.value.ok) {
+        const sd = (await skusRes.value.json()) as {
           skus: Array<{ id: number; code: string; name: string }>;
         };
         setExistingSkus(
@@ -226,7 +235,7 @@ export default function CogsSummaryCard() {
         );
       }
     } catch {
-      /* non-fatal */
+      /* non-fatal — the block just hides / tab stays disabled */
     }
   }, []);
 
