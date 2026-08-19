@@ -20,6 +20,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import CogsDrillModal from "./CogsDrillModal";
+import SkuMatchModal, {
+  type SelectedUnmatchedItem,
+  type ExistingSkuOption,
+} from "./SkuMatchModal";
 
 interface MarginTotals {
   revenue: number;
@@ -193,6 +197,39 @@ export default function CogsSummaryCard() {
     "revenue" | "cogs" | "margin" | null
   >(null);
 
+  // "Cost your top sellers" — the five-minute-margin flow
+  // (2026-08-19). When unmatched line items exist, surface the top 3
+  // by REVENUE with one-click costing via the same SkuMatchModal the
+  // unmatched queue uses. Costing three items usually makes the
+  // margin card real for the bulk of a maker's sales — the fastest
+  // path from "connected" to "I know my margin."
+  const [topUnmatched, setTopUnmatched] = useState<SelectedUnmatchedItem[]>(
+    []
+  );
+  const [existingSkus, setExistingSkus] = useState<ExistingSkuOption[]>([]);
+  const [matchTarget, setMatchTarget] =
+    useState<SelectedUnmatchedItem | null>(null);
+
+  const loadTopUnmatched = useCallback(async () => {
+    try {
+      const res = await fetch("/api/skus/unmatched?limit=3&sort=revenue");
+      if (!res.ok) return; // non-fatal — the block just hides
+      const d = (await res.json()) as { items: SelectedUnmatchedItem[] };
+      setTopUnmatched(d.items ?? []);
+      const skusRes = await fetch("/api/skus?limit=500");
+      if (skusRes.ok) {
+        const sd = (await skusRes.json()) as {
+          skus: Array<{ id: number; code: string; name: string }>;
+        };
+        setExistingSkus(
+          sd.skus.map((s) => ({ id: s.id, code: s.code, name: s.name }))
+        );
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async (keys: string[]) => {
@@ -250,6 +287,15 @@ export default function CogsSummaryCard() {
   useEffect(() => {
     fetchData(selected);
   }, [selected, fetchData]);
+
+  // Load the top-unmatched rows only when there's something to cost.
+  useEffect(() => {
+    if ((data?.totals.unmatchedLineItemCount ?? 0) > 0) {
+      void loadTopUnmatched();
+    } else {
+      setTopUnmatched([]);
+    }
+  }, [data?.totals.unmatchedLineItemCount, loadTopUnmatched]);
 
   // Close the dropdown on an outside click.
   useEffect(() => {
@@ -537,6 +583,39 @@ export default function CogsSummaryCard() {
             </div>
           )}
 
+          {/* Cost your top sellers — one-click path from "unmatched"
+              to a real margin. The modal creates/maps a SKU + cost
+              and retroactively resolves the items' history. */}
+          {topUnmatched.length > 0 && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 m-0 mb-1.5">
+                Cost your top sellers — know your real margin
+              </p>
+              <ul className="m-0 p-0 list-none space-y-1.5">
+                {topUnmatched.map((it) => (
+                  <li
+                    key={it.groupKey}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="truncate text-slate-700 flex-1">
+                      {it.name}
+                    </span>
+                    <span className="text-slate-500 whitespace-nowrap tabular-nums">
+                      {fmtUsd(it.totalRevenue)} sold
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMatchTarget(it)}
+                      className="shrink-0 py-1 px-2.5 rounded-md border-0 bg-emerald-700 text-white text-[11px] font-semibold cursor-pointer hover:bg-emerald-800"
+                    >
+                      Cost this
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Top SKUs */}
           {topSkus.length > 0 && (
             <div>
@@ -583,6 +662,17 @@ export default function CogsSummaryCard() {
           onClose={() => setDrillFocus(null)}
         />
       )}
+
+      <SkuMatchModal
+        open={matchTarget !== null}
+        items={matchTarget ? [matchTarget] : []}
+        existingSkus={existingSkus}
+        onClose={() => setMatchTarget(null)}
+        onSaved={async () => {
+          setMatchTarget(null);
+          await Promise.all([fetchData(selected), loadTopUnmatched()]);
+        }}
+      />
     </div>
   );
 }

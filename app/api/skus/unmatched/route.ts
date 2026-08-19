@@ -7,6 +7,11 @@
 //     ?platform=shopify|wix|square   — optional filter
 //     ?limit=<num>                   — default 200, max 500
 //     ?offset=<num>                  — default 0
+//     ?sort=revenue                  — order by total revenue DESC
+//                                      (default: recency). Used by the
+//                                      dashboard "Cost your top
+//                                      sellers" card (2026-08-19) —
+//                                      the five-minute-margin flow.
 //   Returns:
 //     {
 //       items: UnmatchedItem[],
@@ -106,7 +111,11 @@ export async function GET(req: NextRequest) {
           AND matched_sku_id IS NULL
           AND ($2 = '' OR platform = $2)
         GROUP BY platform, external_item_id, name
-        ORDER BY MAX(sold_at) DESC, COUNT(*) DESC
+        ORDER BY ${
+          params.get("sort") === "revenue"
+            ? "SUM(quantity * unit_price) DESC, COUNT(*) DESC"
+            : "MAX(sold_at) DESC, COUNT(*) DESC"
+        }
         LIMIT $3 OFFSET $4`,
       [client.id, platformFilter, limit, offset]
     );
